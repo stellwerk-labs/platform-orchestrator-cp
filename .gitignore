@@ -1,0 +1,73 @@
+# Local environment and secrets
+.env
+.env.*
+!.env.template
+.envrc
+.direnv/
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.tfvars
+*.tfvars.json
+credentials.json
+secrets.yaml
+secrets.yml
+
+# Go build, test, and dependency artifacts
+bin/
+build/
+dist/
+vendor/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+cover.out
+coverage/
+coverage.html
+go.work
+go.work.sum
+
+# Generated mocks
+*_mock.go
+
+# Score Compose and Docker
+.score-compose/
+compose.yaml
+
+# Temporary files and caches
+.cache/
+.qa-deps/
+tmp/
+temp/
+*.log
+*.tmp
+*.swp
+*.swo
+*~
+
+# JavaScript tooling used by release checks
+node_modules/
+
+# Editors
+.idea/
+.vscode/
+.fleet/
+
+# Operating systems
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Local agent notes
+.claude/
+CODEX_HANDOFF.md

@@ -1,0 +1,72 @@
+apiVersion: score.dev/v1b1
+metadata:
+  name: platform-orchestrator-cp
+service:
+  ports:
+    http:
+      port: 8080
+containers:
+  platform-orchestrator-cp:
+    image: .
+    command: ["/opt/server/server"]
+    livenessProbe:
+      httpGet:
+        path: /alive
+        port: 8080
+    readinessProbe:
+      httpGet:
+        path: /health
+        port: 8080
+    resources:
+      limits:
+        cpu: "1"
+        memory: 256Mi
+      requests:
+        cpu: "0.025"
+        memory: 64Mi
+    variables:
+      AMQP_CONNECTION_STRING: amqp://${resources.rabbitmq.username}:${resources.rabbitmq.password}@${resources.rabbitmq.host}:${resources.rabbitmq.port}/${resources.rabbitmq.vhost}
+      DD_AGENT_HOST: $${pod.status.hostIP}
+      OTEL_ENABLE: ${resources.env.DATADOG_ENABLED}
+      DD_ENV: ${resources.env.DATADOG_ENV}
+      DD_SERVICE: ${metadata.name}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${resources.env.OTEL_EXPORTER_OTLP_ENDPOINT}
+      DD_TRACE_HTTP_CLIENT_ERROR_STATUSES: 500-600
+      DD_TRACE_HTTP_SERVER_ERROR_STATUSES: 500-600
+      PORT: "8080"
+      DATABASE_HOST: ${resources.postgres.host}
+      DATABASE_NAME: ${resources.postgres.name}
+      DATABASE_PASSWORD: ${resources.postgres.password}
+      DATABASE_PORT: ${resources.postgres.port}
+      DATABASE_USER: ${resources.postgres.username}
+      DATA_PLANE_URL: http://${resources.platform-orchestrator-dp.name}:8080
+      IAM_URL: http://${resources.platform-orchestrator-iam.name}:8080
+      VAULT_URL: ${resources.env.VAULT_URL}
+      VAULT_AUTH: kubernetes:platform-orchestrator-cp
+      VAULT_ROLE: platform-orchestrator-cp
+
+resources:
+  env:
+    type: environment
+  postgres:
+    type: postgres
+  rabbitmq:
+    type: amqp
+    id: rabbitmq
+  platform-orchestrator-dp:
+    type: service
+  platform-orchestrator-iam:
+    type: service
+  dns:
+    type: dns
+    id: api-dns
+  route:
+    type: route
+    metadata:
+      annotations:
+        # this annotation is for local compose testing where we don't want to exclude /orgs prefix variant
+        "compose.score.dev/route-provisioner-path-type": exact
+    params:
+      host: ${resources.dns.host}
+      port: 8080
+      path: /(orgs($|/[^/]+/((envs|env-types|resource-types|module-providers|runners|runner-rules|modules|module-rules)($|/.*)|projects($|/[^/]+($|/envs($|/[^/]+($|/(actions($|/.*)|available-resource-types|module-catalogue))))))))

@@ -1,0 +1,119 @@
+openapi: 3.0.0
+info:
+  title: ""
+  version: ""
+paths: {}
+components:
+  schemas:
+
+    EventType:
+      type: string
+      enum:
+        - io.platform-orchestrator.organization.created
+        - io.platform-orchestrator.organization.updated
+        - io.platform-orchestrator.organization.deleted
+        - io.platform-orchestrator.project.created
+        - io.platform-orchestrator.project.updated
+        - io.platform-orchestrator.project.deleted
+        - io.platform-orchestrator.environment_type.created
+        - io.platform-orchestrator.environment_type.updated
+        - io.platform-orchestrator.environment_type.deleted
+        - io.platform-orchestrator.environment.created
+        - io.platform-orchestrator.environment.updated
+        - io.platform-orchestrator.environment.deleted
+
+    OrgId:
+      type: string
+    OrgUuid:
+      type: string
+      format: uuid
+    ProjectId:
+      type: string
+    ProjectUuid:
+      type: string
+      format: uuid
+    EnvId:
+      type: string
+    EnvUuid:
+      type: string
+      format: uuid
+    EnvTypeId:
+      type: string
+    EnvTypeUuid:
+      type: string
+      format: uuid
+
+    OrgLevelCommonData:
+      required:
+        - org_id
+        - org_uuid
+      properties:
+        org_id:
+          $ref: "#/components/schemas/OrgId"
+        org_uuid:
+          $ref: "#/components/schemas/OrgUuid"
+
+    ProjectLevelCommonData:
+      allOf:
+        - $ref: "#/components/schemas/OrgLevelCommonData"
+        - required:
+            - project_id
+            - project_uuid
+          properties:
+            project_id:
+              $ref: "#/components/schemas/ProjectId"
+            project_uuid:
+              $ref: "#/components/schemas/ProjectUuid"
+
+    EnvLevelCommonData:
+      allOf:
+        - $ref: "#/components/schemas/ProjectLevelCommonData"
+        - required:
+            - env_id
+            - env_uuid
+          properties:
+            env_id:
+              $ref: "#/components/schemas/EnvId"
+            env_uuid:
+              $ref: "#/components/schemas/EnvUuid"
+
+    OrgChangedData:
+      allOf:
+        - $ref: "#/components/schemas/OrgLevelCommonData"
+
+    ProjectChangedData:
+      allOf:
+        - $ref: "#/components/schemas/ProjectLevelCommonData"
+        - properties:
+            status:
+              type: string
+
+    EnvTypeChangedData:
+      allOf:
+        - $ref: "#/components/schemas/OrgLevelCommonData"
+        - required:
+            - env_type_id
+            - env_type_uuid
+          properties:
+            env_type_id:
+              $ref: "#/components/schemas/EnvTypeId"
+            env_type_uuid:
+              $ref: "#/components/schemas/EnvTypeUuid"
+
+    EnvChangedData:
+      allOf:
+        - $ref: "#/components/schemas/EnvLevelCommonData"
+        - required:
+            - env_type_id
+            - env_type_uuid
+          properties:
+            status:
+              type: string
+            force:
+              type: boolean
+            env_type_id:
+              $ref: "#/components/schemas/EnvTypeId"
+            env_type_uuid:
+              $ref: "#/components/schemas/EnvTypeUuid"
+            delete_rules:
+              type: boolean

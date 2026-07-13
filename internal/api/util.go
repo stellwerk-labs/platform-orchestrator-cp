@@ -1,0 +1,149 @@
+package api
+
+import (
+	"context"
+	"net/http"
+
+	"github.com/google/uuid"
+	"github.com/labstack/echo/v4"
+	"github.com/pkg/errors"
+	"github.com/stellwerk-labs/golib/hecho"
+	"github.com/stellwerk-labs/golib/herrors"
+	"github.com/stellwerk-labs/golib/hlogger"
+	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
+	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
+	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
+
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/api/middleware"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
+)
+
+func Generate400Response(message string) N400BadRequestJSONResponse {
+	return N400BadRequestJSONResponse{Error: "HTTP-400", Message: message}
+}
+
+func Generate409Response(message string) N409ConflictJSONResponse {
+	return N409ConflictJSONResponse{Error: "HTTP-409", Message: message}
+}
+
+func (resp N400BadRequestJSONResponse) WithDetails(details *map[string]interface{}) N400BadRequestJSONResponse {
+	resp.Details = details
+	return resp
+}
+
+func Generate400FromModelErr(e model.ErrBadRequest) N400BadRequestJSONResponse {
+	return N400BadRequestJSONResponse{Error: "HTTP-400", Message: e.Message}
+}
+
+func Generate404FromModelErr(e model.ErrNotFound) N404NotFoundJSONResponse {
+	return N404NotFoundJSONResponse{Error: "HTTP-404", Message: e.Message}
+}
+
+func Generate409FromModelErr(e model.ErrConflict) N409ConflictJSONResponse {
+	return N409ConflictJSONResponse{Error: "HTTP-409", Message: e.Message}
+}
+
+// GetAuthenticatedUserId retrieves the human or service users id from the authenticated From HTTP header.
+func GetAuthenticatedUserId(ctx context.Context) (uuid.UUID, error) {
+	return uuid.Parse(hecho.GetUserID(ctx))
+}
+
+// GetAuthenticatedUserIdOr401 is the same as GetAuthenticatedUserId but returns a useful http 401 error
+func GetAuthenticatedUserIdOr401(ctx context.Context) (uuid.UUID, *echo.HTTPError) {
+	if u, err := GetAuthenticatedUserId(ctx); err == nil {
+		return u, nil
+	}
+	return uuid.Nil, echo.NewHTTPError(http.StatusUnauthorized)
+}
+
+func (s *Server) checkOrgReadAuthorization(ctx context.Context, userId uuid.UUID, orgId string) error {
+	return s.innerCheck(ctx, userId, orgId, []orchestratoriam.ResourcePermissionCheck{authz.CanReadOrgCheck(orgId)})
+}
+
+func (s *Server) checkOrgManageAuthorization(ctx context.Context, userId uuid.UUID, orgId string) error {
+	return s.innerCheck(ctx, userId, orgId, []orchestratoriam.ResourcePermissionCheck{authz.CanManageOrgCheck(orgId)})
+}
+
+func (s *Server) checkProjectAuthorization(ctx context.Context, checkFunc func(uuid.UUID) orchestratoriam.ResourcePermissionCheck, userId uuid.UUID, orgId, projectId string) error {
+	projectUuid, err := retrieveProjectUUIDById(ctx, s.Database, orgId, projectId)
+	if err != nil {
+		if me, ok := model.IsErrNotFound(err); ok {
+			return herrors.NewWithStatus(http.StatusNotFound, me.Message, nil)
+		}
+		return errors.Wrap(err, "failed to check authorization")
+	}
+
+	if scopedCheckErr := s.innerCheck(ctx, userId, orgId, []orchestratoriam.ResourcePermissionCheck{checkFunc(projectUuid)}); scopedCheckErr != nil {
+		// If the scoped check fails, we fall back to the org manage check for compatibility with older projects
+		if orgErr := s.checkOrgManageAuthorization(ctx, userId, orgId); orgErr != nil {
+			return scopedCheckErr
+		}
+	}
+	return nil
+}
+
+func (s *Server) checkEnvAuthorization(ctx context.Context, checkFunc func(uuid.UUID) orchestratoriam.ResourcePermissionCheck, userId uuid.UUID, orgId, projectId, envId string) error {
+	envUuid, err := retrieveEnvUUIDByIds(ctx, s.Database, orgId, projectId, envId)
+	if err != nil {
+		if me, ok := model.IsErrNotFound(err); ok {
+			middleware.SetAuthCheckedCtx(ctx)
+			return herrors.NewWithStatus(http.StatusNotFound, me.Message, nil)
+		}
+		return errors.Wrap(err, "failed to check authorization")
+	}
+
+	if scopedCheckErr := s.innerCheck(ctx, userId, orgId, []orchestratoriam.ResourcePermissionCheck{checkFunc(envUuid)}); scopedCheckErr != nil {
+		// If the scoped check fails, we fall back to the org manage check for compatibility with older envs
+		if orgErr := s.checkOrgManageAuthorization(ctx, userId, orgId); orgErr != nil {
+			return scopedCheckErr
+		}
+	}
+	return nil
+}
+
+func retrieveProjectUUIDById(ctx context.Context, db model.Databaser, orgId, projectId string) (uuid.UUID, error) {
+	project, err := db.GetProject(ctx, nil, orgId, projectId, model.GetModeDefault)
+	if err != nil {
+		return uuid.Nil, errors.Wrapf(err, "failed to retrieve project %s/%s", orgId, projectId)
+	}
+	return project.Uuid, nil
+}
+
+func retrieveEnvUUIDByIds(ctx context.Context, db model.Databaser, orgId, projectId, envId string) (uuid.UUID, error) {
+	env, err := db.GetEnvironment(ctx, nil, orgId, projectId, envId, model.GetModeDefault)
+	if err != nil {
+		return uuid.Nil, errors.Wrapf(err, "failed to retrieve env %s/%s/%s", orgId, projectId, envId)
+	}
+	return env.Uuid, nil
+}
+
+func (s *Server) innerCheck(ctx context.Context, userId uuid.UUID, orgId string, checks []orchestratoriam.ResourcePermissionCheck) error {
+	ids, ctx := hlogger.EnsurePlatformOrchestratorIdsOnCtx(ctx)
+	ids.OrgId = orgId
+	ids.UserId = userId.String()
+	logger := hlogger.TraceScopedLoggerFromCtx(s.Logger, ctx).WithLazy(ids.AsLogField())
+
+	if c := middleware.GetEchoCtx(ctx); c != nil && c.Request().Header.Get("Po-Org-Id") == orgId {
+		logger.Warn("DEPRECATED ORG-TOKEN authorization used, please switch to real users")
+		middleware.SetAuthCheckedCtx(ctx)
+		return nil
+	}
+
+	if userId == userid.InternalSystemUuid {
+		// system user id can do these things for now
+	} else if r, err := s.IamClient.InternalAuthorizeWithResponse(ctx, orchestratoriam.InternalAuthorizeBody{
+		UserId: userId,
+		Checks: checks,
+	}); err != nil {
+		return errors.Wrap(err, "failed to check authorization")
+	} else if r.StatusCode() == http.StatusForbidden {
+		return &herrors.PlatformOrchestratorError{
+			StatusCode: http.StatusForbidden,
+			Details:    *r.JSON403.Details,
+		}
+	} else if r.StatusCode() != http.StatusNoContent {
+		return errors.Errorf("unexpected status code when checking authorization: %s: %s", r.Status(), string(r.Body))
+	}
+	middleware.SetAuthCheckedCtx(ctx)
+	return nil
+}
