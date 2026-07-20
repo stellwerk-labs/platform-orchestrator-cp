@@ -13,6 +13,8 @@ require (
 	github.com/lib/pq v1.12.3
 	github.com/oapi-codegen/runtime v1.4.0
 	github.com/pkg/errors v0.9.1
+	github.com/pressly/goose/v3 v3.27.1
+	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/stellwerk-labs/golib/hconfig v1.0.0
 	github.com/stellwerk-labs/golib/hecho v1.0.0
 	github.com/stellwerk-labs/golib/herrors v1.0.0
@@ -27,8 +29,6 @@ require (
 	github.com/stellwerk-labs/platform-orchestrator-dp/shared v1.0.0
 	github.com/stellwerk-labs/platform-orchestrator-graph v1.0.0
 	github.com/stellwerk-labs/platform-orchestrator-iam/shared v1.0.0
-	github.com/pressly/goose/v3 v3.27.1
-	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/stretchr/testify v1.11.1
 	github.com/wagslane/go-rabbitmq v0.15.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0
