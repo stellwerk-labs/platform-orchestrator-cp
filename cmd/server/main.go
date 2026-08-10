@@ -12,43 +12,34 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/pkg/errors"
 	"github.com/stellwerk-labs/golib/hconfig"
 	"github.com/stellwerk-labs/golib/hecho"
 	"github.com/stellwerk-labs/golib/hlogger"
-	"github.com/stellwerk-labs/golib/hrabbitmq"
-	delayqueues "github.com/stellwerk-labs/golib/hrabbitmq/delayqueues/v2"
-	"github.com/stellwerk-labs/golib/hrabbitmq/reliableoutbox"
+	"github.com/stellwerk-labs/golib/hmessaging"
+	"github.com/stellwerk-labs/golib/hmessaging/reliableoutbox"
+	"github.com/stellwerk-labs/golib/hnats"
 	"github.com/stellwerk-labs/golib/hretrier"
-	"github.com/stellwerk-labs/golib/hstandardreliableoutbox"
+	"github.com/stellwerk-labs/golib/hstandardoutbox"
 	"github.com/stellwerk-labs/golib/hvaultapi"
-	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/genclient"
+	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v2/genclient"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
-	"github.com/wagslane/go-rabbitmq"
 	"go.uber.org/zap"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/api"
 	apimiddleware "github.com/stellwerk-labs/platform-orchestrator-cp/internal/api/middleware"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/config"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/events"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/vault"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/worker"
 
 	vaultapi "github.com/hashicorp/vault/api"
 	htelemetry "github.com/stellwerk-labs/golib/htelemetry"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-)
-
-const (
-	rabbitmqCacheSize = 10000
-	rabbitmqCacheTtl  = 30 * time.Minute
 )
 
 var buildInfo *debug.BuildInfo
@@ -142,38 +133,39 @@ func main() {
 		zap.L().Info("Database closed")
 	}()
 
-	amqpConnectionString, err := cfg.GetAmqpConnectionString()
+	natsConnection, err := hnats.Connect(hnats.ConnectionConfig{
+		URLs:            []string{cfg.NatsURL},
+		Name:            "platform-orchestrator-cp",
+		Token:           cfg.NatsToken,
+		CredentialsFile: cfg.NatsCredentialsFile,
+		NKeySeedFile:    cfg.NatsNKeySeedFile,
+		CAFile:          cfg.NatsCAFile,
+		ClientCertFile:  cfg.NatsClientCertFile,
+		ClientKeyFile:   cfg.NatsClientKeyFile,
+		TLSServerName:   cfg.NatsTLSServerName,
+		MaxReconnects:   -1,
+	}, zap.L())
 	if err != nil {
-		zap.L().Fatal("Failed to get AMQP connection string", zap.Error(err))
-	}
-	conn, err := rabbitmq.NewConn(amqpConnectionString, rabbitmq.WithConnectionOptionsLogger(hrabbitmq.NewLogger(zap.L())))
-	if err != nil {
-		zap.L().Fatal("Failed to initialize rabbitmq connection", zap.Error(err))
+		zap.L().Fatal("Failed to initialize NATS connection", zap.Error(err))
 	}
 	defer func() {
-		if err := conn.Close(); err != nil {
-			zap.L().Error("Failed to close connection", zap.Error(err))
+		if err := natsConnection.Drain(); err != nil {
+			zap.L().Error("Failed to drain NATS connection", zap.Error(err))
 		}
+		natsConnection.Close()
 	}()
 
-	delayqueues.DefaultExchange = events.DefaultExchange
-	hstandardreliableoutbox.MessageIdPrefix = "platform-orchestrator-cp-"
-
-	publisher, err := rabbitmq.NewPublisher(
-		conn, rabbitmq.WithPublisherOptionsLogger(hrabbitmq.NewLogger(zap.L())),
-		rabbitmq.WithPublisherOptionsExchangeName(events.DefaultExchange),
-		rabbitmq.WithPublisherOptionsExchangeDeclare,
-		rabbitmq.WithPublisherOptionsExchangeDurable,
-		rabbitmq.WithPublisherOptionsExchangeKind("topic"),
-		rabbitmq.WithPublisherOptionsLogger(hrabbitmq.NewLogger(zap.L())),
-	)
+	jetStream, err := hnats.NewJetStream(natsConnection)
 	if err != nil {
-		zap.L().Fatal("Failed to initialize rabbitmq publisher", zap.Error(err))
+		zap.L().Fatal("Failed to initialize JetStream", zap.Error(err))
 	}
-	defer publisher.Close()
-	publisher.NotifyPublish(func(p rabbitmq.Confirmation) {
-		zap.L().Debug("message publish confirmation received", zap.Bool("ack", p.Ack))
-	})
+	if cfg.NatsBootstrapStreams {
+		if _, err := hnats.EnsureStream(ctx, jetStream, hnats.EventsStreamConfig(cfg.NatsStreamReplicas)); err != nil {
+			zap.L().Fatal("Failed to bootstrap the control-plane JetStream stream", zap.Error(err))
+		}
+	}
+	hstandardoutbox.MessageIDPrefix = "platform-orchestrator-cp-"
+	publisher := hnats.NewPublisher(jetStream, hmessaging.EventsStreamName, zap.L())
 
 	vaultHttpClient := &http.Client{
 		Transport: otelhttp.NewTransport(http.DefaultTransport),
@@ -189,12 +181,12 @@ func main() {
 	vaultApiClient := hvaultapiClient.Client()
 
 	server := api.Server{
-		Database:          db,
-		Logger:            zap.L(),
-		Vault:             vault.NewVaultClient(vaultApiClient, zap.L()),
-		RabbitMqPublisher: publisher,
-		DpClient:          dpClient,
-		IamClient:         iamClient,
+		Database:  db,
+		Logger:    zap.L(),
+		Vault:     vault.NewVaultClient(vaultApiClient, zap.L()),
+		Publisher: publisher,
+		DpClient:  dpClient,
+		IamClient: iamClient,
 	}
 
 	echoServer, err := hecho.DefaultEchoServerWithValidation(&hecho.ValidatedServerConfig{
@@ -243,50 +235,6 @@ func main() {
 		}
 	}()
 
-	// This cache is used by hrabbitmq library for messages de-duplication
-	queueCache := expirable.NewLRU[string, int32](rabbitmqCacheSize, nil, rabbitmqCacheTtl)
-
-	// Set up the delay queues which expire the messages after the N seconds delays and then sends the message back to the common exchange
-	if err := delayqueues.SetupStandardDelayConsumers(conn, zap.L().With(zap.String("consumer", "delay"))); err != nil {
-		zap.L().Fatal("Failed to setup delay queues", zap.Error(err))
-	}
-
-	// Set up the dead letter queue and consumer which pushes the messages onto the delay queues and exponential backoff.
-	dlc, err := delayqueues.SetupStandardDeadLetterConsumer(conn, zap.L().With(zap.String("consumer", "dead-letters")), publisher, queueCache)
-	if err != nil {
-		zap.L().Fatal("Failed to setup dead letter queue", zap.Error(err))
-	}
-	defer func() {
-		zap.L().Info("Shutting down dead letter queue consumer")
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-		defer cancel()
-		dlc.CloseWithContext(ctx)
-		zap.L().Info("Dead letter queue consumer shutdown")
-	}()
-
-	wrk := &worker.Worker{
-		RabbitConn:      conn,
-		RabbitPublisher: publisher,
-		Cache:           queueCache,
-		Logger:          zap.L().Named("worker"),
-
-		DB: db,
-
-		IamClient: iamClient,
-		DpClient:  dpClient,
-	}
-	wrkc, err := wrk.BuildMainConsumer()
-	if err != nil {
-		zap.L().Fatal("failed to setup main consumer", zap.Error(err))
-	}
-	defer func() {
-		zap.L().Info("Shutting down main consumer")
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-		defer cancel()
-		wrkc.CloseWithContext(ctx)
-		zap.L().Info("Main consumer shutdown")
-	}()
-
 	errChan := make(chan error)
 
 	// Start HTTP server.
@@ -297,20 +245,6 @@ func main() {
 			if !errors.Is(err, http.ErrServerClosed) {
 				errChan <- errors.Wrap(err, "failed to start server")
 			}
-		}
-	}()
-
-	go func() {
-		zap.L().Info("Starting dead letter queue consumer")
-		if err := dlc.Run(); err != nil && !errors.Is(err, context.Canceled) {
-			errChan <- errors.Wrap(err, "failed to run dead letter queue consumer")
-		}
-	}()
-
-	go func() {
-		zap.L().Info("Starting worker consumer")
-		if err := wrkc.Run(); err != nil && !errors.Is(err, context.Canceled) {
-			errChan <- errors.Wrap(err, "failed to run main queue consumer")
 		}
 	}()
 

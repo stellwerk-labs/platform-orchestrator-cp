@@ -7,11 +7,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pressly/goose/v3"
-	"github.com/stellwerk-labs/golib/hrabbitmq/reliableoutbox"
+	"github.com/stellwerk-labs/golib/hmessaging/reliableoutbox"
 	"go.uber.org/zap"
 
 	"github.com/stellwerk-labs/golib/hpostgresconnect"
-	"github.com/stellwerk-labs/golib/hstandardreliableoutbox"
+	"github.com/stellwerk-labs/golib/hstandardoutbox"
 )
 
 //go:generate go tool mockgen  -destination mocks/databaser.go github.com/stellwerk-labs/platform-orchestrator-cp/internal/model Databaser,TxWithCommit
@@ -40,7 +40,7 @@ func NewDatabaser(ctx context.Context, logger *zap.Logger, connStr string) (Data
 	goose.SetLogger(&gooseZapLogger{SugaredLogger: logger.Named("goose").Sugar()})
 	goose.SetBaseFS(embedMigrations)
 	goose.SetVerbose(logger.Level() <= zap.DebugLevel)
-	goose.AddNamedMigrationContext("000011_pending_event_messages.go", hstandardreliableoutbox.MigrateUp01, hstandardreliableoutbox.MigrateDown01)
+	goose.AddNamedMigrationContext("000011_pending_event_messages.go", hstandardoutbox.MigrateUp01, hstandardoutbox.MigrateDown01)
 
 	if inner, err := hpostgresconnect.InitDatabase(ctx, &hpostgresconnect.Config{
 		Logger:  logger,
@@ -131,8 +131,8 @@ type Databaser interface {
 	Close() error
 	BeginTx(ctx context.Context, opts *sql.TxOptions) (TxWithCommit, error)
 
-	AsReliableOutboxStore() reliableoutbox.Store[*hstandardreliableoutbox.PendingEventMessage]
-	InsertPendingEventMessages(ctx context.Context, optionalTx Tx, messages []*hstandardreliableoutbox.PendingEventMessage) ([]*hstandardreliableoutbox.PendingEventMessage, error)
+	AsReliableOutboxStore() reliableoutbox.Store[*hstandardoutbox.PendingEventMessage]
+	InsertPendingEventMessages(ctx context.Context, optionalTx Tx, messages []*hstandardoutbox.PendingEventMessage) ([]*hstandardoutbox.PendingEventMessage, error)
 }
 
 type Tx interface {
@@ -158,12 +158,12 @@ func (d *databaser) BeginTx(ctx context.Context, opts *sql.TxOptions) (TxWithCom
 	return d.DB.BeginTx(ctx, opts)
 }
 
-func (d *databaser) AsReliableOutboxStore() reliableoutbox.Store[*hstandardreliableoutbox.PendingEventMessage] {
-	return hstandardreliableoutbox.SqlContextAsReliableOutbox(d.DB)
+func (d *databaser) AsReliableOutboxStore() reliableoutbox.Store[*hstandardoutbox.PendingEventMessage] {
+	return hstandardoutbox.SQLContextAsReliableOutbox(d.DB)
 }
 
-func (d *databaser) InsertPendingEventMessages(ctx context.Context, optionalTx Tx, messages []*hstandardreliableoutbox.PendingEventMessage) ([]*hstandardreliableoutbox.PendingEventMessage, error) {
-	return hstandardreliableoutbox.InsertPendingEventMessages(ctx, d.txOrDb(optionalTx), messages)
+func (d *databaser) InsertPendingEventMessages(ctx context.Context, optionalTx Tx, messages []*hstandardoutbox.PendingEventMessage) ([]*hstandardoutbox.PendingEventMessage, error) {
+	return hstandardoutbox.InsertPendingEventMessages(ctx, d.txOrDb(optionalTx), messages)
 }
 
 type GetMode string

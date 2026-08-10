@@ -9,8 +9,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stellwerk-labs/golib/hlogger"
-	"github.com/stellwerk-labs/golib/hrabbitmq/reliableoutbox"
-	"github.com/stellwerk-labs/golib/hstandardreliableoutbox"
+	"github.com/stellwerk-labs/golib/hmessaging/reliableoutbox"
+	"github.com/stellwerk-labs/golib/hstandardoutbox"
 	"github.com/stellwerk-labs/golib/htelemetry"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
 	"go.uber.org/zap"
@@ -167,7 +167,7 @@ func (s *Server) ListEnvironmentsInOrg(ctx context.Context, request ListEnvironm
 func (s *Server) createEnvAndMessageInDatabase(
 	ctx context.Context, tx model.Tx, proj *model.Project, envType *model.EnvType,
 	envId, displayName string,
-) (*model.Environment, []*hstandardreliableoutbox.PendingEventMessage, error) {
+) (*model.Environment, []*hstandardoutbox.PendingEventMessage, error) {
 
 	timeNow := time.Now().UTC()
 
@@ -200,7 +200,7 @@ type DeleteEnvOptions struct {
 
 func DeleteEnvironmentAndCreateMessage(
 	ctx context.Context, db model.Databaser, tx model.Tx, orgId, projectId, envId string, opts DeleteEnvOptions,
-) (*model.Environment, []*hstandardreliableoutbox.PendingEventMessage, error) {
+) (*model.Environment, []*hstandardoutbox.PendingEventMessage, error) {
 	env, err := db.GetEnvironment(ctx, tx, orgId, projectId, envId, model.GetModeForUpdate)
 	if err != nil {
 		return nil, nil, err
@@ -296,7 +296,7 @@ func (s *Server) CreateEnvironment(ctx context.Context, request CreateEnvironmen
 
 		logger.Info("created environment", logging.ZapEnvTypeId(env.EnvTypeId), logging.ZapEnvUuid(env.Uuid))
 
-		reliableoutbox.OptimisticPublish(ctx, logger, s.Database.AsReliableOutboxStore(), s.RabbitMqPublisher, messages)
+		reliableoutbox.OptimisticPublish(ctx, logger, s.Database.AsReliableOutboxStore(), s.Publisher, messages)
 		return CreateEnvironment201JSONResponse(envFromDbModel(env)), nil
 	}
 }
@@ -398,7 +398,7 @@ func (s *Server) DeleteEnvironment(ctx context.Context, request DeleteEnvironmen
 	}
 
 	logger.Info("environment updated into deleting state")
-	reliableoutbox.OptimisticPublish(ctx, logger, s.Database.AsReliableOutboxStore(), s.RabbitMqPublisher, messages)
+	reliableoutbox.OptimisticPublish(ctx, logger, s.Database.AsReliableOutboxStore(), s.Publisher, messages)
 	return DeleteEnvironment202JSONResponse(envFromDbModel(env)), nil
 }
 
@@ -461,7 +461,7 @@ func (s *Server) InternalForceDeleteEnvironment(ctx context.Context, request Int
 	}
 
 	logger.Info("environment deleted")
-	reliableoutbox.OptimisticPublish(ctx, logger, s.Database.AsReliableOutboxStore(), s.RabbitMqPublisher, messages)
+	reliableoutbox.OptimisticPublish(ctx, logger, s.Database.AsReliableOutboxStore(), s.Publisher, messages)
 	return InternalForceDeleteEnvironment204Response{}, nil
 }
 
@@ -512,7 +512,7 @@ func (s *Server) InternalUpdateEnvironment(ctx context.Context, request Internal
 	}
 
 	logger.Info("environment updated")
-	reliableoutbox.OptimisticPublish(ctx, logger, s.Database.AsReliableOutboxStore(), s.RabbitMqPublisher, messages)
+	reliableoutbox.OptimisticPublish(ctx, logger, s.Database.AsReliableOutboxStore(), s.Publisher, messages)
 	return InternalUpdateEnvironment200JSONResponse(envFromDbModel(env)), nil
 }
 

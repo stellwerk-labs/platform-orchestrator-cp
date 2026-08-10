@@ -14,10 +14,9 @@ Requirements:
 - [score-compose](https://docs.score.dev/docs/score-implementation/score-compose/)
 - [golangci-lint](https://golangci-lint.run/)
 
-Go dependencies use the public Stellwerk module paths. No GitHub personal
-access token or private module configuration is supported. Until the dependent
-Stellwerk repositories publish their `v1.0.0` releases, use a local Go workspace
-for development across those repositories.
+Go dependencies use public Stellwerk module paths. No GitHub personal access
+token or private module configuration is supported. A local Go workspace may be
+used while developing coordinated changes across these repositories.
 
 Run the local checks with:
 
@@ -53,6 +52,12 @@ Configuration is read from environment variables. See
 [`internal/config/config.go`](./internal/config/config.go) for the complete
 schema and [`.env.template`](./.env.template) for a local template. Keep real
 credentials in an ignored `.env` file or an external secret store.
+
+Control-plane events are published to the NATS JetStream `PO_EVENTS` stream.
+Production credentials need publish permission for `io.platform-orchestrator.>`
+and do not require stream-administration permission. Stream bootstrap is off by
+default. `NATS_BOOTSTRAP_STREAMS=true` is intended only for local development
+and creates the control-plane event stream, not runner or dead-letter streams.
 
 ## API
 

@@ -6,9 +6,9 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/stellwerk-labs/golib/hecho"
-	"github.com/stellwerk-labs/golib/hrabbitmq"
-	"github.com/stellwerk-labs/golib/hrabbitmq/reliableoutbox"
-	"github.com/stellwerk-labs/golib/hstandardreliableoutbox"
+	"github.com/stellwerk-labs/golib/hmessaging"
+	"github.com/stellwerk-labs/golib/hmessaging/reliableoutbox"
+	"github.com/stellwerk-labs/golib/hstandardoutbox"
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap/zaptest"
 
@@ -35,8 +35,8 @@ func MockServer(t *testing.T) (*echo.Echo, *Server, func()) {
 	tx.EXPECT().Rollback().Return(nil).AnyTimes()
 	tx.EXPECT().Commit().Return(nil).AnyTimes()
 
-	store := new(reliableoutbox.InMemoryStorage[*hstandardreliableoutbox.PendingEventMessage])
-	db.EXPECT().InsertPendingEventMessages(gomock.Any(), gomock.Not(nil), gomock.Any()).DoAndReturn(func(_ context.Context, _ model.Tx, messages []*hstandardreliableoutbox.PendingEventMessage) ([]*hstandardreliableoutbox.PendingEventMessage, error) {
+	store := new(reliableoutbox.InMemoryStorage[*hstandardoutbox.PendingEventMessage])
+	db.EXPECT().InsertPendingEventMessages(gomock.Any(), gomock.Not(nil), gomock.Any()).DoAndReturn(func(_ context.Context, _ model.Tx, messages []*hstandardoutbox.PendingEventMessage) ([]*hstandardoutbox.PendingEventMessage, error) {
 		for i, message := range messages {
 			message.Id = int64(i)
 		}
@@ -49,9 +49,9 @@ func MockServer(t *testing.T) (*echo.Echo, *Server, func()) {
 	orchestratordp := mockorchestratordp.NewMockClientWithResponsesInterface(ctrl)
 	s := &Server{
 		Logger: zaptest.NewLogger(t), Database: db, Vault: vlt,
-		RabbitMqPublisher: new(hrabbitmq.NoOpPublisher),
-		IamClient:         orchestratoriam,
-		DpClient:          orchestratordp,
+		Publisher: new(hmessaging.RecordingPublisher),
+		IamClient: orchestratoriam,
+		DpClient:  orchestratordp,
 	}
 	s.MapRoutes(e)
 	return e, s, func() {

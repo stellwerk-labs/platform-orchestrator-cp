@@ -19,10 +19,7 @@
     WORKOS_API_KEY: dumbworkoskey
     SSO_CALLBACK_URL_PATH: /auth/sso/callback
     OTEL_EXPORTER_OTLP_ENDPOINT: ""
-    RUNNER_IMAGE: "ghcr.io/stellwerk-labs/platform-orchestrator-runner:v1.0.0"
-    RUNNER_LOGS_BUCKET: runner-logs
-    RUNNER_LOGS_BUCKET_ENDPOINT: http://minio:9000
-    RUNNER_LOGS_BUCKET_CREDS: '{"access_key_id":"minioadmin","secret_access_key":"minioadmin"}'
+    RUNNER_IMAGE: "ghcr.io/stellwerk-labs/platform-orchestrator-runner:v2.0.0"
     SSO_STATE_SECRET: {{ env "SSO_STATE_SECRET" | default "test-sso-state-secret-for-integration-tests" }}
 
 - uri: template://service
@@ -35,3 +32,9 @@
   outputs: |
     preshared_key: t0k3n
     hostname: spicedb
+
+- uri: template://nats
+  type: nats
+  outputs: |
+    url: nats://nats:4222
+    token: integration-token

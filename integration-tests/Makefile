@@ -1,11 +1,17 @@
+DP_IMAGE ?= ghcr.io/stellwerk-labs/platform-orchestrator-dp:v2.0.0
+IAM_IMAGE ?= ghcr.io/stellwerk-labs/platform-orchestrator-iam:v2.0.0
+
 compose.yaml: BUILD_ARGS := {"context":"../"}
-compose.yaml: ../score.yaml Makefile compose-mixins.yaml score.provisioners.yaml
+compose.yaml: ../score.yaml Makefile compose-mixins.yaml score.provisioners.yaml score.dp.yaml score.iam.yaml
 	score-compose check-version '>=0.16.0'
 	score-compose init --no-sample
 	cp score.provisioners.yaml .score-compose/
+	cp score.dp.yaml score.iam.yaml .score-compose/
+	yq -i '.containers.platform-orchestrator-dp.image = "$(DP_IMAGE)"' .score-compose/score.dp.yaml
+	yq -i '.containers.platform-orchestrator-iam.image = "$(IAM_IMAGE)"' .score-compose/score.iam.yaml
 	score-compose generate ../score.yaml --build 'platform-orchestrator-cp=$(BUILD_ARGS)'
-	score-compose generate ./score.dp.yaml
-	score-compose generate ./score.iam.yaml
+	score-compose generate .score-compose/score.dp.yaml
+	score-compose generate .score-compose/score.iam.yaml
 	score-compose generate --publish 5432:postgres.default#platform-orchestrator-cp.postgres.host:5432 --publish 8081:platform-orchestrator-cp:8080 --publish 8083:platform-orchestrator-iam:8080
 	yq eval-all '. as $$item ireduce ({}; . * $$item)' --inplace compose.yaml compose-mixins.yaml
 

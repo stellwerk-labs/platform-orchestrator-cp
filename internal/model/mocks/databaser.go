@@ -15,8 +15,8 @@ import (
 	reflect "reflect"
 
 	uuid "github.com/google/uuid"
-	reliableoutbox "github.com/stellwerk-labs/golib/hrabbitmq/reliableoutbox"
-	hstandardreliableoutbox "github.com/stellwerk-labs/golib/hstandardreliableoutbox"
+	reliableoutbox "github.com/stellwerk-labs/golib/hmessaging/reliableoutbox"
+	hstandardoutbox "github.com/stellwerk-labs/golib/hstandardoutbox"
 	model "github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -46,10 +46,10 @@ func (m *MockDatabaser) EXPECT() *MockDatabaserMockRecorder {
 }
 
 // AsReliableOutboxStore mocks base method.
-func (m *MockDatabaser) AsReliableOutboxStore() reliableoutbox.Store[*hstandardreliableoutbox.PendingEventMessage] {
+func (m *MockDatabaser) AsReliableOutboxStore() reliableoutbox.Store[*hstandardoutbox.PendingEventMessage] {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AsReliableOutboxStore")
-	ret0, _ := ret[0].(reliableoutbox.Store[*hstandardreliableoutbox.PendingEventMessage])
+	ret0, _ := ret[0].(reliableoutbox.Store[*hstandardoutbox.PendingEventMessage])
 	return ret0
 }
 
@@ -663,10 +663,10 @@ func (mr *MockDatabaserMockRecorder) GetRunnerRule(ctx, optionalTx, orgId, ruleI
 }
 
 // InsertPendingEventMessages mocks base method.
-func (m *MockDatabaser) InsertPendingEventMessages(ctx context.Context, optionalTx model.Tx, messages []*hstandardreliableoutbox.PendingEventMessage) ([]*hstandardreliableoutbox.PendingEventMessage, error) {
+func (m *MockDatabaser) InsertPendingEventMessages(ctx context.Context, optionalTx model.Tx, messages []*hstandardoutbox.PendingEventMessage) ([]*hstandardoutbox.PendingEventMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "InsertPendingEventMessages", ctx, optionalTx, messages)
-	ret0, _ := ret[0].([]*hstandardreliableoutbox.PendingEventMessage)
+	ret0, _ := ret[0].([]*hstandardoutbox.PendingEventMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
