@@ -1,11 +1,6 @@
 package config
 
-import (
-	"fmt"
-	"time"
-
-	"github.com/pkg/errors"
-)
+import "time"
 
 // Configuration ...
 type Configuration struct {
@@ -17,15 +12,16 @@ type Configuration struct {
 	DatabaseHost     string `env:"DATABASE_HOST"`
 	DatabasePort     string `env:"DATABASE_PORT"`
 
-	// AmqpConnectionString should be an AMQP url like "amqp://%s:%s@%s:%d/%s"
-	AmqpConnectionString string `env:"AMQP_CONNECTION_STRING" validate:"omitempty,url"`
-
-	// Alternatively, separate env vars can be set for AMQP connection
-	AmpqHost     string `env:"AMQP_HOST"`
-	AmpqPort     string `env:"AMQP_PORT, default=5672"`
-	AmpqVhost    string `env:"AMQP_VHOST"`
-	AmpqUsername string `env:"AMQP_USERNAME"`
-	AmpqPassword string `env:"AMQP_PASSWORD"`
+	NatsURL              string `env:"NATS_URL, default=nats://localhost:4222" validate:"required,url"`
+	NatsToken            string `env:"NATS_TOKEN"`
+	NatsCredentialsFile  string `env:"NATS_CREDENTIALS_FILE"`
+	NatsNKeySeedFile     string `env:"NATS_NKEY_SEED_FILE"`
+	NatsCAFile           string `env:"NATS_CA_FILE"`
+	NatsClientCertFile   string `env:"NATS_CLIENT_CERT_FILE"`
+	NatsClientKeyFile    string `env:"NATS_CLIENT_KEY_FILE"`
+	NatsTLSServerName    string `env:"NATS_TLS_SERVER_NAME"`
+	NatsStreamReplicas   int    `env:"NATS_STREAM_REPLICAS, default=1" validate:"min=1,max=5"`
+	NatsBootstrapStreams bool   `env:"NATS_BOOTSTRAP_STREAMS, default=false"`
 
 	// DataPlaneUrl is the api url for the data plane port 8080
 	DataPlaneUrl string `env:"DATA_PLANE_URL" validate:"required,url"`
@@ -40,24 +36,4 @@ type Configuration struct {
 	VaultURL  string `env:"VAULT_URL" validate:"url"`
 	VaultAuth string `env:"VAULT_AUTH" validate:"required"`
 	VaultRole string `env:"VAULT_ROLE"`
-
-}
-
-func (c *Configuration) GetAmqpConnectionString() (string, error) {
-	if c.AmqpConnectionString != "" {
-		return c.AmqpConnectionString, nil
-	}
-	if c.AmpqHost == "" {
-		return "", errors.New("AMQP_HOST or AMQP_CONNECTION_STRING is not set")
-	}
-	if c.AmpqVhost == "" {
-		return "", errors.New("AMQP_VHOST or AMQP_CONNECTION_STRING is not set")
-	}
-	if c.AmpqUsername == "" {
-		return "", errors.New("AMQP_USERNAME or AMQP_CONNECTION_STRING is not set")
-	}
-	if c.AmpqPassword == "" {
-		return "", errors.New("AMQP_PASSWORD or AMQP_CONNECTION_STRING is not set")
-	}
-	return fmt.Sprintf("amqp://%s:%s@%s:%s/%s", c.AmpqUsername, c.AmpqPassword, c.AmpqHost, c.AmpqPort, c.AmpqVhost), nil
 }

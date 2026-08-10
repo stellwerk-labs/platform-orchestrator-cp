@@ -8,8 +8,8 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/stellwerk-labs/golib/hecho"
-	"github.com/stellwerk-labs/golib/hrabbitmq"
-	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/genclient"
+	"github.com/stellwerk-labs/golib/hmessaging"
+	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v2/genclient"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"go.uber.org/zap"
 
@@ -22,12 +22,12 @@ import (
 //go:generate go tool oapi-codegen --config=oapi-codegen.cfg.yaml --exclude-tags not-implemented ../../openapi/spec.yaml
 
 type Server struct {
-	Database          model.Databaser
-	Logger            *zap.Logger
-	Vault             vault.VaultClientInterface
-	RabbitMqPublisher hrabbitmq.Publisher
-	DpClient          orchestratordp.ClientWithResponsesInterface
-	IamClient         orchestratoriam.ClientWithResponsesInterface
+	Database  model.Databaser
+	Logger    *zap.Logger
+	Vault     vault.VaultClientInterface
+	Publisher hmessaging.Publisher
+	DpClient  orchestratordp.ClientWithResponsesInterface
+	IamClient orchestratoriam.ClientWithResponsesInterface
 }
 
 func (s *Server) MapRoutes(e *echo.Echo) {

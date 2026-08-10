@@ -25,7 +25,8 @@ containers:
         cpu: "0.025"
         memory: 64Mi
     variables:
-      AMQP_CONNECTION_STRING: amqp://${resources.rabbitmq.username}:${resources.rabbitmq.password}@${resources.rabbitmq.host}:${resources.rabbitmq.port}/${resources.rabbitmq.vhost}
+      NATS_URL: ${resources.nats.url}
+      NATS_TOKEN: ${resources.nats.token}
       DD_AGENT_HOST: $${pod.status.hostIP}
       OTEL_ENABLE: ${resources.env.DATADOG_ENABLED}
       DD_ENV: ${resources.env.DATADOG_ENV}
@@ -50,9 +51,9 @@ resources:
     type: environment
   postgres:
     type: postgres
-  rabbitmq:
-    type: amqp
-    id: rabbitmq
+  nats:
+    type: nats
+    id: nats
   platform-orchestrator-dp:
     type: service
   platform-orchestrator-iam:

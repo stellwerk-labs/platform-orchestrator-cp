@@ -17,7 +17,7 @@ import (
 	"filippo.io/age"
 	"github.com/google/uuid"
 	"github.com/hashicorp/vault/api"
-	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/genclient"
+	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v2/genclient"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/require"
 

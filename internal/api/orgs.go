@@ -14,7 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stellwerk-labs/golib/herrors"
 	"github.com/stellwerk-labs/golib/hlogger"
-	"github.com/stellwerk-labs/golib/hrabbitmq/reliableoutbox"
+	"github.com/stellwerk-labs/golib/hmessaging/reliableoutbox"
 	"go.uber.org/zap"
 
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
@@ -175,7 +175,7 @@ func (s *Server) createOrganizationCore(
 	}
 
 	logger.Info("created org", logging.ZapOrgId(org.Id), logging.ZapOrgUuid(org.Uuid))
-	reliableoutbox.OptimisticPublish(ctx, logger, s.Database.AsReliableOutboxStore(), s.RabbitMqPublisher, messages)
+	reliableoutbox.OptimisticPublish(ctx, logger, s.Database.AsReliableOutboxStore(), s.Publisher, messages)
 	return org, nil
 }
 

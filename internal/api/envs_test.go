@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stellwerk-labs/golib/hecho"
 	"github.com/stellwerk-labs/golib/herrors"
-	"github.com/stellwerk-labs/golib/hrabbitmq"
+	"github.com/stellwerk-labs/golib/hmessaging"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/genevents"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
@@ -164,9 +164,9 @@ func TestDeleteEnvironment_default(t *testing.T) {
 				require.IsType(t, DeleteEnvironment409JSONResponse{}, r)
 			} else {
 				require.IsType(t, DeleteEnvironment202JSONResponse{}, r)
-				rec := s.RabbitMqPublisher.(*hrabbitmq.NoOpPublisher).GetRecorded()
+				rec := s.Publisher.(*hmessaging.RecordingPublisher).Messages()
 				if assert.Len(t, rec, 1) {
-					assert.Equal(t, "io.platform-orchestrator.environment.updated", rec[0].Keys[0])
+					assert.Equal(t, "io.platform-orchestrator.environment.updated", rec[0].Subject)
 					var event events.CloudEvent[genevents.EnvChangedData]
 					require.NoError(t, json.Unmarshal(rec[0].Data, &event))
 					assert.Equal(t, tc.force, ref.DerefOr(event.Data.Force, false))
@@ -219,9 +219,9 @@ func TestDeleteEnvironment_withDeleteRules(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, DeleteEnvironment202JSONResponse{}, r)
 
-	rec := s.RabbitMqPublisher.(*hrabbitmq.NoOpPublisher).GetRecorded()
+	rec := s.Publisher.(*hmessaging.RecordingPublisher).Messages()
 	if assert.Len(t, rec, 1) {
-		assert.Equal(t, "io.platform-orchestrator.environment.updated", rec[0].Keys[0])
+		assert.Equal(t, "io.platform-orchestrator.environment.updated", rec[0].Subject)
 		var event events.CloudEvent[genevents.EnvChangedData]
 		require.NoError(t, json.Unmarshal(rec[0].Data, &event))
 		assert.True(t, ref.DerefOr(event.Data.DeleteRules, false), "deleteRules should be set to true in the event")
@@ -363,9 +363,9 @@ func TestInternalForceDeleteEnvironment(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, InternalForceDeleteEnvironment204Response{}, r)
 
-	rec := s.RabbitMqPublisher.(*hrabbitmq.NoOpPublisher).GetRecorded()
+	rec := s.Publisher.(*hmessaging.RecordingPublisher).Messages()
 	if assert.Len(t, rec, 1) {
-		assert.Equal(t, "io.platform-orchestrator.environment.deleted", rec[0].Keys[0])
+		assert.Equal(t, "io.platform-orchestrator.environment.deleted", rec[0].Subject)
 	}
 }
 
@@ -383,9 +383,9 @@ func TestInternalUpdateEnvironment(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, InternalUpdateEnvironment200JSONResponse{}, r)
 
-	rec := s.RabbitMqPublisher.(*hrabbitmq.NoOpPublisher).GetRecorded()
+	rec := s.Publisher.(*hmessaging.RecordingPublisher).Messages()
 	if assert.Len(t, rec, 1) {
-		assert.Equal(t, "io.platform-orchestrator.environment.updated", rec[0].Keys[0])
+		assert.Equal(t, "io.platform-orchestrator.environment.updated", rec[0].Subject)
 	}
 }
 
@@ -473,9 +473,9 @@ func TestCreateEnvironment_success(t *testing.T) {
 	assert.False(t, resp.CreatedAt.IsZero())
 	assert.False(t, resp.UpdatedAt.IsZero())
 
-	rec := s.RabbitMqPublisher.(*hrabbitmq.NoOpPublisher).GetRecorded()
+	rec := s.Publisher.(*hmessaging.RecordingPublisher).Messages()
 	if assert.Len(t, rec, 1) {
-		assert.Equal(t, string(genevents.IoPlatformOrchestratorEnvironmentCreated), rec[0].Keys[0])
+		assert.Equal(t, string(genevents.IoPlatformOrchestratorEnvironmentCreated), rec[0].Subject)
 		var event events.CloudEvent[genevents.EnvChangedData]
 		require.NoError(t, json.Unmarshal(rec[0].Data, &event))
 		assert.Equal(t, "org-id", event.Data.OrgId)

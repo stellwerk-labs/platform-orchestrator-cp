@@ -7,7 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stellwerk-labs/golib/hlogger"
-	"github.com/stellwerk-labs/golib/hrabbitmq/reliableoutbox"
+	"github.com/stellwerk-labs/golib/hmessaging/reliableoutbox"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
 	"go.uber.org/zap"
 
@@ -124,7 +124,7 @@ func (s *Server) CreateProject(ctx context.Context, request CreateProjectRequest
 	}
 	logger.Info("created project", logging.ZapProjectUuid(project.Uuid))
 
-	reliableoutbox.OptimisticPublish(ctx, logger, s.Database.AsReliableOutboxStore(), s.RabbitMqPublisher, messages)
+	reliableoutbox.OptimisticPublish(ctx, logger, s.Database.AsReliableOutboxStore(), s.Publisher, messages)
 	return CreateProject201JSONResponse(projectFromDbProject(project)), nil
 }
 
@@ -251,7 +251,7 @@ func (s *Server) DeleteProject(ctx context.Context, request DeleteProjectRequest
 	}
 	logger.Info("project deleted")
 
-	reliableoutbox.OptimisticPublish(ctx, logger, s.Database.AsReliableOutboxStore(), s.RabbitMqPublisher, messages)
+	reliableoutbox.OptimisticPublish(ctx, logger, s.Database.AsReliableOutboxStore(), s.Publisher, messages)
 	return DeleteProject204Response{}, nil
 }
 

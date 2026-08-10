@@ -17,7 +17,7 @@ import (
 	"github.com/hashicorp/hcl/v2/hclparse"
 	"github.com/pkg/errors"
 	"github.com/stellwerk-labs/golib/hlogger"
-	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/genclient"
+	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v2/genclient"
 	"go.uber.org/zap"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/logging"

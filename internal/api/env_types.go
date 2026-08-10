@@ -7,7 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stellwerk-labs/golib/hlogger"
-	"github.com/stellwerk-labs/golib/hrabbitmq/reliableoutbox"
+	"github.com/stellwerk-labs/golib/hmessaging/reliableoutbox"
 	"go.uber.org/zap"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/events"
@@ -101,7 +101,7 @@ func (s *Server) CreateEnvironmentType(ctx context.Context, request CreateEnviro
 	}
 
 	logger.Info("created environment type")
-	reliableoutbox.OptimisticPublish(ctx, logger, s.Database.AsReliableOutboxStore(), s.RabbitMqPublisher, messages)
+	reliableoutbox.OptimisticPublish(ctx, logger, s.Database.AsReliableOutboxStore(), s.Publisher, messages)
 	return CreateEnvironmentType201JSONResponse(envTypeFromDbEnvType(et)), nil
 }
 
@@ -184,7 +184,7 @@ func (s *Server) DeleteEnvironmentType(ctx context.Context, request DeleteEnviro
 	}
 
 	logger.Info("environment type deleted")
-	reliableoutbox.OptimisticPublish(ctx, logger, s.Database.AsReliableOutboxStore(), s.RabbitMqPublisher, messages)
+	reliableoutbox.OptimisticPublish(ctx, logger, s.Database.AsReliableOutboxStore(), s.Publisher, messages)
 	return DeleteEnvironmentType204Response{}, nil
 }
 

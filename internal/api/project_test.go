@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stellwerk-labs/golib/hecho"
 	"github.com/stellwerk-labs/golib/herrors"
-	"github.com/stellwerk-labs/golib/hrabbitmq"
+	"github.com/stellwerk-labs/golib/hmessaging"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/genevents"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
@@ -498,9 +498,9 @@ func TestCreateProject_success(t *testing.T) {
 			assert.False(t, resp.CreatedAt.IsZero())
 			assert.False(t, resp.UpdatedAt.IsZero())
 
-			rec := s.RabbitMqPublisher.(*hrabbitmq.NoOpPublisher).GetRecorded()
+			rec := s.Publisher.(*hmessaging.RecordingPublisher).Messages()
 			if assert.Len(t, rec, 1) {
-				assert.Equal(t, string(genevents.IoPlatformOrchestratorProjectCreated), rec[0].Keys[0])
+				assert.Equal(t, string(genevents.IoPlatformOrchestratorProjectCreated), rec[0].Subject)
 				var event events.CloudEvent[genevents.ProjectChangedData]
 				require.NoError(t, json.Unmarshal(rec[0].Data, &event))
 				assert.Equal(t, orgId, event.Data.OrgId)
@@ -673,9 +673,9 @@ func TestDeleteProject_success(t *testing.T) {
 	_, ok := r.(DeleteProject204Response)
 	require.True(t, ok, "expected DeleteProject204Response, got %T", r)
 
-	rec := s.RabbitMqPublisher.(*hrabbitmq.NoOpPublisher).GetRecorded()
+	rec := s.Publisher.(*hmessaging.RecordingPublisher).Messages()
 	if assert.Len(t, rec, 1) {
-		assert.Equal(t, string(genevents.IoPlatformOrchestratorProjectDeleted), rec[0].Keys[0])
+		assert.Equal(t, string(genevents.IoPlatformOrchestratorProjectDeleted), rec[0].Subject)
 		var event events.CloudEvent[genevents.ProjectChangedData]
 		require.NoError(t, json.Unmarshal(rec[0].Data, &event))
 		assert.Equal(t, orgId, event.Data.OrgId)
@@ -736,9 +736,9 @@ func TestDeleteProject_withDeleteRules(t *testing.T) {
 	_, ok := r.(DeleteProject204Response)
 	require.True(t, ok, "expected DeleteProject204Response, got %T", r)
 
-	rec := s.RabbitMqPublisher.(*hrabbitmq.NoOpPublisher).GetRecorded()
+	rec := s.Publisher.(*hmessaging.RecordingPublisher).Messages()
 	if assert.Len(t, rec, 1) {
-		assert.Equal(t, string(genevents.IoPlatformOrchestratorProjectDeleted), rec[0].Keys[0])
+		assert.Equal(t, string(genevents.IoPlatformOrchestratorProjectDeleted), rec[0].Subject)
 	}
 }
 
