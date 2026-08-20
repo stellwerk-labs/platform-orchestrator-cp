@@ -1,5 +1,5 @@
 DP_IMAGE ?= ghcr.io/stellwerk-labs/platform-orchestrator-dp:v2.0.0
-IAM_IMAGE ?= ghcr.io/stellwerk-labs/platform-orchestrator-iam:v2.0.0
+IAM_IMAGE ?= ghcr.io/stellwerk-labs/platform-orchestrator-iam:v2.1.0
 
 compose.yaml: BUILD_ARGS := {"context":"../"}
 compose.yaml: ../score.yaml Makefile compose-mixins.yaml score.provisioners.yaml score.dp.yaml score.iam.yaml

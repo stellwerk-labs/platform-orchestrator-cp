@@ -39,9 +39,6 @@ services:
       LOG_LEVEL: debug
       DD_AGENT_HOST: ""
       SHUTDOWN_DELAY: 1s
-    depends_on:
-      spicedb:
-        condition: service_healthy
   vault:
     image: hashicorp/vault:1.14
     environment:
@@ -51,17 +48,3 @@ services:
       - IPC_LOCK
     ports:
       - "8200:8200"
-  spicedb:
-    image: authzed/spicedb:v1.45.4
-    command: serve-testing
-    ports:
-      - "50051:50051"
-      - "8443:8443"
-      - "9090:9090"  
-    environment:
-      - SPICEDB_GRPC_PRESHARED_KEY=t0k3n
-    healthcheck:
-      test: ["CMD", "grpc_health_probe", "-v", "-addr=localhost:50051"]
-      interval: 5s
-      timeout: 3s
-      retries: 3
