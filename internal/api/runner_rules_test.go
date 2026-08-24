@@ -56,7 +56,7 @@ func TestRunnerRuleCreateBody_checkRunnerRuleBody(t *testing.T) {
 			mockIamClient := s.IamClient.(*mockorchestratoriam.MockClientWithResponsesInterface)
 			mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 				UserId: userId,
-				Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageOrgCheck("my-org")},
+				Checks: []orchestratoriam.ResourcePermissionCheck{authz.OrgCheck("my-org", authz.PermissionRunnerRuleWrite)},
 			}).Return(&orchestratoriam.InternalAuthorizeResponse{
 				HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 			}, nil)
@@ -80,7 +80,7 @@ func TestCreateRunnerRuleInOrg_no_runner_id(t *testing.T) {
 	mockIamClient := s.IamClient.(*mockorchestratoriam.MockClientWithResponsesInterface)
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userId,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageOrgCheck("my-org")},
+		Checks: []orchestratoriam.ResourcePermissionCheck{authz.OrgCheck("my-org", authz.PermissionRunnerRuleWrite)},
 	}).Return(&orchestratoriam.InternalAuthorizeResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 	}, nil)

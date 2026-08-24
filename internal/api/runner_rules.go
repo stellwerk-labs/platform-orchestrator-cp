@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stellwerk-labs/golib/hlogger"
+	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
 	"go.uber.org/zap"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/logging"
@@ -34,7 +35,7 @@ func (s *Server) ListRunnerRulesInOrg(ctx context.Context, request ListRunnerRul
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgReadAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionRunnerRuleRead); err != nil {
 		return nil, err
 	}
 	if page, next, err := s.Database.ListRunnerRules(ctx, nil, request.OrgId, ref.DerefOr(request.Params.Page, ""), ref.DerefOr(request.Params.PerPage, 100), model.ListRunnerRulesParams{
@@ -62,7 +63,7 @@ func (s *Server) CreateRunnerRuleInOrg(ctx context.Context, request CreateRunner
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgManageAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionRunnerRuleWrite); err != nil {
 		return nil, err
 	}
 	ids, ctx := hlogger.EnsurePlatformOrchestratorIdsOnCtx(ctx)
@@ -114,7 +115,7 @@ func (s *Server) DeleteRunnerRuleInOrg(ctx context.Context, request DeleteRunner
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgManageAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionRunnerRuleWrite); err != nil {
 		return nil, err
 	}
 	ids, ctx := hlogger.EnsurePlatformOrchestratorIdsOnCtx(ctx)
@@ -135,7 +136,7 @@ func (s *Server) GetRunnerRuleInOrg(ctx context.Context, request GetRunnerRuleIn
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgReadAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionRunnerRuleRead); err != nil {
 		return nil, err
 	}
 	if res, err := s.Database.GetRunnerRule(ctx, nil, request.OrgId, request.RuleId.String()); err != nil {

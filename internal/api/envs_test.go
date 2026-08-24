@@ -138,7 +138,7 @@ func TestDeleteEnvironment_default(t *testing.T) {
 
 			mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 				UserId: userId,
-				Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageProjectCheck(projectUuid)},
+				Checks: []orchestratoriam.ResourcePermissionCheck{authz.ProjectCheck(projectUuid, authz.PermissionEnvironmentWrite)},
 			}).Return(&orchestratoriam.InternalAuthorizeResponse{
 				HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 			}, nil).Times(1)
@@ -194,7 +194,7 @@ func TestDeleteEnvironment_withDeleteRules(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userId,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageProjectCheck(projectUuid)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{authz.ProjectCheck(projectUuid, authz.PermissionEnvironmentWrite)},
 	}).Return(&orchestratoriam.InternalAuthorizeResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 	}, nil).Times(1)
@@ -248,7 +248,7 @@ func TestDeleteEnvironment_successWithOrgFallback(t *testing.T) {
 		HTTPResponse: &http.Response{StatusCode: http.StatusForbidden},
 	}
 	projectDetails := map[string]interface{}{
-		"permission": "manage",
+		"permission": "environment_write",
 		"resource":   "project:" + projectUuid.String(),
 	}
 	projectAuthResp.JSON403 = &orchestratoriam.N403Forbidden{
@@ -259,13 +259,13 @@ func TestDeleteEnvironment_successWithOrgFallback(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userId,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageProjectCheck(projectUuid)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{authz.ProjectCheck(projectUuid, authz.PermissionEnvironmentWrite)},
 	}).Return(projectAuthResp, nil).Times(1)
 
 	// Fallback to org-level authorization succeeds
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userId,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageOrgCheck("org-id")},
+		Checks: []orchestratoriam.ResourcePermissionCheck{authz.OrgCheck("org-id", authz.PermissionEnvironmentWrite)},
 	}).Return(&orchestratoriam.InternalAuthorizeResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 	}, nil).Times(1)
@@ -305,7 +305,7 @@ func TestDeleteEnvironment_forbidden(t *testing.T) {
 		HTTPResponse: &http.Response{StatusCode: http.StatusForbidden},
 	}
 	projectDetails := map[string]interface{}{
-		"permission": "manage",
+		"permission": "environment_write",
 		"resource":   "project:" + projectUuid.String(),
 	}
 	projectAuthResp.JSON403 = &orchestratoriam.N403Forbidden{
@@ -316,7 +316,7 @@ func TestDeleteEnvironment_forbidden(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userId,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageProjectCheck(projectUuid)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{authz.ProjectCheck(projectUuid, authz.PermissionEnvironmentWrite)},
 	}).Return(projectAuthResp, nil).Times(1)
 
 	// Fallback to org-level authorization also fails
@@ -324,7 +324,7 @@ func TestDeleteEnvironment_forbidden(t *testing.T) {
 		HTTPResponse: &http.Response{StatusCode: http.StatusForbidden},
 	}
 	orgDetails := map[string]interface{}{
-		"permission": "manage",
+		"permission": "environment_write",
 		"resource":   "org:org-id",
 	}
 	orgAuthResp.JSON403 = &orchestratoriam.N403Forbidden{
@@ -335,7 +335,7 @@ func TestDeleteEnvironment_forbidden(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userId,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageOrgCheck("org-id")},
+		Checks: []orchestratoriam.ResourcePermissionCheck{authz.OrgCheck("org-id", authz.PermissionEnvironmentWrite)},
 	}).Return(orgAuthResp, nil).Times(1)
 
 	ctx := context.WithValue(t.Context(), hecho.ContextKeyUserID, userId.String())
@@ -422,7 +422,7 @@ func TestCreateEnvironment_success(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userID,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageProjectCheck(projectUuid)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{authz.ProjectCheck(projectUuid, authz.PermissionEnvironmentWrite)},
 	}).Return(&orchestratoriam.InternalAuthorizeResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 	}, nil).Times(1)
@@ -512,7 +512,7 @@ func TestCreateEnvironment_forbidden(t *testing.T) {
 		HTTPResponse: &http.Response{StatusCode: http.StatusForbidden},
 	}
 	projectDetails := map[string]interface{}{
-		"permission": "manage",
+		"permission": "environment_write",
 		"resource":   "project:" + projectUuid.String(),
 	}
 	projectAuthResp.JSON403 = &orchestratoriam.N403Forbidden{
@@ -523,7 +523,7 @@ func TestCreateEnvironment_forbidden(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userID,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageProjectCheck(projectUuid)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{authz.ProjectCheck(projectUuid, authz.PermissionEnvironmentWrite)},
 	}).Return(projectAuthResp, nil).Times(1)
 
 	// Fallback to org-level authorization also fails
@@ -531,7 +531,7 @@ func TestCreateEnvironment_forbidden(t *testing.T) {
 		HTTPResponse: &http.Response{StatusCode: http.StatusForbidden},
 	}
 	orgDetails := map[string]interface{}{
-		"permission": "manage",
+		"permission": "environment_write",
 		"resource":   "org:org-id",
 	}
 	orgAuthResp.JSON403 = &orchestratoriam.N403Forbidden{
@@ -542,7 +542,7 @@ func TestCreateEnvironment_forbidden(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userID,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageOrgCheck("org-id")},
+		Checks: []orchestratoriam.ResourcePermissionCheck{authz.OrgCheck("org-id", authz.PermissionEnvironmentWrite)},
 	}).Return(orgAuthResp, nil).Times(1)
 
 	ctx := context.WithValue(t.Context(), hecho.ContextKeyUserID, userID.String())
@@ -591,7 +591,7 @@ func TestCreateEnvironment_successWithOrgFallback(t *testing.T) {
 		HTTPResponse: &http.Response{StatusCode: http.StatusForbidden},
 	}
 	projectDetails := map[string]interface{}{
-		"permission": "manage",
+		"permission": "environment_write",
 		"resource":   "project:" + projectUuid.String(),
 	}
 	projectAuthResp.JSON403 = &orchestratoriam.N403Forbidden{
@@ -602,13 +602,13 @@ func TestCreateEnvironment_successWithOrgFallback(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userID,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageProjectCheck(projectUuid)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{authz.ProjectCheck(projectUuid, authz.PermissionEnvironmentWrite)},
 	}).Return(projectAuthResp, nil).Times(1)
 
 	// Fallback to org-level authorization succeeds
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userID,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageOrgCheck("org-id")},
+		Checks: []orchestratoriam.ResourcePermissionCheck{authz.OrgCheck("org-id", authz.PermissionEnvironmentWrite)},
 	}).Return(&orchestratoriam.InternalAuthorizeResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 	}, nil).Times(1)
@@ -667,7 +667,7 @@ func TestCreateEnvironment_projectNotFound(t *testing.T) {
 	// Fallback to org-level authorization is attempted even for not-found errors
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userId,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageOrgCheck("org-id")},
+		Checks: []orchestratoriam.ResourcePermissionCheck{authz.OrgCheck("org-id", authz.PermissionEnvironmentWrite)},
 	}).Return(&orchestratoriam.InternalAuthorizeResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 	}, nil).Times(1)
@@ -712,7 +712,7 @@ func TestUpdateEnvironment_successWithOrgFallback(t *testing.T) {
 		HTTPResponse: &http.Response{StatusCode: http.StatusForbidden},
 	}
 	envDetails := map[string]interface{}{
-		"permission": "manage",
+		"permission": "environment_write",
 		"resource":   "environment:" + envUuid.String(),
 	}
 	envAuthResp.JSON403 = &orchestratoriam.N403Forbidden{
@@ -723,13 +723,13 @@ func TestUpdateEnvironment_successWithOrgFallback(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userID,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageEnvironmentCheck(envUuid)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{authz.EnvironmentCheck(envUuid, authz.PermissionEnvironmentWrite)},
 	}).Return(envAuthResp, nil).Times(1)
 
 	// Fallback to org-level authorization succeeds
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userID,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageOrgCheck("org-id")},
+		Checks: []orchestratoriam.ResourcePermissionCheck{authz.OrgCheck("org-id", authz.PermissionEnvironmentWrite)},
 	}).Return(&orchestratoriam.InternalAuthorizeResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 	}, nil).Times(1)
@@ -783,7 +783,7 @@ func TestUpdateEnvironment_forbidden(t *testing.T) {
 		HTTPResponse: &http.Response{StatusCode: http.StatusForbidden},
 	}
 	envDetails := map[string]interface{}{
-		"permission": "manage",
+		"permission": "environment_write",
 		"resource":   "environment:" + envUuid.String(),
 	}
 	envAuthResp.JSON403 = &orchestratoriam.N403Forbidden{
@@ -794,7 +794,7 @@ func TestUpdateEnvironment_forbidden(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userID,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageEnvironmentCheck(envUuid)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{authz.EnvironmentCheck(envUuid, authz.PermissionEnvironmentWrite)},
 	}).Return(envAuthResp, nil).Times(1)
 
 	// Fallback to org-level authorization also fails
@@ -802,7 +802,7 @@ func TestUpdateEnvironment_forbidden(t *testing.T) {
 		HTTPResponse: &http.Response{StatusCode: http.StatusForbidden},
 	}
 	orgDetails := map[string]interface{}{
-		"permission": "manage",
+		"permission": "environment_write",
 		"resource":   "org:org-id",
 	}
 	orgAuthResp.JSON403 = &orchestratoriam.N403Forbidden{
@@ -813,7 +813,7 @@ func TestUpdateEnvironment_forbidden(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userID,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageOrgCheck("org-id")},
+		Checks: []orchestratoriam.ResourcePermissionCheck{authz.OrgCheck("org-id", authz.PermissionEnvironmentWrite)},
 	}).Return(orgAuthResp, nil).Times(1)
 
 	ctx := context.WithValue(t.Context(), hecho.ContextKeyUserID, userID.String())

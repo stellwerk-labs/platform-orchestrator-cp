@@ -18,6 +18,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stellwerk-labs/golib/hlogger"
 	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v2/genclient"
+	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
 	"go.uber.org/zap"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/logging"
@@ -155,7 +156,7 @@ func (s *Server) ListModules(ctx context.Context, request ListModulesRequestObje
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgReadAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionModuleRead); err != nil {
 		return nil, err
 	}
 	page, next, err := s.Database.ListModuleDefinitions(ctx, nil, request.OrgId, ref.DerefOr(request.Params.Page, ""), ref.DerefOr(request.Params.PerPage, 100), model.ListModuleDefinitionsParams{
@@ -249,7 +250,7 @@ func (s *Server) CreateModule(ctx context.Context, request CreateModuleRequestOb
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgManageAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionModuleWrite); err != nil {
 		return nil, err
 	}
 	logger := hlogger.TraceScopedLoggerFromCtx(s.Logger, ctx).With(logging.ZapModuleDefinitionId(request.Body.Id))
@@ -342,7 +343,7 @@ func (s *Server) DeleteModule(ctx context.Context, request DeleteModuleRequestOb
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgManageAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionModuleWrite); err != nil {
 		return nil, err
 	}
 	logger := hlogger.TraceScopedLoggerFromCtx(s.Logger, ctx).With(logging.ZapModuleDefinitionId(request.ModuleId))
@@ -386,7 +387,7 @@ func (s *Server) GetModule(ctx context.Context, request GetModuleRequestObject) 
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgReadAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionModuleRead); err != nil {
 		return nil, err
 	}
 	if r, err := s.Database.GetModuleDefinition(ctx, nil, request.OrgId, request.ModuleId, model.GetModeDefault); err != nil {
@@ -403,7 +404,7 @@ func (s *Server) UpdateModule(ctx context.Context, request UpdateModuleRequestOb
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgManageAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionModuleWrite); err != nil {
 		return nil, err
 	}
 	logger := hlogger.TraceScopedLoggerFromCtx(s.Logger, ctx).With(logging.ZapModuleDefinitionId(request.ModuleId))
@@ -531,7 +532,7 @@ func (s *Server) ListModuleVersions(ctx context.Context, request ListModuleVersi
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgReadAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionModuleRead); err != nil {
 		return nil, err
 	}
 	if _, err := s.Database.GetModuleDefinition(ctx, nil, request.OrgId, request.ModuleId, model.GetModeDefault); err != nil {
@@ -558,7 +559,7 @@ func (s *Server) GetModuleVersion(ctx context.Context, request GetModuleVersionR
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgReadAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionModuleRead); err != nil {
 		return nil, err
 	}
 	if r, err := s.Database.GetModuleDefinitionVersion(ctx, nil, request.OrgId, request.ModuleId, request.ModuleVersionId.String()); err != nil {

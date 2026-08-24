@@ -47,7 +47,7 @@ func (s *Server) ListProjects(ctx context.Context, request ListProjectsRequestOb
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgReadAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionProjectRead); err != nil {
 		return nil, err
 	}
 	page, next, err := s.Database.ListProjects(ctx, nil, request.OrgId, ref.DerefOr(request.Params.Page, ""), ref.DerefOr(request.Params.PerPage, 100))
@@ -73,7 +73,7 @@ func (s *Server) CreateProject(ctx context.Context, request CreateProjectRequest
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgManageAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionProjectWrite); err != nil {
 		return nil, err
 	}
 	ids, ctx := hlogger.EnsurePlatformOrchestratorIdsOnCtx(ctx)
@@ -134,7 +134,7 @@ func (s *Server) GetProject(ctx context.Context, request GetProjectRequestObject
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgReadAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionProjectRead); err != nil {
 		return nil, err
 	}
 	if out, err := s.Database.GetProject(ctx, nil, request.OrgId, request.ProjectId, model.GetModeDefault); err != nil {
@@ -153,7 +153,7 @@ func (s *Server) UpdateProject(ctx context.Context, request UpdateProjectRequest
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkProjectAuthorization(ctx, authz.CanManageProjectCheck, uid, request.OrgId, request.ProjectId); err != nil {
+	} else if err := s.checkProjectAuthorization(ctx, uid, request.OrgId, request.ProjectId, authz.PermissionProjectWrite); err != nil {
 		return nil, err
 	}
 
@@ -187,7 +187,7 @@ func (s *Server) DeleteProject(ctx context.Context, request DeleteProjectRequest
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgManageAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionProjectWrite); err != nil {
 		return nil, err
 	}
 	ids, ctx := hlogger.EnsurePlatformOrchestratorIdsOnCtx(ctx)

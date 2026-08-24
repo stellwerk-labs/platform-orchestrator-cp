@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stellwerk-labs/golib/hlogger"
 	"github.com/stellwerk-labs/golib/hmessaging/reliableoutbox"
+	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
 	"go.uber.org/zap"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/events"
@@ -32,7 +33,7 @@ func (s *Server) ListEnvironmentTypes(ctx context.Context, request ListEnvironme
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgReadAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionEnvironmentTypeRead); err != nil {
 		return nil, err
 	}
 	page, next, err := s.Database.ListEnvironmentTypes(ctx, nil, request.OrgId, ref.DerefOr(request.Params.Page, ""), ref.DerefOr(request.Params.PerPage, 100))
@@ -56,7 +57,7 @@ func (s *Server) CreateEnvironmentType(ctx context.Context, request CreateEnviro
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgManageAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionEnvironmentTypeWrite); err != nil {
 		return nil, err
 	}
 	logger := hlogger.TraceScopedLoggerFromCtx(s.Logger, ctx).With(logging.ZapEnvTypeId(request.Body.Id))
@@ -109,7 +110,7 @@ func (s *Server) UpdateEnvironmentType(ctx context.Context, request UpdateEnviro
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgManageAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionEnvironmentTypeWrite); err != nil {
 		return nil, err
 	}
 
@@ -140,7 +141,7 @@ func (s *Server) DeleteEnvironmentType(ctx context.Context, request DeleteEnviro
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgManageAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionEnvironmentTypeWrite); err != nil {
 		return nil, err
 	}
 	logger := hlogger.TraceScopedLoggerFromCtx(s.Logger, ctx).With(logging.ZapEnvTypeId(request.EnvTypeId))
@@ -192,7 +193,7 @@ func (s *Server) GetEnvironmentType(ctx context.Context, request GetEnvironmentT
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgReadAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionEnvironmentTypeRead); err != nil {
 		return nil, err
 	}
 	if out, err := s.Database.GetEnvironmentType(ctx, nil, request.OrgId, request.EnvTypeId, model.GetModeDefault); err != nil {

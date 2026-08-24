@@ -108,7 +108,7 @@ func (s *Server) ListEnvironments(ctx context.Context, request ListEnvironmentsR
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgReadAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionEnvironmentRead); err != nil {
 		return nil, err
 	}
 	page, next, err := s.Database.ListEnvironments(
@@ -139,7 +139,7 @@ func (s *Server) ListEnvironmentsInOrg(ctx context.Context, request ListEnvironm
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgReadAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionEnvironmentRead); err != nil {
 		return nil, err
 	}
 	page, next, err := s.Database.ListEnvironmentsInOrg(
@@ -250,7 +250,7 @@ func (s *Server) CreateEnvironment(ctx context.Context, request CreateEnvironmen
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkProjectAuthorization(ctx, authz.CanManageProjectCheck, uid, request.OrgId, request.ProjectId); err != nil {
+	} else if err := s.checkProjectAuthorization(ctx, uid, request.OrgId, request.ProjectId, authz.PermissionEnvironmentWrite); err != nil {
 		return nil, err
 	}
 	ids, ctx := hlogger.EnsurePlatformOrchestratorIdsOnCtx(ctx)
@@ -307,7 +307,7 @@ func (s *Server) UpdateEnvironment(ctx context.Context, request UpdateEnvironmen
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkEnvAuthorization(ctx, authz.CanManageEnvironmentCheck, uid, request.OrgId, request.ProjectId, request.EnvId); err != nil {
+	} else if err := s.checkEnvAuthorization(ctx, uid, request.OrgId, request.ProjectId, request.EnvId, authz.PermissionEnvironmentWrite); err != nil {
 		return nil, err
 	}
 
@@ -342,7 +342,7 @@ func (s *Server) GetEnvironment(ctx context.Context, request GetEnvironmentReque
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgReadAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionEnvironmentRead); err != nil {
 		return nil, err
 	}
 	if out, err := s.Database.GetEnvironment(ctx, nil, request.OrgId, request.ProjectId, request.EnvId, model.GetModeDefault); err != nil {
@@ -361,7 +361,7 @@ func (s *Server) DeleteEnvironment(ctx context.Context, request DeleteEnvironmen
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkProjectAuthorization(ctx, authz.CanManageProjectCheck, uid, request.OrgId, request.ProjectId); err != nil {
+	} else if err := s.checkProjectAuthorization(ctx, uid, request.OrgId, request.ProjectId, authz.PermissionEnvironmentWrite); err != nil {
 		return nil, err
 	}
 	ids, ctx := hlogger.EnsurePlatformOrchestratorIdsOnCtx(ctx)
@@ -406,7 +406,7 @@ func (s *Server) InternalForceDeleteEnvironment(ctx context.Context, request Int
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgManageAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionEnvironmentWrite); err != nil {
 		return nil, err
 	}
 	ids, ctx := hlogger.EnsurePlatformOrchestratorIdsOnCtx(ctx)
@@ -522,7 +522,7 @@ func (s *Server) UpdateRunnerInAnEnvironment(ctx context.Context, request Update
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgManageAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionRunnerWrite); err != nil {
 		return nil, err
 	}
 	ids, ctx := hlogger.EnsurePlatformOrchestratorIdsOnCtx(ctx)
