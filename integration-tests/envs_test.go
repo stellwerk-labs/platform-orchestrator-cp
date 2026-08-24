@@ -87,7 +87,7 @@ func TestEnvs(t *testing.T) {
 		res, err := viewerUserClient.CreateEnvironmentWithResponse(t.Context(), orgId, projectId, genclient.EnvironmentCreateBody{Id: "env-" + strings.ToLower(rand.Text()), EnvTypeId: envType})
 		if assert.NoError(t, err) && assert.Equal(t, http.StatusForbidden, res.StatusCode(), string(res.Body)) {
 
-			assert.Contains(t, string(res.Body), fmt.Sprintf(`"permission":"manage","resource":"project:%s"`, projectOne.Uuid.String()))
+			assert.Contains(t, string(res.Body), fmt.Sprintf(`"permission":"environment_write","resource":"project:%s"`, projectOne.Uuid.String()))
 		}
 	})
 
