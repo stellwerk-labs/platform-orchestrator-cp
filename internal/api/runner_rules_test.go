@@ -10,7 +10,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/require"
@@ -56,7 +55,7 @@ func TestRunnerRuleCreateBody_checkRunnerRuleBody(t *testing.T) {
 			mockIamClient := s.IamClient.(*mockorchestratoriam.MockClientWithResponsesInterface)
 			mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 				UserId: userId,
-				Checks: []orchestratoriam.ResourcePermissionCheck{authz.OrgCheck("my-org", authz.PermissionRunnerRuleWrite)},
+				Checks: []orchestratoriam.ResourcePermissionCheck{orgCheck("my-org", PermissionRunnerRuleWrite)},
 			}).Return(&orchestratoriam.InternalAuthorizeResponse{
 				HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 			}, nil)
@@ -80,7 +79,7 @@ func TestCreateRunnerRuleInOrg_no_runner_id(t *testing.T) {
 	mockIamClient := s.IamClient.(*mockorchestratoriam.MockClientWithResponsesInterface)
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userId,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.OrgCheck("my-org", authz.PermissionRunnerRuleWrite)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{orgCheck("my-org", PermissionRunnerRuleWrite)},
 	}).Return(&orchestratoriam.InternalAuthorizeResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 	}, nil)

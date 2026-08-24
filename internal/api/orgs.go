@@ -17,7 +17,6 @@ import (
 	"github.com/stellwerk-labs/golib/hmessaging/reliableoutbox"
 	"go.uber.org/zap"
 
-	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 
@@ -91,7 +90,7 @@ func (s *Server) GetOrganization(ctx context.Context, request GetOrganizationReq
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionOrganizationRead); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionOrganizationRead); err != nil {
 		return nil, err
 	}
 	if out, err := s.Database.GetOrg(ctx, nil, request.OrgId); err != nil {

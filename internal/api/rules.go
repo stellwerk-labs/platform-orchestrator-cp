@@ -7,7 +7,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stellwerk-labs/golib/hlogger"
-	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
 	"go.uber.org/zap"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/logging"
@@ -41,7 +40,7 @@ func (s *Server) ListModuleRulesInOrg(ctx context.Context, request ListModuleRul
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionModuleRuleRead); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionModuleRuleRead); err != nil {
 		return nil, err
 	}
 
@@ -75,7 +74,7 @@ func (s *Server) CreateModuleRuleInOrg(ctx context.Context, request CreateModule
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionModuleRuleWrite); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionModuleRuleWrite); err != nil {
 		return nil, err
 	}
 	logger := hlogger.TraceScopedLoggerFromCtx(s.Logger, ctx).With(logging.ZapModuleDefinitionId(request.Body.ModuleId))
@@ -137,7 +136,7 @@ func (s *Server) DeleteModuleRuleInOrg(ctx context.Context, request DeleteModule
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionModuleRuleWrite); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionModuleRuleWrite); err != nil {
 		return nil, err
 	}
 	logger := hlogger.TraceScopedLoggerFromCtx(s.Logger, ctx).With(logging.ZapModuleRuleId(request.RuleId.String()))
@@ -157,7 +156,7 @@ func (s *Server) GetModuleRuleInOrg(ctx context.Context, request GetModuleRuleIn
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionModuleRuleRead); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionModuleRuleRead); err != nil {
 		return nil, err
 	}
 	if res, err := s.Database.GetModuleRule(ctx, nil, request.OrgId, request.RuleId.String()); err != nil {

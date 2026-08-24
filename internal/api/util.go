@@ -10,7 +10,6 @@ import (
 	"github.com/stellwerk-labs/golib/hecho"
 	"github.com/stellwerk-labs/golib/herrors"
 	"github.com/stellwerk-labs/golib/hlogger"
-	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 
@@ -57,7 +56,7 @@ func GetAuthenticatedUserIdOr401(ctx context.Context) (uuid.UUID, *echo.HTTPErro
 }
 
 func (s *Server) checkOrgAuthorization(ctx context.Context, userId uuid.UUID, orgId, permission string) error {
-	return s.innerCheck(ctx, userId, orgId, []orchestratoriam.ResourcePermissionCheck{authz.OrgCheck(orgId, permission)})
+	return s.innerCheck(ctx, userId, orgId, []orchestratoriam.ResourcePermissionCheck{orgCheck(orgId, permission)})
 }
 
 func (s *Server) checkProjectAuthorization(ctx context.Context, userId uuid.UUID, orgId, projectId, permission string) error {
@@ -69,7 +68,7 @@ func (s *Server) checkProjectAuthorization(ctx context.Context, userId uuid.UUID
 		return errors.Wrap(err, "failed to check authorization")
 	}
 
-	if scopedCheckErr := s.innerCheck(ctx, userId, orgId, []orchestratoriam.ResourcePermissionCheck{authz.ProjectCheck(projectUuid, permission)}); scopedCheckErr != nil {
+	if scopedCheckErr := s.innerCheck(ctx, userId, orgId, []orchestratoriam.ResourcePermissionCheck{projectCheck(projectUuid, permission)}); scopedCheckErr != nil {
 		// If the scoped check fails, fall back to the same permission at org scope for compatibility with older projects.
 		if orgErr := s.checkOrgAuthorization(ctx, userId, orgId, permission); orgErr != nil {
 			return scopedCheckErr
@@ -88,7 +87,7 @@ func (s *Server) checkEnvAuthorization(ctx context.Context, userId uuid.UUID, or
 		return errors.Wrap(err, "failed to check authorization")
 	}
 
-	if scopedCheckErr := s.innerCheck(ctx, userId, orgId, []orchestratoriam.ResourcePermissionCheck{authz.EnvironmentCheck(envUuid, permission)}); scopedCheckErr != nil {
+	if scopedCheckErr := s.innerCheck(ctx, userId, orgId, []orchestratoriam.ResourcePermissionCheck{environmentCheck(envUuid, permission)}); scopedCheckErr != nil {
 		// If the scoped check fails, fall back to the same permission at org scope for compatibility with older environments.
 		if orgErr := s.checkOrgAuthorization(ctx, userId, orgId, permission); orgErr != nil {
 			return scopedCheckErr

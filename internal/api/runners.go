@@ -11,7 +11,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stellwerk-labs/golib/hlogger"
-	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
 	"go.uber.org/zap"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/logging"
@@ -106,7 +105,7 @@ func (s *Server) ListRunners(ctx context.Context, request ListRunnersRequestObje
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionRunnerRead); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionRunnerRead); err != nil {
 		return nil, err
 	}
 	page, next, err := s.Database.ListRunners(ctx, nil, request.OrgId, ref.DerefOr(request.Params.Page, ""), ref.DerefOr(request.Params.PerPage, 100))
@@ -132,7 +131,7 @@ func (s *Server) CreateRunner(ctx context.Context, request CreateRunnerRequestOb
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionRunnerWrite); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionRunnerWrite); err != nil {
 		return nil, err
 	}
 	logger := hlogger.TraceScopedLoggerFromCtx(s.Logger, ctx).With(logging.ZapRunnerId(request.Body.Id))
@@ -205,7 +204,7 @@ func (s *Server) GetRunner(ctx context.Context, request GetRunnerRequestObject) 
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionRunnerRead); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionRunnerRead); err != nil {
 		return nil, err
 	}
 	runner, err := s.Database.GetRunner(ctx, nil, request.OrgId, request.RunnerId)
@@ -237,7 +236,7 @@ func (s *Server) DeleteRunner(ctx context.Context, request DeleteRunnerRequestOb
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionRunnerWrite); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionRunnerWrite); err != nil {
 		return nil, err
 	}
 	ids, ctx := hlogger.EnsurePlatformOrchestratorIdsOnCtx(ctx)
@@ -301,7 +300,7 @@ func (s *Server) UpdateRunner(ctx context.Context, request UpdateRunnerRequestOb
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionRunnerWrite); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionRunnerWrite); err != nil {
 		return nil, err
 	}
 	ids, ctx := hlogger.EnsurePlatformOrchestratorIdsOnCtx(ctx)

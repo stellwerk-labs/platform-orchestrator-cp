@@ -11,7 +11,6 @@ import (
 	"github.com/stellwerk-labs/golib/herrors"
 	"github.com/stellwerk-labs/golib/hmessaging"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/genevents"
-	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/assert"
@@ -138,7 +137,7 @@ func TestDeleteEnvironment_default(t *testing.T) {
 
 			mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 				UserId: userId,
-				Checks: []orchestratoriam.ResourcePermissionCheck{authz.ProjectCheck(projectUuid, authz.PermissionEnvironmentWrite)},
+				Checks: []orchestratoriam.ResourcePermissionCheck{projectCheck(projectUuid, PermissionEnvironmentWrite)},
 			}).Return(&orchestratoriam.InternalAuthorizeResponse{
 				HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 			}, nil).Times(1)
@@ -194,7 +193,7 @@ func TestDeleteEnvironment_withDeleteRules(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userId,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.ProjectCheck(projectUuid, authz.PermissionEnvironmentWrite)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{projectCheck(projectUuid, PermissionEnvironmentWrite)},
 	}).Return(&orchestratoriam.InternalAuthorizeResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 	}, nil).Times(1)
@@ -259,13 +258,13 @@ func TestDeleteEnvironment_successWithOrgFallback(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userId,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.ProjectCheck(projectUuid, authz.PermissionEnvironmentWrite)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{projectCheck(projectUuid, PermissionEnvironmentWrite)},
 	}).Return(projectAuthResp, nil).Times(1)
 
 	// Fallback to org-level authorization succeeds
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userId,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.OrgCheck("org-id", authz.PermissionEnvironmentWrite)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{orgCheck("org-id", PermissionEnvironmentWrite)},
 	}).Return(&orchestratoriam.InternalAuthorizeResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 	}, nil).Times(1)
@@ -316,7 +315,7 @@ func TestDeleteEnvironment_forbidden(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userId,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.ProjectCheck(projectUuid, authz.PermissionEnvironmentWrite)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{projectCheck(projectUuid, PermissionEnvironmentWrite)},
 	}).Return(projectAuthResp, nil).Times(1)
 
 	// Fallback to org-level authorization also fails
@@ -335,7 +334,7 @@ func TestDeleteEnvironment_forbidden(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userId,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.OrgCheck("org-id", authz.PermissionEnvironmentWrite)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{orgCheck("org-id", PermissionEnvironmentWrite)},
 	}).Return(orgAuthResp, nil).Times(1)
 
 	ctx := context.WithValue(t.Context(), hecho.ContextKeyUserID, userId.String())
@@ -422,7 +421,7 @@ func TestCreateEnvironment_success(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userID,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.ProjectCheck(projectUuid, authz.PermissionEnvironmentWrite)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{projectCheck(projectUuid, PermissionEnvironmentWrite)},
 	}).Return(&orchestratoriam.InternalAuthorizeResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 	}, nil).Times(1)
@@ -523,7 +522,7 @@ func TestCreateEnvironment_forbidden(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userID,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.ProjectCheck(projectUuid, authz.PermissionEnvironmentWrite)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{projectCheck(projectUuid, PermissionEnvironmentWrite)},
 	}).Return(projectAuthResp, nil).Times(1)
 
 	// Fallback to org-level authorization also fails
@@ -542,7 +541,7 @@ func TestCreateEnvironment_forbidden(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userID,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.OrgCheck("org-id", authz.PermissionEnvironmentWrite)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{orgCheck("org-id", PermissionEnvironmentWrite)},
 	}).Return(orgAuthResp, nil).Times(1)
 
 	ctx := context.WithValue(t.Context(), hecho.ContextKeyUserID, userID.String())
@@ -602,13 +601,13 @@ func TestCreateEnvironment_successWithOrgFallback(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userID,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.ProjectCheck(projectUuid, authz.PermissionEnvironmentWrite)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{projectCheck(projectUuid, PermissionEnvironmentWrite)},
 	}).Return(projectAuthResp, nil).Times(1)
 
 	// Fallback to org-level authorization succeeds
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userID,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.OrgCheck("org-id", authz.PermissionEnvironmentWrite)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{orgCheck("org-id", PermissionEnvironmentWrite)},
 	}).Return(&orchestratoriam.InternalAuthorizeResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 	}, nil).Times(1)
@@ -667,7 +666,7 @@ func TestCreateEnvironment_projectNotFound(t *testing.T) {
 	// Fallback to org-level authorization is attempted even for not-found errors
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userId,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.OrgCheck("org-id", authz.PermissionEnvironmentWrite)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{orgCheck("org-id", PermissionEnvironmentWrite)},
 	}).Return(&orchestratoriam.InternalAuthorizeResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 	}, nil).Times(1)
@@ -723,13 +722,13 @@ func TestUpdateEnvironment_successWithOrgFallback(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userID,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.EnvironmentCheck(envUuid, authz.PermissionEnvironmentWrite)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{environmentCheck(envUuid, PermissionEnvironmentWrite)},
 	}).Return(envAuthResp, nil).Times(1)
 
 	// Fallback to org-level authorization succeeds
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userID,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.OrgCheck("org-id", authz.PermissionEnvironmentWrite)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{orgCheck("org-id", PermissionEnvironmentWrite)},
 	}).Return(&orchestratoriam.InternalAuthorizeResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 	}, nil).Times(1)
@@ -794,7 +793,7 @@ func TestUpdateEnvironment_forbidden(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userID,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.EnvironmentCheck(envUuid, authz.PermissionEnvironmentWrite)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{environmentCheck(envUuid, PermissionEnvironmentWrite)},
 	}).Return(envAuthResp, nil).Times(1)
 
 	// Fallback to org-level authorization also fails
@@ -813,7 +812,7 @@ func TestUpdateEnvironment_forbidden(t *testing.T) {
 
 	mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 		UserId: userID,
-		Checks: []orchestratoriam.ResourcePermissionCheck{authz.OrgCheck("org-id", authz.PermissionEnvironmentWrite)},
+		Checks: []orchestratoriam.ResourcePermissionCheck{orgCheck("org-id", PermissionEnvironmentWrite)},
 	}).Return(orgAuthResp, nil).Times(1)
 
 	ctx := context.WithValue(t.Context(), hecho.ContextKeyUserID, userID.String())

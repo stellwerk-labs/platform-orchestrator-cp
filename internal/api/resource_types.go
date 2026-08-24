@@ -9,7 +9,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stellwerk-labs/golib/hlogger"
-	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
 	"go.uber.org/zap"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
@@ -126,7 +125,7 @@ func (s *Server) ListResourceTypes(ctx context.Context, request ListResourceType
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionResourceTypeRead); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionResourceTypeRead); err != nil {
 		return nil, err
 	}
 	page, next, err := s.Database.ListResourceTypes(ctx, nil, &request.OrgId, ref.DerefOr(request.Params.Page, ""), ref.DerefOr(request.Params.PerPage, 100))
@@ -149,7 +148,7 @@ func (s *Server) CreateResourceType(ctx context.Context, request CreateResourceT
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionResourceTypeWrite); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionResourceTypeWrite); err != nil {
 		return nil, err
 	}
 	ids, ctx := hlogger.EnsurePlatformOrchestratorIdsOnCtx(ctx)
@@ -203,7 +202,7 @@ func (s *Server) DeleteResourceType(ctx context.Context, request DeleteResourceT
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionResourceTypeWrite); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionResourceTypeWrite); err != nil {
 		return nil, err
 	}
 	ids, ctx := hlogger.EnsurePlatformOrchestratorIdsOnCtx(ctx)
@@ -237,7 +236,7 @@ func (s *Server) GetResourceType(ctx context.Context, request GetResourceTypeReq
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionResourceTypeRead); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionResourceTypeRead); err != nil {
 		return nil, err
 	}
 	resType, err := s.Database.GetResourceType(ctx, nil, &request.OrgId, request.TypeId)
@@ -256,7 +255,7 @@ func (s *Server) UpdateResourceType(ctx context.Context, request UpdateResourceT
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, authz.PermissionResourceTypeWrite); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionResourceTypeWrite); err != nil {
 		return nil, err
 	}
 	ids, ctx := hlogger.EnsurePlatformOrchestratorIdsOnCtx(ctx)
