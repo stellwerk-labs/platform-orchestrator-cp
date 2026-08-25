@@ -119,13 +119,15 @@ func TestEnvs(t *testing.T) {
 	}
 
 	t.Run("can update environment display name", func(t *testing.T) {
-		res, err := viewerUserClient.UpdateEnvironmentWithResponse(t.Context(), orgId, projectId, envNoDisplayNameId, genclient.UpdateEnvironmentJSONRequestBody{
-			DisplayName: "New Env Name",
-		})
-		if assert.NoError(t, err) && assert.Equal(t, http.StatusOK, res.StatusCode(), string(res.Body)) {
-			envNoDisplayName.DisplayName = res.JSON200.DisplayName
-			assert.Equal(t, "New Env Name", envNoDisplayName.DisplayName)
-		}
+		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+			res, err := viewerUserClient.UpdateEnvironmentWithResponse(t.Context(), orgId, projectId, envNoDisplayNameId, genclient.UpdateEnvironmentJSONRequestBody{
+				DisplayName: "New Env Name",
+			})
+			if assert.NoError(collect, err) && assert.Equal(collect, http.StatusOK, res.StatusCode(), string(res.Body)) {
+				envNoDisplayName.DisplayName = res.JSON200.DisplayName
+				assert.Equal(collect, "New Env Name", envNoDisplayName.DisplayName)
+			}
+		}, 30*time.Second, time.Second, "environment authorization relationship did not propagate")
 	})
 
 	t.Run("can retrieve the environmenty by uuid", func(t *testing.T) {
