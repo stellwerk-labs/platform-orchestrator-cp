@@ -90,7 +90,7 @@ func (s *Server) GetOrganization(ctx context.Context, request GetOrganizationReq
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgReadAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionOrganizationRead); err != nil {
 		return nil, err
 	}
 	if out, err := s.Database.GetOrg(ctx, nil, request.OrgId); err != nil {

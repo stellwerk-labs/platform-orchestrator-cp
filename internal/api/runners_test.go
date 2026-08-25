@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/assert"
@@ -636,7 +635,7 @@ MCowBQYDK2VwAyEAc5dgCx4ano39JT0XgTsHnts3jej+5xl7ZAwSIrKpef0=
 			mockIamClient := s.IamClient.(*mockorchestratoriam.MockClientWithResponsesInterface)
 			mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 				UserId: userId,
-				Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageOrgCheck(orgId)},
+				Checks: []orchestratoriam.ResourcePermissionCheck{orgCheck(orgId, PermissionRunnerWrite)},
 			}).Return(&orchestratoriam.InternalAuthorizeResponse{
 				HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 			}, nil)
@@ -1083,7 +1082,7 @@ func TestUpdateRunner(t *testing.T) {
 			mockIamClient := s.IamClient.(*mockorchestratoriam.MockClientWithResponsesInterface)
 			mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 				UserId: userId,
-				Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageOrgCheck("my-org")},
+				Checks: []orchestratoriam.ResourcePermissionCheck{orgCheck("my-org", PermissionRunnerWrite)},
 			}).Return(&orchestratoriam.InternalAuthorizeResponse{
 				HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 			}, nil)
@@ -1218,7 +1217,7 @@ func TestDeleteRunner(t *testing.T) {
 			mockIamClient := s.IamClient.(*mockorchestratoriam.MockClientWithResponsesInterface)
 			mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 				UserId: userId,
-				Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageOrgCheck(orgId)},
+				Checks: []orchestratoriam.ResourcePermissionCheck{orgCheck(orgId, PermissionRunnerWrite)},
 			}).Return(&orchestratoriam.InternalAuthorizeResponse{
 				HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 			}, nil)

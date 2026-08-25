@@ -10,7 +10,6 @@ import (
 	"github.com/stellwerk-labs/golib/hecho"
 	"github.com/stellwerk-labs/golib/herrors"
 	"github.com/stellwerk-labs/golib/hlogger"
-	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 
@@ -56,15 +55,11 @@ func GetAuthenticatedUserIdOr401(ctx context.Context) (uuid.UUID, *echo.HTTPErro
 	return uuid.Nil, echo.NewHTTPError(http.StatusUnauthorized)
 }
 
-func (s *Server) checkOrgReadAuthorization(ctx context.Context, userId uuid.UUID, orgId string) error {
-	return s.innerCheck(ctx, userId, orgId, []orchestratoriam.ResourcePermissionCheck{authz.CanReadOrgCheck(orgId)})
+func (s *Server) checkOrgAuthorization(ctx context.Context, userId uuid.UUID, orgId, permission string) error {
+	return s.innerCheck(ctx, userId, orgId, []orchestratoriam.ResourcePermissionCheck{orgCheck(orgId, permission)})
 }
 
-func (s *Server) checkOrgManageAuthorization(ctx context.Context, userId uuid.UUID, orgId string) error {
-	return s.innerCheck(ctx, userId, orgId, []orchestratoriam.ResourcePermissionCheck{authz.CanManageOrgCheck(orgId)})
-}
-
-func (s *Server) checkProjectAuthorization(ctx context.Context, checkFunc func(uuid.UUID) orchestratoriam.ResourcePermissionCheck, userId uuid.UUID, orgId, projectId string) error {
+func (s *Server) checkProjectAuthorization(ctx context.Context, userId uuid.UUID, orgId, projectId, permission string) error {
 	projectUuid, err := retrieveProjectUUIDById(ctx, s.Database, orgId, projectId)
 	if err != nil {
 		if me, ok := model.IsErrNotFound(err); ok {
@@ -73,16 +68,16 @@ func (s *Server) checkProjectAuthorization(ctx context.Context, checkFunc func(u
 		return errors.Wrap(err, "failed to check authorization")
 	}
 
-	if scopedCheckErr := s.innerCheck(ctx, userId, orgId, []orchestratoriam.ResourcePermissionCheck{checkFunc(projectUuid)}); scopedCheckErr != nil {
-		// If the scoped check fails, we fall back to the org manage check for compatibility with older projects
-		if orgErr := s.checkOrgManageAuthorization(ctx, userId, orgId); orgErr != nil {
+	if scopedCheckErr := s.innerCheck(ctx, userId, orgId, []orchestratoriam.ResourcePermissionCheck{projectCheck(projectUuid, permission)}); scopedCheckErr != nil {
+		// If the scoped check fails, fall back to the same permission at org scope for compatibility with older projects.
+		if orgErr := s.checkOrgAuthorization(ctx, userId, orgId, permission); orgErr != nil {
 			return scopedCheckErr
 		}
 	}
 	return nil
 }
 
-func (s *Server) checkEnvAuthorization(ctx context.Context, checkFunc func(uuid.UUID) orchestratoriam.ResourcePermissionCheck, userId uuid.UUID, orgId, projectId, envId string) error {
+func (s *Server) checkEnvAuthorization(ctx context.Context, userId uuid.UUID, orgId, projectId, envId, permission string) error {
 	envUuid, err := retrieveEnvUUIDByIds(ctx, s.Database, orgId, projectId, envId)
 	if err != nil {
 		if me, ok := model.IsErrNotFound(err); ok {
@@ -92,9 +87,9 @@ func (s *Server) checkEnvAuthorization(ctx context.Context, checkFunc func(uuid.
 		return errors.Wrap(err, "failed to check authorization")
 	}
 
-	if scopedCheckErr := s.innerCheck(ctx, userId, orgId, []orchestratoriam.ResourcePermissionCheck{checkFunc(envUuid)}); scopedCheckErr != nil {
-		// If the scoped check fails, we fall back to the org manage check for compatibility with older envs
-		if orgErr := s.checkOrgManageAuthorization(ctx, userId, orgId); orgErr != nil {
+	if scopedCheckErr := s.innerCheck(ctx, userId, orgId, []orchestratoriam.ResourcePermissionCheck{environmentCheck(envUuid, permission)}); scopedCheckErr != nil {
+		// If the scoped check fails, fall back to the same permission at org scope for compatibility with older environments.
+		if orgErr := s.checkOrgAuthorization(ctx, userId, orgId, permission); orgErr != nil {
 			return scopedCheckErr
 		}
 	}

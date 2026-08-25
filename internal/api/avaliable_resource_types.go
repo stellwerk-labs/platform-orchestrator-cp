@@ -17,7 +17,7 @@ func (s *Server) ListAvailableResourceTypes(ctx context.Context, request ListAva
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgReadAuthorization(ctx, uid, request.OrgId); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionResourceTypeRead); err != nil {
 		return nil, err
 	}
 	page, next, err := s.Database.ListAvailableResourceTypes(ctx, nil, request.OrgId, request.ProjectId, request.EnvId,

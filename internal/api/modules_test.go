@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 
@@ -128,7 +127,7 @@ output "bar" {
 			mockIamClient := s.IamClient.(*mockorchestratoriam.MockClientWithResponsesInterface)
 			mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 				UserId: userId,
-				Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageOrgCheck("my-org")},
+				Checks: []orchestratoriam.ResourcePermissionCheck{orgCheck("my-org", PermissionModuleWrite)},
 			}).Return(&orchestratoriam.InternalAuthorizeResponse{
 				HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 			}, nil)
@@ -236,7 +235,7 @@ func TestDefinitionsValidation_update(t *testing.T) {
 			mockIamClient := s.IamClient.(*mockorchestratoriam.MockClientWithResponsesInterface)
 			mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 				UserId: userId,
-				Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageOrgCheck("my-org")},
+				Checks: []orchestratoriam.ResourcePermissionCheck{orgCheck("my-org", PermissionModuleWrite)},
 			}).Return(&orchestratoriam.InternalAuthorizeResponse{
 				HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 			}, nil)

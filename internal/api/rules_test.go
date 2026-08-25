@@ -9,7 +9,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/require"
@@ -44,7 +43,7 @@ func TestRuleCreateBody_validate(t *testing.T) {
 			mockIamClient := s.IamClient.(*mockorchestratoriam.MockClientWithResponsesInterface)
 			mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 				UserId: userId,
-				Checks: []orchestratoriam.ResourcePermissionCheck{authz.CanManageOrgCheck("my-org")},
+				Checks: []orchestratoriam.ResourcePermissionCheck{orgCheck("my-org", PermissionModuleRuleWrite)},
 			}).Return(&orchestratoriam.InternalAuthorizeResponse{
 				HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 			}, nil)
