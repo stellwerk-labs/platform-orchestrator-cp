@@ -2,6 +2,11 @@
 MAKEFLAGS += --no-builtin-rules
 .SUFFIXES:
 
+GO_VERSION := $(shell awk '$$1 == "go" { print $$2; exit }' go.mod)
+GO := env GOTOOLCHAIN=go$(GO_VERSION) go
+YQ_VERSION ?= v4.47.2
+YQ := $(GO) run github.com/mikefarah/yq/v4@$(YQ_VERSION)
+
 ## Display help menu
 .PHONY: help
 help:
@@ -27,11 +32,11 @@ install:
 ## Generate mocks
 .PHONY: generate
 generate:
-	yq 'del(.components.securitySchemes, (.. | select(has("security")).security) )' openapi/spec.yaml | yq --prettyPrint -o=json > openapi/spec.json
-	go generate -v ./...
-	go tool oapi-codegen --config=shared/genclient/oapi-codegen.cfg.yaml openapi/spec.yaml
-	go tool oapi-codegen --config=shared/genevents/oapi-codegen.cfg.yaml openapi/events.yaml
-	cd shared && go mod tidy
+	$(YQ) 'del(.components.securitySchemes, (.. | select(has("security")).security) )' openapi/spec.yaml | $(YQ) --prettyPrint -o=json > openapi/spec.json
+	$(GO) generate -v ./...
+	$(GO) tool oapi-codegen --config=shared/genclient/oapi-codegen.cfg.yaml openapi/spec.yaml
+	$(GO) tool oapi-codegen --config=shared/genevents/oapi-codegen.cfg.yaml openapi/events.yaml
+	cd shared && $(GO) mod tidy
 
 # ------------------------------------------------------------------------------
 # NOTE: the names of the build, clean, test-integration, and test-unit steps are important and cannot be changed
