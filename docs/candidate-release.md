@@ -23,8 +23,9 @@ repository, not forks or private mirrors.
   repository's release policy. The preflight refuses a missing environment or
   one without reviewers; the workflow does not provision it.
 - Confirm the established GHCR package is public and anonymously readable. The
-  candidate path refuses an existing image tag and fails closed on ambiguous
-  registry or authorization errors. It does not change package visibility.
+  candidate path refuses an existing draft or published GitHub release, refuses
+  an existing image tag and fails closed on ambiguous registry or authorization
+  errors. It does not change package visibility.
 
 ## Dispatch and outputs
 

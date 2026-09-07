@@ -45,11 +45,29 @@ class CandidateReleaseTests(unittest.TestCase):
             with self.subTest(status=status), self.assertRaises(ValueError):
                 candidate.validate_absence_status(status)
 
+    def test_empty_or_other_release_page(self):
+        candidate.validate_release_page("v3.0.0-rc.1", [])
+        candidate.validate_release_page("v3.0.0-rc.1", [{"tag_name": "v2.1.1", "draft": False}])
+
+    def test_drafts_and_published_releases_reserve_candidate_tag(self):
+        for draft in (True, False):
+            with self.subTest(draft=draft), self.assertRaises(ValueError):
+                candidate.validate_release_page("v3.0.0-rc.1", [{"tag_name": "v3.0.0-rc.1", "draft": draft}])
+
+    def test_malformed_or_unbounded_release_page_fails_closed(self):
+        for page in ({"message": "not found"}, [None], [{}], [{"tag_name": "v2.1.1", "draft": "false"}],
+                     [{"tag_name": "v2.1.1", "draft": False}] * 101):
+            with self.subTest(page=page), self.assertRaises(ValueError):
+                candidate.validate_release_page("v3.0.0-rc.1", page)
 
     def test_workflow_is_manual_repository_guarded_and_approval_gated(self):
         text = Path(__file__).parents[1].joinpath(".github/workflows/ci.yaml").read_text()
         jobs = dict(re.findall(r"^  ([a-z-]+):\n(.*?)(?=^  [a-z-]+:\n|\Z)", text, re.M | re.S))
         publication = jobs["candidate-release"]
+        image_step = next(step for step in publication.split("\n      - ")
+                          if "uses: docker/build-push-action@" in step)
+        self.assertIn("\n          context: .\n", image_step,
+                      "Build the checked-out approved SHA, not the workflow event's default Git context")
         self.assertIn("github.repository == 'stellwerk-labs/platform-orchestrator-", publication)
         self.assertIn("github.event_name == 'workflow_dispatch'", publication)
         self.assertIn("environment: public-release-candidate", publication)
