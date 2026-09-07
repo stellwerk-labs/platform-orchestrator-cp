@@ -2157,7 +2157,7 @@
           "Modules"
         ],
         "summary": "Create a Module with an initial immutable Proposed version",
-        "description": "Compatibility authoring endpoint. Requires semantic_version and a complete definition; external sources also require artifact_digest. This does not promote the version. New clients should create a catalogue entry, publish a version, and promote explicitly.",
+        "description": "Compatibility authoring endpoint. Requires semantic_version and a complete definition; external sources may declare an optional artifact_digest. This does not promote the version. New clients should create a catalogue entry, publish a version, and promote explicitly.",
         "parameters": [
           {
             "$ref": "#/components/parameters/orgIdPathParam"
@@ -5050,6 +5050,9 @@
             "example": {},
             "additionalProperties": true
           },
+          "module_contract": {
+            "$ref": "#/components/schemas/ResourceTypeModuleContract"
+          },
           "created_at": {
             "description": "The date and time when the resource type was created",
             "example": "2023-01-01T00:00:00Z",
@@ -5141,12 +5144,25 @@
             "example": {},
             "additionalProperties": true
           },
+          "module_contract": {
+            "$ref": "#/components/schemas/ResourceTypeModuleContract"
+          },
           "is_developer_accessible": {
             "description": "Indicates if this resource type is for developers to use in the manifest. Resource types with this flag set to false, will not be available as types of resources in a manifest. If omitted, this property defaults to true.",
             "type": "boolean",
             "default": true
           }
         }
+      },
+      "ResourceTypeModuleContract": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Immutable, offline OpenAPI 3.0 Schema Object subset over module_inputs,\nmodule_params, provider_mapping, dependencies, coprovisioned and output_schema.\nRoot type must be object. References and unsupported keywords are rejected.\nMaximum 64 KiB, 16 schema levels and 64 schema nodes. This validates author\ndeclarations, not external artifacts or resolved runtime values.\n"
+      },
+      "ModuleOutputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Immutable author-declared output interface. Required on new managed\npublication when the Resource Type output_schema is nonempty, and must\nequal that contract as a JSON value. Never inferred from external source.\nHistorical absence is preserved and does not imply artifact verification.\n"
       },
       "ResourceTypeUpdateBody": {
         "type": "object",
@@ -5644,6 +5660,9 @@
           "coprovisioned"
         ],
         "properties": {
+          "output_schema": {
+            "$ref": "#/components/schemas/ModuleOutputSchema"
+          },
           "module_params": {
             "description": "The parameters supported by this module. The orchestrator enforces that any required parameters are\nprovided and that they keys do not overlap with the 'module_inputs'.\n",
             "type": "object",
@@ -5816,6 +5835,9 @@
           "module_source"
         ],
         "properties": {
+          "output_schema": {
+            "$ref": "#/components/schemas/ModuleOutputSchema"
+          },
           "semantic_version": {
             "type": "string",
             "description": "Canonical SemVer identity of the immutable Core Module Version."
@@ -5823,7 +5845,7 @@
           "artifact_digest": {
             "type": "string",
             "pattern": "^sha256:[a-f0-9]{64}$",
-            "description": "Canonical digest protecting the referenced external artifact. Omitted for inline source."
+            "description": "Optional immutable external artifact digest claim, not verification evidence. Omitted for inline source."
           },
           "id": {
             "$ref": "#/components/schemas/ModuleId"
@@ -5901,6 +5923,9 @@
         "type": "object",
         "description": "A request to update an existing module",
         "properties": {
+          "output_schema": {
+            "$ref": "#/components/schemas/ModuleOutputSchema"
+          },
           "semantic_version": {
             "type": "string",
             "description": "Canonical SemVer identity for the immutable Proposed version."
@@ -7288,13 +7313,17 @@
           "coprovisioned"
         ],
         "properties": {
+          "output_schema": {
+            "$ref": "#/components/schemas/ModuleOutputSchema"
+          },
           "semantic_version": {
             "type": "string",
             "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
           },
           "artifact_digest": {
             "type": "string",
-            "pattern": "^sha256:[a-f0-9]{64}$"
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "description": "Optional immutable external artifact digest claim. Omit for inline source. Absence never implies verification."
           },
           "source_revision": {
             "type": "string",
@@ -7531,7 +7560,8 @@
           "added_dependencies",
           "removed_dependencies",
           "changed_dependencies",
-          "coprovisioning_changed"
+          "coprovisioning_changed",
+          "output_schema_changed"
         ],
         "properties": {
           "from_version_uuid": {
@@ -7637,6 +7667,9 @@
           },
           "coprovisioning_changed": {
             "type": "boolean"
+          },
+          "output_schema_changed": {
+            "type": "boolean"
           }
         }
       },
@@ -7655,6 +7688,9 @@
           "coprovisioned"
         ],
         "properties": {
+          "output_schema": {
+            "$ref": "#/components/schemas/ModuleOutputSchema"
+          },
           "module_source": {
             "type": "string"
           },
@@ -8599,7 +8635,7 @@
                   "v1",
                   "managed"
                 ],
-                "description": "Authoritative persisted migration provenance. Only migrated v0 versions may reference external artifacts without a declared digest."
+                "description": "Authoritative persisted migration provenance. External digest claims are optional for both managed and migrated versions; v0 must not acquire invented metadata."
               },
               "verification_status": {
                 "$ref": "#/components/schemas/ModuleVerificationStatus"

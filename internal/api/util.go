@@ -31,7 +31,24 @@ func (resp N400BadRequestJSONResponse) WithDetails(details *map[string]interface
 }
 
 func Generate400FromModelErr(e model.ErrBadRequest) N400BadRequestJSONResponse {
-	return N400BadRequestJSONResponse{Error: "HTTP-400", Message: e.Message}
+	code := e.Code
+	if code == "" {
+		code = "HTTP-400"
+	}
+	response := N400BadRequestJSONResponse{Error: code, Message: e.Message}
+	if e.Details != nil {
+		response.Details = &e.Details
+	}
+	return response
+}
+
+// Preserve historical absence separately from an explicitly declared empty object.
+func optionalJSONObject[T ~map[string]any](value map[string]any) *T {
+	if value == nil {
+		return nil
+	}
+	result := T(value)
+	return &result
 }
 
 func Generate404FromModelErr(e model.ErrNotFound) N404NotFoundJSONResponse {

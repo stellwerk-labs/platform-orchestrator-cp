@@ -250,6 +250,7 @@ func publicationModel(module *model.ModuleCatalogue, body ModuleVersionPublishBo
 		ResourceType: module.ResourceType, VersionId: body.SemanticVersion, SemanticVersion: body.SemanticVersion,
 		UpdatedAt: now, Description: opt.OfRef(body.Description), ModuleSource: body.ModuleSource,
 		ModuleSourceCode: opt.OfRef(body.ModuleSourceCode), ModuleInputs: body.ModuleInputs, ModuleParams: params,
+		OutputSchema: ref.DerefOr(body.OutputSchema, nil),
 		Dependencies: dependencies, CoProvisioned: coprovisioned, ProviderMapping: body.ProviderMapping,
 		ArtifactDigest: ref.DerefOr(body.ArtifactDigest, ""), SourceRevision: ref.DerefOr(body.SourceRevision, ""),
 		ReleaseNotes: opt.OfRef(body.ReleaseNotes), PublishedBy: &actor,
@@ -268,11 +269,10 @@ func validatePublicationBody(body ModuleVersionPublishBody) error {
 			return fmt.Errorf("artifact_digest protects referenced external artifacts and must be omitted for inline source")
 		}
 	} else {
-		if body.ArtifactDigest == nil {
-			return fmt.Errorf("artifact_digest is required for an external module artifact")
-		}
-		if err := moduleversions.ValidateArtifactDigest(*body.ArtifactDigest); err != nil {
-			return err
+		if body.ArtifactDigest != nil {
+			if err := moduleversions.ValidateArtifactDigest(*body.ArtifactDigest); err != nil {
+				return err
+			}
 		}
 		if strings.TrimSpace(ref.DerefOr(body.SourceRevision, "")) == "" {
 			return fmt.Errorf("source_revision is required for an external module artifact")
@@ -652,6 +652,7 @@ func moduleVersionComparisonSnapshot(value model.ModuleDefinitionVersion) Module
 		ProviderMapping:  definition.ProviderMapping,
 		Dependencies:     definition.Dependencies,
 		Coprovisioned:    definition.Coprovisioned,
+		OutputSchema:     optionalJSONObject[ModuleOutputSchema](value.OutputSchema),
 	}
 }
 
@@ -694,6 +695,7 @@ func (s *Server) CompareModuleVersions(ctx context.Context, request CompareModul
 		AddedProviderMappings: addedProviders, RemovedProviderMappings: removedProviders, ChangedProviderMappings: changedProviders,
 		AddedDependencies: addedDependencies, RemovedDependencies: removedDependencies, ChangedDependencies: changedDependencies,
 		CoprovisioningChanged: !reflect.DeepEqual(left.CoProvisioned, right.CoProvisioned),
+		OutputSchemaChanged:   !reflect.DeepEqual(left.OutputSchema, right.OutputSchema),
 	}), nil
 }
 

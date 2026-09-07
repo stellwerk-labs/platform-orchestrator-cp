@@ -294,7 +294,9 @@ func TestValidateManagedModuleVersionArtifactBoundary(t *testing.T) {
 	require.NoError(t, validateManagedModuleVersion(&version, nil, &inline))
 	require.EqualError(t, validateManagedModuleVersion(&version, &digest, &inline),
 		"artifact_digest protects referenced external artifacts and must be omitted for inline source")
-	require.EqualError(t, validateManagedModuleVersion(&version, nil, nil),
-		"artifact_digest is required for an external module artifact")
+	require.NoError(t, validateManagedModuleVersion(&version, nil, nil))
 	require.NoError(t, validateManagedModuleVersion(&version, &digest, nil))
+	for _, malformed := range []string{"", "sha256:abc", "sha256:" + strings.Repeat("A", 64)} {
+		require.Error(t, validateManagedModuleVersion(&version, &malformed, nil))
+	}
 }

@@ -208,15 +208,23 @@ func (d *databaser) PublishStableModuleVersionSuccessor(ctx context.Context, tx 
 		return nil, NewErrBadRequest("stable successor must have higher SemVer precedence than the expected prerelease")
 	}
 
+	request.OrgId = orgID
+	request.DefinitionId = prerelease.ModuleSlug
+	request.ModuleUUID = prerelease.ModuleUUID
+	module, err := d.GetModuleCatalogue(ctx, tx, orgID, moduleRef, GetModeDefault)
+	if err != nil {
+		return nil, err
+	}
+	request.ResourceType = module.ResourceType
+	if err := d.validateModuleConformance(ctx, tx, request); err != nil {
+		return nil, err
+	}
 	correlationID := uuid.New()
 	updatedPrerelease, err := d.TransitionCoreModuleVersion(ctx, tx, orgID, moduleRef, prerelease.UUID.String(),
 		moduleversions.LifecycleDeprecated, expectedPrereleaseVersion, actor, reason, &correlationID)
 	if err != nil {
 		return nil, err
 	}
-	request.OrgId = orgID
-	request.DefinitionId = prerelease.ModuleSlug
-	request.ModuleUUID = prerelease.ModuleUUID
 	published, err := d.PublishCoreModuleVersion(ctx, tx, request, actor)
 	if err != nil {
 		return nil, err
@@ -286,6 +294,16 @@ const moduleCatalogueColumns = `org_id, uuid, id, display_name, COALESCE(descrip
 func (d *databaser) CreateEmptyModule(ctx context.Context, tx Tx, orgID, slug, displayName, description, resourceType string, tags map[string]string) (*ModuleCatalogue, error) {
 	if tx == nil {
 		return nil, errors.New("transaction required")
+	}
+	if err := lockResourceTypeIdentity(ctx, tx, resourceType); err != nil {
+		return nil, err
+	}
+	resource, err := d.GetResourceType(ctx, tx, &orgID, resourceType)
+	if err != nil {
+		return nil, err
+	}
+	if resource.CatalogueStatus == catalogueStatusArchived {
+		return nil, NewErrConflict("archived resource types reject new module bindings")
 	}
 	if strings.TrimSpace(displayName) == "" {
 		displayName = slug

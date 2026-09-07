@@ -27,6 +27,7 @@ func apiResourceTypeFromModelResourceType(resourceType model.ResourceType) Resou
 		Id:                    resourceType.Id,
 		Description:           ref.RefStringEmptyNil(resourceType.Description),
 		OutputSchema:          resourceType.OutputsSchema,
+		ModuleContract:        optionalJSONObject[ResourceTypeModuleContract](resourceType.ModuleContract),
 		CreatedAt:             resourceType.CreatedAt,
 		BuiltIn:               !resourceType.OrgId.IsSet(),
 		IsDeveloperAccessible: resourceType.IsDeveloperAccessible,
@@ -63,10 +64,14 @@ func (s *Server) InternalCreateResourceType(ctx context.Context, request Interna
 		Id:                    request.Body.Id,
 		Description:           ref.DerefOr(request.Body.Description, ""),
 		OutputsSchema:         request.Body.OutputSchema,
+		ModuleContract:        ref.DerefOr(request.Body.ModuleContract, nil),
 		CreatedAt:             time.Now().UTC(),
 		IsDeveloperAccessible: ref.DerefOr(request.Body.IsDeveloperAccessible, true),
 	})
 	if err != nil {
+		if me, ok := model.IsErrBadRequest(err); ok {
+			return InternalCreateResourceType400JSONResponse{N400BadRequestJSONResponse: Generate400FromModelErr(me)}, nil
+		}
 		if me, ok := model.IsErrConflict(err); ok {
 			return InternalCreateResourceType409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(me)}, nil
 		}
@@ -188,10 +193,14 @@ func (s *Server) CreateResourceType(ctx context.Context, request CreateResourceT
 		Id:                    request.Body.Id,
 		Description:           ref.DerefOr(request.Body.Description, ""),
 		OutputsSchema:         request.Body.OutputSchema,
+		ModuleContract:        ref.DerefOr(request.Body.ModuleContract, nil),
 		CreatedAt:             time.Now().UTC(),
 		IsDeveloperAccessible: ref.DerefOr(request.Body.IsDeveloperAccessible, true),
 	})
 	if err != nil {
+		if me, ok := model.IsErrBadRequest(err); ok {
+			return CreateResourceType400JSONResponse{N400BadRequestJSONResponse: Generate400FromModelErr(me)}, nil
+		}
 		if me, ok := model.IsErrConflict(err); ok {
 			return CreateResourceType409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(me)}, nil
 		}

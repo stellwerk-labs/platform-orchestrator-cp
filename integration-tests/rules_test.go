@@ -74,6 +74,7 @@ func TestRules(t *testing.T) {
 			ModuleSource:    "/some/module/path",
 			ResourceType:    resourceType,
 			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
+			OutputSchema: ref.Ref(genclient.ModuleOutputSchema{"type": "object"}),
 		})
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, res.StatusCode(), string(res.Body))

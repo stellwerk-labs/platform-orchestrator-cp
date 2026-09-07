@@ -13,6 +13,7 @@ import (
 	"github.com/stellwerk-labs/golib/hlogger"
 	"go.uber.org/zap"
 
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleconformance"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/opt"
 )
 
@@ -21,6 +22,7 @@ type ResourceType struct {
 	Id                    string
 	Description           string
 	OutputsSchema         map[string]interface{}
+	ModuleContract        map[string]any
 	CreatedAt             time.Time
 	IsDeveloperAccessible bool
 	CatalogueStatus       string
@@ -48,7 +50,7 @@ func (d *databaser) ListResourceTypes(ctx context.Context, optionalTx Tx, orgId 
 	rs, err := d.txOrDb(optionalTx).QueryContext(
 		ctx,
 		`SELECT DISTINCT ON(id) org_id, id, "description", output_schema, created_at, is_developer_accessible,
-			catalogue_status, resource_version, archived_at, archived_by, COALESCE(archive_reason, '')
+			catalogue_status, resource_version, archived_at, archived_by, COALESCE(archive_reason, ''), module_contract
          FROM resource_types 
 		 WHERE (org_id = $1 OR org_id IS NULL) AND id > $2
 		 ORDER BY id, org_id NULLS LAST LIMIT $3`,
@@ -89,7 +91,7 @@ func (d *databaser) BulkGetResourceTypes(ctx context.Context, optionalTx Tx, org
 	rs, err := d.txOrDb(optionalTx).QueryContext(
 		ctx,
 		`SELECT org_id, id, "description", output_schema, created_at, is_developer_accessible,
-			catalogue_status, resource_version, archived_at, archived_by, COALESCE(archive_reason, '')
+			catalogue_status, resource_version, archived_at, archived_by, COALESCE(archive_reason, ''), module_contract
          FROM resource_types 
 		 WHERE (org_id = $1 OR org_id IS NULL) AND id = ANY($2)`,
 		orgId, pq.Array(ids),
@@ -124,7 +126,7 @@ func (d *databaser) GetResourceType(ctx context.Context, optionalTx Tx, orgId *s
 	}
 	row := d.txOrDb(optionalTx).QueryRowContext(ctx,
 		`SELECT org_id, id, description, output_schema, created_at, is_developer_accessible,
-			catalogue_status, resource_version, archived_at, archived_by, COALESCE(archive_reason, '')
+			catalogue_status, resource_version, archived_at, archived_by, COALESCE(archive_reason, ''), module_contract
 		 FROM resource_types WHERE (org_id = $1 OR org_id IS NULL) AND id = $2
 		 ORDER BY org_id NULLS LAST LIMIT 1`, orgId, id)
 	if err := scanResourceType(row, res); err != nil {
@@ -137,11 +139,42 @@ func (d *databaser) GetResourceType(ctx context.Context, optionalTx Tx, orgId *s
 }
 
 func (d *databaser) CreateResourceType(ctx context.Context, optionalTx Tx, request *ResourceType) (*ResourceType, error) {
+	if err := moduleconformance.ValidateContract(ctx, request.ModuleContract); err != nil {
+		return nil, conformanceBadRequest(err)
+	}
+	if optionalTx == nil {
+		tx, err := d.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = tx.Rollback() }()
+		result, err := d.CreateResourceType(ctx, tx, request)
+		if err != nil {
+			return nil, err
+		}
+		return result, tx.Commit()
+	}
+	if err := lockResourceTypeIdentity(ctx, optionalTx, request.Id); err != nil {
+		return nil, err
+	}
+	if request.OrgId.IsSet() {
+		var shadowsUsedType bool
+		if err := optionalTx.QueryRowContext(ctx, `SELECT
+			EXISTS(SELECT 1 FROM resource_types WHERE org_id IS NULL AND id = $2)
+			AND NOT EXISTS(SELECT 1 FROM resource_types WHERE org_id = $1 AND id = $2)
+			AND EXISTS(SELECT 1 FROM definitions WHERE org_id = $1 AND resource_type = $2)`,
+			request.OrgId.Must(), request.Id).Scan(&shadowsUsedType); err != nil {
+			return nil, errors.Wrap(err, "failed to inspect Resource Type binding")
+		}
+		if shadowsUsedType {
+			return nil, NewErrConflict("cannot shadow a built-in Resource Type already bound to a Module in this organization; use a new Resource Type identity")
+		}
+	}
 	ret := *request
 	row := d.txOrDb(optionalTx).QueryRowContext(ctx,
-		`INSERT INTO resource_types (org_id, id, "description", output_schema, created_at, is_developer_accessible) VALUES ($1, $2, $3, $4, $5, $6)
+		`INSERT INTO resource_types (org_id, id, "description", output_schema, created_at, is_developer_accessible, module_contract) VALUES ($1, $2, $3, $4, $5, $6, $7)
 		 RETURNING created_at, catalogue_status, resource_version`,
-		request.OrgId, request.Id, request.Description, asJson(&request.OutputsSchema), request.CreatedAt, request.IsDeveloperAccessible,
+		request.OrgId, request.Id, request.Description, asJson(&request.OutputsSchema), request.CreatedAt, request.IsDeveloperAccessible, asJson(&request.ModuleContract),
 	)
 	if err := row.Scan(&ret.CreatedAt, &ret.CatalogueStatus, &ret.ResourceVersion); err != nil {
 		if pqe := new(pq.Error); errors.As(err, &pqe) {
@@ -166,7 +199,7 @@ func scanResourceType(row interface{ Scan(...any) error }, result *ResourceType)
 	var archivedBy uuid.NullUUID
 	if err := row.Scan(opt.Scan(&result.OrgId), &result.Id, &result.Description, asJson(&result.OutputsSchema),
 		&result.CreatedAt, &result.IsDeveloperAccessible, &result.CatalogueStatus, &result.ResourceVersion,
-		&archivedAt, &archivedBy, &result.ArchiveReason); err != nil {
+		&archivedAt, &archivedBy, &result.ArchiveReason, asJson(&result.ModuleContract)); err != nil {
 		return err
 	}
 	if archivedAt.Valid {
@@ -208,12 +241,12 @@ func (d *databaser) SetResourceTypeCatalogueStatus(ctx context.Context, tx Tx, o
 		row = tx.QueryRowContext(ctx, `UPDATE resource_types SET catalogue_status = 'archived', archived_at = now(), archived_by = $3,
 			archive_reason = $4, resource_version = resource_version + 1 WHERE org_id = $1 AND id = $2
 			RETURNING org_id, id, description, output_schema, created_at, is_developer_accessible,
-			catalogue_status, resource_version, archived_at, archived_by, COALESCE(archive_reason, '')`, orgID, id, actor, reason)
+			catalogue_status, resource_version, archived_at, archived_by, COALESCE(archive_reason, ''), module_contract`, orgID, id, actor, reason)
 	} else {
 		row = tx.QueryRowContext(ctx, `UPDATE resource_types SET catalogue_status = 'active', archived_at = NULL, archived_by = NULL,
 			archive_reason = NULL, resource_version = resource_version + 1 WHERE org_id = $1 AND id = $2
 			RETURNING org_id, id, description, output_schema, created_at, is_developer_accessible,
-			catalogue_status, resource_version, archived_at, archived_by, COALESCE(archive_reason, '')`, orgID, id)
+			catalogue_status, resource_version, archived_at, archived_by, COALESCE(archive_reason, ''), module_contract`, orgID, id)
 	}
 	updated := &ResourceType{}
 	if err := scanResourceType(row, updated); err != nil {
@@ -240,6 +273,19 @@ func (d *databaser) SetResourceTypeCatalogueStatus(ctx context.Context, tx Tx, o
 func (d *databaser) DeleteResourceType(ctx context.Context, optionalTx Tx, orgId *string, id string) error {
 	if optionalTx == nil {
 		return fmt.Errorf("optional transaction cannot be nil")
+	}
+	if err := lockResourceTypeIdentity(ctx, optionalTx, id); err != nil {
+		return err
+	}
+	if orgId == nil {
+		var used bool
+		if err := optionalTx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM definitions d
+			WHERE d.resource_type = $1 AND NOT EXISTS(SELECT 1 FROM resource_types r WHERE r.org_id = d.org_id AND r.id = $1))`, id).Scan(&used); err != nil {
+			return errors.Wrap(err, "failed to inspect built-in Resource Type usage")
+		}
+		if used {
+			return NewErrConflict("modules are still using this built-in Resource Type")
+		}
 	}
 
 	if orgId != nil {
@@ -271,4 +317,9 @@ func (d *databaser) DeleteResourceType(ctx context.Context, optionalTx Tx, orgId
 		return NewErrNotFound("resource type not found")
 	}
 	return nil
+}
+
+func lockResourceTypeIdentity(ctx context.Context, tx Tx, id string) error {
+	_, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, "resource-type:"+id)
+	return errors.Wrap(err, "failed to lock Resource Type identity")
 }

@@ -8,7 +8,7 @@ import (
 
 // NewErrBadRequest constructs a new bad request error. Use this when the arguments are invalid or malformed.
 func NewErrBadRequest(message string) ErrBadRequest {
-	return ErrBadRequest{message}
+	return ErrBadRequest{Message: message}
 }
 
 // NewErrConflict constructs a conflict error. Use this when the database state is not valid for this operation.
@@ -23,6 +23,8 @@ func NewErrNotFound(message string) ErrNotFound {
 
 type ErrBadRequest struct {
 	Message string
+	Code    string
+	Details map[string]any
 }
 
 func (e ErrBadRequest) Error() string {

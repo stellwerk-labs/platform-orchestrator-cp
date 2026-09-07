@@ -8,6 +8,7 @@ import (
 	"iter"
 	"maps"
 	"net/http"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -73,6 +74,7 @@ func apiMdFromDbMd(mp model.ModuleDefinitionVersion) Module {
 		Description:      mp.Description.Ref(),
 		Id:               mp.DefinitionId,
 		ModuleInputs:     mp.ModuleInputs,
+		OutputSchema:     optionalJSONObject[ModuleOutputSchema](mp.OutputSchema),
 		ModuleParams:     mps,
 		ModuleSource:     mp.ModuleSource,
 		ModuleSourceCode: mp.ModuleSourceCode.Ref(),
@@ -91,6 +93,7 @@ func apiMdvFromApiMd(md Module) ModuleVersion {
 		Description:      md.Description,
 		Dependencies:     md.Dependencies,
 		ModuleInputs:     md.ModuleInputs,
+		OutputSchema:     md.OutputSchema,
 		ModuleParams:     md.ModuleParams,
 		ModuleSource:     md.ModuleSource,
 		ModuleSourceCode: md.ModuleSourceCode,
@@ -139,7 +142,8 @@ func coreModuleVersionDetailFromDB(mp model.ModuleDefinitionVersion) CoreModuleV
 		ModuleInputs: definition.ModuleInputs, ModuleParams: definition.ModuleParams,
 		ModuleSource: definition.ModuleSource, ModuleSourceCode: definition.ModuleSourceCode,
 		ProviderMapping: definition.ProviderMapping, ResourceType: definition.ResourceType,
-		VersionId: definition.VersionId,
+		VersionId:    definition.VersionId,
+		OutputSchema: definition.OutputSchema,
 	}
 }
 
@@ -250,11 +254,10 @@ func validateManagedModuleVersion(version, digest *string, inlineSource *string)
 		}
 		return nil
 	}
-	if digest == nil {
-		return fmt.Errorf("artifact_digest is required for an external module artifact")
-	}
-	if err := moduleversions.ValidateArtifactDigest(*digest); err != nil {
-		return err
+	if digest != nil {
+		if err := moduleversions.ValidateArtifactDigest(*digest); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -354,6 +357,7 @@ func (s *Server) CreateModule(ctx context.Context, request CreateModuleRequestOb
 			ModuleSourceCode:    opt.OfRef(request.Body.ModuleSourceCode),
 			ModuleParams:        prms,
 			ModuleInputs:        request.Body.ModuleInputs,
+			OutputSchema:        ref.DerefOr(request.Body.OutputSchema, nil),
 			Dependencies:        deps,
 			CoProvisioned:       cops,
 			ProviderMapping:     request.Body.ProviderMapping,
@@ -478,7 +482,7 @@ func (s *Server) UpdateModule(ctx context.Context, request UpdateModuleRequestOb
 		}
 
 		var zero ModuleUpdateBody
-		if *request.Body == zero {
+		if reflect.DeepEqual(*request.Body, zero) {
 			return UpdateModule200JSONResponse(apiMdFromDbMd(*current)), nil
 		}
 
@@ -518,6 +522,7 @@ func (s *Server) UpdateModule(ctx context.Context, request UpdateModuleRequestOb
 		}
 
 		current.ModuleInputs = ref.DerefOr(request.Body.ModuleInputs, current.ModuleInputs)
+		current.OutputSchema = ref.DerefOr(request.Body.OutputSchema, nil)
 		current.ProviderMapping = ref.DerefOr(request.Body.ProviderMapping, current.ProviderMapping)
 		var referencedTypes = make([]string, 0)
 		if request.Body.Dependencies != nil {

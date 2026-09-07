@@ -440,6 +440,7 @@ func TestDefinitions(t *testing.T) {
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.ModuleCreateBody{
 			Id: "parent", ResourceType: "thing", ModuleSource: "acme/k8ss/generic@v1", Description: ref.Ref("parent def"),
 			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
+			OutputSchema: ref.Ref(genclient.ModuleOutputSchema{"type": "object", "properties": map[string]interface{}{}}),
 			Dependencies: map[string]genclient.ModuleDependencyManifest{"child": {Type: "thing", Class: ref.Ref("child")}},
 		})
 		require.NoError(t, err)
@@ -449,6 +450,7 @@ func TestDefinitions(t *testing.T) {
 
 		res2, err := client.UpdateModuleWithResponse(t.Context(), orgId, "parent", genclient.UpdateModuleJSONRequestBody{
 			SemanticVersion: ref.Ref("1.1.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
+			OutputSchema: ref.Ref(genclient.ModuleOutputSchema{"type": "object", "properties": map[string]interface{}{}}),
 			Dependencies: &map[string]genclient.ModuleDependencyManifest{"child": {Type: "thing", Class: ref.Ref("child"), Id: ref.Ref("child-id")}},
 		})
 		require.NoError(t, err)
@@ -460,6 +462,7 @@ func TestDefinitions(t *testing.T) {
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.ModuleCreateBody{
 			Id: "parent2", ResourceType: "thing", ModuleSource: "acme/k8ss/generic@v1", Description: ref.Ref("parent def"),
 			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
+			OutputSchema:  ref.Ref(genclient.ModuleOutputSchema{"type": "object", "properties": map[string]interface{}{}}),
 			Coprovisioned: []genclient.ModuleCoProvisionManifest{{Type: "thing", Class: ref.Ref("remote"), Id: ref.Ref("remote-id"), CopyDependentsFromCurrent: true, IsDependentOnCurrent: true, Params: map[string]interface{}{"param1": "value1"}}},
 		})
 		require.NoError(t, err)
@@ -469,6 +472,7 @@ func TestDefinitions(t *testing.T) {
 
 		res2, err := client.UpdateModuleWithResponse(t.Context(), orgId, res.JSON201.Id, genclient.UpdateModuleJSONRequestBody{
 			SemanticVersion: ref.Ref("1.1.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
+			OutputSchema:  ref.Ref(genclient.ModuleOutputSchema{"type": "object", "properties": map[string]interface{}{}}),
 			Coprovisioned: &[]genclient.ModuleCoProvisionManifest{{Type: "thing", CopyDependentsFromCurrent: false, IsDependentOnCurrent: false}},
 		})
 		require.NoError(t, err)
@@ -480,6 +484,7 @@ func TestDefinitions(t *testing.T) {
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.ModuleCreateBody{
 			Id: "inline-eg", ResourceType: "thing",
 			ModuleSource: "inline", SemanticVersion: ref.Ref("1.0.0"),
+			OutputSchema: ref.Ref(genclient.ModuleOutputSchema{"type": "object", "properties": map[string]interface{}{}}),
 			ModuleSourceCode: ref.Ref(`
 output "foo" {
   value = "bar"
@@ -520,6 +525,7 @@ output "foo" {
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.ModuleCreateBody{
 			Id: "conflict", ResourceType: "thing",
 			ModuleSource: "acme/k8ss/generic@v1", SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
+			OutputSchema: ref.Ref(genclient.ModuleOutputSchema{"type": "object", "properties": map[string]interface{}{}}),
 			ModuleParams: map[string]genclient.ModuleParamItem{"x": {Type: "string"}},
 			ModuleInputs: map[string]interface{}{"x": "y"},
 		})
@@ -534,6 +540,7 @@ output "foo" {
 			res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.ModuleCreateBody{
 				Id: fmt.Sprintf("inline-%d", i), ResourceType: "thing",
 				ModuleSource: "inline", SemanticVersion: ref.Ref("1.0.0"),
+				OutputSchema:     ref.Ref(genclient.ModuleOutputSchema{"type": "object", "properties": map[string]interface{}{}}),
 				ModuleSourceCode: ref.Ref(strings.Repeat(" ", i)),
 			})
 			require.NoError(t, err)
@@ -546,6 +553,7 @@ output "foo" {
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.ModuleCreateBody{
 			Id: "inline-too-long", ResourceType: "thing",
 			ModuleSource: "inline", SemanticVersion: ref.Ref("1.0.0"),
+			OutputSchema:     ref.Ref(genclient.ModuleOutputSchema{"type": "object", "properties": map[string]interface{}{}}),
 			ModuleSourceCode: ref.Ref(strings.Repeat(" ", 10_001)),
 		})
 		require.NoError(t, err)
