@@ -121,3 +121,73 @@ func TestDefectiveDefaultRestorationNeverSkipsTheExactDeprecatedPredecessor(t *t
 		})
 	}
 }
+
+func TestConcurrentStableSuccessorCommandsCreateOneStableProposedVersion(t *testing.T) {
+	client := MustServerClient(t)
+	orgID := MustCreateOrg(t, MustInternalServerClient(t)).Id
+	database := lifecycleSQLDatabase(t)
+	const moduleID = "concurrent-stable-successor"
+	createLifecycleModule(t, client, orgID, moduleID)
+	first := publishLifecycleVersion(t, client, orgID, moduleID, "1.0.0")
+	transitionLifecycleVersion(t, client, orgID, moduleID, "promote", first)
+	prerelease := publishLifecycleVersion(t, client, orgID, moduleID, "1.1.0-rc.1")
+
+	type outcome struct {
+		response *genclient.PublishStableModuleVersionSuccessorResponse
+		err      error
+	}
+	stableVersions := []string{"1.1.0", "1.2.0", "2.0.0"}
+	start := make(chan struct{})
+	results := make(chan outcome, len(stableVersions))
+	for _, version := range stableVersions {
+		go func() {
+			<-start
+			response, err := client.PublishStableModuleVersionSuccessorWithResponse(t.Context(), orgID, moduleID, prerelease.Uuid.String(),
+				&genclient.PublishStableModuleVersionSuccessorParams{IdempotencyKey: "graduate-" + version},
+				genclient.StableModuleVersionSuccessorBody{
+					ExpectedPrereleaseResourceVersion: prerelease.ResourceVersion,
+					Reason:                            "Graduate one concurrent stable successor",
+					Version:                           lifecyclePublication(version),
+				})
+			results <- outcome{response: response, err: err}
+		}()
+	}
+	close(start)
+	var accepted *genclient.StableModuleVersionSuccessorResult
+	rejected := 0
+	for range stableVersions {
+		result := <-results
+		require.NoError(t, result.err)
+		switch result.response.StatusCode() {
+		case http.StatusCreated:
+			require.Nil(t, accepted, "only one stable successor command may commit")
+			accepted = result.response.JSON201
+		case http.StatusConflict:
+			rejected++
+		default:
+			t.Fatalf("unexpected stable successor status %d: %s", result.response.StatusCode(), result.response.Body)
+		}
+	}
+	require.NotNil(t, accepted)
+	require.Equal(t, len(stableVersions)-1, rejected)
+	require.Equal(t, genclient.ModuleVersionSemanticStatus("deprecated"), accepted.Prerelease.LifecycleStatus)
+	require.Equal(t, genclient.ModuleVersionSemanticStatus("proposed"), accepted.Stable.LifecycleStatus)
+	require.NotEqual(t, prerelease.Uuid, accepted.Stable.Uuid)
+
+	var totalVersions, proposedVersions, deprecatedPrereleases, commandReceipts, correlatedEvents int
+	require.NoError(t, database.QueryRowContext(t.Context(), `SELECT
+		count(*),
+		count(*) FILTER (WHERE semantic_status='proposed'),
+		count(*) FILTER (WHERE uuid=$2 AND semantic_status='deprecated')
+		FROM definition_versions WHERE org_id=$1`,
+		orgID, prerelease.Uuid).Scan(&totalVersions, &proposedVersions, &deprecatedPrereleases))
+	require.Equal(t, 3, totalVersions)
+	require.Equal(t, 1, proposedVersions)
+	require.Equal(t, 1, deprecatedPrereleases)
+	require.NoError(t, database.QueryRowContext(t.Context(), `SELECT count(*) FROM module_core_commands WHERE org_id=$1 AND command_scope=$2`,
+		orgID, "stable-successor:"+moduleID+":"+prerelease.Uuid.String()).Scan(&commandReceipts))
+	require.Equal(t, 1, commandReceipts)
+	require.NoError(t, database.QueryRowContext(t.Context(), `SELECT count(*) FROM module_version_lifecycle_events WHERE org_id=$1 AND correlation_id=$2`,
+		orgID, accepted.CorrelationId).Scan(&correlatedEvents))
+	require.Equal(t, 2, correlatedEvents)
+}

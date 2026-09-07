@@ -1247,6 +1247,16 @@ func (s *Server) ReconcileEnvironmentModuleVersionPinOverride(ctx context.Contex
 	} else if found {
 		return ReconcileEnvironmentModuleVersionPinOverride200JSONResponse(response), nil
 	}
+	pin, err = s.Database.GetEnvironmentModuleVersionPin(ctx, tx, request.OrgId, request.PinId, model.GetModeForUpdate)
+	if err != nil {
+		if notFound, ok := model.IsErrNotFound(err); ok {
+			return ReconcileEnvironmentModuleVersionPinOverride404JSONResponse{N404NotFoundJSONResponse: Generate404FromModelErr(notFound)}, nil
+		}
+		return nil, err
+	}
+	if pin.Status != moduleversions.PinOverridePending || pin.OverrideOperationID == nil || *pin.OverrideOperationID != request.Body.OperationId {
+		return ReconcileEnvironmentModuleVersionPinOverride409JSONResponse{N409ConflictJSONResponse: Generate409Response("Pin is not override-pending for this operation")}, nil
+	}
 	deployment, err := s.authoritativePinDeployment(ctx, request.OrgId, *pin, request.Body.DeploymentId)
 	if err != nil {
 		return ReconcileEnvironmentModuleVersionPinOverride409JSONResponse{N409ConflictJSONResponse: Generate409Response(err.Error())}, nil
@@ -1335,6 +1345,16 @@ func (s *Server) RestoreEnvironmentModuleVersionPinAfterRollback(ctx context.Con
 		return nil, err
 	} else if found {
 		return RestoreEnvironmentModuleVersionPinAfterRollback200JSONResponse(response), nil
+	}
+	pin, err = s.Database.GetEnvironmentModuleVersionPin(ctx, tx, request.OrgId, request.PinId, model.GetModeForUpdate)
+	if err != nil {
+		if notFound, ok := model.IsErrNotFound(err); ok {
+			return RestoreEnvironmentModuleVersionPinAfterRollback404JSONResponse{N404NotFoundJSONResponse: Generate404FromModelErr(notFound)}, nil
+		}
+		return nil, err
+	}
+	if pin.Status != moduleversions.PinOverridden || pin.OverrideOperationID == nil || *pin.OverrideOperationID != request.Body.OperationId {
+		return RestoreEnvironmentModuleVersionPinAfterRollback409JSONResponse{N409ConflictJSONResponse: Generate409Response("Pin was not overridden by this operation")}, nil
 	}
 	if request.Body.RestoredVersionUuid != pin.VersionUUID {
 		return RestoreEnvironmentModuleVersionPinAfterRollback409JSONResponse{N409ConflictJSONResponse: Generate409Response("Rollback did not restore the exact pinned Module Version")}, nil

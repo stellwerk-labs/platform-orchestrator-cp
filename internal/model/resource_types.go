@@ -223,6 +223,9 @@ func (d *databaser) SetResourceTypeCatalogueStatus(ctx context.Context, tx Tx, o
 	if target != catalogueStatusActive && target != catalogueStatusArchived {
 		return nil, NewErrBadRequest("invalid resource type catalogue status")
 	}
+	if err := lockResourceTypeIdentity(ctx, tx, id); err != nil {
+		return nil, err
+	}
 	current, err := d.GetResourceType(ctx, tx, &orgID, id)
 	if err != nil {
 		return nil, err

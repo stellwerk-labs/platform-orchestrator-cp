@@ -7,6 +7,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stellwerk-labs/golib/hecho"
+	"github.com/stellwerk-labs/golib/hmessaging"
+	mockorchestratordp "github.com/stellwerk-labs/platform-orchestrator-cp/internal/clients/orchestratordp/mocks"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
 	mockmodel "github.com/stellwerk-labs/platform-orchestrator-cp/internal/model/mocks"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
@@ -15,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap/zaptest"
 
 	mockorchestratoriam "github.com/stellwerk-labs/platform-orchestrator-cp/internal/clients/orchestratoriam/mocks"
 )
@@ -109,4 +112,90 @@ func TestUnpinIsAuthorizedByScopeRatherThanPinCreator(t *testing.T) {
 	response := result.(TransitionEnvironmentModuleVersionPin200JSONResponse)
 	assert.Equal(t, ModuleVersionPinStatus(moduleversions.PinRemoved), response.Status)
 	assert.NotEqual(t, creator, actor, "the test must exercise a different scope-authorized actor")
+}
+
+func TestPinOverrideReconciliationRequiresCurrentOwnedPendingState(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	database := mockmodel.NewMockDatabaser(ctrl)
+	tx := mockmodel.NewMockTxWithCommit(ctrl)
+	database.EXPECT().BeginTx(gomock.Any(), gomock.Any()).Return(tx, nil)
+	tx.EXPECT().Rollback().Return(nil)
+
+	pinID, operationID, deploymentID := uuid.New(), uuid.New(), uuid.New()
+	pin := model.EnvironmentModuleVersionPin{
+		ID: pinID, OrgID: "acme", ProjectUUID: uuid.New(), ProjectID: "retail",
+		EnvironmentUUID: uuid.New(), EnvironmentID: "production", ModuleUUID: uuid.New(),
+		VersionUUID: uuid.New(), Status: moduleversions.PinActive, ResourceVersion: 7,
+		ActivationEventID: uuid.New(), CreatedBy: userid.InternalSystemUuid,
+	}
+
+	database.EXPECT().GetEnvironmentModuleVersionPin(gomock.Any(), nil, "acme", pinID, model.GetModeDefault).Return(&pin, nil)
+	database.EXPECT().GetModuleCoreCommand(gomock.Any(), tx, "acme",
+		"pin-reconcile:"+pinID.String()+":"+operationID.String()+":"+deploymentID.String(), "stale-callback",
+	).Return("", nil, false, nil)
+	database.EXPECT().GetEnvironmentModuleVersionPin(gomock.Any(), tx, "acme", pinID, model.GetModeForUpdate).Return(&pin, nil)
+
+	server := &Server{
+		Database: database, Logger: zaptest.NewLogger(t), Publisher: new(hmessaging.RecordingPublisher),
+		DpClient:  mockorchestratordp.NewMockClientWithResponsesInterface(ctrl),
+		IamClient: mockorchestratoriam.NewMockClientWithResponsesInterface(ctrl),
+	}
+	ctx := context.WithValue(t.Context(), hecho.ContextKeyUserID, userid.InternalSystemUuid.String())
+
+	result, err := server.ReconcileEnvironmentModuleVersionPinOverride(ctx, ReconcileEnvironmentModuleVersionPinOverrideRequestObject{
+		OrgId: "acme", PinId: pinID, Params: ReconcileEnvironmentModuleVersionPinOverrideParams{IdempotencyKey: "stale-callback"},
+		Body: &ModuleVersionPinOverrideReconcileBody{
+			ExpectedResourceVersion: pin.ResourceVersion, OperationId: operationID, DeploymentId: deploymentID,
+			Outcome: ModuleVersionPinOverrideReconcileBodyOutcomeFailed, Reason: "Authoritative failure from old callback",
+		},
+	})
+
+	require.NoError(t, err)
+	response := result.(ReconcileEnvironmentModuleVersionPinOverride409JSONResponse)
+	assert.Equal(t, "Pin is not override-pending for this operation", response.Message)
+}
+
+func TestPinRollbackRestorationRequiresCurrentOwnedOverriddenState(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+
+	database := mockmodel.NewMockDatabaser(ctrl)
+	tx := mockmodel.NewMockTxWithCommit(ctrl)
+	database.EXPECT().BeginTx(gomock.Any(), gomock.Any()).Return(tx, nil)
+	tx.EXPECT().Rollback().Return(nil)
+
+	pinID, operationID, deploymentID := uuid.New(), uuid.New(), uuid.New()
+	pin := model.EnvironmentModuleVersionPin{
+		ID: pinID, OrgID: "acme", ProjectUUID: uuid.New(), ProjectID: "retail",
+		EnvironmentUUID: uuid.New(), EnvironmentID: "production", ModuleUUID: uuid.New(),
+		VersionUUID: uuid.New(), Status: moduleversions.PinActive, ResourceVersion: 11,
+		ActivationEventID: uuid.New(), CreatedBy: userid.InternalSystemUuid,
+	}
+
+	database.EXPECT().GetEnvironmentModuleVersionPin(gomock.Any(), nil, "acme", pinID, model.GetModeDefault).Return(&pin, nil)
+	database.EXPECT().GetModuleCoreCommand(gomock.Any(), tx, "acme",
+		"pin-restore:"+pinID.String()+":"+operationID.String()+":"+deploymentID.String(), "stale-rollback",
+	).Return("", nil, false, nil)
+	database.EXPECT().GetEnvironmentModuleVersionPin(gomock.Any(), tx, "acme", pinID, model.GetModeForUpdate).Return(&pin, nil)
+
+	server := &Server{
+		Database: database, Logger: zaptest.NewLogger(t), Publisher: new(hmessaging.RecordingPublisher),
+		DpClient:  mockorchestratordp.NewMockClientWithResponsesInterface(ctrl),
+		IamClient: mockorchestratoriam.NewMockClientWithResponsesInterface(ctrl),
+	}
+	ctx := context.WithValue(t.Context(), hecho.ContextKeyUserID, userid.InternalSystemUuid.String())
+
+	result, err := server.RestoreEnvironmentModuleVersionPinAfterRollback(ctx, RestoreEnvironmentModuleVersionPinAfterRollbackRequestObject{
+		OrgId: "acme", PinId: pinID, Params: RestoreEnvironmentModuleVersionPinAfterRollbackParams{IdempotencyKey: "stale-rollback"},
+		Body: &ModuleVersionPinRollbackRestoreBody{
+			ExpectedResourceVersion: pin.ResourceVersion, OperationId: operationID, DeploymentId: deploymentID,
+			RestoredVersionUuid: pin.VersionUUID, Reason: "Rollback callback after protection was already active",
+		},
+	})
+
+	require.NoError(t, err)
+	response := result.(RestoreEnvironmentModuleVersionPinAfterRollback409JSONResponse)
+	assert.Equal(t, "Pin was not overridden by this operation", response.Message)
 }

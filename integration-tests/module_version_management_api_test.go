@@ -17,6 +17,7 @@ import (
 
 func TestEmptyModuleHardDeleteReleasesCreateIdempotency(t *testing.T) {
 	client := MustServerClient(t)
+	database := lifecycleSQLDatabase(t)
 	orgID := MustCreateOrg(t, MustInternalServerClient(t)).Id
 	resourceType := MustCreateResourceType(t, client, orgID, "recreate-"+strings.ToLower(rand.Text()))
 	moduleSlug := "recreate-" + strings.ToLower(rand.Text())
@@ -31,6 +32,14 @@ func TestEmptyModuleHardDeleteReleasesCreateIdempotency(t *testing.T) {
 	deleted, err := client.DeleteModuleWithResponse(t.Context(), orgID, moduleSlug)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusNoContent, deleted.StatusCode(), string(deleted.Body))
+	var shellResidue int
+	require.NoError(t, database.QueryRowContext(t.Context(), `SELECT
+		(SELECT count(*) FROM definitions WHERE org_id=$1 AND uuid=$2)
+		+ (SELECT count(*) FROM module_catalogue_events WHERE org_id=$1 AND module_uuid=$2)
+		+ (SELECT count(*) FROM module_version_lifecycle_events WHERE org_id=$1 AND module_uuid=$2)
+		+ (SELECT count(*) FROM module_core_commands WHERE org_id=$1 AND command_scope=$3 AND idempotency_key=$4)`,
+		orgID, created.JSON201.Uuid, "module-create:"+moduleSlug, params.IdempotencyKey).Scan(&shellResidue))
+	require.Zero(t, shellResidue, "hard-deleted empty shells must not leave retained identity, events, or create receipts")
 
 	recreated, err := client.CreateModuleCatalogueEntryWithResponse(t.Context(), orgID, params, body)
 	require.NoError(t, err)
