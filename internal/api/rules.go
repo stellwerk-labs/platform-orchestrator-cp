@@ -11,6 +11,7 @@ import (
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/logging"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/opt"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 )
@@ -95,6 +96,16 @@ func (s *Server) CreateModuleRuleInOrg(ctx context.Context, request CreateModule
 				logger.Error("failed to rollback transaction", zap.Error(err))
 			}
 		}()
+		catalogue, err := s.Database.GetModuleCatalogue(ctx, tx, request.OrgId, request.Body.ModuleId, model.GetModeForUpdate)
+		if err != nil {
+			if me, ok := model.IsErrNotFound(err); ok {
+				return CreateModuleRuleInOrg400JSONResponse{N400BadRequestJSONResponse: Generate400FromModelErr(model.NewErrBadRequest(me.Message))}, nil
+			}
+			return nil, errors.Wrap(err, "failed to get Module catalogue entry")
+		}
+		if catalogue.Status == moduleversions.CatalogueArchived {
+			return CreateModuleRuleInOrg409JSONResponse{N409ConflictJSONResponse: Generate409Response("archived Modules reject new Module Rules")}, nil
+		}
 
 		definition, err := s.Database.GetModuleDefinition(ctx, tx, request.OrgId, request.Body.ModuleId, model.GetModeForUpdate)
 		if err != nil {

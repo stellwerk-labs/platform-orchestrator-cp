@@ -13,7 +13,7 @@ func NewErrBadRequest(message string) ErrBadRequest {
 
 // NewErrConflict constructs a conflict error. Use this when the database state is not valid for this operation.
 func NewErrConflict(message string) ErrConflict {
-	return ErrConflict{message}
+	return ErrConflict{Message: message}
 }
 
 // NewErrNotFound constructs a not found error. Use this when the subject of the request is not found
@@ -39,7 +39,11 @@ func IsErrBadRequest(err error) (ErrBadRequest, bool) {
 
 type ErrConflict struct {
 	Message string
+	Code    string
 }
+
+// ModuleHistoryRetained identifies immutable history, not a transient deletion blocker.
+const ModuleHistoryRetained = "module_history_retained"
 
 func (e ErrConflict) Error() string {
 	return fmt.Sprintf("conflict: %s", e.Message)

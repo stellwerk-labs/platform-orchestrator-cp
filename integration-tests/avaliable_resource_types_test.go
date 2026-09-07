@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/genclient"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genclient"
 )
 
 func TestAvailableResourceTypesCrud(t *testing.T) {
@@ -180,9 +180,10 @@ func TestAvailableResourceTypesCrud(t *testing.T) {
 	const k8sClusterModuleId = "my-k8s-cluster-definition"
 	{
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.CreateModuleJSONRequestBody{
-			Id:           k8sClusterModuleId,
-			ResourceType: "k8s-cluster",
-			ModuleSource: "/modules/my-module",
+			Id:              k8sClusterModuleId,
+			ResourceType:    "k8s-cluster",
+			ModuleSource:    "/modules/my-module",
+			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
 			ProviderMapping: map[string]string{
 				provType: provType + "." + provId,
 			},
@@ -197,13 +198,15 @@ func TestAvailableResourceTypesCrud(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, res.StatusCode())
 	}
+	MustPromoteModuleVersion(t, client, orgId, k8sClusterModuleId, "1.0.0")
 
 	const s3ModuleId = "my-s3-definition"
 	{
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.CreateModuleJSONRequestBody{
-			Id:           s3ModuleId,
-			ResourceType: "s3",
-			ModuleSource: "/modules/my-s3",
+			Id:              s3ModuleId,
+			ResourceType:    "s3",
+			ModuleSource:    "/modules/my-s3",
+			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
 			ProviderMapping: map[string]string{
 				provType: provType + "." + provId,
 			},
@@ -211,13 +214,15 @@ func TestAvailableResourceTypesCrud(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, res.StatusCode())
 	}
+	MustPromoteModuleVersion(t, client, orgId, s3ModuleId, "1.0.0")
 
 	const anotherS3ModuleId = "my-another-s3-definition"
 	{
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.CreateModuleJSONRequestBody{
-			Id:           anotherS3ModuleId,
-			ResourceType: "s3",
-			ModuleSource: "/modules/another-my-s3",
+			Id:              anotherS3ModuleId,
+			ResourceType:    "s3",
+			ModuleSource:    "/modules/another-my-s3",
+			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
 			ProviderMapping: map[string]string{
 				provType: provType + "." + provId,
 			},
@@ -225,13 +230,15 @@ func TestAvailableResourceTypesCrud(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, res.StatusCode())
 	}
+	MustPromoteModuleVersion(t, client, orgId, anotherS3ModuleId, "1.0.0")
 
 	const postgresModuleId = "my-postgres-definition"
 	{
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.CreateModuleJSONRequestBody{
-			Id:           postgresModuleId,
-			ResourceType: "postgres",
-			ModuleSource: "/modules/my-postgres",
+			Id:              postgresModuleId,
+			ResourceType:    "postgres",
+			ModuleSource:    "/modules/my-postgres",
+			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
 			ProviderMapping: map[string]string{
 				provType: provType + "." + provId,
 			},
@@ -239,13 +246,15 @@ func TestAvailableResourceTypesCrud(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, res.StatusCode())
 	}
+	MustPromoteModuleVersion(t, client, orgId, postgresModuleId, "1.0.0")
 
 	const myTypeModuleId = "my-type-definition"
 	{
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.CreateModuleJSONRequestBody{
-			Id:           myTypeModuleId,
-			ResourceType: "my-type",
-			ModuleSource: "/modules/my-type",
+			Id:              myTypeModuleId,
+			ResourceType:    "my-type",
+			ModuleSource:    "/modules/my-type",
+			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
 			ProviderMapping: map[string]string{
 				provType: provType + "." + provId,
 			},
@@ -253,6 +262,7 @@ func TestAvailableResourceTypesCrud(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, res.StatusCode())
 	}
+	MustPromoteModuleVersion(t, client, orgId, myTypeModuleId, "1.0.0")
 
 	var defaultK8sClusterRuleId string
 	{

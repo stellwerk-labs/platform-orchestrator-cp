@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"github.com/stellwerk-labs/golib/hlogger"
@@ -22,6 +23,11 @@ type ResourceType struct {
 	OutputsSchema         map[string]interface{}
 	CreatedAt             time.Time
 	IsDeveloperAccessible bool
+	CatalogueStatus       string
+	ResourceVersion       int64
+	ArchivedAt            *time.Time
+	ArchivedBy            *uuid.UUID
+	ArchiveReason         string
 }
 
 type ResourceTypePatch struct {
@@ -41,7 +47,8 @@ func (d *databaser) ListResourceTypes(ctx context.Context, optionalTx Tx, orgId 
 
 	rs, err := d.txOrDb(optionalTx).QueryContext(
 		ctx,
-		`SELECT DISTINCT ON(id) org_id, id, "description", output_schema, created_at, is_developer_accessible
+		`SELECT DISTINCT ON(id) org_id, id, "description", output_schema, created_at, is_developer_accessible,
+			catalogue_status, resource_version, archived_at, archived_by, COALESCE(archive_reason, '')
          FROM resource_types 
 		 WHERE (org_id = $1 OR org_id IS NULL) AND id > $2
 		 ORDER BY id, org_id NULLS LAST LIMIT $3`,
@@ -59,7 +66,7 @@ func (d *databaser) ListResourceTypes(ctx context.Context, optionalTx Tx, orgId 
 	out := make([]ResourceType, 0, limitPlusOne-1)
 	for rs.Next() {
 		next := ResourceType{}
-		if err = rs.Scan(opt.Scan(&next.OrgId), &next.Id, &next.Description, asJson(&next.OutputsSchema), &next.CreatedAt, &next.IsDeveloperAccessible); err != nil {
+		if err = scanResourceType(rs, &next); err != nil {
 			return nil, "", errors.Wrap(err, "failed to scan resource_types")
 		}
 		if len(out) >= limitPlusOne-1 {
@@ -81,7 +88,8 @@ func (d *databaser) BulkGetResourceTypes(ctx context.Context, optionalTx Tx, org
 	logger := hlogger.TraceScopedLoggerFromCtx(d.logger, ctx)
 	rs, err := d.txOrDb(optionalTx).QueryContext(
 		ctx,
-		`SELECT id org_id, id, "description", output_schema, created_at, is_developer_accessible
+		`SELECT org_id, id, "description", output_schema, created_at, is_developer_accessible,
+			catalogue_status, resource_version, archived_at, archived_by, COALESCE(archive_reason, '')
          FROM resource_types 
 		 WHERE (org_id = $1 OR org_id IS NULL) AND id = ANY($2)`,
 		orgId, pq.Array(ids),
@@ -98,7 +106,7 @@ func (d *databaser) BulkGetResourceTypes(ctx context.Context, optionalTx Tx, org
 	out := make([]ResourceType, 0)
 	for rs.Next() {
 		next := ResourceType{}
-		if err = rs.Scan(opt.Scan(&next.OrgId), &next.Id, &next.Description, asJson(&next.OutputsSchema), &next.CreatedAt, &next.IsDeveloperAccessible); err != nil {
+		if err = scanResourceType(rs, &next); err != nil {
 			return nil, errors.Wrap(err, "failed to scan resource_types")
 		}
 		out = append(out, next)
@@ -115,8 +123,11 @@ func (d *databaser) GetResourceType(ctx context.Context, optionalTx Tx, orgId *s
 		Id:    id,
 	}
 	row := d.txOrDb(optionalTx).QueryRowContext(ctx,
-		`SELECT description, output_schema, created_at, is_developer_accessible FROM resource_types WHERE org_id = $1 AND id = $2`, orgId, id)
-	if err := row.Scan(&res.Description, asJson(&res.OutputsSchema), &res.CreatedAt, &res.IsDeveloperAccessible); err != nil {
+		`SELECT org_id, id, description, output_schema, created_at, is_developer_accessible,
+			catalogue_status, resource_version, archived_at, archived_by, COALESCE(archive_reason, '')
+		 FROM resource_types WHERE (org_id = $1 OR org_id IS NULL) AND id = $2
+		 ORDER BY org_id NULLS LAST LIMIT 1`, orgId, id)
+	if err := scanResourceType(row, res); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, NewErrNotFound("resource type not found")
 		}
@@ -128,10 +139,11 @@ func (d *databaser) GetResourceType(ctx context.Context, optionalTx Tx, orgId *s
 func (d *databaser) CreateResourceType(ctx context.Context, optionalTx Tx, request *ResourceType) (*ResourceType, error) {
 	ret := *request
 	row := d.txOrDb(optionalTx).QueryRowContext(ctx,
-		`INSERT INTO resource_types (org_id, id, "description", output_schema, created_at, is_developer_accessible) VALUES ($1, $2, $3, $4, $5, $6) RETURNING created_at`,
+		`INSERT INTO resource_types (org_id, id, "description", output_schema, created_at, is_developer_accessible) VALUES ($1, $2, $3, $4, $5, $6)
+		 RETURNING created_at, catalogue_status, resource_version`,
 		request.OrgId, request.Id, request.Description, asJson(&request.OutputsSchema), request.CreatedAt, request.IsDeveloperAccessible,
 	)
-	if err := row.Scan(&ret.CreatedAt); err != nil {
+	if err := row.Scan(&ret.CreatedAt, &ret.CatalogueStatus, &ret.ResourceVersion); err != nil {
 		if pqe := new(pq.Error); errors.As(err, &pqe) {
 			if strings.Contains(pqe.Message, "resource_types_unq") {
 				return nil, NewErrConflict("resource type already exists")
@@ -143,31 +155,86 @@ func (d *databaser) CreateResourceType(ctx context.Context, optionalTx Tx, reque
 }
 
 func (d *databaser) UpdateResourceType(ctx context.Context, optionalTx Tx, orgId *string, id string, request *ResourceTypePatch) (*ResourceType, error) {
-	var outputsSchema *asJsonInner[map[string]interface{}]
-	if request.OutputsSchema != nil {
-		outputsSchema = asJson(request.OutputsSchema)
+	if _, err := d.GetResourceType(ctx, optionalTx, orgId, id); err != nil {
+		return nil, err
 	}
+	return nil, NewErrConflict("resource types are immutable; create a new resource type identity for a changed contract")
+}
 
-	row := d.txOrDb(optionalTx).QueryRowContext(
-		ctx, `UPDATE resource_types 
-			  SET "description" = COALESCE($3, description),
-			      output_schema = COALESCE($4, output_schema),
-				  is_developer_accessible = COALESCE($5, is_developer_accessible)
-			  WHERE (org_id IS NULL AND $1::text IS NULL OR org_id = $1::text) AND id = $2
-			  RETURNING "description", output_schema, created_at, is_developer_accessible`,
-		opt.OfRef(orgId), id, request.Description, outputsSchema, request.IsDeveloperAccessible.Ref(),
-	)
-	ret := ResourceType{
-		OrgId: opt.OfRef(orgId),
-		Id:    id,
+func scanResourceType(row interface{ Scan(...any) error }, result *ResourceType) error {
+	var archivedAt sql.NullTime
+	var archivedBy uuid.NullUUID
+	if err := row.Scan(opt.Scan(&result.OrgId), &result.Id, &result.Description, asJson(&result.OutputsSchema),
+		&result.CreatedAt, &result.IsDeveloperAccessible, &result.CatalogueStatus, &result.ResourceVersion,
+		&archivedAt, &archivedBy, &result.ArchiveReason); err != nil {
+		return err
 	}
-	if err := row.Scan(&ret.Description, asJson(&ret.OutputsSchema), &ret.CreatedAt, &ret.IsDeveloperAccessible); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, NewErrNotFound("resource type not found")
-		}
-		return nil, errors.Wrap(err, "failed to update row")
+	if archivedAt.Valid {
+		result.ArchivedAt = &archivedAt.Time
 	}
-	return &ret, nil
+	if archivedBy.Valid {
+		value := archivedBy.UUID
+		result.ArchivedBy = &value
+	}
+	return nil
+}
+
+func (d *databaser) SetResourceTypeCatalogueStatus(ctx context.Context, tx Tx, orgID, id, target string, actor uuid.UUID, reason string, expectedVersion int64) (*ResourceType, error) {
+	if tx == nil {
+		return nil, errors.New("transaction required")
+	}
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return nil, NewErrBadRequest("reason is required")
+	}
+	if target != catalogueStatusActive && target != catalogueStatusArchived {
+		return nil, NewErrBadRequest("invalid resource type catalogue status")
+	}
+	current, err := d.GetResourceType(ctx, tx, &orgID, id)
+	if err != nil {
+		return nil, err
+	}
+	if !current.OrgId.IsSet() || current.OrgId.Must() != orgID {
+		return nil, NewErrConflict("built-in resource types cannot be managed through an organization")
+	}
+	if current.ResourceVersion != expectedVersion {
+		return nil, NewErrConflict("resource type changed since it was read")
+	}
+	if current.CatalogueStatus == target {
+		return current, nil
+	}
+	var row *sql.Row
+	if target == "archived" {
+		row = tx.QueryRowContext(ctx, `UPDATE resource_types SET catalogue_status = 'archived', archived_at = now(), archived_by = $3,
+			archive_reason = $4, resource_version = resource_version + 1 WHERE org_id = $1 AND id = $2
+			RETURNING org_id, id, description, output_schema, created_at, is_developer_accessible,
+			catalogue_status, resource_version, archived_at, archived_by, COALESCE(archive_reason, '')`, orgID, id, actor, reason)
+	} else {
+		row = tx.QueryRowContext(ctx, `UPDATE resource_types SET catalogue_status = 'active', archived_at = NULL, archived_by = NULL,
+			archive_reason = NULL, resource_version = resource_version + 1 WHERE org_id = $1 AND id = $2
+			RETURNING org_id, id, description, output_schema, created_at, is_developer_accessible,
+			catalogue_status, resource_version, archived_at, archived_by, COALESCE(archive_reason, '')`, orgID, id)
+	}
+	updated := &ResourceType{}
+	if err := scanResourceType(row, updated); err != nil {
+		return nil, errors.Wrap(err, "failed to change resource type catalogue status")
+	}
+	eventType := "resource_type.archived"
+	if target == catalogueStatusActive {
+		eventType = "resource_type.unarchived"
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO resource_type_catalogue_events
+		(org_id, resource_type_id, event_type, resource_version, actor, reason) VALUES ($1, $2, $3, $4, $5, $6)`,
+		orgID, id, eventType, updated.ResourceVersion, actor, reason); err != nil {
+		return nil, errors.Wrap(err, "failed to append resource type catalogue event")
+	}
+	if err := d.appendModuleCoreOutboxEvent(ctx, tx, "io.platform-orchestrator.resource-type.catalogue.changed", map[string]any{
+		eventFieldOrgID: orgID, "resource_type": id, "catalogue_status": target,
+		eventFieldResourceVer: updated.ResourceVersion, eventFieldActor: actor, eventFieldReason: reason,
+	}); err != nil {
+		return nil, err
+	}
+	return updated, nil
 }
 
 func (d *databaser) DeleteResourceType(ctx context.Context, optionalTx Tx, orgId *string, id string) error {
@@ -184,6 +251,14 @@ func (d *databaser) DeleteResourceType(ctx context.Context, optionalTx Tx, orgId
 			// pass through
 		} else if count > 0 {
 			return NewErrConflict("modules are still using this resource type")
+		}
+
+		if err := optionalTx.QueryRowContext(ctx, `SELECT 1 FROM resource_type_catalogue_events WHERE org_id = $1 AND resource_type_id = $2 LIMIT 1`, *orgId, id).Scan(&count); err != nil {
+			if !errors.Is(err, sql.ErrNoRows) {
+				return errors.Wrap(err, "failed to query resource type catalogue history")
+			}
+		} else {
+			return NewErrConflict("resource types with catalogue history cannot be deleted or reused")
 		}
 	}
 

@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/hashicorp/hcl/v2/hclparse"
 	"github.com/pkg/errors"
 	"github.com/stellwerk-labs/golib/hlogger"
@@ -22,6 +21,7 @@ import (
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/logging"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/opt"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 )
@@ -117,17 +117,29 @@ func apiMdSummaryFromDbMd(mp model.ModuleDefinitionVersion) ModuleSummary {
 	}
 }
 
-func apiMdvSummaryFromDbMd(mp model.ModuleDefinitionVersion) ModuleVersionSummary {
-	if mp.ProviderMapping == nil {
-		mp.ProviderMapping = make(map[string]string)
+func coreModuleVersionDetailFromDB(mp model.ModuleDefinitionVersion) CoreModuleVersionDetail {
+	var semanticVersion *string
+	if mp.SemanticVersion != "" {
+		semanticVersion = &mp.SemanticVersion
 	}
-	return ModuleVersionSummary{
-		CreatedAt:       mp.UpdatedAt,
-		Description:     mp.Description.Ref(),
-		ModuleSource:    mp.ModuleSource,
-		ProviderMapping: mp.ProviderMapping,
-		ResourceType:    mp.ResourceType,
-		VersionId:       mp.VersionId,
+	core := model.CoreModuleVersion{
+		OrgID: mp.OrgId, ModuleUUID: mp.ModuleUUID, ModuleSlug: mp.DefinitionId,
+		UUID: mp.VersionUUID, SemanticVersion: semanticVersion, OpaqueVersionID: mp.VersionId,
+		MigrationGeneration: mp.MigrationGeneration, ArtifactDigest: mp.ArtifactDigest,
+		VerificationStatus: moduleversions.VerificationStatus(mp.VerificationStatus),
+		LifecycleStatus:    moduleversions.LifecycleStatus(mp.SemanticStatus), SourceRevision: mp.SourceRevision,
+		ReleaseNotes: mp.ReleaseNotes.Ref(), ResourceVersion: mp.ResourceVersion, PublishedBy: mp.PublishedBy,
+		CreatedAt: mp.UpdatedAt,
+	}
+	definition := apiMdvFromApiMd(apiMdFromDbMd(mp))
+	return CoreModuleVersionDetail{
+		Version: coreModuleVersionToAPI(core), Definition: definition,
+		Coprovisioned: definition.Coprovisioned, CreatedAt: definition.CreatedAt,
+		Dependencies: definition.Dependencies, Description: definition.Description,
+		ModuleInputs: definition.ModuleInputs, ModuleParams: definition.ModuleParams,
+		ModuleSource: definition.ModuleSource, ModuleSourceCode: definition.ModuleSourceCode,
+		ProviderMapping: definition.ProviderMapping, ResourceType: definition.ResourceType,
+		VersionId: definition.VersionId,
 	}
 }
 
@@ -155,7 +167,7 @@ func (s *Server) ListModules(ctx context.Context, request ListModulesRequestObje
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionModuleRead); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionModuleCoreRead); err != nil {
 		return nil, err
 	}
 	page, next, err := s.Database.ListModuleDefinitions(ctx, nil, request.OrgId, ref.DerefOr(request.Params.Page, ""), ref.DerefOr(request.Params.PerPage, 100), model.ListModuleDefinitionsParams{
@@ -225,6 +237,28 @@ func validateModuleSource(moduleSource string, moduleSourceCode *string) error {
 	return fmt.Errorf("module source must either be a module registry reference, a git:: repository, or an absolute path available in the runner")
 }
 
+func validateManagedModuleVersion(version, digest *string, inlineSource *string) error {
+	if version == nil {
+		return fmt.Errorf("semantic_version is required while Core Module Version Management is enabled")
+	}
+	if _, err := moduleversions.ParseVersion(*version); err != nil {
+		return err
+	}
+	if inlineSource != nil {
+		if digest != nil {
+			return fmt.Errorf("artifact_digest protects referenced external artifacts and must be omitted for inline source")
+		}
+		return nil
+	}
+	if digest == nil {
+		return fmt.Errorf("artifact_digest is required for an external module artifact")
+	}
+	if err := moduleversions.ValidateArtifactDigest(*digest); err != nil {
+		return err
+	}
+	return nil
+}
+
 var validTerraformIdentifier = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_-]*$`)
 
 func validateModuleInputsAndParamInputs(inputKeys iter.Seq[string], paramKeys iter.Seq[string]) error {
@@ -249,15 +283,20 @@ func (s *Server) CreateModule(ctx context.Context, request CreateModuleRequestOb
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionModuleWrite); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionModuleVersionPublish); err != nil {
 		return nil, err
 	}
 	logger := hlogger.TraceScopedLoggerFromCtx(s.Logger, ctx).With(logging.ZapModuleDefinitionId(request.Body.Id))
 	if err := validateModuleSource(request.Body.ModuleSource, request.Body.ModuleSourceCode); err != nil {
 		return CreateModule400JSONResponse{N400BadRequestJSONResponse: Generate400Response("/module_source: " + err.Error())}, nil
 	}
+	if err := validateManagedModuleVersion(request.Body.SemanticVersion, request.Body.ArtifactDigest, request.Body.ModuleSourceCode); err != nil {
+		return CreateModule400JSONResponse{N400BadRequestJSONResponse: Generate400Response(err.Error())}, nil
+	}
+	versionID, artifactDigest := *request.Body.SemanticVersion, ref.DerefOr(request.Body.ArtifactDigest, "")
+	semanticStatus, migrationGeneration := string(moduleversions.LifecycleProposed), "managed"
 
-	if err := validateModuleInputsAndParamInputs(maps.Keys(request.Body.ModuleParams), maps.Keys(request.Body.ModuleInputs)); err != nil {
+	if err := validateModuleInputsAndParamInputs(maps.Keys(request.Body.ModuleInputs), maps.Keys(request.Body.ModuleParams)); err != nil {
 		return CreateModule400JSONResponse{N400BadRequestJSONResponse: Generate400Response("/module_inputs: " + err.Error())}, nil
 	}
 
@@ -304,20 +343,26 @@ func (s *Server) CreateModule(ctx context.Context, request CreateModuleRequestOb
 		}
 
 		r, err := s.Database.CreateModuleDefinition(ctx, tx, &model.ModuleDefinitionVersion{
-			OrgId:            request.OrgId,
-			DefinitionId:     request.Body.Id,
-			CreatedAt:        now,
-			ResourceType:     request.Body.ResourceType,
-			VersionId:        uuid.NewString(),
-			UpdatedAt:        now,
-			Description:      opt.OfRef(request.Body.Description),
-			ModuleSource:     request.Body.ModuleSource,
-			ModuleSourceCode: opt.OfRef(request.Body.ModuleSourceCode),
-			ModuleParams:     prms,
-			ModuleInputs:     request.Body.ModuleInputs,
-			Dependencies:     deps,
-			CoProvisioned:    cops,
-			ProviderMapping:  request.Body.ProviderMapping,
+			OrgId:               request.OrgId,
+			DefinitionId:        request.Body.Id,
+			CreatedAt:           now,
+			ResourceType:        request.Body.ResourceType,
+			VersionId:           versionID,
+			UpdatedAt:           now,
+			Description:         opt.OfRef(request.Body.Description),
+			ModuleSource:        request.Body.ModuleSource,
+			ModuleSourceCode:    opt.OfRef(request.Body.ModuleSourceCode),
+			ModuleParams:        prms,
+			ModuleInputs:        request.Body.ModuleInputs,
+			Dependencies:        deps,
+			CoProvisioned:       cops,
+			ProviderMapping:     request.Body.ProviderMapping,
+			ArtifactDigest:      artifactDigest,
+			SemanticStatus:      semanticStatus,
+			SemanticVersion:     ref.DerefOr(request.Body.SemanticVersion, ""),
+			MigrationGeneration: migrationGeneration,
+			VerificationStatus:  "unverified",
+			PublishedBy:         &uid,
 		})
 		if err != nil {
 			if me, ok := model.IsErrNotFound(err); ok {
@@ -342,7 +387,7 @@ func (s *Server) DeleteModule(ctx context.Context, request DeleteModuleRequestOb
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionModuleWrite); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionModuleArchive); err != nil {
 		return nil, err
 	}
 	logger := hlogger.TraceScopedLoggerFromCtx(s.Logger, ctx).With(logging.ZapModuleDefinitionId(request.ModuleId))
@@ -371,6 +416,9 @@ func (s *Server) DeleteModule(ctx context.Context, request DeleteModuleRequestOb
 			if me, ok := model.IsErrNotFound(err); ok {
 				return DeleteModule404JSONResponse{N404NotFoundJSONResponse: Generate404FromModelErr(me)}, nil
 			}
+			if me, ok := model.IsErrConflict(err); ok {
+				return DeleteModule409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(me)}, nil
+			}
 			return nil, err
 		}
 
@@ -378,7 +426,7 @@ func (s *Server) DeleteModule(ctx context.Context, request DeleteModuleRequestOb
 			return nil, errors.Wrap(err, "failed to commit transaction")
 		}
 	}
-	logger.Info("deleted module and all versions")
+	logger.Info("deleted empty module catalogue entry")
 	return DeleteModule204Response{}, nil
 }
 
@@ -386,7 +434,7 @@ func (s *Server) GetModule(ctx context.Context, request GetModuleRequestObject) 
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionModuleRead); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionModuleCoreRead); err != nil {
 		return nil, err
 	}
 	if r, err := s.Database.GetModuleDefinition(ctx, nil, request.OrgId, request.ModuleId, model.GetModeDefault); err != nil {
@@ -403,7 +451,7 @@ func (s *Server) UpdateModule(ctx context.Context, request UpdateModuleRequestOb
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionModuleWrite); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionModuleVersionPublish); err != nil {
 		return nil, err
 	}
 	logger := hlogger.TraceScopedLoggerFromCtx(s.Logger, ctx).With(logging.ZapModuleDefinitionId(request.ModuleId))
@@ -434,15 +482,32 @@ func (s *Server) UpdateModule(ctx context.Context, request UpdateModuleRequestOb
 			return UpdateModule200JSONResponse(apiMdFromDbMd(*current)), nil
 		}
 
-		current.VersionId = uuid.NewString()
+		effectiveSource := current.ModuleSource
+		effectiveSourceCode := current.ModuleSourceCode.Ref()
+		if request.Body.ModuleSource != nil {
+			effectiveSource = *request.Body.ModuleSource
+			effectiveSourceCode = request.Body.ModuleSourceCode
+		} else if request.Body.ModuleSourceCode != nil {
+			effectiveSourceCode = request.Body.ModuleSourceCode
+		}
+		if err := validateModuleSource(effectiveSource, effectiveSourceCode); err != nil {
+			return UpdateModule400JSONResponse{N400BadRequestJSONResponse: Generate400Response("/module_source: " + err.Error())}, nil
+		}
+		if err := validateManagedModuleVersion(request.Body.SemanticVersion, request.Body.ArtifactDigest, effectiveSourceCode); err != nil {
+			return UpdateModule400JSONResponse{N400BadRequestJSONResponse: Generate400Response(err.Error())}, nil
+		}
+		current.VersionId = *request.Body.SemanticVersion
+		current.SemanticVersion = *request.Body.SemanticVersion
+		current.ArtifactDigest = ref.DerefOr(request.Body.ArtifactDigest, "")
+		current.SemanticStatus = string(moduleversions.LifecycleProposed)
+		current.MigrationGeneration = "managed"
+		current.VerificationStatus = string(moduleversions.VerificationUnverified)
+		current.PublishedBy = &uid
 		current.UpdatedAt = time.Now().UTC()
 		current.Description = opt.OfRef(request.Body.Description).OrOpt(current.Description)
 
 		// allow the module source to be switched from remote source to code source and vise versa
 		if request.Body.ModuleSource != nil {
-			if err := validateModuleSource(*request.Body.ModuleSource, request.Body.ModuleSourceCode); err != nil {
-				return UpdateModule400JSONResponse{N400BadRequestJSONResponse: Generate400Response("/module_source: " + err.Error())}, nil
-			}
 			current.ModuleSource = *request.Body.ModuleSource
 			current.ModuleSourceCode = opt.OfRef(request.Body.ModuleSourceCode)
 		} else if request.Body.ModuleSourceCode != nil {
@@ -490,7 +555,12 @@ func (s *Server) UpdateModule(ctx context.Context, request UpdateModuleRequestOb
 			return UpdateModule409JSONResponse{N409ConflictJSONResponse: Generate409Response(fmt.Sprintf("the following types referenced by the module do not exist as builtin or custom types: %v", missingTypes))}, nil
 		}
 
-		r, err := s.Database.CreateModuleDefinitionVersion(ctx, tx, current)
+		published, publishErr := s.Database.PublishCoreModuleVersion(ctx, tx, current, uid)
+		var r *model.ModuleDefinitionVersion
+		if publishErr == nil {
+			r, publishErr = s.Database.GetModuleDefinitionVersion(ctx, tx, request.OrgId, request.ModuleId, published.UUID.String())
+		}
+		err = publishErr
 		if err != nil {
 			if me, ok := model.IsErrNotFound(err); ok {
 				return UpdateModule404JSONResponse{N404NotFoundJSONResponse: Generate404FromModelErr(me)}, nil
@@ -531,22 +601,26 @@ func (s *Server) ListModuleVersions(ctx context.Context, request ListModuleVersi
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionModuleRead); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionModuleVersionRead); err != nil {
 		return nil, err
 	}
-	if _, err := s.Database.GetModuleDefinition(ctx, nil, request.OrgId, request.ModuleId, model.GetModeDefault); err != nil {
+	if _, err := s.Database.GetModuleCatalogue(ctx, nil, request.OrgId, request.ModuleId, model.GetModeDefault); err != nil {
 		if me, ok := model.IsErrNotFound(err); ok {
 			return ListModuleVersions404JSONResponse{N404NotFoundJSONResponse: Generate404FromModelErr(me)}, nil
 		}
 		return nil, errors.Wrap(err, "failed to get module")
 	}
-	page, next, err := s.Database.ListModuleDefinitionVersions(ctx, nil, request.OrgId, request.ModuleId, ref.DerefOr(request.Params.Page, ""), ref.DerefOr(request.Params.PerPage, 100), model.ListModuleDefinitionVersionsParams{})
+	page, next, err := s.Database.ListModuleDefinitionVersions(ctx, nil, request.OrgId, request.ModuleId,
+		ref.DerefOr(request.Params.Page, ""), ref.DerefOr(request.Params.PerPage, 100), model.ListModuleDefinitionVersionsParams{
+			IncludeDeprecated: ref.DerefOr(request.Params.IncludeDeprecated, false),
+			IncludeDefective:  ref.DerefOr(request.Params.IncludeDefective, false),
+		})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list modules")
 	}
-	out := make([]ModuleVersionSummary, len(page))
+	out := make([]CoreModuleVersionDetail, len(page))
 	for i, item := range page {
-		out[i] = apiMdvSummaryFromDbMd(item)
+		out[i] = coreModuleVersionDetailFromDB(item)
 	}
 	return ListModuleVersions200JSONResponse{
 		Items:         out,
@@ -558,15 +632,15 @@ func (s *Server) GetModuleVersion(ctx context.Context, request GetModuleVersionR
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionModuleRead); err != nil {
+	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionModuleVersionRead); err != nil {
 		return nil, err
 	}
-	if r, err := s.Database.GetModuleDefinitionVersion(ctx, nil, request.OrgId, request.ModuleId, request.ModuleVersionId.String()); err != nil {
+	if r, err := s.Database.GetModuleDefinitionVersion(ctx, nil, request.OrgId, request.ModuleId, request.ModuleVersionId); err != nil {
 		if me, ok := model.IsErrNotFound(err); ok {
 			return GetModuleVersion404JSONResponse{N404NotFoundJSONResponse: Generate404FromModelErr(me)}, nil
 		}
 		return nil, err
 	} else {
-		return GetModuleVersion200JSONResponse(apiMdvFromApiMd(apiMdFromDbMd(*r))), nil
+		return GetModuleVersion200JSONResponse(coreModuleVersionDetailFromDB(*r)), nil
 	}
 }

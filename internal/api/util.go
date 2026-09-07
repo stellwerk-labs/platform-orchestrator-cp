@@ -39,7 +39,11 @@ func Generate404FromModelErr(e model.ErrNotFound) N404NotFoundJSONResponse {
 }
 
 func Generate409FromModelErr(e model.ErrConflict) N409ConflictJSONResponse {
-	return N409ConflictJSONResponse{Error: "HTTP-409", Message: e.Message}
+	code := e.Code
+	if code == "" {
+		code = "HTTP-409"
+	}
+	return N409ConflictJSONResponse{Error: code, Message: e.Message}
 }
 
 // GetAuthenticatedUserId retrieves the human or service users id from the authenticated From HTTP header.
@@ -48,7 +52,7 @@ func GetAuthenticatedUserId(ctx context.Context) (uuid.UUID, error) {
 }
 
 // GetAuthenticatedUserIdOr401 is the same as GetAuthenticatedUserId but returns a useful http 401 error
-func GetAuthenticatedUserIdOr401(ctx context.Context) (uuid.UUID, *echo.HTTPError) {
+func GetAuthenticatedUserIdOr401(ctx context.Context) (uuid.UUID, error) {
 	if u, err := GetAuthenticatedUserId(ctx); err == nil {
 		return u, nil
 	}

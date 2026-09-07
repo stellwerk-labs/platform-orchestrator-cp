@@ -6,7 +6,7 @@ import (
 
 	"github.com/stellwerk-labs/golib/hstandardoutbox"
 
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/genevents"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genevents"
 )
 
 type CloudEvent[e any] struct {

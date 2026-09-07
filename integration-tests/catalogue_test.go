@@ -11,8 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/errcodes"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/genclient"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genclient"
 )
 
 func TestModuleCatalogueApi(t *testing.T) {
@@ -54,6 +53,7 @@ func TestModuleCatalogueApi(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.ModuleCreateBody{
 			Id: fmt.Sprintf("def-%d", i), ModuleSource: "/some/module/path", ResourceType: orgResourceType,
+			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
 			ProviderMapping: map[string]string{
 				"banana": provType + "." + provId,
 			},
@@ -63,10 +63,11 @@ func TestModuleCatalogueApi(t *testing.T) {
 		if egDefinition == "" {
 			egDefinition = res.JSON201.Id + "@" + res.JSON201.VersionId
 		}
+		MustPromoteModuleVersion(t, client, orgId, res.JSON201.Id, "1.0.0")
 	}
 
 	t.Run("generate catalogue with empty org", func(t *testing.T) {
-		res, err := internalClient.GenerateInternalModuleCatalogueWithResponse(t.Context(), orgId, projectId, envId, genclient.InternalModuleCatalogueGenerateBody{})
+		res, err := internalClient.GenerateInternalModuleCatalogueWithResponse(t.Context(), orgId, projectId, envId, nil, genclient.InternalModuleCatalogueGenerateBody{})
 		if assert.NoError(t, err) && assert.Equal(t, http.StatusOK, res.StatusCode(), string(res.Body)) {
 			assert.Empty(t, res.JSON200.Providers)
 			assert.Empty(t, res.JSON200.Modules)
@@ -99,7 +100,7 @@ func TestModuleCatalogueApi(t *testing.T) {
 	}
 
 	t.Run("generate catalogue", func(t *testing.T) {
-		res, err := internalClient.GenerateInternalModuleCatalogueWithResponse(t.Context(), orgId, projectId, envId, genclient.InternalModuleCatalogueGenerateBody{
+		res, err := internalClient.GenerateInternalModuleCatalogueWithResponse(t.Context(), orgId, projectId, envId, nil, genclient.InternalModuleCatalogueGenerateBody{
 			PinnedModuleVersions: []string{egDefinition},
 		})
 		if assert.NoError(t, err) && assert.Equal(t, http.StatusOK, res.StatusCode(), string(res.Body)) {
@@ -134,7 +135,7 @@ func TestModuleCatalogueApi(t *testing.T) {
 	})
 
 	t.Run("generate catalogue pinned only", func(t *testing.T) {
-		res, err := internalClient.GenerateInternalModuleCatalogueWithResponse(t.Context(), orgId, projectId, envId, genclient.InternalModuleCatalogueGenerateBody{
+		res, err := internalClient.GenerateInternalModuleCatalogueWithResponse(t.Context(), orgId, projectId, envId, nil, genclient.InternalModuleCatalogueGenerateBody{
 			PinnedModuleVersions: []string{egDefinition},
 			AreRulesIgnored:      true,
 		})
@@ -150,10 +151,11 @@ func TestModuleCatalogueApi(t *testing.T) {
 		}
 	})
 
-	t.Run("with deleted provider", func(t *testing.T) {
+	t.Run("provider referenced by immutable history cannot be deleted", func(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			r, err := client.UpdateModuleWithResponse(t.Context(), orgId, fmt.Sprintf("def-%d", i), genclient.UpdateModuleJSONRequestBody{
-				ProviderMapping: &map[string]string{},
+				ProviderMapping: &map[string]string{}, SemanticVersion: ref.Ref("1.1.0"),
+				ArtifactDigest: ref.Ref(testModuleArtifactDigest),
 			})
 			require.NoError(t, err)
 			require.Equal(t, http.StatusOK, r.StatusCode(), string(r.Body))
@@ -161,14 +163,14 @@ func TestModuleCatalogueApi(t *testing.T) {
 
 		r, err := client.DeleteModuleProviderWithResponse(t.Context(), orgId, provType, provId)
 		require.NoError(t, err)
-		require.Equal(t, http.StatusNoContent, r.StatusCode(), string(r.Body))
-		res, err := internalClient.GenerateInternalModuleCatalogueWithResponse(t.Context(), orgId, projectId, envId, genclient.InternalModuleCatalogueGenerateBody{
+		require.Equal(t, http.StatusConflict, r.StatusCode(), string(r.Body))
+		res, err := internalClient.GenerateInternalModuleCatalogueWithResponse(t.Context(), orgId, projectId, envId, nil, genclient.InternalModuleCatalogueGenerateBody{
 			PinnedModuleVersions: []string{egDefinition},
 		})
-		if assert.NoError(t, err) && assert.Equal(t, http.StatusConflict, res.StatusCode(), string(res.Body)) {
-			assert.Equal(t, string(errcodes.PinnedModuleMissingProvider), res.JSON409.Error)
-			assert.Equal(t, &map[string]interface{}{"missing_providers": []interface{}{"aws.default"}}, res.JSON409.Details)
-		}
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode(), string(res.Body))
+		require.Len(t, res.JSON200.Providers, 1)
+		assert.Equal(t, provId, res.JSON200.Providers[0].Id)
 	})
 
 }

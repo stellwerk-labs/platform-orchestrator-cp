@@ -5,6 +5,48 @@
     "version": ""
   },
   "paths": {
+    "/orgs/{orgId}/plugins/{pluginId}": {
+      "get": {
+        "operationId": "getPluginCapability",
+        "summary": "Discover an installed plugin and its availability for this organization.",
+        "tags": [
+          "Plugin"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "name": "pluginId",
+            "in": "path",
+            "required": true,
+            "description": "Immutable, reverse-DNS plugin identity.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)+$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The plugin capability state. An unknown plugin is represented as not_installed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginCapability"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          }
+        }
+      }
+    },
     "/internal/orgs": {
       "get": {
         "operationId": "listInternalOrganizations",
@@ -300,7 +342,7 @@
       },
       "patch": {
         "operationId": "internalUpdateResourceType",
-        "summary": "Update a built-in resource type",
+        "summary": "Reject mutation of an immutable built-in resource type contract",
         "tags": [
           "ResourceType",
           "internal"
@@ -336,6 +378,9 @@
           },
           "404": {
             "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
           }
         }
       }
@@ -1011,6 +1056,44 @@
         }
       }
     },
+    "/orgs/{orgId}/projects/{projectId}/envs/{envId}/deletion-impact": {
+      "get": {
+        "operationId": "getEnvironmentDeletionImpact",
+        "summary": "Preview retained Module Pins and add-on resources affected by Environment deletion.",
+        "tags": [
+          "Environment"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/projectIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/envIdPathParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exact current deletion impact.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentDeletionImpact"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          }
+        }
+      }
+    },
     "/orgs/{orgId}/envs": {
       "get": {
         "operationId": "listEnvironmentsInOrg",
@@ -1375,7 +1458,7 @@
       },
       "patch": {
         "operationId": "updateResourceType",
-        "summary": "Update a resource type",
+        "summary": "Reject mutation of an immutable resource type contract",
         "tags": [
           "ResourceType"
         ],
@@ -1413,6 +1496,75 @@
           },
           "404": {
             "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/resource-types/{typeId}/actions/{catalogueAction}": {
+      "post": {
+        "operationId": "changeResourceTypeCatalogueStatus",
+        "summary": "Archive or unarchive an immutable resource type identity",
+        "tags": [
+          "ResourceType"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/resourceTypeIdPathParam"
+          },
+          {
+            "name": "catalogueAction",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "archive",
+                "unarchive"
+              ]
+            }
+          },
+          {
+            "$ref": "#/components/parameters/idempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleReasonedCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resource type catalogue status changed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceType"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
           }
         }
       }
@@ -2004,7 +2156,8 @@
         "tags": [
           "Modules"
         ],
-        "summary": "Create a new modules in the org",
+        "summary": "Create a Module with an initial immutable Proposed version",
+        "description": "Compatibility authoring endpoint. Requires semantic_version and a complete definition; external sources also require artifact_digest. This does not promote the version. New clients should create a catalogue entry, publish a version, and promote explicitly.",
         "parameters": [
           {
             "$ref": "#/components/parameters/orgIdPathParam"
@@ -2076,7 +2229,8 @@
         "tags": [
           "Modules"
         ],
-        "summary": "Update an existing module",
+        "summary": "Publish a new immutable Proposed version for an existing Module",
+        "description": "Compatibility authoring endpoint, not an in-place mutation or Default update. Requires a new semantic_version. Prefer publishModuleVersion and explicit lifecycle commands.",
         "parameters": [
           {
             "$ref": "#/components/parameters/orgIdPathParam"
@@ -2122,7 +2276,8 @@
         "tags": [
           "Modules"
         ],
-        "summary": "Delete an existing module in the org if it is unused",
+        "summary": "Delete an unused empty Module catalogue entry",
+        "description": "Requires module.archive. Published versions are never deleted. A 409 response with error module_history_retained directs clients to reasoned catalogue archival. Other 409 responses represent usage or deletion blockers and must not be treated as success.",
         "parameters": [
           {
             "$ref": "#/components/parameters/orgIdPathParam"
@@ -2163,6 +2318,22 @@
           },
           {
             "$ref": "#/components/parameters/pageTokenQueryParam"
+          },
+          {
+            "name": "include_deprecated",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "include_defective",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
           }
         ],
         "responses": {
@@ -2171,13 +2342,65 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ModuleVersionPage"
+                  "$ref": "#/components/schemas/CoreModuleVersionPage"
                 }
               }
             }
           },
           "404": {
             "$ref": "#/components/responses/404NotFound"
+          }
+        }
+      },
+      "post": {
+        "operationId": "publishModuleVersion",
+        "tags": [
+          "Modules"
+        ],
+        "summary": "Publish a complete immutable Proposed Module Version",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/moduleIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/idempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleVersionPublishBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Immutable Proposed version published.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoreModuleVersion"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
           }
         }
       }
@@ -2206,13 +2429,1407 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ModuleVersion"
+                  "$ref": "#/components/schemas/CoreModuleVersionDetail"
                 }
               }
             }
           },
           "404": {
             "$ref": "#/components/responses/404NotFound"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/modules/{moduleId}/catalogue": {
+      "get": {
+        "operationId": "getModuleCatalogueEntry",
+        "tags": [
+          "Modules"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/moduleIdPathParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stable Module catalogue identity and metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleCatalogueEntry"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateModuleCatalogueEntry",
+        "tags": [
+          "Modules"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/moduleIdPathParam"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleCatalogueUpdateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Catalogue metadata updated without publishing a version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleCatalogueEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/module-catalogue": {
+      "get": {
+        "operationId": "listModuleCatalogueEntries",
+        "tags": [
+          "Modules"
+        ],
+        "summary": "List stable Module identities, including empty shells",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "name": "include_archived",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Module catalogue identities and mutable metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModuleCatalogueEntry"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createModuleCatalogueEntry",
+        "tags": [
+          "Modules"
+        ],
+        "summary": "Create an empty stable Module identity without publishing a version",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/idempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleCatalogueCreateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Empty Module shell created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleCatalogueEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/modules/{moduleId}/versions/{moduleVersionId}/stable-successor": {
+      "post": {
+        "operationId": "publishStableModuleVersionSuccessor",
+        "tags": [
+          "Modules"
+        ],
+        "summary": "Atomically publish a stable successor and deprecate the exact Proposed prerelease",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/moduleIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/moduleVersionIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/idempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StableModuleVersionSuccessorBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Stable Proposed successor and deprecated prerelease committed atomically.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StableModuleVersionSuccessorResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/modules/{moduleId}/versions/{moduleVersionId}/compare/{otherModuleVersionId}": {
+      "get": {
+        "operationId": "compareModuleVersions",
+        "tags": [
+          "Modules"
+        ],
+        "summary": "Structurally compare two immutable versions of one Module",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/moduleIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/moduleVersionIdPathParam"
+          },
+          {
+            "name": "otherModuleVersionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deterministic structural comparison.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleVersionComparison"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/modules/{moduleId}/versions/{moduleVersionId}/usage": {
+      "get": {
+        "operationId": "getModuleVersionUsage",
+        "tags": [
+          "Modules"
+        ],
+        "summary": "Inspect observed Environment adoption and Pin usage for one immutable Module Version",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/moduleIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/moduleVersionIdPathParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Observational usage derived from the latest trustworthy Deployment snapshots.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleVersionUsage"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/module-version-lifecycle-transactions": {
+      "post": {
+        "operationId": "transactModuleVersionLifecycles",
+        "tags": [
+          "Modules"
+        ],
+        "summary": "Apply lifecycle changes across Modules in one atomic Core transaction",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/idempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleVersionLifecycleTransactionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Every transition committed atomically.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleVersionLifecycleTransactionResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/modules/{moduleId}/catalogue/actions/{catalogueAction}": {
+      "post": {
+        "operationId": "changeModuleCatalogueStatus",
+        "tags": [
+          "Modules"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/moduleIdPathParam"
+          },
+          {
+            "name": "catalogueAction",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "archive",
+                "unarchive"
+              ]
+            }
+          },
+          {
+            "$ref": "#/components/parameters/idempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleReasonedCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Catalogue state changed atomically.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleCatalogueEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/modules/{moduleId}/versions/{moduleVersionId}/actions/{lifecycleAction}": {
+      "post": {
+        "operationId": "transitionModuleVersion",
+        "tags": [
+          "Modules"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/moduleIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/moduleVersionIdPathParam"
+          },
+          {
+            "name": "lifecycleAction",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "promote",
+                "deprecate",
+                "mark-defective",
+                "restore"
+              ]
+            }
+          },
+          {
+            "$ref": "#/components/parameters/idempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleReasonedCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lifecycle transition committed with an append-only event.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoreModuleVersion"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/modules/{moduleId}/versions/{moduleVersionId}/events": {
+      "get": {
+        "operationId": "listModuleVersionLifecycleEvents",
+        "tags": [
+          "Modules"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/moduleIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/moduleVersionIdPathParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Append-only lifecycle history.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModuleVersionLifecycleEvent"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/module-version-pins": {
+      "get": {
+        "operationId": "listEnvironmentModuleVersionPins",
+        "tags": [
+          "Modules"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "name": "environment_uuid",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "module_uuid",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "include_removed",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exact Environment Module Version Pins.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EnvironmentModuleVersionPin"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createEnvironmentModuleVersionPin",
+        "tags": [
+          "Modules"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/idempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnvironmentModuleVersionPinCreateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Exact active version pinned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentModuleVersionPin"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/module-version-pins/{pinId}/actions/{pinAction}": {
+      "post": {
+        "operationId": "transitionEnvironmentModuleVersionPin",
+        "tags": [
+          "Modules"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "name": "pinId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "pinAction",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "unpin",
+                "discard"
+              ]
+            }
+          },
+          {
+            "$ref": "#/components/parameters/idempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleReasonedCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pin transition committed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentModuleVersionPin"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/module-version-pins/{pinId}": {
+      "get": {
+        "operationId": "getEnvironmentModuleVersionPin",
+        "tags": [
+          "Modules"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "name": "pinId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exact Pin state and immutable activation boundary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentModuleVersionPin"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/module-version-pins/{pinId}/events": {
+      "get": {
+        "operationId": "listEnvironmentModuleVersionPinEvents",
+        "tags": [
+          "Modules"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "name": "pinId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Append-only Pin lifecycle history.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModuleVersionPinEvent"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/module-version-pins/{pinId}/notes": {
+      "post": {
+        "operationId": "appendEnvironmentModuleVersionPinNote",
+        "tags": [
+          "Modules"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "name": "pinId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/idempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleVersionPinNoteBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Append-only note recorded without changing Pin state or activation boundary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleVersionPinEvent"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/module-version-pins/bulk-preview": {
+      "post": {
+        "operationId": "previewEnvironmentModuleVersionPinBulkOperation",
+        "tags": [
+          "Modules"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleVersionPinBulkPreviewBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Frozen exact Environment decisions; no Pin was changed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleVersionPinBulkPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/module-version-pins/bulk": {
+      "post": {
+        "operationId": "executeEnvironmentModuleVersionPinBulkOperation",
+        "tags": [
+          "Modules"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/idempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleVersionPinBulkCommandBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Every materialised Environment Pin changed atomically.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleVersionPinBulkResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
+    "/internal/orgs/{orgId}/module-version-pins/{pinId}/actions/override": {
+      "post": {
+        "operationId": "beginEnvironmentModuleVersionPinOverride",
+        "tags": [
+          "internal",
+          "Modules"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "name": "pinId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/idempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleVersionPinOverrideBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pin is operation-locked in override_pending.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentModuleVersionPin"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
+    "/internal/orgs/{orgId}/modules/{moduleId}/operation-reservations": {
+      "get": {
+        "operationId": "listModuleOperationReservations",
+        "tags": [
+          "internal",
+          "Modules"
+        ],
+        "summary": "List add-on reservations that exclusively protect a Module operation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/moduleIdPathParam"
+          },
+          {
+            "name": "include_released",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Module operation reservations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModuleOperationReservation"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          }
+        }
+      },
+      "post": {
+        "operationId": "acquireModuleOperationReservation",
+        "tags": [
+          "internal",
+          "Modules"
+        ],
+        "summary": "Acquire the Module's exclusive add-on operation reservation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/moduleIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/idempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleOperationReservationAcquireBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Exclusive reservation acquired or replayed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleOperationReservation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
+    "/internal/orgs/{orgId}/modules/{moduleId}/operation-reservations/{reservationId}/actions/release": {
+      "post": {
+        "operationId": "releaseModuleOperationReservation",
+        "tags": [
+          "internal",
+          "Modules"
+        ],
+        "summary": "Release an exact add-on operation reservation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/moduleIdPathParam"
+          },
+          {
+            "name": "reservationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/idempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleReasonedCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reservation released or replayed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleOperationReservation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
+    "/internal/orgs/{orgId}/modules/{moduleId}/extension-contributions": {
+      "get": {
+        "operationId": "listModuleExtensionContributions",
+        "tags": [
+          "internal",
+          "Modules"
+        ],
+        "summary": "List namespaced related resources and contextual actions registered by add-ons",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/moduleIdPathParam"
+          },
+          {
+            "name": "include_draft",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "include_terminal",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Registered extension contributions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModuleExtensionContribution"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          }
+        }
+      },
+      "post": {
+        "operationId": "upsertModuleExtensionContribution",
+        "tags": [
+          "internal",
+          "Modules"
+        ],
+        "summary": "Register or update a namespaced related resource or contextual action",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/moduleIdPathParam"
+          },
+          {
+            "$ref": "#/components/parameters/idempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleExtensionContributionUpsertBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contribution registered or updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleExtensionContribution"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
+    "/internal/orgs/{orgId}/module-version-pins/{pinId}/actions/reconcile-override": {
+      "post": {
+        "operationId": "reconcileEnvironmentModuleVersionPinOverride",
+        "tags": [
+          "internal",
+          "Modules"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "name": "pinId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/idempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleVersionPinOverrideReconcileBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authoritative Deployment outcome reconciled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentModuleVersionPin"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
+    "/internal/orgs/{orgId}/module-version-pins/{pinId}/actions/restore-after-rollback": {
+      "post": {
+        "operationId": "restoreEnvironmentModuleVersionPinAfterRollback",
+        "tags": [
+          "internal",
+          "Modules"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "name": "pinId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/idempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleVersionPinRollbackRestoreBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Exact previously pinned Version restored by the owning operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentModuleVersionPin"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
           }
         }
       }
@@ -2401,6 +4018,65 @@
           },
           {
             "$ref": "#/components/parameters/envIdPathParam"
+          },
+          {
+            "name": "X-Stellwerk-Rollback",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Internal audited exception allowing retained Deprecated or Defective artifacts during rollback."
+          },
+          {
+            "name": "X-Stellwerk-Module-Operation-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Exact add-on operation allowed to consume its own override-pending Pin target."
+          },
+          {
+            "name": "X-Stellwerk-Module-Operation-Planning",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Internal dry-run compilation for an add-on Module operation. It does not mutate or override Core Pins."
+          },
+          {
+            "name": "X-Stellwerk-Restricted-Version-Confirmations",
+            "in": "header",
+            "required": false,
+            "style": "simple",
+            "explode": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            "description": "Exact Defective Module Version UUIDs confirmed by an authorised deployment caller."
+          },
+          {
+            "name": "X-Stellwerk-Active-Module-Versions",
+            "in": "header",
+            "required": false,
+            "style": "simple",
+            "explode": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Exact Module coordinates observed in the Environment's last graph. This evidence permits an archived Module to carry forward only the version already active there."
           }
         ],
         "requestBody": {
@@ -2444,6 +4120,17 @@
         "required": true,
         "schema": {
           "type": "string"
+        }
+      },
+      "idempotencyKeyHeader": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "description": "Stable caller-generated key used to deduplicate command retries.",
+        "schema": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 200
         }
       },
       "projectIdPathParam": {
@@ -2542,11 +4229,10 @@
         "name": "moduleVersionId",
         "in": "path",
         "description": "A Module Version ID",
-        "example": "01234567-89ab-cdef-0123-456789abcdef",
+        "example": "2.4.0",
         "required": true,
         "schema": {
-          "type": "string",
-          "format": "uuid"
+          "type": "string"
         }
       },
       "ruleIdPathParam": {
@@ -2691,6 +4377,60 @@
       }
     },
     "schemas": {
+      "PluginAvailabilityState": {
+        "type": "string",
+        "enum": [
+          "available",
+          "not_installed",
+          "not_enabled",
+          "not_entitled",
+          "incompatible",
+          "unavailable"
+        ],
+        "x-enum-varnames": [
+          "PluginAvailabilityStateAvailable",
+          "PluginAvailabilityStateNotInstalled",
+          "PluginAvailabilityStateNotEnabled",
+          "PluginAvailabilityStateNotEntitled",
+          "PluginAvailabilityStateIncompatible",
+          "PluginAvailabilityStateUnavailable"
+        ]
+      },
+      "PluginCapability": {
+        "type": "object",
+        "required": [
+          "id",
+          "display_name",
+          "state",
+          "capabilities"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Immutable reverse-DNS plugin identity."
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string",
+            "description": "Immutable installed plugin artifact version when installed."
+          },
+          "state": {
+            "$ref": "#/components/schemas/PluginAvailabilityState"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "admin_action": {
+            "type": "string",
+            "description": "Scope-safe remediation guidance for an administrator."
+          }
+        }
+      },
       "Error": {
         "description": "A standard error response",
         "properties": {
@@ -2890,6 +4630,10 @@
             "enum": [
               "active",
               "deleting"
+            ],
+            "x-enum-varnames": [
+              "ProjectStatusActive",
+              "ProjectStatusDeleting"
             ]
           }
         }
@@ -3037,6 +4781,14 @@
             "description": "The id of the runner to be used to deploy this environment. If not set, this will be filled in upon first deployment.",
             "type": "string",
             "example": "my-k8s-runner"
+          },
+          "labels": {
+            "description": "Labels used by module policy and add-on selectors.",
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "x-go-type-skip-optional-pointer": true
           }
         }
       },
@@ -3090,6 +4842,15 @@
             "x-pattern-error": "display_name contains invalid characters",
             "type": "string",
             "example": "My Sample Environment"
+          },
+          "labels": {
+            "description": "Labels used by module policy and add-on selectors.",
+            "type": "object",
+            "maxProperties": 50,
+            "additionalProperties": {
+              "type": "string"
+            },
+            "x-go-type-skip-optional-pointer": true
           }
         }
       },
@@ -3108,6 +4869,14 @@
             "x-pattern-error": "display_name contains invalid characters",
             "type": "string",
             "example": "My Sample Environment"
+          },
+          "labels": {
+            "description": "Complete replacement label set used by module policy and add-on selectors.",
+            "type": "object",
+            "maxProperties": 50,
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         }
       },
@@ -3129,7 +4898,8 @@
           "id",
           "uuid",
           "created_at",
-          "display_name"
+          "display_name",
+          "is_production"
         ],
         "properties": {
           "id": {
@@ -3153,6 +4923,10 @@
             "description": "Human readable name for the environment type",
             "type": "string",
             "example": "Development"
+          },
+          "is_production": {
+            "description": "Authoritative Production classification. Clients must not infer this from IDs, names or labels.",
+            "type": "boolean"
           }
         }
       },
@@ -3202,21 +4976,27 @@
             "type": "string",
             "example": "Development",
             "maxLength": 60
+          },
+          "is_production": {
+            "description": "Whether Environments of this type are Production targets.",
+            "type": "boolean",
+            "default": false
           }
         }
       },
       "EnvironmentTypeUpdateBody": {
         "type": "object",
         "description": "A request to update an environment type in the org.",
-        "required": [
-          "display_name"
-        ],
         "properties": {
           "display_name": {
             "description": "Human readable name for the environment type. This will be generated if not provided.",
             "type": "string",
             "example": "Development",
             "maxLength": 60
+          },
+          "is_production": {
+            "description": "Whether Environments of this type are Production targets.",
+            "type": "boolean"
           }
         }
       },
@@ -3248,7 +5028,9 @@
           "output_schema",
           "created_at",
           "built_in",
-          "is_developer_accessible"
+          "is_developer_accessible",
+          "catalogue_status",
+          "resource_version"
         ],
         "properties": {
           "id": {
@@ -3282,6 +5064,33 @@
           "is_developer_accessible": {
             "description": "Indicates if this resource type is for developers to use in the manifest. Resource types with this flag set to false will not be available as types of resources in a manifest.",
             "type": "boolean"
+          },
+          "catalogue_status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "x-enum-varnames": [
+              "ResourceTypeCatalogueStatusActive",
+              "ResourceTypeCatalogueStatusArchived"
+            ]
+          },
+          "resource_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "archived_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "archived_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "archive_reason": {
+            "type": "string"
           }
         }
       },
@@ -4007,6 +5816,15 @@
           "module_source"
         ],
         "properties": {
+          "semantic_version": {
+            "type": "string",
+            "description": "Canonical SemVer identity of the immutable Core Module Version."
+          },
+          "artifact_digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "description": "Canonical digest protecting the referenced external artifact. Omitted for inline source."
+          },
           "id": {
             "$ref": "#/components/schemas/ModuleId"
           },
@@ -4083,6 +5901,14 @@
         "type": "object",
         "description": "A request to update an existing module",
         "properties": {
+          "semantic_version": {
+            "type": "string",
+            "description": "Canonical SemVer identity for the immutable Proposed version."
+          },
+          "artifact_digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
           "description": {
             "description": "An optional text description for this module",
             "type": "string",
@@ -5250,6 +7076,1422 @@
           }
         }
       },
+      "ModuleVersionSemanticStatus": {
+        "type": "string",
+        "enum": [
+          "proposed",
+          "default",
+          "deprecated",
+          "defective"
+        ],
+        "x-enum-varnames": [
+          "ModuleVersionSemanticStatusProposed",
+          "ModuleVersionSemanticStatusDefault",
+          "ModuleVersionSemanticStatusDeprecated",
+          "ModuleVersionSemanticStatusDefective"
+        ]
+      },
+      "ModuleCatalogueStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "archived"
+        ],
+        "x-enum-varnames": [
+          "ModuleCatalogueStatusActive",
+          "ModuleCatalogueStatusArchived"
+        ]
+      },
+      "ModuleVerificationStatus": {
+        "type": "string",
+        "enum": [
+          "unverified"
+        ],
+        "x-enum-varnames": [
+          "ModuleVerificationStatusUnverified"
+        ]
+      },
+      "ModuleCatalogueEntry": {
+        "type": "object",
+        "required": [
+          "org_id",
+          "uuid",
+          "slug",
+          "display_name",
+          "description",
+          "resource_type",
+          "tags",
+          "status",
+          "resource_version",
+          "managed_default_generation",
+          "created_at"
+        ],
+        "properties": {
+          "org_id": {
+            "type": "string"
+          },
+          "uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "resource_type": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "$ref": "#/components/schemas/ModuleCatalogueStatus"
+          },
+          "resource_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "current_default_version_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "previous_default_version_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "managed_default_generation": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "archived_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "archived_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "archive_reason": {
+            "type": "string"
+          }
+        }
+      },
+      "ModuleCatalogueUpdateBody": {
+        "type": "object",
+        "required": [
+          "display_name",
+          "description",
+          "tags",
+          "expected_resource_version"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "tags": {
+            "type": "object",
+            "maxProperties": 50,
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          "expected_resource_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      },
+      "ModuleCatalogueCreateBody": {
+        "type": "object",
+        "required": [
+          "slug",
+          "resource_type"
+        ],
+        "properties": {
+          "slug": {
+            "$ref": "#/components/schemas/ModuleId"
+          },
+          "display_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "resource_type": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 200
+          },
+          "tags": {
+            "type": "object",
+            "maxProperties": 50,
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        }
+      },
+      "ModuleReasonedCommand": {
+        "type": "object",
+        "required": [
+          "reason",
+          "expected_resource_version"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "expected_resource_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      },
+      "ModuleVersionPublishBody": {
+        "type": "object",
+        "required": [
+          "semantic_version",
+          "module_source",
+          "module_params",
+          "module_inputs",
+          "provider_mapping",
+          "dependencies",
+          "coprovisioned"
+        ],
+        "properties": {
+          "semantic_version": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+          },
+          "artifact_digest": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "source_revision": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "release_notes": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "module_source": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 200
+          },
+          "module_source_code": {
+            "type": "string"
+          },
+          "module_params": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ModuleParamItem"
+            }
+          },
+          "module_inputs": {
+            "type": "object",
+            "maxProperties": 20,
+            "additionalProperties": true
+          },
+          "provider_mapping": {
+            "type": "object",
+            "maxProperties": 20,
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "dependencies": {
+            "type": "object",
+            "maxProperties": 20,
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ModuleDependencyManifest"
+            }
+          },
+          "coprovisioned": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/components/schemas/ModuleCoProvisionManifest"
+            }
+          }
+        }
+      },
+      "CoreModuleVersion": {
+        "type": "object",
+        "required": [
+          "org_id",
+          "module_uuid",
+          "module_slug",
+          "uuid",
+          "opaque_version_id",
+          "migration_generation",
+          "verification_status",
+          "lifecycle_status",
+          "artifact_digest",
+          "source_revision",
+          "resource_version",
+          "created_at"
+        ],
+        "properties": {
+          "org_id": {
+            "type": "string"
+          },
+          "module_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "module_slug": {
+            "type": "string"
+          },
+          "uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "semantic_version": {
+            "type": "string"
+          },
+          "opaque_version_id": {
+            "type": "string"
+          },
+          "migration_generation": {
+            "type": "string",
+            "enum": [
+              "v0",
+              "v1",
+              "managed"
+            ]
+          },
+          "artifact_digest": {
+            "type": "string"
+          },
+          "verification_status": {
+            "$ref": "#/components/schemas/ModuleVerificationStatus"
+          },
+          "lifecycle_status": {
+            "$ref": "#/components/schemas/ModuleVersionSemanticStatus"
+          },
+          "source_revision": {
+            "type": "string"
+          },
+          "release_notes": {
+            "type": "string"
+          },
+          "resource_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "published_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CoreModuleVersionDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ModuleVersion"
+          },
+          {
+            "type": "object",
+            "required": [
+              "version",
+              "definition"
+            ],
+            "properties": {
+              "version": {
+                "$ref": "#/components/schemas/CoreModuleVersion"
+              },
+              "definition": {
+                "$ref": "#/components/schemas/ModuleVersion"
+              }
+            }
+          }
+        ]
+      },
+      "CoreModuleVersionPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CoreModuleVersionDetail"
+            }
+          },
+          "next_page_token": {
+            "type": "string"
+          }
+        }
+      },
+      "StableModuleVersionSuccessorBody": {
+        "type": "object",
+        "required": [
+          "expected_prerelease_resource_version",
+          "reason",
+          "version"
+        ],
+        "properties": {
+          "expected_prerelease_resource_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "version": {
+            "$ref": "#/components/schemas/ModuleVersionPublishBody"
+          }
+        }
+      },
+      "StableModuleVersionSuccessorResult": {
+        "type": "object",
+        "required": [
+          "prerelease",
+          "stable",
+          "correlation_id"
+        ],
+        "properties": {
+          "prerelease": {
+            "$ref": "#/components/schemas/CoreModuleVersion"
+          },
+          "stable": {
+            "$ref": "#/components/schemas/CoreModuleVersion"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ModuleVersionComparison": {
+        "type": "object",
+        "required": [
+          "from_version_uuid",
+          "to_version_uuid",
+          "before",
+          "after",
+          "module_source_changed",
+          "module_source_code_changed",
+          "artifact_digest_changed",
+          "source_revision_changed",
+          "resource_type_changed",
+          "added_module_inputs",
+          "removed_module_inputs",
+          "changed_module_inputs",
+          "added_module_params",
+          "removed_module_params",
+          "changed_module_params",
+          "added_provider_mappings",
+          "removed_provider_mappings",
+          "changed_provider_mappings",
+          "added_dependencies",
+          "removed_dependencies",
+          "changed_dependencies",
+          "coprovisioning_changed"
+        ],
+        "properties": {
+          "from_version_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "to_version_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "before": {
+            "$ref": "#/components/schemas/ModuleVersionComparisonSnapshot"
+          },
+          "after": {
+            "$ref": "#/components/schemas/ModuleVersionComparisonSnapshot"
+          },
+          "module_source_changed": {
+            "type": "boolean"
+          },
+          "module_source_code_changed": {
+            "type": "boolean"
+          },
+          "artifact_digest_changed": {
+            "type": "boolean"
+          },
+          "source_revision_changed": {
+            "type": "boolean"
+          },
+          "resource_type_changed": {
+            "type": "boolean"
+          },
+          "added_module_inputs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "removed_module_inputs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "changed_module_inputs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "added_module_params": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "removed_module_params": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "changed_module_params": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "added_provider_mappings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "removed_provider_mappings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "changed_provider_mappings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "added_dependencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "removed_dependencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "changed_dependencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "coprovisioning_changed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ModuleVersionComparisonSnapshot": {
+        "type": "object",
+        "required": [
+          "module_source",
+          "module_source_code",
+          "artifact_digest",
+          "source_revision",
+          "resource_type",
+          "module_inputs",
+          "module_params",
+          "provider_mapping",
+          "dependencies",
+          "coprovisioned"
+        ],
+        "properties": {
+          "module_source": {
+            "type": "string"
+          },
+          "module_source_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "artifact_digest": {
+            "type": "string"
+          },
+          "source_revision": {
+            "type": "string"
+          },
+          "resource_type": {
+            "type": "string"
+          },
+          "module_inputs": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "module_params": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ModuleParamItem"
+            }
+          },
+          "provider_mapping": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "dependencies": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ModuleDependencyManifest"
+            }
+          },
+          "coprovisioned": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModuleCoProvisionManifest"
+            }
+          }
+        }
+      },
+      "ModuleVersionUsageEnvironment": {
+        "type": "object",
+        "required": [
+          "project_id",
+          "environment_id",
+          "environment_uuid",
+          "environment_type",
+          "deployment_id",
+          "observed_at"
+        ],
+        "properties": {
+          "project_id": {
+            "type": "string"
+          },
+          "environment_id": {
+            "type": "string"
+          },
+          "environment_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "environment_type": {
+            "type": "string"
+          },
+          "deployment_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ModuleVersionUsage": {
+        "type": "object",
+        "required": [
+          "module_uuid",
+          "version_uuid",
+          "semantic_version",
+          "active_environment_count",
+          "by_project",
+          "by_environment_type",
+          "environments",
+          "unknown_environments",
+          "observed_at",
+          "active_pins",
+          "override_pending_pins",
+          "historical_pins"
+        ],
+        "properties": {
+          "module_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "semantic_version": {
+            "type": "string"
+          },
+          "active_environment_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "by_project": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "by_environment_type": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "environments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModuleVersionUsageEnvironment"
+            }
+          },
+          "unknown_environments": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "active_pins": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "override_pending_pins": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "historical_pins": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "ModuleVersionLifecycleTransactionItem": {
+        "type": "object",
+        "required": [
+          "module_id",
+          "module_version_id",
+          "action",
+          "expected_resource_version",
+          "reason"
+        ],
+        "properties": {
+          "module_id": {
+            "$ref": "#/components/schemas/ModuleId"
+          },
+          "module_version_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "promote",
+              "deprecate",
+              "mark-defective",
+              "restore"
+            ]
+          },
+          "expected_resource_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        }
+      },
+      "ModuleVersionLifecycleTransactionBody": {
+        "type": "object",
+        "required": [
+          "transitions"
+        ],
+        "properties": {
+          "transitions": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/ModuleVersionLifecycleTransactionItem"
+            }
+          }
+        }
+      },
+      "ModuleVersionLifecycleTransactionResult": {
+        "type": "object",
+        "required": [
+          "correlation_id",
+          "versions"
+        ],
+        "properties": {
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CoreModuleVersion"
+            }
+          }
+        }
+      },
+      "ModuleVersionLifecycleEvent": {
+        "type": "object",
+        "required": [
+          "sequence",
+          "id",
+          "module_uuid",
+          "version_uuid",
+          "to_status",
+          "version_resource_version",
+          "actor",
+          "payload",
+          "created_at"
+        ],
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "module_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "from_status": {
+            "$ref": "#/components/schemas/ModuleVersionSemanticStatus"
+          },
+          "to_status": {
+            "$ref": "#/components/schemas/ModuleVersionSemanticStatus"
+          },
+          "version_resource_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "actor": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ModuleVersionPinStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "override_pending",
+          "overridden",
+          "removed"
+        ]
+      },
+      "EnvironmentModuleVersionPin": {
+        "type": "object",
+        "required": [
+          "id",
+          "org_id",
+          "project_uuid",
+          "project_id",
+          "environment_uuid",
+          "environment_id",
+          "module_uuid",
+          "version_uuid",
+          "status",
+          "resource_version",
+          "activation_event_id",
+          "created_by",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "org_id": {
+            "type": "string"
+          },
+          "project_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "environment_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "environment_id": {
+            "type": "string"
+          },
+          "module_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ModuleVersionPinStatus"
+          },
+          "resource_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "activation_event_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bulk_operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "override_operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "override_target_version_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "override_actor": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "override_reason": {
+            "type": "string"
+          },
+          "override_deployment_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "removed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "EnvironmentModuleVersionPinCreateBody": {
+        "type": "object",
+        "required": [
+          "project_uuid",
+          "environment_uuid",
+          "module_uuid",
+          "version_uuid",
+          "reason"
+        ],
+        "properties": {
+          "project_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "environment_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "module_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "confirm_defective_version_uuid": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ModuleVersionPinEvent": {
+        "type": "object",
+        "required": [
+          "sequence",
+          "id",
+          "pin_id",
+          "revision",
+          "event_type",
+          "to_status",
+          "activation_event_id",
+          "actor",
+          "actor_type",
+          "created_at"
+        ],
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pin_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "from_status": {
+            "$ref": "#/components/schemas/ModuleVersionPinStatus"
+          },
+          "to_status": {
+            "$ref": "#/components/schemas/ModuleVersionPinStatus"
+          },
+          "activation_event_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actor": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actor_type": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "description": "Immutable note text, present only when event_type is note_added."
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deployment_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bulk_operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ModuleVersionPinNoteBody": {
+        "type": "object",
+        "required": [
+          "note"
+        ],
+        "properties": {
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        }
+      },
+      "ModuleVersionPinBulkAction": {
+        "type": "string",
+        "enum": [
+          "pin",
+          "unpin",
+          "discard"
+        ]
+      },
+      "ModuleVersionPinBulkPreviewBody": {
+        "type": "object",
+        "required": [
+          "action",
+          "module_uuid",
+          "environment_uuids"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ModuleVersionPinBulkAction"
+          },
+          "module_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "environment_uuids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 500,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "confirm_defective_version_uuids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "ModuleVersionPinBulkPreviewItem": {
+        "type": "object",
+        "required": [
+          "environment_uuid",
+          "project_uuid",
+          "environment_id",
+          "project_id",
+          "eligible",
+          "production"
+        ],
+        "properties": {
+          "environment_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "project_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "environment_id": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "environment_type": {
+            "type": "string"
+          },
+          "production": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "version_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pin_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pin_resource_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idempotent_match": {
+            "type": "boolean"
+          },
+          "problem": {
+            "type": "string"
+          }
+        }
+      },
+      "ModuleVersionPinBulkPreview": {
+        "type": "object",
+        "required": [
+          "operation_id",
+          "fingerprint",
+          "action",
+          "module_uuid",
+          "eligible",
+          "items"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "action": {
+            "$ref": "#/components/schemas/ModuleVersionPinBulkAction"
+          },
+          "module_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModuleVersionPinBulkPreviewItem"
+            }
+          }
+        }
+      },
+      "ModuleVersionPinBulkCommandBody": {
+        "type": "object",
+        "required": [
+          "action",
+          "module_uuid",
+          "environment_uuids",
+          "preview_fingerprint",
+          "reason"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ModuleVersionPinBulkAction"
+          },
+          "module_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "environment_uuids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 500,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "preview_fingerprint": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "confirm_defective_version_uuids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "ModuleVersionPinBulkResult": {
+        "type": "object",
+        "required": [
+          "operation_id",
+          "action",
+          "pins"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "action": {
+            "$ref": "#/components/schemas/ModuleVersionPinBulkAction"
+          },
+          "pins": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentModuleVersionPin"
+            }
+          }
+        }
+      },
+      "ModuleVersionPinOverrideBody": {
+        "type": "object",
+        "required": [
+          "expected_resource_version",
+          "operation_id",
+          "target_version_uuid",
+          "reason"
+        ],
+        "properties": {
+          "expected_resource_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_version_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        }
+      },
+      "ModuleVersionPinOverrideReconcileBody": {
+        "type": "object",
+        "required": [
+          "expected_resource_version",
+          "operation_id",
+          "outcome",
+          "deployment_id",
+          "reason"
+        ],
+        "properties": {
+          "expected_resource_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "x-enum-varnames": [
+              "ModuleVersionPinOverrideReconcileBodyOutcomeSucceeded",
+              "ModuleVersionPinOverrideReconcileBodyOutcomeFailed",
+              "ModuleVersionPinOverrideReconcileBodyOutcomeCancelled"
+            ]
+          },
+          "deployment_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        }
+      },
+      "ModuleVersionPinRollbackRestoreBody": {
+        "type": "object",
+        "required": [
+          "expected_resource_version",
+          "operation_id",
+          "deployment_id",
+          "restored_version_uuid",
+          "reason"
+        ],
+        "properties": {
+          "expected_resource_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deployment_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "restored_version_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        }
+      },
       "InternalModuleCatalogue": {
         "type": "object",
         "description": "A collation of all the applicable modules, and providers for an environment. A module is applicable if there is at least one rule for it that matches the requested environment.",
@@ -5316,7 +8558,14 @@
           },
           {
             "required": [
-              "rules"
+              "rules",
+              "artifact_digest",
+              "semantic_status",
+              "module_uuid",
+              "version_uuid",
+              "semantic_version",
+              "migration_generation",
+              "verification_status"
             ],
             "properties": {
               "rules": {
@@ -5324,6 +8573,36 @@
                 "items": {
                   "$ref": "#/components/schemas/InternalModuleCatalogueModuleRule"
                 }
+              },
+              "artifact_digest": {
+                "type": "string"
+              },
+              "semantic_status": {
+                "$ref": "#/components/schemas/ModuleVersionSemanticStatus"
+              },
+              "module_uuid": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "version_uuid": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "semantic_version": {
+                "type": "string",
+                "description": "Canonical SemVer for managed versions; empty only for migrated v0 versions."
+              },
+              "migration_generation": {
+                "type": "string",
+                "enum": [
+                  "v0",
+                  "v1",
+                  "managed"
+                ],
+                "description": "Authoritative persisted migration provenance. Only migrated v0 versions may reference external artifacts without a declared digest."
+              },
+              "verification_status": {
+                "$ref": "#/components/schemas/ModuleVerificationStatus"
               }
             }
           }
@@ -5344,7 +8623,7 @@
             "x-go-type-skip-optional-pointer": true
           },
           "pinned_providers": {
-            "description": "The normal response body only includes the modules and providers currently configured. However if we are removing nodes that still rely on providers we need to fetch their details without having the modules.",
+            "description": "The normal response body only includes the latest versions for modules. However if there are pinned resources, we need to request providers retained by the previous graph.",
             "type": "array",
             "items": {
               "description": "The provider type and id separated by a '.'.",
@@ -5354,10 +8633,269 @@
             "x-go-type-skip-optional-pointer": true
           },
           "are_rules_ignored": {
-            "description": "When running a destroy deployment, we only care about pinned module version and do not need to check the rules. This option can be used to skip rule evaluation.",
+            "description": "When running a destroy deployment, only pinned module versions are required and rule evaluation is skipped.",
             "type": "boolean",
             "example": false,
             "x-go-type-skip-optional-pointer": true
+          }
+        }
+      },
+      "ModuleOperationReservation": {
+        "type": "object",
+        "required": [
+          "id",
+          "module_uuid",
+          "namespace",
+          "operation_id",
+          "related_resource_id",
+          "reason",
+          "resource_version",
+          "acquired_by",
+          "acquired_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "module_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "namespace": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9.-]*$"
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "related_resource_id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "resource_version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "acquired_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "acquired_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "released_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "released_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "release_reason": {
+            "type": "string"
+          }
+        }
+      },
+      "ModuleOperationReservationAcquireBody": {
+        "type": "object",
+        "required": [
+          "namespace",
+          "operation_id",
+          "related_resource_id",
+          "reason"
+        ],
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9.-]*$"
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "related_resource_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "ModuleExtensionContribution": {
+        "type": "object",
+        "required": [
+          "id",
+          "module_uuid",
+          "namespace",
+          "external_resource_id",
+          "kind",
+          "lifecycle_state",
+          "label",
+          "payload",
+          "created_by",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "module_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "environment_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "namespace": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9.-]*$"
+          },
+          "external_resource_id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "related_resource",
+              "contextual_action"
+            ]
+          },
+          "lifecycle_state": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "active",
+              "terminal"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "target_url": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ModuleExtensionContributionUpsertBody": {
+        "type": "object",
+        "required": [
+          "namespace",
+          "external_resource_id",
+          "kind",
+          "lifecycle_state",
+          "label",
+          "payload"
+        ],
+        "properties": {
+          "version_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "environment_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "namespace": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9.-]*$"
+          },
+          "external_resource_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "related_resource",
+              "contextual_action"
+            ]
+          },
+          "lifecycle_state": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "active",
+              "terminal"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target_url": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "EnvironmentDeletionImpact": {
+        "type": "object",
+        "required": [
+          "environment_uuid",
+          "blocked",
+          "blockers",
+          "pins",
+          "related_resources"
+        ],
+        "properties": {
+          "environment_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "blocked": {
+            "type": "boolean"
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pins": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentModuleVersionPin"
+            }
+          },
+          "related_resources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModuleExtensionContribution"
+            }
           }
         }
       }

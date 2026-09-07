@@ -14,7 +14,7 @@ import (
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/opt"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/genclient"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genclient"
 )
 
 func TestRules(t *testing.T) {
@@ -70,12 +70,14 @@ func TestRules(t *testing.T) {
 	moduleId := "def-" + strings.ToLower(rand.Text())
 	{
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.ModuleCreateBody{
-			Id:           moduleId,
-			ModuleSource: "/some/module/path",
-			ResourceType: resourceType,
+			Id:              moduleId,
+			ModuleSource:    "/some/module/path",
+			ResourceType:    resourceType,
+			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
 		})
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, res.StatusCode(), string(res.Body))
+		MustPromoteModuleVersion(t, client, orgId, moduleId, "1.0.0")
 	}
 
 	var createdRule genclient.Rule
@@ -233,17 +235,17 @@ func TestRules(t *testing.T) {
 		}
 	})
 
-	t.Run("deleting the definition deletes the rules", func(t *testing.T) {
+	t.Run("published module history prevents deleting the module and its rules", func(t *testing.T) {
 		{
 			res, err := client.DeleteModuleWithResponse(t.Context(), orgId, moduleId)
 			if assert.NoError(t, err) {
-				assert.Equal(t, http.StatusNoContent, res.StatusCode(), string(res.Body))
+				assert.Equal(t, http.StatusConflict, res.StatusCode(), string(res.Body))
 			}
 		}
 		{
 			res, err := client.ListModuleRulesInOrgWithResponse(t.Context(), orgId, &genclient.ListModuleRulesInOrgParams{ByModuleId: &moduleId})
 			if assert.NoError(t, err) && assert.Equal(t, http.StatusOK, res.StatusCode(), string(res.Body)) {
-				assert.Empty(t, res.JSON200.Items)
+				assert.NotEmpty(t, res.JSON200.Items)
 			}
 		}
 	})

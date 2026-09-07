@@ -22,6 +22,7 @@ build: compose.yaml
 .PHONY: test
 test: compose.yaml
 	docker compose up --no-build -d platform-orchestrator-cp-platform-orchestrator-cp platform-orchestrator-dp-platform-orchestrator-dp --wait
+	@DB_CONNECTION_STRING="$$(score-compose resources get-outputs 'postgres.default#platform-orchestrator-cp.postgres' | jq -r '"postgres://\(.username):\(.password)@127.0.0.1:5432/\(.name)?sslmode=disable"')" \
 	SERVER_URL=http://$(shell score-compose resources get-outputs dns.default\#api-dns | jq -r .host):8080 \
 	INTERNAL_SERVER_URL=http://localhost:8081 \
 	INTERNAL_IAM_URL=http://localhost:8083 \

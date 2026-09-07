@@ -10,16 +10,71 @@ import (
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
 	mockmodel "github.com/stellwerk-labs/platform-orchestrator-cp/internal/model/mocks"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/opt"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 )
+
+func TestResolvedPinVersionUUIDRequiresExactOwningOperation(t *testing.T) {
+	pinnedVersion, targetVersion := uuid.New(), uuid.New()
+	owner, other := uuid.New(), uuid.New()
+	pin := model.EnvironmentModuleVersionPin{
+		VersionUUID:               pinnedVersion,
+		Status:                    moduleversions.PinOverridePending,
+		OverrideOperationID:       &owner,
+		OverrideTargetVersionUUID: &targetVersion,
+	}
+
+	assert.Equal(t, pinnedVersion, resolvedPinVersionUUID(pin, nil))
+	assert.Equal(t, pinnedVersion, resolvedPinVersionUUID(pin, &other))
+	assert.Equal(t, targetVersion, resolvedPinVersionUUID(pin, &owner))
+}
+
+func TestArchivedModuleVersionRequiresExactCarryForwardOrRollback(t *testing.T) {
+	active := map[string]struct{}{"checkout@1.2.3": {}}
+
+	assert.True(t, permitsArchivedModuleVersion(moduleversions.CatalogueActive, "checkout@2.0.0", nil, false))
+	assert.True(t, permitsArchivedModuleVersion(moduleversions.CatalogueArchived, "checkout@1.2.3", active, false))
+	assert.False(t, permitsArchivedModuleVersion(moduleversions.CatalogueArchived, "checkout@2.0.0", active, false))
+	assert.False(t, permitsArchivedModuleVersion(moduleversions.CatalogueArchived, "cart@1.2.3", active, false))
+	assert.True(t, permitsArchivedModuleVersion(moduleversions.CatalogueArchived, "checkout@2.0.0", nil, true))
+}
+
+func TestArchivedCarryForwardRequiresUnambiguousExactIdentity(t *testing.T) {
+	version, err := archivedCarryForwardVersion("checkout", map[string]struct{}{"cart@2.0.0": {}, "checkout@opaque-v0": {}})
+	require.NoError(t, err)
+	assert.Equal(t, "opaque-v0", version)
+	version, err = archivedCarryForwardVersion("checkout", map[string]struct{}{"cart@2.0.0": {}, "checkout@": {}})
+	require.NoError(t, err)
+	assert.Empty(t, version)
+	_, err = archivedCarryForwardVersion("checkout", map[string]struct{}{"checkout@1.0.0": {}, "checkout@2.0.0": {}})
+	require.ErrorContains(t, err, "multiple effective versions")
+}
+
+func TestRestrictedModuleVersionRequiresCurrentScopedAuthority(t *testing.T) {
+	assert.True(t, permitsRestrictedModuleVersion("default", false, false, false))
+	assert.False(t, permitsRestrictedModuleVersion("deprecated", false, false, true))
+	assert.True(t, permitsRestrictedModuleVersion("deprecated", true, false, false))
+	assert.True(t, permitsRestrictedModuleVersion("deprecated", false, true, false))
+	assert.False(t, permitsRestrictedModuleVersion("defective", true, false, false))
+	assert.False(t, permitsRestrictedModuleVersion("defective", false, true, false))
+	assert.False(t, permitsRestrictedModuleVersion("defective", false, false, true), "a stale confirmation alone cannot authorize new adoption")
+	assert.True(t, permitsRestrictedModuleVersion("defective", true, false, true))
+	assert.True(t, permitsRestrictedModuleVersion("defective", false, true, true))
+}
 
 func TestGenerateInternalModuleCatalogue_empty(t *testing.T) {
 	_, s, fin := MockServer(t)
 	defer fin()
 
 	mdb := s.Database.(*mockmodel.MockDatabaser)
-	mdb.EXPECT().GetEnvironment(gomock.Any(), gomock.Not(gomock.Nil()), "my-org", "my-project", "my-env", model.GetModeDefault).Return(&model.Environment{ProjectId: "my-project", Id: "my-env", EnvTypeId: "dev"}, nil)
+	environmentUUID := uuid.New()
+	mdb.EXPECT().GetEnvironment(gomock.Any(), gomock.Not(gomock.Nil()), "my-org", "my-project", "my-env", model.GetModeDefault).Return(&model.Environment{ProjectId: "my-project", Id: "my-env", EnvTypeId: "dev", Uuid: environmentUUID}, nil)
+	mdb.EXPECT().ListEnvironmentModuleVersionPins(gomock.Any(), gomock.Not(gomock.Nil()), "my-org", &environmentUUID, gomock.Nil(), false).Return(nil, nil)
+	mdb.EXPECT().GetModuleCatalogue(gomock.Any(), gomock.Any(), "my-org", gomock.Any(), model.GetModeDefault).
+		DoAndReturn(func(_ any, _ any, orgID, moduleID string, _ model.GetMode) (*model.ModuleCatalogue, error) {
+			return &model.ModuleCatalogue{OrgID: orgID, Slug: moduleID, Status: moduleversions.CatalogueActive}, nil
+		}).AnyTimes()
 	mdb.EXPECT().ListModuleRules(gomock.Any(), gomock.Not(gomock.Nil()), "my-org", "", getModuleCataloguePaginationSize, model.ListModuleRulesParams{
 		EffectiveInProjectId: ref.Ref("my-project"),
 		EffectiveInEnvTypeId: ref.Ref("dev"),
@@ -44,7 +99,13 @@ func TestGenerateInternalModuleCatalogue_full(t *testing.T) {
 	defer fin()
 
 	mdb := s.Database.(*mockmodel.MockDatabaser)
-	mdb.EXPECT().GetEnvironment(gomock.Any(), gomock.Not(gomock.Nil()), "my-org", "my-project", "my-env", model.GetModeDefault).Return(&model.Environment{ProjectId: "my-project", Id: "my-env", EnvTypeId: "dev"}, nil)
+	environmentUUID := uuid.New()
+	mdb.EXPECT().GetEnvironment(gomock.Any(), gomock.Not(gomock.Nil()), "my-org", "my-project", "my-env", model.GetModeDefault).Return(&model.Environment{ProjectId: "my-project", Id: "my-env", EnvTypeId: "dev", Uuid: environmentUUID}, nil)
+	mdb.EXPECT().ListEnvironmentModuleVersionPins(gomock.Any(), gomock.Not(gomock.Nil()), "my-org", &environmentUUID, gomock.Nil(), false).Return(nil, nil)
+	mdb.EXPECT().GetModuleCatalogue(gomock.Any(), gomock.Any(), "my-org", gomock.Any(), model.GetModeDefault).
+		DoAndReturn(func(_ any, _ any, orgID, moduleID string, _ model.GetMode) (*model.ModuleCatalogue, error) {
+			return &model.ModuleCatalogue{OrgID: orgID, Slug: moduleID, Status: moduleversions.CatalogueActive}, nil
+		}).AnyTimes()
 	mdb.EXPECT().ListModuleRules(gomock.Any(), gomock.Not(gomock.Nil()), "my-org", "", getModuleCataloguePaginationSize, model.ListModuleRulesParams{
 		EffectiveInProjectId: ref.Ref("my-project"),
 		EffectiveInEnvTypeId: ref.Ref("dev"),
@@ -68,9 +129,11 @@ func TestGenerateInternalModuleCatalogue_full(t *testing.T) {
 	}).Return([]model.ModuleDefinitionVersion{
 		{
 			DefinitionId: "def-0", ResourceType: "my-type", ModuleSource: "/modules/my-s3", ProviderMapping: map[string]string{"aws": "aws.my-prov"},
+			MigrationGeneration: "v0",
 		},
 		{
 			DefinitionId: "def-1", ResourceType: "my-type", ModuleSource: "/modules/my-s3", ProviderMapping: map[string]string{"aws": "google.my-google"},
+			MigrationGeneration: "v1", SemanticVersion: "1.0.0", ArtifactDigest: "sha256:declared",
 			ModuleParams: map[string]model.ModuleParam{"animal": {Type: "string", IsOptional: true, Description: "animal description"}},
 			Dependencies: map[string]model.ModuleDefinitionDependency{
 				"thing": {Type: "x", Class: opt.Of("default"), Id: opt.Of("y"), Params: map[string]interface{}{"thing": "thing"}},
@@ -116,9 +179,10 @@ func TestGenerateInternalModuleCatalogue_full(t *testing.T) {
 		Modules: []InternalModuleCatalogueModule{
 			{
 				Id: "def-0", ResourceType: "my-type", ModuleSource: "/modules/my-s3", ProviderMapping: map[string]string{"aws": "aws.my-prov"},
-				ModuleParams:  map[string]ModuleParamItem{},
-				Dependencies:  map[string]ModuleDependencyManifest{},
-				Coprovisioned: []ModuleCoProvisionManifest{},
+				MigrationGeneration: "v0",
+				ModuleParams:        map[string]ModuleParamItem{},
+				Dependencies:        map[string]ModuleDependencyManifest{},
+				Coprovisioned:       []ModuleCoProvisionManifest{},
 				Rules: []InternalModuleCatalogueModuleRule{
 					{
 						RuleId:        uuid.NewMD5(uuid.Nil, []byte{0}),
@@ -130,6 +194,7 @@ func TestGenerateInternalModuleCatalogue_full(t *testing.T) {
 			},
 			{
 				Id: "def-1", ResourceType: "my-type", ModuleSource: "/modules/my-s3", ProviderMapping: map[string]string{"aws": "google.my-google"},
+				MigrationGeneration: "v1", SemanticVersion: "1.0.0", ArtifactDigest: "sha256:declared",
 				ModuleParams: map[string]ModuleParamItem{
 					"animal": {Type: String, IsOptional: true},
 				},

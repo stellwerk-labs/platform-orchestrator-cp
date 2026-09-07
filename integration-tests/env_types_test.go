@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/genclient"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genclient"
 )
 
 func TestEnvTypes(t *testing.T) {
@@ -34,6 +34,7 @@ func TestEnvTypes(t *testing.T) {
 			assert.Equal(t, http.StatusCreated, res.StatusCode(), string(res.Body))
 			assert.Equal(t, "dev", res.JSON201.Id)
 			assert.Equal(t, "Development", res.JSON201.DisplayName)
+			assert.False(t, res.JSON201.IsProduction)
 			assert.NotEmpty(t, res.JSON201.Id)
 			assert.NotEmpty(t, res.JSON201.Uuid)
 			assert.NotEmpty(t, res.JSON201.CreatedAt)
@@ -43,7 +44,7 @@ func TestEnvTypes(t *testing.T) {
 
 	t.Run("can update environment type display name", func(t *testing.T) {
 		if res, err := client.UpdateEnvironmentTypeWithResponse(t.Context(), orgId, "dev", genclient.EnvironmentTypeUpdateBody{
-			DisplayName: "New Development",
+			DisplayName: ref.Ref("New Development"),
 		}); assert.NoError(t, err) {
 			assert.Equal(t, http.StatusOK, res.StatusCode(), string(res.Body))
 			assert.Equal(t, "dev", res.JSON200.Id)
@@ -73,11 +74,12 @@ func TestEnvTypes(t *testing.T) {
 	var et2 genclient.EnvironmentType
 	t.Run("can create another env type", func(t *testing.T) {
 		if res, err := client.CreateEnvironmentTypeWithResponse(t.Context(), orgId, genclient.EnvironmentTypeCreateBody{
-			Id: "prod",
+			Id: "prod", IsProduction: ref.Ref(true),
 		}); assert.NoError(t, err) {
 			assert.Equal(t, http.StatusCreated, res.StatusCode(), string(res.Body))
 			assert.Equal(t, "prod", res.JSON201.Id)
 			assert.Equal(t, "prod", res.JSON201.DisplayName)
+			assert.True(t, res.JSON201.IsProduction)
 			et2 = *res.JSON201
 		}
 	})

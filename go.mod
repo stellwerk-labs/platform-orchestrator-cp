@@ -24,7 +24,7 @@ require (
 	github.com/stellwerk-labs/golib/hstandardoutbox v1.1.1
 	github.com/stellwerk-labs/golib/htelemetry v1.0.0
 	github.com/stellwerk-labs/golib/hvaultapi v1.0.0
-	github.com/stellwerk-labs/platform-orchestrator-cp/shared v0.0.0
+	github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2 v2.0.0
 	github.com/stellwerk-labs/platform-orchestrator-dp/shared/v2 v2.0.0
 	github.com/stellwerk-labs/platform-orchestrator-graph v1.0.0
 	github.com/stellwerk-labs/platform-orchestrator-iam/shared v1.0.0
@@ -37,7 +37,7 @@ require (
 	k8s.io/apimachinery v0.35.3
 )
 
-replace github.com/stellwerk-labs/platform-orchestrator-cp/shared v0.0.0 => ./shared
+replace github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2 v2.0.0 => ./shared
 
 require (
 	filippo.io/hpke v0.4.0 // indirect

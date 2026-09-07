@@ -37,6 +37,8 @@ func TestRuleCreateBody_validate(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			db := s.Database.(*mockmodel.MockDatabaser)
+			db.EXPECT().GetModuleCatalogue(gomock.Any(), gomock.Any(), "my-org", gomock.Any(), model.GetModeForUpdate).
+				Return(&model.ModuleCatalogue{Status: "active"}, nil).AnyTimes()
 			db.EXPECT().GetModuleDefinition(gomock.Any(), gomock.Any(), "my-org", gomock.Any(), model.GetModeForUpdate).Return(nil, fmt.Errorf("here")).AnyTimes()
 
 			userId := userid.NewHumanUserId()
