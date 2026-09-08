@@ -31,6 +31,10 @@ Release regression evidence:
   graduation and multi-Module lifecycle transactions against exact persisted
   state/event/receipt snapshots, including failure after an earlier write in the
   transaction. Corrected retries and successful command replays are also checked.
+- `TestConcurrentStableSuccessorCommandsCreateOneStableProposedVersion` submits
+  simultaneous stable-successor commands for the same Proposed prerelease and
+  verifies only one command commits, one receipt scope is retained and one stable
+  Proposed successor is created.
 
 These are database/API tests against an isolated compatible Core stack, not
 substituted repository mocks. They do not claim production Runner, distribution

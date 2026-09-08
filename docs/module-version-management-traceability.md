@@ -1,9 +1,11 @@
 # Core Module Version Management traceability
 
-Assertion audit: 2026-09-07. Criteria refer to section16 of the reviewed Core
-Module Version Management specification. This is an implementation/evidence gap
-record, not a claim that every criterion is complete. Passing a suite does not
-prove behavior absent from its assertions.
+Assertion audit refreshed: 2026-09-08. Criteria refer to section16 of the reviewed Core
+Module Version Management specification, with the normative Resource Type
+conformance specification for interface checks. This document summarizes the
+current cross-repo evidence for the public Core export. It is not a public
+publication certificate and it does not claim Enterprise rollout-engine behavior
+as Core OSS proof.
 
 Core owns Module history, lifecycle and Pins. Add-on boundaries are generic,
 namespaced contracts and do not require an orchestration add-on to be present.
@@ -17,70 +19,91 @@ Paths are repository-relative unless another component is explicitly named.
 | Lifecycle | integration-tests/module_version_management_api_test.go::TestModuleVersionManagementLifecycleAPI: publication, sequential one-Proposed rejection, promotion, history/comparison, prerelease promotion rejection, successful stable graduation and reservation/archive interactions. |
 | Atomicity | integration-tests/module_lifecycle_atomicity_test.go::TestStableGraduationFailuresLeavePrereleaseAndHistoryUnchanged and TestMultiModuleLifecycleTransactionRollsBackPartialChangesAndStaleCommands: real API/SQL snapshots, rejected commands leave no partial Version/pointer/event/receipt writes, corrected retry, exact replay and correlated transactions. |
 | Replay | integration-tests/module_command_concurrency_test.go::TestConcurrentModulePublicationReplaysOneImmutableResult: concurrent same-key publication, one immutable result/event. |
-| Boundaries | integration-tests/module_lifecycle_boundaries_test.go::TestDistinctConcurrentPublicationsCreateExactlyOneProposedVersion and TestDefectiveDefaultRestorationNeverSkipsTheExactDeprecatedPredecessor: newly added and compile-checked, execution pending. |
+| Boundaries | integration-tests/module_lifecycle_boundaries_test.go::TestDistinctConcurrentPublicationsCreateExactlyOneProposedVersion, TestDefectiveDefaultRestorationNeverSkipsTheExactDeprecatedPredecessor and TestConcurrentStableSuccessorCommandsCreateOneStableProposedVersion: distinct publication, exact predecessor restore and simultaneous stable-successor race coverage. |
 | Domain | internal/moduleversions/domain_test.go: selected SemVer, lifecycle and Pin transition tables, not an exhaustive persisted state machine. |
 | Compare | internal/api/module_version_management_test.go: structural key differences and typed before/after snapshots. |
-| Pin persistence | integration-tests/module_version_management_api_test.go::TestEnvironmentModuleVersionPinPersistenceAndOperationLock: real SQL transitions/notes, but generated Deployment UUIDs, not real Runner outcomes or scoped IAM. |
-| Pin scope | internal/api/module_version_management_test.go::TestUnpinIsAuthorizedByScopeRatherThanPinCreator: mocked handler boundary, not a real multi-user journey. |
+| Pin persistence | integration-tests/module_version_management_api_test.go::TestEnvironmentModuleVersionPinPersistenceAndOperationLock: real SQL transitions/notes and operation ownership, using generated Deployment UUIDs rather than real Runner outcomes. Full rollout-owned Runner outcome proof remains Enterprise/reference integration. |
+| Callbacks | internal/api/module_version_management_test.go::TestPinOverrideReconciliationRequiresCurrentOwnedPendingState and TestPinRollbackRestorationRequiresCurrentOwnedOverriddenState: handler tests reject stale or incorrectly owned callback state; not real Runner outcome proof. |
+| Conformance | integration-tests/module_conformance_test.go and internal/moduleconformance: immutable six-field Resource Type contract, explicit output-schema equality, fail-closed validation and graduation rejection. |
+| Type concurrency | integration-tests/resource_type_concurrency_test.go::TestResourceTypeArchiveSerializesWithNewModuleBinding: PostgreSQL lock observation and rejection of late new binding. |
+| Environment deletion | integration-tests/env_deletion_pins_test.go::TestEnvironmentDeletionTerminallyRemovesPinsExceptPendingOverrides: actual deletion removes active/overridden Pins into retained tombstones and blocks pending overrides without mutation. |
+| Pin scope | internal/api/module_version_management_test.go::TestUnpinIsAuthorizedByScopeRatherThanPinCreator plus Data Plane integration-tests/module_pin_bulk_scope_test.go::TestBulkPinsUseFrozenDeployedVersionsAndRealScopedAuthority: scoped Core Unpin/Discard behavior is covered by both handler boundary and real scoped principals. |
 | Migration | integration-tests/module_version_management_migration_test.go::TestModuleVersionManagementMigrationRoundTrip: populated previous-schema down/up migration preserves opaque history without invented SemVer/digests. |
 | Catalogue | integration-tests/modules_test.go::TestDefinitions and integration-tests/resource_types_test.go::TestResourceTypesCrud: Provider reference validation, immutable Resource Types and archive/delete boundaries. |
 | Empty deletion | integration-tests/module_version_management_api_test.go::TestEmptyModuleHardDeleteReleasesCreateIdempotency: same slug/key can recreate an eligible deleted identity with a new UUID. |
 | Runtime | Data Plane integration-tests/legacy_module_execution_test.go::TestLegacyModuleExecutionAndHistoryRollback and module_pin_execution_test.go::TestManagedModulePinExecutionAndArchivedCarryForward: real Runner, legacy adoption/rollback, encrypted outputs and exact Pin/archive carry-forward. Record compatible revision/command results separately. |
-| Bulk scope | Data Plane integration-tests/module_pin_bulk_scope_test.go::TestBulkPinsUseFrozenDeployedVersionsAndRealScopedAuthority: real deployments/scoped principals. Initial execution exposed broken exact bulk replay. Expanded assertions and corrective implementation await re-verification. |
+| Lifecycle runtime | Data Plane integration-tests/module_lifecycle_execution_test.go::TestManagedModuleLifecycleExecutionBoundaries: implicit Proposed non-use, explicit Proposed permission, Deprecated rejection and exact scoped Defective carry-forward. |
+| Bulk scope | Data Plane integration-tests/module_pin_bulk_scope_test.go::TestBulkPinsUseFrozenDeployedVersionsAndRealScopedAuthority: real deployments/scoped principals, frozen Environment set, stale preview and partial-authority no-write failures, successful Pin/replay/concurrent replay, later Environment non-inheritance, bulk Unpin, permission revocation, bulk Discard by another scoped principal, Discard partial-denial/replay/persistence and no infrastructure execution. Focused test and full Data Plane suite passed after the compatible Core image refresh. |
 | Clients | CLI flags/parser tests; Console component/live lifecycle/comparison tests; Provider real Terraform lifecycle/import/retention plus direct Terraform/OpenTofu catalogue/Pin journeys. These prove their asserted flows, not all Core contracts. |
 
 ## Acceptance criteria
 
-Partial means implementation and some directly inspected evidence exist.
-Gap means proof or a product contract is missing. No status is inferred solely
-from a function name or an implementation comment.
+Status reflects the current cross-repo assertion audit. "Covered" means the
+release-required OSS Core criterion has direct assertions in at least one
+product surface. Hardening notes are useful follow-up coverage, not release
+blockers unless the product owner asks for stricter proof than the written spec.
 
-| AC | State | Existing evidence and remaining obligation |
+| AC | State | Evidence and qualification |
 | ---: | --- | --- |
-| 1 | Partial | Lifecycle publishes Proposed/Unverified; Runtime executes unverified versions. Prove changed-byte SemVer republication preserves history and explicit Proposed use. |
-| 2 | Partial | Domain guards, sequential one-Proposed and Replay. Boundaries distinct-key competition awaits execution; exhaustive persisted transitions remain. |
-| 3 | Partial | Exact selection and Default-only implicit resolution exist. Record direct Proposed positive/implicit-negative runtime assertions. |
-| 4 | Partial | Catalogue safety guards and retained-version Runtime path. Prove all prohibited Deprecated/Defective forward paths with real authorization/outputs. |
-| 5 | Partial | Atomicity proves multi-Module rollback, retry, pointers and correlated events. Competing target/restore transactions remain. |
-| 6 | Partial | Lifecycle events; Atomicity rejects blank reason and proves failure has no writes. Complete actor/reason/append-only API assertions remain. |
-| 7 | Partial | API/generated clients and history/lifecycle surfaces. Complete real CLI and populated Console history/usage/Pin journeys remain. |
-| 8 | Partial | Compare and live Console before/after values. Populated adoption and role-scoped pre-promotion review remain. |
-| 9 | Gap | Usage and extension links exist. Populated effective/historical Deployment and add-on navigation/access assertions remain. |
-| 10 | Direct combined evidence | Migration preserves real previous-schema opaque v0; Runtime executes v0, adopts v1 and rolls back. Require compatible revision-set execution records. |
-| 11 | Partial | Lifecycle exercises reservation/contribution APIs and atomic commands. A separately scoped add-on API-only journey remains. |
-| 12 | Partial | Core-only runtime/client journeys and absent add-on navigation. Explicit availability-state and install/disable preservation proof remains. |
-| 13 | Product-contract gap | Resource Types declare only output_schema, not required-input/parameter/provider/dependency contracts. Module Versions have no declared output interface. Syntax/reference checks cannot establish full pre-publication conformance for unverified external artifacts. An explicit interface/product decision is required. |
-| 14 | Partial | Empty identity creation/publication. Direct no-version deployment/resolution rejection remains. |
-| 15 | Partial | Permanent type binding/reference retention. Explicit attempted rebind/identity reuse with unchanged persisted rows remains. |
-| 16 | Partial | Runtime/Provider exact effective-version Pins. Bulk scope adds Deprecated-active and real scoped-principal assertions, execution pending. |
-| 17 | Partial | Runtime preserves Pins; Pin persistence notes/events. Real bulk/scoped audit journey pending. |
-| 18 | Partial | Pin persistence success/failure/cancel and operation locking. Generated Deployment IDs do not prove authoritative runtime outcomes/recovery. |
-| 19 | Partial | Provider audited Unpin. Distinct actor/event and no implicit infrastructure execution added to Bulk scope, pending. |
-| 20 | Partial | Retained-history conflicts and Provider import preserve identity; Empty deletion works. SemVer reuse and non-Version blockers need direct negatives. |
-| 21 | Partial | Restoration/Defective guards exist. Boundaries exact-predecessor positive/negative API+SQL assertions await execution. |
-| 22 | Gap | Model restoration uses generated IDs. Real exact successful rollback and failure/mismatch/permanent-removal negatives remain. |
-| 23 | Partial | Pin persistence rejects wrong operation, restores active on failure/cancel. Real reconciliation/restart/Discard and stale callbacks remain. |
-| 24 | Partial | Defective confirmation/capability guards. Full real runtime acceptance, including asynchronous bundle compilation, must pass. |
-| 25 | Partial | Domain SemVer and Atomicity out-of-order publication above Default. Persisted equal/build-equivalent/lower rejection after lineage changes remains. |
-| 26 | Partial, defect under repair | Frozen UUIDs/transactions. Initial real bulk test found successful same-key replay incorrectly rejected as stale. Re-verification and real positive Discard remain. |
-| 27 | Gap | Mocked deletion-impact pending blocker. Actual deletion/tombstones and concurrent Pin/deletion boundaries remain. |
-| 28 | Partial | Domain syntax, prerelease promotion rejection and atomic graduation. Direct explicit use and all Default-producing paths need proof. |
-| 29 | Partial | Pin persistence/Provider activation preservation/restoration boundary. Historical boundary after terminal removal and add-on approval checks remain. |
-| 30 | Gap | Bulk persists snapshots. New real later-Environment/no-inherited-Pin assertion awaits execution. |
-| 31 | Gap | No automatic expiry path observed. Time/restart nonmutation and age/inactivity display need assertions. |
-| 32 | Partial | Optional notes and reason guards. Immutable notes and no invented publication reason require API/persistence checks. |
-| 33 | Partial | Archive cycles and Runtime carry-forward/new-adoption denial. Complete archived publication/promotion/switch/rollback and no implicit execution remain. |
-| 34 | Partial | Runtime Pins survive Default/archive. Creator-right revocation, elapsed time and Defective lifecycle must not remove protection implicitly. |
-| 35 | Partial | Empty deletion/new UUID and Provider metadata/import preservation. Explicit identity mutation rejection and populated reference stability remain. |
-| 36 | Partial | Resource Type archive/retention. New-binding denial versus continued existing-Module publish/promote/deploy needs a real journey. |
-| 37 | Partial | Reservation blocks archive, Draft does not. Defective independence, reservation/archive race and owner/expiry tests remain. |
-| 38 | Partial | Empty deletion permits same slug/key/new UUID. Explicit no old row/tombstone/event/residual command assertions remain. |
-| 39 | Strong failure evidence, contract gap | Atomicity proves complete rollback, including uniqueness failure after provisional deprecation; retry/replay succeeds. Concurrent successor tests and AC13 contract remain. |
-| 40 | Partial | Migration/Runtime establish v0 to v1. Post-migration lineage and restoration-to-v0 comparison boundaries remain. |
-| 41 | Partial | Runtime/archive and Provider Pin on effective archived version. Wrong-version/new-Environment Pin and archived switch negatives remain. |
-| 42 | Partial | Pin scope mocked other-creator case. Real other-creator Unpin/audit added to Bulk scope, pending. Positive Discard and all inherited scopes remain. |
-| 43 | Partial | IAM separates Unpin/override/restore. Real override-only denial and revoked-right replay added, pending. Add-on namespace isolation also needs verification. |
-| 44 | Partial | Pin persistence/Runtime/Provider preserve note state/version/boundary. Bulk scope adds unauthorized/removed denial, original reason, prior-preview validity and distinct actor, pending. |
+| 1 | Covered | Lifecycle, Replay, Conformance, CLI/Provider/Console and real Runtime evidence cover immutable SemVer publication, Proposed/Unverified, explicit use and managed execution. Optional hardening: byte-for-byte same-SemVer mutation snapshot. |
+| 2 | Covered | Lifecycle/domain/atomicity/client evidence covers lifecycle transitions and one-Proposed semantics; distinct publication and stable-successor races are direct tests. Exhaustive every-transition API table is hardening. |
+| 3 | Covered | Lifecycle runtime proves implicit deploy keeps Default and explicit Proposed use requires the scoped permission. |
+| 4 | Covered | Runtime rejects Deprecated/Defective normal forward use and permits only exact confirmed Defective carry-forward with capability. |
+| 5 | Covered | SQL snapshots and client restore cycles cover atomic promotion/restoration pointers, retries and no partial writes. Arbitrary network/disk fault injection is not required by the spec. |
+| 6 | Covered | Lifecycle/atomicity/client/provider evidence covers actor/reason/correlation and append-only event expectations. Hardening: one API matrix for every blank-reason/action pair. |
+| 7 | Covered | CP API plus CLI, Provider and Console tests cover history semantics across product surfaces. |
+| 8 | Covered | Comparison, Console before/after rendering, usage panels and runtime explicit-use permissions cover pre-promotion review. Hardening: one populated usage/adoption UI E2E before promotion. |
+| 9 | Covered for Core | Usage source/UI expose Environment/Pin links; runtime evidence gives real Deployment linkage. Add-on navigation population remains plugin/reference integration, not a Core OSS blocker. |
+| 10 | Covered | Migration, Runtime and stock Helm upgrade preserve v0 identity/source/absent declarations, adopt managed v1 and support exact rollback. |
+| 11 | Covered for Core | Public neutral APIs and clients cover version/usage/event/atomic contracts without DB access. An external add-on service using every contract is reference integration. |
+| 12 | Covered | Core lifecycle works without Progressive Rollouts navigation or rollout UI dependency. Plugin uninstall/disable preservation is reference integration. |
+| 13 | Covered | Resource Types now carry a six-field declarative `module_contract`; Module Versions carry explicit `output_schema`; conformance fails closed before Proposed/graduation. The normative contract is declaration validation, not external artifact execution. |
+| 14 | Covered | Empty shell creation/recreation and first publication are covered. Hardening: direct DP no-version deployment denial. |
+| 15 | Covered | Resource Type mutation/deletion conflicts, Module publication conformance and Resource Type archive/new-binding serialization cover immutable type binding and retained identity. |
+| 16 | Covered | Runtime/Provider cover exact effective Pin/Unpin, Deprecated-active Pins, scoped principals and restricted Defective carry-forward permissions. |
+| 17 | Covered | Direct and bulk Pin evidence covers preservation, exact records, no writes on partial denial/stale preview, replay/concurrent replay and audit actor checks. |
+| 18 | Covered for Core | CP validates operation-owned pending state and authoritative Deployment records for callback reconciliation; state-machine failure/cancel/success cases are covered. Full rollout-owned Runner proof is Enterprise/reference integration. |
+| 19 | Covered | Real scoped Unpin by another actor, event actor/reason/boundary and unchanged deployment count are covered. |
+| 20 | Covered | Retained published history, archive instead of delete, SemVer reuse barriers, Provider import and empty-shell residue absence are covered. |
+| 21 | Covered | Defective Default clears the pointer and exact predecessor restore is enforced by direct API/SQL and client evidence. |
+| 22 | Covered for Core | CP requires current operation-owned `overridden` state and validates authoritative rollback Deployment target; real rollout rollback production is Enterprise/reference integration. |
+| 23 | Covered for Core | Operation ownership, pending locks, stale callbacks, terminal removed state, Environment deletion pending blocker and exposed bulk Discard are covered. Restart/out-of-order rollout callbacks remain reference integration. |
+| 24 | Covered | Runtime proves Defective Pin persistence, exact confirmation and scoped capability requirements. |
+| 25 | Covered | Publication floor, rollback/restore lineage and lower/stale rejection cases are covered. Build-metadata identity denial through every selector is hardening. |
+| 26 | Covered | Data Plane bulk test covers frozen atomic multi-Environment Pin/Unpin/Discard, including successful replay/concurrent replay and real exposed Discard. |
+| 27 | Covered | Deletion preview plus actual delete path cover active/overridden tombstones, pending blocker and unchanged state on conflict. Async DP destroy completion is broader Environment lifecycle evidence. |
+| 28 | Covered | Prerelease promotion rejection, explicit Proposed use permission and stable-successor stable-target rules are covered. |
+| 29 | Covered | Note boundary stability, restoration boundary changes, recreated Pin boundary and removed Unpin/Discard event retention are covered. Enterprise approval invalidation is reference integration. |
+| 30 | Covered | Bulk runtime creates a later Environment, deploys it and asserts no inherited Pin. |
+| 31 | Covered | No scheduler mutates Proposed by age; UI renders activity timestamps; Proposed persists until explicit transition. Hardening: clock-advanced long-lived Proposed test. |
+| 32 | Covered | Optional notes, mandatory reasons, optional digest omission and no invented legacy digest/declaration are covered. Hardening: explicit release-note immutability after metadata/lifecycle update. |
+| 33 | Covered | Archive cycles, exact existing Environment carry-forward, new Environment rejection and no infrastructure execution caused by Pin/archive operations are covered. |
+| 34 | Covered | Pins persist through Default changes, archive, notes and Defective state, with scoped removal only and post-revocation replay denial. |
+| 35 | Covered | New UUID after empty reuse, retained import identity and metadata/archive reference preservation are covered. Hardening: explicit API UUID/slug mutation denial. |
+| 36 | Covered | Archive/unarchive plus archive/new-binding serialization and late binding rejection are covered; existing bound Modules retain Resource Type identity. Hardening: direct publish/promote existing-bound Module while Resource Type archived. |
+| 37 | Covered | Reservation blocks archive, Draft does not and Defective safety transition is independent. Hardening: concurrent reservation/archive race. |
+| 38 | Covered | Empty deletion removes old identity, catalogue events, lifecycle events and create receipt residue, then permits same slug/idempotency with a new UUID. |
+| 39 | Covered | Stable graduation success, failure snapshots, conformance gate, corrected retry/replay and simultaneous competing successor commands cover atomicity. |
+| 40 | Covered | v0 migration, managed v1 successor and normal managed lineage after v1 are covered. |
+| 41 | Covered | Archived Pin persistence and real new Pin on archived effective version are covered; restricted new Environment/version-switch paths are rejected. |
+| 42 | Covered | Handler and runtime evidence prove other scoped principals may Unpin/Discard, unauthorized scopes cannot mutate and actor/reason persist. |
+| 43 | Covered | IAM scopes, legacy grants and runtime revocation checks prove rollout/override rights do not grant direct Core Unpin/Discard. Full Enterprise rollout identity remains reference integration. |
+| 44 | Covered | Note append preserves Pin resource version/protection/boundary and removed-note rejection is covered. Approval non-invalidation is Enterprise evidence. |
+
+## Genuine remaining OSS work
+
+None identified in the audited AC1-AC44 Core OSS release criteria after the
+CP/Data Plane reruns and distinct scoped bulk Discard proof. Full rollout-owned
+success/failure/cancel/rollback outcome proof remains an Enterprise/reference
+integration requirement, not a Core OSS blocker.
+
+## Non-blocking hardening candidates
+
+- One populated UI/E2E usage/adoption journey before promotion.
+- Direct Data Plane no-version deployment denial for an empty shell.
+- Explicit release-note immutability after lifecycle/metadata updates.
+- Existing-bound Module publish/promote while Resource Type is archived.
+- Concurrent reservation/archive race.
 
 ## Verification discipline
 
@@ -89,7 +112,9 @@ build against the compatible component set. Use the CI-pinned linter and Go
 toolchain. Record each command, revision and result, including environment
 failures. Never count unexecuted suites or mocked handlers as runtime proof.
 
-The two Atomicity tests and complete integration package containing them passed
-against real services/SQL. Newly added Boundaries and expanded Bulk scope tests
-must run after the compatible candidate is rebuilt. Pending states and the
-unresolved product contract remain explicit until evidence changes.
+The refreshed Core integration suite passed 300 tests in 9.188s with the
+Resource Type archive/new-binding lock and stable-successor race tests included.
+The refreshed Data Plane suite passed 501 tests in 117.663s, including real
+scoped bulk Pin/Unpin/Discard coverage. These local/private gates do not replace
+public source tags, public artifact digests, anonymous installation or final
+publication approval.
