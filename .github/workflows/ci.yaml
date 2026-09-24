@@ -179,7 +179,20 @@ jobs:
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      IAM_IMAGE: ${{ vars.CORE_IAM_INTEGRATION_IMAGE }}
+      DP_IMAGE: ${{ vars.CORE_DP_INTEGRATION_IMAGE }}
     steps:
+      - name: Require compatible digest-pinned integration dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          for image_variable in IAM_IMAGE DP_IMAGE; do
+            if [[ ! "${!image_variable}" =~ @sha256:[0-9a-f]{64}$ ]]; then
+              echo "::error::Set CORE_${image_variable%_IMAGE}_INTEGRATION_IMAGE to a compatible public image digest before running CI."
+              exit 1
+            fi
+          done
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:

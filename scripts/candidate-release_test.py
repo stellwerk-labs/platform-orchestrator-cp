@@ -2,6 +2,8 @@
 import importlib.util
 from pathlib import Path
 import re
+import subprocess
+import textwrap
 import unittest
 
 spec = importlib.util.spec_from_file_location("candidate", Path(__file__).with_name("candidate-release.py"))
@@ -11,6 +13,22 @@ SHA = "a" * 40
 
 
 class CandidateReleaseTests(unittest.TestCase):
+    def test_integration_dependencies_fail_closed_before_tests(self):
+        workflow = Path(__file__).parents[1].joinpath(".github/workflows/ci.yaml").read_text()
+        integration = workflow.split("\n  integration:\n", 1)[1].split("\n  commitlint:", 1)[0]
+        for name in ("IAM", "DP"):
+            self.assertIn(f"{name}_IMAGE: ${{{{ vars.CORE_{name}_INTEGRATION_IMAGE }}}}", integration)
+        script = textwrap.dedent(integration.split("        run: |\n", 1)[1].split("\n      - ", 1)[0])
+        image = "ghcr.io/stellwerk-labs/dependency@sha256:" + "a" * 64
+        for iam, dp, succeeds in ((image, image, True), ("", image, False),
+                                  (image, "", False), ("image:v2.2.0", image, False),
+                                  (image, "image@sha256:123", False)):
+            with self.subTest(iam=iam, dp=dp):
+                result = subprocess.run(["/bin/bash", "-c", script],
+                                        env={"IAM_IMAGE": iam, "DP_IMAGE": dp},
+                                        capture_output=True, text=True, timeout=5)
+                self.assertEqual(result.returncode == 0, succeeds, result.stdout + result.stderr)
+
     def test_canonical_candidate_and_exact_commit(self):
         for tag in ("v3.0.0-rc.1", "v2.4.0-rc.12", "v0.7.0-rc.1"):
             with self.subTest(tag=tag):
