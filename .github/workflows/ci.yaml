@@ -55,6 +55,7 @@ jobs:
     if: github.repository == 'stellwerk-labs/platform-orchestrator-cp' && github.event_name == 'workflow_dispatch'
     needs:
       - candidate-preflight
+      - commitlint
       - unit
       - integration
     runs-on: ubuntu-latest
@@ -225,21 +226,36 @@ jobs:
         run: make clean
 
   commitlint:
-    if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.candidate_sha || github.sha }}
           fetch-depth: 0
 
-      - name: Lint commits
-        uses: wagoid/commitlint-github-action@6cf16efdf4da5277c791d335142c03a0bdf1766e # v6.2.1
+      - name: Validate the complete landing range
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BASE: ${{ github.event.before }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          case "$EVENT_NAME" in
+            pull_request) base="$PR_BASE"; head="$PR_HEAD" ;;
+            push) base="$PUSH_BASE"; head="$GITHUB_SHA" ;;
+            workflow_dispatch) base="refs/remotes/origin/$DEFAULT_BRANCH"; head=HEAD ;;
+            *) echo "Unsupported commit validation event: $EVENT_NAME" >&2; exit 1 ;;
+          esac
+          bash scripts/check-release-commits.sh "$base" "$head"
 
   release:
     if: github.repository == 'stellwerk-labs/platform-orchestrator-cp' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs:
+      - commitlint
       - unit
       - integration
     runs-on: ubuntu-latest

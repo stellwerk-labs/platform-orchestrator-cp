@@ -98,6 +98,15 @@ class CandidateReleaseTests(unittest.TestCase):
         self.assertNotIn(":latest", publication)
         self.assertIn("/environments/public-release-candidate", jobs["candidate-preflight"])
 
+    def test_commit_gate_covers_candidates_and_stable_publication(self):
+        text = Path(__file__).parents[1].joinpath(".github/workflows/ci.yaml").read_text()
+        jobs = dict(re.findall(r"^  ([a-z-]+):\n(.*?)(?=^  [a-z-]+:\n|\Z)", text, re.M | re.S))
+        for publisher in ("candidate-release", "release"):
+            self.assertIn("- commitlint", jobs[publisher])
+        self.assertNotIn("\n    if:", jobs["commitlint"])
+        self.assertIn("inputs.candidate_sha || github.sha", jobs["commitlint"])
+        self.assertIn('bash scripts/check-release-commits.sh "$base" "$head"', jobs["commitlint"])
+
     def test_all_existing_gates_test_candidate_sha_and_stable_path_stays_separate(self):
         text = Path(__file__).parents[1].joinpath(".github/workflows/ci.yaml").read_text()
         jobs = dict(re.findall(r"^  ([a-z-]+):\n(.*?)(?=^  [a-z-]+:\n|\Z)", text, re.M | re.S))
