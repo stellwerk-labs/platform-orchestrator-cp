@@ -20,7 +20,7 @@ build: compose.yaml
 	docker compose build --pull
 
 .PHONY: test
-test: compose.yaml
+test: compose.yaml test-iam-startup
 	docker compose up --no-build -d platform-orchestrator-cp-platform-orchestrator-cp platform-orchestrator-dp-platform-orchestrator-dp --wait
 	@DB_CONNECTION_STRING="$$(score-compose resources get-outputs 'postgres.default#platform-orchestrator-cp.postgres' | jq -r '"postgres://\(.username):\(.password)@127.0.0.1:5432/\(.name)?sslmode=disable"')" \
 	SERVER_URL=http://$(shell score-compose resources get-outputs dns.default\#api-dns | jq -r .host):8080 \
@@ -29,6 +29,11 @@ test: compose.yaml
 	VAULT_URL=http://localhost:8200 VAULT_TOKEN=mytoken \
 	TEST_USER_IDENTITY_RECIPIENT=age10hmkvsqfxr5ha05ay6pqj9zdtal7pw7x2r3t4n00rzucc3en3u9q3cycqm \
 	go tool gotestsum --format testname ./ -test.timeout 10m -test.parallel=2 -test.v $(TESTARGS)
+
+## Verify IAM can bootstrap an empty event transport before CP starts.
+.PHONY: test-iam-startup
+test-iam-startup: compose.yaml
+	docker compose up --no-build -d platform-orchestrator-iam-platform-orchestrator-iam --wait --wait-timeout 60
 
 .PHONY: clean
 clean:

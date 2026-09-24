@@ -36,9 +36,13 @@ services:
         condition: service_started
   platform-orchestrator-iam-platform-orchestrator-iam:
     environment:
+      NATS_BOOTSTRAP_STREAMS: "true"
       LOG_LEVEL: debug
       DD_AGENT_HOST: ""
       SHUTDOWN_DELAY: 1s
+    depends_on:
+      nats:
+        condition: service_healthy
   vault:
     image: hashicorp/vault:1.14
     environment:
