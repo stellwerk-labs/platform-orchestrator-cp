@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/genclient"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genclient"
 )
 
 func TestEnvs(t *testing.T) {

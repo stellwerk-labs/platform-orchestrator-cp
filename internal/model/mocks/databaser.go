@@ -12,12 +12,14 @@ package mock_model
 import (
 	context "context"
 	sql "database/sql"
+	json "encoding/json"
 	reflect "reflect"
 
 	uuid "github.com/google/uuid"
 	reliableoutbox "github.com/stellwerk-labs/golib/hmessaging/reliableoutbox"
 	hstandardoutbox "github.com/stellwerk-labs/golib/hstandardoutbox"
 	model "github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
+	moduleversions "github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -43,6 +45,36 @@ func NewMockDatabaser(ctrl *gomock.Controller) *MockDatabaser {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockDatabaser) EXPECT() *MockDatabaserMockRecorder {
 	return m.recorder
+}
+
+// AcquireModuleOperationReservation mocks base method.
+func (m *MockDatabaser) AcquireModuleOperationReservation(ctx context.Context, tx model.Tx, orgID, moduleRef, namespace string, operationID uuid.UUID, relatedResourceID, reason string, actor uuid.UUID) (*model.ModuleOperationReservation, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AcquireModuleOperationReservation", ctx, tx, orgID, moduleRef, namespace, operationID, relatedResourceID, reason, actor)
+	ret0, _ := ret[0].(*model.ModuleOperationReservation)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AcquireModuleOperationReservation indicates an expected call of AcquireModuleOperationReservation.
+func (mr *MockDatabaserMockRecorder) AcquireModuleOperationReservation(ctx, tx, orgID, moduleRef, namespace, operationID, relatedResourceID, reason, actor any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AcquireModuleOperationReservation", reflect.TypeOf((*MockDatabaser)(nil).AcquireModuleOperationReservation), ctx, tx, orgID, moduleRef, namespace, operationID, relatedResourceID, reason, actor)
+}
+
+// AppendModuleVersionPinNote mocks base method.
+func (m *MockDatabaser) AppendModuleVersionPinNote(ctx context.Context, tx model.Tx, orgID string, pinID, actor uuid.UUID, actorType, note string) (*model.ModuleVersionPinEvent, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AppendModuleVersionPinNote", ctx, tx, orgID, pinID, actor, actorType, note)
+	ret0, _ := ret[0].(*model.ModuleVersionPinEvent)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AppendModuleVersionPinNote indicates an expected call of AppendModuleVersionPinNote.
+func (mr *MockDatabaserMockRecorder) AppendModuleVersionPinNote(ctx, tx, orgID, pinID, actor, actorType, note any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppendModuleVersionPinNote", reflect.TypeOf((*MockDatabaser)(nil).AppendModuleVersionPinNote), ctx, tx, orgID, pinID, actor, actorType, note)
 }
 
 // AsReliableOutboxStore mocks base method.
@@ -148,6 +180,21 @@ func (mr *MockDatabaserMockRecorder) Close() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockDatabaser)(nil).Close))
 }
 
+// CreateEmptyModule mocks base method.
+func (m *MockDatabaser) CreateEmptyModule(ctx context.Context, tx model.Tx, orgID, slug, displayName, description, resourceType string, tags map[string]string) (*model.ModuleCatalogue, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateEmptyModule", ctx, tx, orgID, slug, displayName, description, resourceType, tags)
+	ret0, _ := ret[0].(*model.ModuleCatalogue)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateEmptyModule indicates an expected call of CreateEmptyModule.
+func (mr *MockDatabaserMockRecorder) CreateEmptyModule(ctx, tx, orgID, slug, displayName, description, resourceType, tags any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEmptyModule", reflect.TypeOf((*MockDatabaser)(nil).CreateEmptyModule), ctx, tx, orgID, slug, displayName, description, resourceType, tags)
+}
+
 // CreateEnvironment mocks base method.
 func (m *MockDatabaser) CreateEnvironment(ctx context.Context, optionalTx model.Tx, request *model.Environment) (*model.Environment, error) {
 	m.ctrl.T.Helper()
@@ -161,6 +208,21 @@ func (m *MockDatabaser) CreateEnvironment(ctx context.Context, optionalTx model.
 func (mr *MockDatabaserMockRecorder) CreateEnvironment(ctx, optionalTx, request any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEnvironment", reflect.TypeOf((*MockDatabaser)(nil).CreateEnvironment), ctx, optionalTx, request)
+}
+
+// CreateEnvironmentModuleVersionPin mocks base method.
+func (m *MockDatabaser) CreateEnvironmentModuleVersionPin(ctx context.Context, tx model.Tx, orgID string, projectUUID uuid.UUID, projectID string, environmentUUID uuid.UUID, environmentID string, moduleUUID, versionUUID, actor uuid.UUID, actorType, reason string, bulkOperationID *uuid.UUID, allowDefective bool) (*model.EnvironmentModuleVersionPin, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateEnvironmentModuleVersionPin", ctx, tx, orgID, projectUUID, projectID, environmentUUID, environmentID, moduleUUID, versionUUID, actor, actorType, reason, bulkOperationID, allowDefective)
+	ret0, _ := ret[0].(*model.EnvironmentModuleVersionPin)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateEnvironmentModuleVersionPin indicates an expected call of CreateEnvironmentModuleVersionPin.
+func (mr *MockDatabaserMockRecorder) CreateEnvironmentModuleVersionPin(ctx, tx, orgID, projectUUID, projectID, environmentUUID, environmentID, moduleUUID, versionUUID, actor, actorType, reason, bulkOperationID, allowDefective any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEnvironmentModuleVersionPin", reflect.TypeOf((*MockDatabaser)(nil).CreateEnvironmentModuleVersionPin), ctx, tx, orgID, projectUUID, projectID, environmentUUID, environmentID, moduleUUID, versionUUID, actor, actorType, reason, bulkOperationID, allowDefective)
 }
 
 // CreateEnvironmentType mocks base method.
@@ -467,6 +529,21 @@ func (mr *MockDatabaserMockRecorder) DeleteRunnerRule(ctx, optionalTx, orgId, ru
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRunnerRule", reflect.TypeOf((*MockDatabaser)(nil).DeleteRunnerRule), ctx, optionalTx, orgId, ruleId)
 }
 
+// GetCoreModuleVersion mocks base method.
+func (m *MockDatabaser) GetCoreModuleVersion(ctx context.Context, optionalTx model.Tx, orgID, moduleRef, versionRef string, mode model.GetMode) (*model.CoreModuleVersion, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCoreModuleVersion", ctx, optionalTx, orgID, moduleRef, versionRef, mode)
+	ret0, _ := ret[0].(*model.CoreModuleVersion)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCoreModuleVersion indicates an expected call of GetCoreModuleVersion.
+func (mr *MockDatabaserMockRecorder) GetCoreModuleVersion(ctx, optionalTx, orgID, moduleRef, versionRef, mode any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCoreModuleVersion", reflect.TypeOf((*MockDatabaser)(nil).GetCoreModuleVersion), ctx, optionalTx, orgID, moduleRef, versionRef, mode)
+}
+
 // GetEnvironment mocks base method.
 func (m *MockDatabaser) GetEnvironment(ctx context.Context, optionalTx model.Tx, orgId, projectId, id string, mode model.GetMode) (*model.Environment, error) {
 	m.ctrl.T.Helper()
@@ -497,6 +574,21 @@ func (mr *MockDatabaserMockRecorder) GetEnvironmentByUuid(ctx, optionalTx, orgId
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEnvironmentByUuid", reflect.TypeOf((*MockDatabaser)(nil).GetEnvironmentByUuid), ctx, optionalTx, orgId, arg3, mode)
 }
 
+// GetEnvironmentModuleVersionPin mocks base method.
+func (m *MockDatabaser) GetEnvironmentModuleVersionPin(ctx context.Context, optionalTx model.Tx, orgID string, pinID uuid.UUID, mode model.GetMode) (*model.EnvironmentModuleVersionPin, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEnvironmentModuleVersionPin", ctx, optionalTx, orgID, pinID, mode)
+	ret0, _ := ret[0].(*model.EnvironmentModuleVersionPin)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetEnvironmentModuleVersionPin indicates an expected call of GetEnvironmentModuleVersionPin.
+func (mr *MockDatabaserMockRecorder) GetEnvironmentModuleVersionPin(ctx, optionalTx, orgID, pinID, mode any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEnvironmentModuleVersionPin", reflect.TypeOf((*MockDatabaser)(nil).GetEnvironmentModuleVersionPin), ctx, optionalTx, orgID, pinID, mode)
+}
+
 // GetEnvironmentType mocks base method.
 func (m *MockDatabaser) GetEnvironmentType(ctx context.Context, optionalTx model.Tx, orgId, id string, mode model.GetMode) (*model.EnvType, error) {
 	m.ctrl.T.Helper()
@@ -510,6 +602,38 @@ func (m *MockDatabaser) GetEnvironmentType(ctx context.Context, optionalTx model
 func (mr *MockDatabaserMockRecorder) GetEnvironmentType(ctx, optionalTx, orgId, id, mode any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEnvironmentType", reflect.TypeOf((*MockDatabaser)(nil).GetEnvironmentType), ctx, optionalTx, orgId, id, mode)
+}
+
+// GetModuleCatalogue mocks base method.
+func (m *MockDatabaser) GetModuleCatalogue(ctx context.Context, optionalTx model.Tx, orgID, moduleRef string, mode model.GetMode) (*model.ModuleCatalogue, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetModuleCatalogue", ctx, optionalTx, orgID, moduleRef, mode)
+	ret0, _ := ret[0].(*model.ModuleCatalogue)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetModuleCatalogue indicates an expected call of GetModuleCatalogue.
+func (mr *MockDatabaserMockRecorder) GetModuleCatalogue(ctx, optionalTx, orgID, moduleRef, mode any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetModuleCatalogue", reflect.TypeOf((*MockDatabaser)(nil).GetModuleCatalogue), ctx, optionalTx, orgID, moduleRef, mode)
+}
+
+// GetModuleCoreCommand mocks base method.
+func (m *MockDatabaser) GetModuleCoreCommand(ctx context.Context, optionalTx model.Tx, orgID, scope, key string) (string, json.RawMessage, bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetModuleCoreCommand", ctx, optionalTx, orgID, scope, key)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(json.RawMessage)
+	ret2, _ := ret[2].(bool)
+	ret3, _ := ret[3].(error)
+	return ret0, ret1, ret2, ret3
+}
+
+// GetModuleCoreCommand indicates an expected call of GetModuleCoreCommand.
+func (mr *MockDatabaserMockRecorder) GetModuleCoreCommand(ctx, optionalTx, orgID, scope, key any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetModuleCoreCommand", reflect.TypeOf((*MockDatabaser)(nil).GetModuleCoreCommand), ctx, optionalTx, orgID, scope, key)
 }
 
 // GetModuleDefinition mocks base method.
@@ -540,6 +664,21 @@ func (m *MockDatabaser) GetModuleDefinitionVersion(ctx context.Context, optional
 func (mr *MockDatabaserMockRecorder) GetModuleDefinitionVersion(ctx, optionalTx, orgId, defId, versionId any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetModuleDefinitionVersion", reflect.TypeOf((*MockDatabaser)(nil).GetModuleDefinitionVersion), ctx, optionalTx, orgId, defId, versionId)
+}
+
+// GetModuleOperationReservation mocks base method.
+func (m *MockDatabaser) GetModuleOperationReservation(ctx context.Context, optionalTx model.Tx, orgID string, reservationID uuid.UUID, mode model.GetMode) (*model.ModuleOperationReservation, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetModuleOperationReservation", ctx, optionalTx, orgID, reservationID, mode)
+	ret0, _ := ret[0].(*model.ModuleOperationReservation)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetModuleOperationReservation indicates an expected call of GetModuleOperationReservation.
+func (mr *MockDatabaserMockRecorder) GetModuleOperationReservation(ctx, optionalTx, orgID, reservationID, mode any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetModuleOperationReservation", reflect.TypeOf((*MockDatabaser)(nil).GetModuleOperationReservation), ctx, optionalTx, orgID, reservationID, mode)
 }
 
 // GetModuleProvider mocks base method.
@@ -693,6 +832,36 @@ func (mr *MockDatabaserMockRecorder) ListAvailableResourceTypes(ctx, optionalTx,
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAvailableResourceTypes", reflect.TypeOf((*MockDatabaser)(nil).ListAvailableResourceTypes), ctx, optionalTx, orgId, projectId, envId, pageToken, perPage, filters)
 }
 
+// ListCoreModuleVersions mocks base method.
+func (m *MockDatabaser) ListCoreModuleVersions(ctx context.Context, optionalTx model.Tx, orgID, moduleRef string, includeDeprecated, includeDefective bool) ([]model.CoreModuleVersion, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListCoreModuleVersions", ctx, optionalTx, orgID, moduleRef, includeDeprecated, includeDefective)
+	ret0, _ := ret[0].([]model.CoreModuleVersion)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListCoreModuleVersions indicates an expected call of ListCoreModuleVersions.
+func (mr *MockDatabaserMockRecorder) ListCoreModuleVersions(ctx, optionalTx, orgID, moduleRef, includeDeprecated, includeDefective any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCoreModuleVersions", reflect.TypeOf((*MockDatabaser)(nil).ListCoreModuleVersions), ctx, optionalTx, orgID, moduleRef, includeDeprecated, includeDefective)
+}
+
+// ListEnvironmentModuleVersionPins mocks base method.
+func (m *MockDatabaser) ListEnvironmentModuleVersionPins(ctx context.Context, optionalTx model.Tx, orgID string, environmentUUID, moduleUUID *uuid.UUID, includeRemoved bool) ([]model.EnvironmentModuleVersionPin, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListEnvironmentModuleVersionPins", ctx, optionalTx, orgID, environmentUUID, moduleUUID, includeRemoved)
+	ret0, _ := ret[0].([]model.EnvironmentModuleVersionPin)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListEnvironmentModuleVersionPins indicates an expected call of ListEnvironmentModuleVersionPins.
+func (mr *MockDatabaserMockRecorder) ListEnvironmentModuleVersionPins(ctx, optionalTx, orgID, environmentUUID, moduleUUID, includeRemoved any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEnvironmentModuleVersionPins", reflect.TypeOf((*MockDatabaser)(nil).ListEnvironmentModuleVersionPins), ctx, optionalTx, orgID, environmentUUID, moduleUUID, includeRemoved)
+}
+
 // ListEnvironmentTypes mocks base method.
 func (m *MockDatabaser) ListEnvironmentTypes(ctx context.Context, optionalTx model.Tx, orgId, pageToken string, perPage int) ([]model.EnvType, string, error) {
 	m.ctrl.T.Helper()
@@ -773,6 +942,21 @@ func (mr *MockDatabaserMockRecorder) ListEnvironmentsInOrg(ctx, optionalTx, orgI
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEnvironmentsInOrg", reflect.TypeOf((*MockDatabaser)(nil).ListEnvironmentsInOrg), ctx, optionalTx, orgId, pageToken, perPage, params)
 }
 
+// ListModuleCatalogues mocks base method.
+func (m *MockDatabaser) ListModuleCatalogues(ctx context.Context, optionalTx model.Tx, orgID string, includeArchived bool) ([]model.ModuleCatalogue, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListModuleCatalogues", ctx, optionalTx, orgID, includeArchived)
+	ret0, _ := ret[0].([]model.ModuleCatalogue)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListModuleCatalogues indicates an expected call of ListModuleCatalogues.
+func (mr *MockDatabaserMockRecorder) ListModuleCatalogues(ctx, optionalTx, orgID, includeArchived any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListModuleCatalogues", reflect.TypeOf((*MockDatabaser)(nil).ListModuleCatalogues), ctx, optionalTx, orgID, includeArchived)
+}
+
 // ListModuleDefinitionVersions mocks base method.
 func (m *MockDatabaser) ListModuleDefinitionVersions(ctx context.Context, optionalTx model.Tx, orgId, defId, pageToken string, perPage int, params model.ListModuleDefinitionVersionsParams) ([]model.ModuleDefinitionVersion, string, error) {
 	m.ctrl.T.Helper()
@@ -805,6 +989,66 @@ func (mr *MockDatabaserMockRecorder) ListModuleDefinitions(ctx, optionalTx, orgI
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListModuleDefinitions", reflect.TypeOf((*MockDatabaser)(nil).ListModuleDefinitions), ctx, optionalTx, orgId, pageToken, perPage, params)
 }
 
+// ListModuleExtensionContributions mocks base method.
+func (m *MockDatabaser) ListModuleExtensionContributions(ctx context.Context, optionalTx model.Tx, orgID string, moduleUUID uuid.UUID, includeDraft, includeTerminal bool) ([]model.ModuleExtensionContribution, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListModuleExtensionContributions", ctx, optionalTx, orgID, moduleUUID, includeDraft, includeTerminal)
+	ret0, _ := ret[0].([]model.ModuleExtensionContribution)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListModuleExtensionContributions indicates an expected call of ListModuleExtensionContributions.
+func (mr *MockDatabaserMockRecorder) ListModuleExtensionContributions(ctx, optionalTx, orgID, moduleUUID, includeDraft, includeTerminal any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListModuleExtensionContributions", reflect.TypeOf((*MockDatabaser)(nil).ListModuleExtensionContributions), ctx, optionalTx, orgID, moduleUUID, includeDraft, includeTerminal)
+}
+
+// ListModuleExtensionContributionsForEnvironment mocks base method.
+func (m *MockDatabaser) ListModuleExtensionContributionsForEnvironment(ctx context.Context, optionalTx model.Tx, orgID string, environmentUUID uuid.UUID, includeDraft, includeTerminal bool) ([]model.ModuleExtensionContribution, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListModuleExtensionContributionsForEnvironment", ctx, optionalTx, orgID, environmentUUID, includeDraft, includeTerminal)
+	ret0, _ := ret[0].([]model.ModuleExtensionContribution)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListModuleExtensionContributionsForEnvironment indicates an expected call of ListModuleExtensionContributionsForEnvironment.
+func (mr *MockDatabaserMockRecorder) ListModuleExtensionContributionsForEnvironment(ctx, optionalTx, orgID, environmentUUID, includeDraft, includeTerminal any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListModuleExtensionContributionsForEnvironment", reflect.TypeOf((*MockDatabaser)(nil).ListModuleExtensionContributionsForEnvironment), ctx, optionalTx, orgID, environmentUUID, includeDraft, includeTerminal)
+}
+
+// ListModuleLifecycleEvents mocks base method.
+func (m *MockDatabaser) ListModuleLifecycleEvents(ctx context.Context, optionalTx model.Tx, orgID, moduleRef, versionRef string) ([]model.ModuleLifecycleEvent, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListModuleLifecycleEvents", ctx, optionalTx, orgID, moduleRef, versionRef)
+	ret0, _ := ret[0].([]model.ModuleLifecycleEvent)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListModuleLifecycleEvents indicates an expected call of ListModuleLifecycleEvents.
+func (mr *MockDatabaserMockRecorder) ListModuleLifecycleEvents(ctx, optionalTx, orgID, moduleRef, versionRef any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListModuleLifecycleEvents", reflect.TypeOf((*MockDatabaser)(nil).ListModuleLifecycleEvents), ctx, optionalTx, orgID, moduleRef, versionRef)
+}
+
+// ListModuleOperationReservations mocks base method.
+func (m *MockDatabaser) ListModuleOperationReservations(ctx context.Context, optionalTx model.Tx, orgID string, moduleUUID uuid.UUID, includeReleased bool) ([]model.ModuleOperationReservation, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListModuleOperationReservations", ctx, optionalTx, orgID, moduleUUID, includeReleased)
+	ret0, _ := ret[0].([]model.ModuleOperationReservation)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListModuleOperationReservations indicates an expected call of ListModuleOperationReservations.
+func (mr *MockDatabaserMockRecorder) ListModuleOperationReservations(ctx, optionalTx, orgID, moduleUUID, includeReleased any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListModuleOperationReservations", reflect.TypeOf((*MockDatabaser)(nil).ListModuleOperationReservations), ctx, optionalTx, orgID, moduleUUID, includeReleased)
+}
+
 // ListModuleProviders mocks base method.
 func (m *MockDatabaser) ListModuleProviders(ctx context.Context, optionalTx model.Tx, orgId, pageToken string, perPage int, params model.ListModuleProvidersParams) ([]model.ModuleProvider, string, error) {
 	m.ctrl.T.Helper()
@@ -835,6 +1079,21 @@ func (m *MockDatabaser) ListModuleRules(ctx context.Context, optionalTx model.Tx
 func (mr *MockDatabaserMockRecorder) ListModuleRules(ctx, optionalTx, orgId, pageToken, perPage, params any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListModuleRules", reflect.TypeOf((*MockDatabaser)(nil).ListModuleRules), ctx, optionalTx, orgId, pageToken, perPage, params)
+}
+
+// ListModuleVersionPinEvents mocks base method.
+func (m *MockDatabaser) ListModuleVersionPinEvents(ctx context.Context, optionalTx model.Tx, orgID string, pinID uuid.UUID) ([]model.ModuleVersionPinEvent, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListModuleVersionPinEvents", ctx, optionalTx, orgID, pinID)
+	ret0, _ := ret[0].([]model.ModuleVersionPinEvent)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListModuleVersionPinEvents indicates an expected call of ListModuleVersionPinEvents.
+func (mr *MockDatabaserMockRecorder) ListModuleVersionPinEvents(ctx, optionalTx, orgID, pinID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListModuleVersionPinEvents", reflect.TypeOf((*MockDatabaser)(nil).ListModuleVersionPinEvents), ctx, optionalTx, orgID, pinID)
 }
 
 // ListOrgs mocks base method.
@@ -917,6 +1176,140 @@ func (mr *MockDatabaserMockRecorder) ListRunners(ctx, optionalTx, orgId, pageTok
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRunners", reflect.TypeOf((*MockDatabaser)(nil).ListRunners), ctx, optionalTx, orgId, pageToken, perPage)
 }
 
+// PublishCoreModuleVersion mocks base method.
+func (m *MockDatabaser) PublishCoreModuleVersion(ctx context.Context, tx model.Tx, request *model.ModuleDefinitionVersion, actor uuid.UUID) (*model.CoreModuleVersion, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PublishCoreModuleVersion", ctx, tx, request, actor)
+	ret0, _ := ret[0].(*model.CoreModuleVersion)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PublishCoreModuleVersion indicates an expected call of PublishCoreModuleVersion.
+func (mr *MockDatabaserMockRecorder) PublishCoreModuleVersion(ctx, tx, request, actor any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishCoreModuleVersion", reflect.TypeOf((*MockDatabaser)(nil).PublishCoreModuleVersion), ctx, tx, request, actor)
+}
+
+// PublishStableModuleVersionSuccessor mocks base method.
+func (m *MockDatabaser) PublishStableModuleVersionSuccessor(ctx context.Context, tx model.Tx, orgID, moduleRef, prereleaseRef string, expectedPrereleaseVersion int64, reason string, request *model.ModuleDefinitionVersion, actor uuid.UUID) (*model.StableModuleVersionSuccessor, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PublishStableModuleVersionSuccessor", ctx, tx, orgID, moduleRef, prereleaseRef, expectedPrereleaseVersion, reason, request, actor)
+	ret0, _ := ret[0].(*model.StableModuleVersionSuccessor)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PublishStableModuleVersionSuccessor indicates an expected call of PublishStableModuleVersionSuccessor.
+func (mr *MockDatabaserMockRecorder) PublishStableModuleVersionSuccessor(ctx, tx, orgID, moduleRef, prereleaseRef, expectedPrereleaseVersion, reason, request, actor any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishStableModuleVersionSuccessor", reflect.TypeOf((*MockDatabaser)(nil).PublishStableModuleVersionSuccessor), ctx, tx, orgID, moduleRef, prereleaseRef, expectedPrereleaseVersion, reason, request, actor)
+}
+
+// ReleaseModuleOperationReservation mocks base method.
+func (m *MockDatabaser) ReleaseModuleOperationReservation(ctx context.Context, tx model.Tx, orgID string, reservationID uuid.UUID, expectedVersion int64, actor uuid.UUID, reason string) (*model.ModuleOperationReservation, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReleaseModuleOperationReservation", ctx, tx, orgID, reservationID, expectedVersion, actor, reason)
+	ret0, _ := ret[0].(*model.ModuleOperationReservation)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReleaseModuleOperationReservation indicates an expected call of ReleaseModuleOperationReservation.
+func (mr *MockDatabaserMockRecorder) ReleaseModuleOperationReservation(ctx, tx, orgID, reservationID, expectedVersion, actor, reason any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleaseModuleOperationReservation", reflect.TypeOf((*MockDatabaser)(nil).ReleaseModuleOperationReservation), ctx, tx, orgID, reservationID, expectedVersion, actor, reason)
+}
+
+// RemoveEnvironmentModuleVersionPinsForDeletion mocks base method.
+func (m *MockDatabaser) RemoveEnvironmentModuleVersionPinsForDeletion(ctx context.Context, tx model.Tx, orgID string, environmentUUID, actor uuid.UUID, actorType string) ([]model.EnvironmentModuleVersionPin, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveEnvironmentModuleVersionPinsForDeletion", ctx, tx, orgID, environmentUUID, actor, actorType)
+	ret0, _ := ret[0].([]model.EnvironmentModuleVersionPin)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RemoveEnvironmentModuleVersionPinsForDeletion indicates an expected call of RemoveEnvironmentModuleVersionPinsForDeletion.
+func (mr *MockDatabaserMockRecorder) RemoveEnvironmentModuleVersionPinsForDeletion(ctx, tx, orgID, environmentUUID, actor, actorType any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveEnvironmentModuleVersionPinsForDeletion", reflect.TypeOf((*MockDatabaser)(nil).RemoveEnvironmentModuleVersionPinsForDeletion), ctx, tx, orgID, environmentUUID, actor, actorType)
+}
+
+// SetModuleCatalogueStatus mocks base method.
+func (m *MockDatabaser) SetModuleCatalogueStatus(ctx context.Context, tx model.Tx, orgID, moduleRef string, target moduleversions.CatalogueStatus, actor uuid.UUID, reason string, expectedVersion int64) (*model.ModuleCatalogue, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetModuleCatalogueStatus", ctx, tx, orgID, moduleRef, target, actor, reason, expectedVersion)
+	ret0, _ := ret[0].(*model.ModuleCatalogue)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SetModuleCatalogueStatus indicates an expected call of SetModuleCatalogueStatus.
+func (mr *MockDatabaserMockRecorder) SetModuleCatalogueStatus(ctx, tx, orgID, moduleRef, target, actor, reason, expectedVersion any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetModuleCatalogueStatus", reflect.TypeOf((*MockDatabaser)(nil).SetModuleCatalogueStatus), ctx, tx, orgID, moduleRef, target, actor, reason, expectedVersion)
+}
+
+// SetResourceTypeCatalogueStatus mocks base method.
+func (m *MockDatabaser) SetResourceTypeCatalogueStatus(ctx context.Context, tx model.Tx, orgID, id, target string, actor uuid.UUID, reason string, expectedVersion int64) (*model.ResourceType, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetResourceTypeCatalogueStatus", ctx, tx, orgID, id, target, actor, reason, expectedVersion)
+	ret0, _ := ret[0].(*model.ResourceType)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SetResourceTypeCatalogueStatus indicates an expected call of SetResourceTypeCatalogueStatus.
+func (mr *MockDatabaserMockRecorder) SetResourceTypeCatalogueStatus(ctx, tx, orgID, id, target, actor, reason, expectedVersion any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetResourceTypeCatalogueStatus", reflect.TypeOf((*MockDatabaser)(nil).SetResourceTypeCatalogueStatus), ctx, tx, orgID, id, target, actor, reason, expectedVersion)
+}
+
+// StoreModuleCoreCommand mocks base method.
+func (m *MockDatabaser) StoreModuleCoreCommand(ctx context.Context, tx model.Tx, orgID, scope, key, fingerprint string, actor uuid.UUID, response any) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StoreModuleCoreCommand", ctx, tx, orgID, scope, key, fingerprint, actor, response)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// StoreModuleCoreCommand indicates an expected call of StoreModuleCoreCommand.
+func (mr *MockDatabaserMockRecorder) StoreModuleCoreCommand(ctx, tx, orgID, scope, key, fingerprint, actor, response any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreModuleCoreCommand", reflect.TypeOf((*MockDatabaser)(nil).StoreModuleCoreCommand), ctx, tx, orgID, scope, key, fingerprint, actor, response)
+}
+
+// TransitionCoreModuleVersion mocks base method.
+func (m *MockDatabaser) TransitionCoreModuleVersion(ctx context.Context, tx model.Tx, orgID, moduleRef, versionRef string, target moduleversions.LifecycleStatus, expectedVersion int64, actor uuid.UUID, reason string, correlationID *uuid.UUID) (*model.CoreModuleVersion, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TransitionCoreModuleVersion", ctx, tx, orgID, moduleRef, versionRef, target, expectedVersion, actor, reason, correlationID)
+	ret0, _ := ret[0].(*model.CoreModuleVersion)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// TransitionCoreModuleVersion indicates an expected call of TransitionCoreModuleVersion.
+func (mr *MockDatabaserMockRecorder) TransitionCoreModuleVersion(ctx, tx, orgID, moduleRef, versionRef, target, expectedVersion, actor, reason, correlationID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransitionCoreModuleVersion", reflect.TypeOf((*MockDatabaser)(nil).TransitionCoreModuleVersion), ctx, tx, orgID, moduleRef, versionRef, target, expectedVersion, actor, reason, correlationID)
+}
+
+// TransitionEnvironmentModuleVersionPin mocks base method.
+func (m *MockDatabaser) TransitionEnvironmentModuleVersionPin(ctx context.Context, tx model.Tx, orgID string, pinID uuid.UUID, expectedVersion int64, target moduleversions.PinStatus, eventType string, actor uuid.UUID, actorType, reason string, operationID, targetVersionUUID, deploymentID *uuid.UUID) (*model.EnvironmentModuleVersionPin, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TransitionEnvironmentModuleVersionPin", ctx, tx, orgID, pinID, expectedVersion, target, eventType, actor, actorType, reason, operationID, targetVersionUUID, deploymentID)
+	ret0, _ := ret[0].(*model.EnvironmentModuleVersionPin)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// TransitionEnvironmentModuleVersionPin indicates an expected call of TransitionEnvironmentModuleVersionPin.
+func (mr *MockDatabaserMockRecorder) TransitionEnvironmentModuleVersionPin(ctx, tx, orgID, pinID, expectedVersion, target, eventType, actor, actorType, reason, operationID, targetVersionUUID, deploymentID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransitionEnvironmentModuleVersionPin", reflect.TypeOf((*MockDatabaser)(nil).TransitionEnvironmentModuleVersionPin), ctx, tx, orgID, pinID, expectedVersion, target, eventType, actor, actorType, reason, operationID, targetVersionUUID, deploymentID)
+}
+
 // UpdateEnvironment mocks base method.
 func (m *MockDatabaser) UpdateEnvironment(ctx context.Context, optionalTx model.Tx, orgId, projectId, id string, request *model.EnvironmentPatch) (*model.Environment, error) {
 	m.ctrl.T.Helper()
@@ -945,6 +1338,21 @@ func (m *MockDatabaser) UpdateEnvironmentType(ctx context.Context, optionalTx mo
 func (mr *MockDatabaserMockRecorder) UpdateEnvironmentType(ctx, optionalTx, orgId, id, params any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateEnvironmentType", reflect.TypeOf((*MockDatabaser)(nil).UpdateEnvironmentType), ctx, optionalTx, orgId, id, params)
+}
+
+// UpdateModuleCatalogueMetadata mocks base method.
+func (m *MockDatabaser) UpdateModuleCatalogueMetadata(ctx context.Context, tx model.Tx, orgID, moduleRef, displayName, description string, tags map[string]string, expectedVersion int64) (*model.ModuleCatalogue, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateModuleCatalogueMetadata", ctx, tx, orgID, moduleRef, displayName, description, tags, expectedVersion)
+	ret0, _ := ret[0].(*model.ModuleCatalogue)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateModuleCatalogueMetadata indicates an expected call of UpdateModuleCatalogueMetadata.
+func (mr *MockDatabaserMockRecorder) UpdateModuleCatalogueMetadata(ctx, tx, orgID, moduleRef, displayName, description, tags, expectedVersion any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateModuleCatalogueMetadata", reflect.TypeOf((*MockDatabaser)(nil).UpdateModuleCatalogueMetadata), ctx, tx, orgID, moduleRef, displayName, description, tags, expectedVersion)
 }
 
 // UpdateModuleProvider mocks base method.
@@ -1020,6 +1428,21 @@ func (m *MockDatabaser) UpdatedProject(ctx context.Context, optional model.Tx, o
 func (mr *MockDatabaserMockRecorder) UpdatedProject(ctx, optional, orgId, id, params any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatedProject", reflect.TypeOf((*MockDatabaser)(nil).UpdatedProject), ctx, optional, orgId, id, params)
+}
+
+// UpsertModuleExtensionContribution mocks base method.
+func (m *MockDatabaser) UpsertModuleExtensionContribution(ctx context.Context, tx model.Tx, orgID, moduleRef string, versionUUID, environmentUUID *uuid.UUID, namespace, externalResourceID, kind, lifecycleState, label, targetURL string, payload map[string]any, actor uuid.UUID) (*model.ModuleExtensionContribution, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpsertModuleExtensionContribution", ctx, tx, orgID, moduleRef, versionUUID, environmentUUID, namespace, externalResourceID, kind, lifecycleState, label, targetURL, payload, actor)
+	ret0, _ := ret[0].(*model.ModuleExtensionContribution)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpsertModuleExtensionContribution indicates an expected call of UpsertModuleExtensionContribution.
+func (mr *MockDatabaserMockRecorder) UpsertModuleExtensionContribution(ctx, tx, orgID, moduleRef, versionUUID, environmentUUID, namespace, externalResourceID, kind, lifecycleState, label, targetURL, payload, actor any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertModuleExtensionContribution", reflect.TypeOf((*MockDatabaser)(nil).UpsertModuleExtensionContribution), ctx, tx, orgID, moduleRef, versionUUID, environmentUUID, namespace, externalResourceID, kind, lifecycleState, label, targetURL, payload, actor)
 }
 
 // MockTxWithCommit is a mock of TxWithCommit interface.

@@ -10,7 +10,7 @@ import (
 	"github.com/stellwerk-labs/golib/hecho"
 	"github.com/stellwerk-labs/golib/herrors"
 	"github.com/stellwerk-labs/golib/hmessaging"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/genevents"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genevents"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/assert"
@@ -21,6 +21,7 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/events"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
 	mockmodel "github.com/stellwerk-labs/platform-orchestrator-cp/internal/model/mocks"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/opt"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 )
@@ -96,7 +97,7 @@ func TestDeleteEnvironment_default(t *testing.T) {
 		name        string
 		envStatus   model.EnvironmentStatus
 		force       bool
-		expectError bool
+		deleteRules bool
 	}{
 		{
 			name:      "delete when status active",
@@ -113,9 +114,9 @@ func TestDeleteEnvironment_default(t *testing.T) {
 			force:     true,
 		},
 		{
-			name:        "error: delete when status deleting",
+			name:        "resume delete when status deleting",
 			envStatus:   model.EnvironmentStatusDeleting,
-			expectError: true,
+			deleteRules: true,
 		},
 	}
 
@@ -148,32 +149,79 @@ func TestDeleteEnvironment_default(t *testing.T) {
 			}, nil).Times(1)
 			db.EXPECT().GetEnvironment(gomock.Any(), gomock.Not(nil), "org-id", "proj-id", "env-id", model.GetModeForUpdate).Return(&model.Environment{
 				Status: tc.envStatus,
+				Uuid:   envUuid,
 			}, nil).Times(1)
+			db.EXPECT().ListEnvironmentModuleVersionPins(gomock.Any(), gomock.Not(nil), "org-id", &envUuid, nil, false).Return(nil, nil)
 			db.EXPECT().UpdateEnvironment(gomock.Any(), gomock.Not(nil), "org-id", "proj-id", "env-id", gomock.Any()).
 				Return(&model.Environment{}, nil)
 
 			ctx := context.WithValue(t.Context(), hecho.ContextKeyUserID, userId.String())
 			var params DeleteEnvironmentParams
 			if tc.force {
-				params = DeleteEnvironmentParams{Force: ref.Ref(true)}
+				params.Force = ref.Ref(true)
+			}
+			if tc.deleteRules {
+				params.DeleteRules = ref.Ref(true)
 			}
 			r, err := s.DeleteEnvironment(ctx, DeleteEnvironmentRequestObject{OrgId: "org-id", ProjectId: "proj-id", EnvId: "env-id", Params: params})
 			require.NoError(t, err)
-			if tc.expectError {
-				require.IsType(t, DeleteEnvironment409JSONResponse{}, r)
-			} else {
-				require.IsType(t, DeleteEnvironment202JSONResponse{}, r)
-				rec := s.Publisher.(*hmessaging.RecordingPublisher).Messages()
-				if assert.Len(t, rec, 1) {
-					assert.Equal(t, "io.platform-orchestrator.environment.updated", rec[0].Subject)
-					var event events.CloudEvent[genevents.EnvChangedData]
-					require.NoError(t, json.Unmarshal(rec[0].Data, &event))
-					assert.Equal(t, tc.force, ref.DerefOr(event.Data.Force, false))
-					assert.False(t, ref.DerefOr(event.Data.DeleteRules, false), "deleteRules should be set to true in the event")
-				}
+			require.IsType(t, DeleteEnvironment202JSONResponse{}, r)
+			rec := s.Publisher.(*hmessaging.RecordingPublisher).Messages()
+			if assert.Len(t, rec, 1) {
+				assert.Equal(t, "io.platform-orchestrator.environment.updated", rec[0].Subject)
+				var event events.CloudEvent[genevents.EnvChangedData]
+				require.NoError(t, json.Unmarshal(rec[0].Data, &event))
+				assert.Equal(t, tc.force, ref.DerefOr(event.Data.Force, false))
+				assert.Equal(t, tc.deleteRules, ref.DerefOr(event.Data.DeleteRules, false))
 			}
 		})
 	}
+}
+
+func TestGetEnvironmentDeletionImpactListsPinsResourcesAndBlocker(t *testing.T) {
+	_, s, cleanup := MockServer(t)
+	defer cleanup()
+	db := s.Database.(*mockmodel.MockDatabaser)
+	iamClient := s.IamClient.(*mockorchestratoriam.MockClientWithResponsesInterface)
+	userID := userid.NewHumanUserId()
+	projectUUID, environmentUUID, moduleUUID := uuid.New(), uuid.New(), uuid.New()
+	pinID, operationID := uuid.New(), uuid.New()
+
+	db.EXPECT().GetProject(gomock.Any(), nil, "org-id", "proj-id", model.GetModeDefault).
+		Return(&model.Project{Uuid: projectUUID}, nil)
+	iamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
+		UserId: userID,
+		Checks: []orchestratoriam.ResourcePermissionCheck{projectCheck(projectUUID, PermissionEnvironmentWrite)},
+	}).Return(&orchestratoriam.InternalAuthorizeResponse{
+		HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
+	}, nil)
+	db.EXPECT().GetEnvironment(gomock.Any(), nil, "org-id", "proj-id", "env-id", model.GetModeDefault).
+		Return(&model.Environment{Uuid: environmentUUID}, nil)
+	db.EXPECT().ListEnvironmentModuleVersionPins(gomock.Any(), nil, "org-id", &environmentUUID, nil, false).
+		Return([]model.EnvironmentModuleVersionPin{{
+			ID: pinID, OrgID: "org-id", ProjectUUID: projectUUID, ProjectID: "proj-id",
+			EnvironmentUUID: environmentUUID, EnvironmentID: "env-id", ModuleUUID: moduleUUID,
+			VersionUUID: uuid.New(), Status: moduleversions.PinOverridePending,
+			OverrideOperationID: &operationID, ResourceVersion: 2, ActivationEventID: uuid.New(),
+		}}, nil)
+	db.EXPECT().ListModuleExtensionContributionsForEnvironment(gomock.Any(), nil, "org-id", environmentUUID, true, false).
+		Return([]model.ModuleExtensionContribution{{
+			ID: uuid.New(), OrgID: "org-id", ModuleUUID: moduleUUID, EnvironmentUUID: &environmentUUID,
+			Namespace: "dev.example.change-orchestrator", ExternalResourceID: "change/video-release",
+			Kind: "related_resource", LifecycleState: "active", Label: "Video release", Payload: map[string]any{},
+		}}, nil)
+
+	ctx := context.WithValue(t.Context(), hecho.ContextKeyUserID, userID.String())
+	result, err := s.GetEnvironmentDeletionImpact(ctx, GetEnvironmentDeletionImpactRequestObject{
+		OrgId: "org-id", ProjectId: "proj-id", EnvId: "env-id",
+	})
+	require.NoError(t, err)
+	response := result.(GetEnvironmentDeletionImpact200JSONResponse)
+	require.True(t, response.Blocked)
+	require.Len(t, response.Pins, 1)
+	require.Len(t, response.RelatedResources, 1)
+	require.Equal(t, environmentUUID, response.EnvironmentUuid)
+	require.Equal(t, []string{"Pin " + pinID.String() + " is owned by operation " + operationID.String()}, response.Blockers)
 }
 
 func TestDeleteEnvironment_withDeleteRules(t *testing.T) {
@@ -204,7 +252,9 @@ func TestDeleteEnvironment_withDeleteRules(t *testing.T) {
 	}, nil).Times(1)
 	db.EXPECT().GetEnvironment(gomock.Any(), gomock.Not(nil), "org-id", "proj-id", "env-id", model.GetModeForUpdate).Return(&model.Environment{
 		Status: model.EnvironmentStatusActive,
+		Uuid:   envUuid,
 	}, nil)
+	db.EXPECT().ListEnvironmentModuleVersionPins(gomock.Any(), gomock.Not(nil), "org-id", &envUuid, nil, false).Return(nil, nil)
 	db.EXPECT().BulkDeleteModuleRuleDefinitions(gomock.Any(), gomock.Not(nil), "org-id", model.DeleteModuleRulesParams{
 		ByProjectId: ref.Ref("proj-id"),
 		ByEnvId:     ref.Ref("env-id"),
@@ -275,7 +325,9 @@ func TestDeleteEnvironment_successWithOrgFallback(t *testing.T) {
 	}, nil).Times(1)
 	db.EXPECT().GetEnvironment(gomock.Any(), gomock.Not(nil), "org-id", "proj-id", "env-id", model.GetModeForUpdate).Return(&model.Environment{
 		Status: model.EnvironmentStatusActive,
+		Uuid:   envUuid,
 	}, nil).Times(1)
+	db.EXPECT().ListEnvironmentModuleVersionPins(gomock.Any(), gomock.Not(nil), "org-id", &envUuid, nil, false).Return(nil, nil)
 	db.EXPECT().UpdateEnvironment(gomock.Any(), gomock.Not(nil), "org-id", "proj-id", "env-id", gomock.Any()).
 		Return(&model.Environment{}, nil)
 
@@ -349,11 +401,14 @@ func TestDeleteEnvironment_forbidden(t *testing.T) {
 func TestInternalForceDeleteEnvironment(t *testing.T) {
 	_, s, cleanup := MockServer(t)
 	defer cleanup()
+	envUuid := uuid.MustParse("01234567-89ab-cdef-0123-456789abcdef")
 
 	db := s.Database.(*mockmodel.MockDatabaser)
 	db.EXPECT().GetEnvironment(gomock.Any(), gomock.Not(nil), "org-id", "proj-id", "env-id", model.GetModeForUpdate).Return(&model.Environment{
 		Status: model.EnvironmentStatusActive,
+		Uuid:   envUuid,
 	}, nil)
+	db.EXPECT().RemoveEnvironmentModuleVersionPinsForDeletion(gomock.Any(), gomock.Not(nil), "org-id", envUuid, userid.InternalSystemUuid, "system").Return(nil, nil)
 	db.EXPECT().DeleteEnvironment(gomock.Any(), gomock.Not(nil), "org-id", "proj-id", "env-id").
 		Return(nil)
 

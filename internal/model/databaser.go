@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"encoding/json"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/pressly/goose/v3"
@@ -12,12 +14,15 @@ import (
 
 	"github.com/stellwerk-labs/golib/hpostgresconnect"
 	"github.com/stellwerk-labs/golib/hstandardoutbox"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
 )
 
 //go:generate go tool mockgen  -destination mocks/databaser.go github.com/stellwerk-labs/platform-orchestrator-cp/internal/model Databaser,TxWithCommit
 
 //go:embed migrations/*.sql
 var embedMigrations embed.FS
+
+var registerGoMigrations sync.Once
 
 const UniqueViolationErrorCode string = "unique_violation"
 
@@ -40,7 +45,9 @@ func NewDatabaser(ctx context.Context, logger *zap.Logger, connStr string) (Data
 	goose.SetLogger(&gooseZapLogger{SugaredLogger: logger.Named("goose").Sugar()})
 	goose.SetBaseFS(embedMigrations)
 	goose.SetVerbose(logger.Level() <= zap.DebugLevel)
-	goose.AddNamedMigrationContext("000011_pending_event_messages.go", hstandardoutbox.MigrateUp01, hstandardoutbox.MigrateDown01)
+	registerGoMigrations.Do(func() {
+		goose.AddNamedMigrationContext("000011_pending_event_messages.go", hstandardoutbox.MigrateUp01, hstandardoutbox.MigrateDown01)
+	})
 
 	if inner, err := hpostgresconnect.InitDatabase(ctx, &hpostgresconnect.Config{
 		Logger:  logger,
@@ -90,6 +97,7 @@ type Databaser interface {
 	GetResourceType(ctx context.Context, optionalTx Tx, orgId *string, id string) (*ResourceType, error)
 	CreateResourceType(ctx context.Context, optionalTx Tx, request *ResourceType) (*ResourceType, error)
 	UpdateResourceType(ctx context.Context, optionalTx Tx, orgId *string, id string, request *ResourceTypePatch) (*ResourceType, error)
+	SetResourceTypeCatalogueStatus(ctx context.Context, tx Tx, orgID, id, target string, actor uuid.UUID, reason string, expectedVersion int64) (*ResourceType, error)
 	DeleteResourceType(ctx context.Context, optionalTx Tx, orgId *string, id string) error
 
 	ListAvailableResourceTypes(ctx context.Context, optionalTx Tx, orgId, projectId, envId string, pageToken string, perPage int, filters ListAvailableResourceTypeParams) ([]AvailableResourceType, string, error)
@@ -109,6 +117,33 @@ type Databaser interface {
 	CreateModuleDefinitionVersion(ctx context.Context, tx Tx, request *ModuleDefinitionVersion) (*ModuleDefinitionVersion, error)
 	DeleteModuleDefinitionVersion(ctx context.Context, optionalTx Tx, orgId, defId string, versionId string) error
 	DeleteModuleDefinition(ctx context.Context, optionalTx Tx, orgId, defId string) error
+	ListModuleCatalogues(ctx context.Context, optionalTx Tx, orgID string, includeArchived bool) ([]ModuleCatalogue, error)
+	GetModuleCatalogue(ctx context.Context, optionalTx Tx, orgID, moduleRef string, mode GetMode) (*ModuleCatalogue, error)
+	CreateEmptyModule(ctx context.Context, tx Tx, orgID, slug, displayName, description, resourceType string, tags map[string]string) (*ModuleCatalogue, error)
+	UpdateModuleCatalogueMetadata(ctx context.Context, tx Tx, orgID, moduleRef, displayName, description string, tags map[string]string, expectedVersion int64) (*ModuleCatalogue, error)
+	SetModuleCatalogueStatus(ctx context.Context, tx Tx, orgID, moduleRef string, target moduleversions.CatalogueStatus, actor uuid.UUID, reason string, expectedVersion int64) (*ModuleCatalogue, error)
+	GetCoreModuleVersion(ctx context.Context, optionalTx Tx, orgID, moduleRef, versionRef string, mode GetMode) (*CoreModuleVersion, error)
+	ListCoreModuleVersions(ctx context.Context, optionalTx Tx, orgID, moduleRef string, includeDeprecated, includeDefective bool) ([]CoreModuleVersion, error)
+	TransitionCoreModuleVersion(ctx context.Context, tx Tx, orgID, moduleRef, versionRef string, target moduleversions.LifecycleStatus, expectedVersion int64, actor uuid.UUID, reason string, correlationID *uuid.UUID) (*CoreModuleVersion, error)
+	ListModuleLifecycleEvents(ctx context.Context, optionalTx Tx, orgID, moduleRef, versionRef string) ([]ModuleLifecycleEvent, error)
+	PublishCoreModuleVersion(ctx context.Context, tx Tx, request *ModuleDefinitionVersion, actor uuid.UUID) (*CoreModuleVersion, error)
+	PublishStableModuleVersionSuccessor(ctx context.Context, tx Tx, orgID, moduleRef, prereleaseRef string, expectedPrereleaseVersion int64, reason string, request *ModuleDefinitionVersion, actor uuid.UUID) (*StableModuleVersionSuccessor, error)
+	GetEnvironmentModuleVersionPin(ctx context.Context, optionalTx Tx, orgID string, pinID uuid.UUID, mode GetMode) (*EnvironmentModuleVersionPin, error)
+	ListEnvironmentModuleVersionPins(ctx context.Context, optionalTx Tx, orgID string, environmentUUID *uuid.UUID, moduleUUID *uuid.UUID, includeRemoved bool) ([]EnvironmentModuleVersionPin, error)
+	CreateEnvironmentModuleVersionPin(ctx context.Context, tx Tx, orgID string, projectUUID uuid.UUID, projectID string, environmentUUID uuid.UUID, environmentID string, moduleUUID, versionUUID, actor uuid.UUID, actorType, reason string, bulkOperationID *uuid.UUID, allowDefective bool) (*EnvironmentModuleVersionPin, error)
+	TransitionEnvironmentModuleVersionPin(ctx context.Context, tx Tx, orgID string, pinID uuid.UUID, expectedVersion int64, target moduleversions.PinStatus, eventType string, actor uuid.UUID, actorType, reason string, operationID, targetVersionUUID, deploymentID *uuid.UUID) (*EnvironmentModuleVersionPin, error)
+	GetModuleOperationReservation(ctx context.Context, optionalTx Tx, orgID string, reservationID uuid.UUID, mode GetMode) (*ModuleOperationReservation, error)
+	ListModuleOperationReservations(ctx context.Context, optionalTx Tx, orgID string, moduleUUID uuid.UUID, includeReleased bool) ([]ModuleOperationReservation, error)
+	AcquireModuleOperationReservation(ctx context.Context, tx Tx, orgID, moduleRef, namespace string, operationID uuid.UUID, relatedResourceID, reason string, actor uuid.UUID) (*ModuleOperationReservation, error)
+	ReleaseModuleOperationReservation(ctx context.Context, tx Tx, orgID string, reservationID uuid.UUID, expectedVersion int64, actor uuid.UUID, reason string) (*ModuleOperationReservation, error)
+	UpsertModuleExtensionContribution(ctx context.Context, tx Tx, orgID, moduleRef string, versionUUID, environmentUUID *uuid.UUID, namespace, externalResourceID, kind, lifecycleState, label, targetURL string, payload map[string]any, actor uuid.UUID) (*ModuleExtensionContribution, error)
+	ListModuleExtensionContributions(ctx context.Context, optionalTx Tx, orgID string, moduleUUID uuid.UUID, includeDraft, includeTerminal bool) ([]ModuleExtensionContribution, error)
+	ListModuleExtensionContributionsForEnvironment(ctx context.Context, optionalTx Tx, orgID string, environmentUUID uuid.UUID, includeDraft, includeTerminal bool) ([]ModuleExtensionContribution, error)
+	ListModuleVersionPinEvents(ctx context.Context, optionalTx Tx, orgID string, pinID uuid.UUID) ([]ModuleVersionPinEvent, error)
+	AppendModuleVersionPinNote(ctx context.Context, tx Tx, orgID string, pinID uuid.UUID, actor uuid.UUID, actorType, note string) (*ModuleVersionPinEvent, error)
+	RemoveEnvironmentModuleVersionPinsForDeletion(ctx context.Context, tx Tx, orgID string, environmentUUID, actor uuid.UUID, actorType string) ([]EnvironmentModuleVersionPin, error)
+	GetModuleCoreCommand(ctx context.Context, optionalTx Tx, orgID, scope, key string) (string, json.RawMessage, bool, error)
+	StoreModuleCoreCommand(ctx context.Context, tx Tx, orgID, scope, key, fingerprint string, actor uuid.UUID, response any) error
 
 	ListModuleRules(ctx context.Context, optionalTx Tx, orgId string, pageToken string, perPage int, params ListModuleRulesParams) (items []DefinitionRule, nextPageToken string, err error)
 	CreateModuleRule(ctx context.Context, optionalTx Tx, orgId string, request *DefinitionRule) (*DefinitionRule, error)

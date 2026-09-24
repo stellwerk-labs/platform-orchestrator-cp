@@ -3,7 +3,7 @@
   outputs: |
     DATADOG_ENABLED: false
     DATADOG_ENV: ""
-    RUNNER_TOKEN_SALT: vnXd0Ses8L1X0TGGcp+mf/V8dQs+L4/fWvijORwb7
+    RUNNER_TOKEN_SALT: integration-test-runner-token-salt
     VAULT_URL: http://vault:8200
     SERVER_BASE_URL: http://platform-orchestrator-cp-platform-orchestrator-cp:8080
     OIDC_ISSUER_URL: https://oidc.platform-orchestrator.io

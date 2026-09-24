@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/genclient"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genclient"
 )
 
 func TestResourceTypesCrud(t *testing.T) {
@@ -145,7 +145,7 @@ func TestResourceTypesCrud(t *testing.T) {
 		}
 	})
 
-	t.Run("update built-in type", func(t *testing.T) {
+	t.Run("built-in type definitions are immutable", func(t *testing.T) {
 		patch := genclient.ResourceTypeUpdateBody{
 			OutputSchema: &map[string]interface{}{
 				"type": "object",
@@ -160,18 +160,13 @@ func TestResourceTypesCrud(t *testing.T) {
 			},
 			IsDeveloperAccessible: ref.Ref(true),
 		}
-		builtInPostgres.OutputSchema = *patch.OutputSchema // Update for further assertions
 		res, err := internalClient.InternalUpdateResourceTypeWithResponse(t.Context(), "postgres", patch)
-		if assert.NoError(t, err) && assert.Equal(t, http.StatusOK, res.StatusCode()) {
-			assert.Equal(t, builtInPostgres.Id, res.JSON200.Id)
-			assert.Equal(t, builtInPostgres.Description, res.JSON200.Description)
-			assert.Equal(t, builtInPostgres.OutputSchema, res.JSON200.OutputSchema)
-			assert.True(t, res.JSON200.BuiltIn)
-			assert.True(t, res.JSON200.IsDeveloperAccessible)
+		if assert.NoError(t, err) && assert.Equal(t, http.StatusConflict, res.StatusCode()) {
+			assert.Contains(t, res.JSON409.Message, "immutable")
 		}
 	})
 
-	t.Run("update built-in type - developer_accessible was true and it should still be true", func(t *testing.T) {
+	t.Run("built-in type accessibility is immutable", func(t *testing.T) {
 		patch := genclient.ResourceTypeUpdateBody{
 			OutputSchema: &map[string]interface{}{
 				"type": "object",
@@ -186,14 +181,9 @@ func TestResourceTypesCrud(t *testing.T) {
 			},
 			IsDeveloperAccessible: ref.Ref(true),
 		}
-		builtInS3.OutputSchema = *patch.OutputSchema // Update for further assertions
 		res, err := internalClient.InternalUpdateResourceTypeWithResponse(t.Context(), "s3", patch)
-		if assert.NoError(t, err) && assert.Equal(t, http.StatusOK, res.StatusCode()) {
-			assert.Equal(t, builtInS3.Id, res.JSON200.Id)
-			assert.Equal(t, builtInS3.Description, res.JSON200.Description)
-			assert.Equal(t, builtInS3.OutputSchema, res.JSON200.OutputSchema)
-			assert.True(t, res.JSON200.BuiltIn)
-			assert.True(t, res.JSON200.IsDeveloperAccessible)
+		if assert.NoError(t, err) && assert.Equal(t, http.StatusConflict, res.StatusCode()) {
+			assert.Contains(t, res.JSON409.Message, "immutable")
 		}
 	})
 
@@ -301,29 +291,54 @@ func TestResourceTypesCrud(t *testing.T) {
 		}
 	})
 
-	t.Run("update a type", func(t *testing.T) {
+	t.Run("custom type definitions are immutable", func(t *testing.T) {
 		patch := genclient.ResourceTypeUpdateBody{
 			Description:           ref.Ref("My New Type Updated"),
 			IsDeveloperAccessible: ref.Ref(false),
 		}
-		usersNewType.Description = patch.Description // Update for further assertions
 		res, err := client.UpdateResourceTypeWithResponse(t.Context(), orgId, "my-type", patch)
-		if assert.NoError(t, err) && assert.Equal(t, http.StatusOK, res.StatusCode()) {
-			assert.Equal(t, usersNewType.Id, res.JSON200.Id)
-			assert.Equal(t, usersNewType.Description, res.JSON200.Description)
-			assert.Equal(t, usersNewType.OutputSchema, res.JSON200.OutputSchema)
-			assert.False(t, res.JSON200.BuiltIn)
-			assert.False(t, res.JSON200.IsDeveloperAccessible)
+		if assert.NoError(t, err) && assert.Equal(t, http.StatusConflict, res.StatusCode()) {
+			assert.Contains(t, res.JSON409.Message, "immutable")
 		}
 	})
 
-	t.Run("get updated type", func(t *testing.T) {
+	t.Run("get immutable type", func(t *testing.T) {
 		res, err := client.GetResourceTypeWithResponse(t.Context(), orgId, "my-type")
 		if assert.NoError(t, err) && assert.Equal(t, http.StatusOK, res.StatusCode()) {
 			assert.Equal(t, usersNewType.Id, res.JSON200.Id)
 			assert.Equal(t, usersNewType.Description, res.JSON200.Description)
 			assert.Equal(t, usersNewType.OutputSchema, res.JSON200.OutputSchema)
 			assert.False(t, res.JSON200.BuiltIn)
+			assert.Equal(t, genclient.ResourceTypeCatalogueStatusActive, res.JSON200.CatalogueStatus)
+			assert.EqualValues(t, 1, res.JSON200.ResourceVersion)
+		}
+	})
+
+	t.Run("archive and unarchive a custom type", func(t *testing.T) {
+		archive, err := client.ChangeResourceTypeCatalogueStatusWithResponse(
+			t.Context(), orgId, "my-type",
+			genclient.ChangeResourceTypeCatalogueStatusParamsCatalogueActionArchive,
+			&genclient.ChangeResourceTypeCatalogueStatusParams{IdempotencyKey: "archive-my-type"},
+			genclient.ModuleReasonedCommand{ExpectedResourceVersion: 1, Reason: "Retire the catalogue entry"},
+		)
+		if assert.NoError(t, err) && assert.Equal(t, http.StatusOK, archive.StatusCode()) {
+			assert.Equal(t, genclient.ResourceTypeCatalogueStatusArchived, archive.JSON200.CatalogueStatus)
+			assert.EqualValues(t, 2, archive.JSON200.ResourceVersion)
+			assert.NotNil(t, archive.JSON200.ArchivedAt)
+			assert.Equal(t, "Retire the catalogue entry", *archive.JSON200.ArchiveReason)
+		}
+
+		unarchive, err := client.ChangeResourceTypeCatalogueStatusWithResponse(
+			t.Context(), orgId, "my-type",
+			genclient.ChangeResourceTypeCatalogueStatusParamsCatalogueActionUnarchive,
+			&genclient.ChangeResourceTypeCatalogueStatusParams{IdempotencyKey: "unarchive-my-type"},
+			genclient.ModuleReasonedCommand{ExpectedResourceVersion: 2, Reason: "Return the catalogue entry"},
+		)
+		if assert.NoError(t, err) && assert.Equal(t, http.StatusOK, unarchive.StatusCode()) {
+			assert.Equal(t, genclient.ResourceTypeCatalogueStatusActive, unarchive.JSON200.CatalogueStatus)
+			assert.EqualValues(t, 3, unarchive.JSON200.ResourceVersion)
+			assert.Nil(t, unarchive.JSON200.ArchivedAt)
+			assert.Nil(t, unarchive.JSON200.ArchiveReason)
 		}
 	})
 
@@ -333,7 +348,7 @@ func TestResourceTypesCrud(t *testing.T) {
 		}
 		res, err := client.UpdateResourceTypeWithResponse(t.Context(), orgId, "postgres", patch)
 		if assert.NoError(t, err) {
-			assert.Equal(t, http.StatusNotFound, res.StatusCode())
+			assert.Equal(t, http.StatusConflict, res.StatusCode())
 		}
 	})
 
@@ -344,13 +359,16 @@ func TestResourceTypesCrud(t *testing.T) {
 		}
 	})
 
-	t.Run("delete user types", func(t *testing.T) {
+	t.Run("can't delete a type with retained catalogue history", func(t *testing.T) {
 		res, err := client.DeleteResourceTypeWithResponse(t.Context(), orgId, "my-type")
 		if assert.NoError(t, err) {
-			assert.Equal(t, http.StatusNoContent, res.StatusCode())
+			assert.Equal(t, http.StatusConflict, res.StatusCode())
+			assert.Contains(t, res.JSON409.Message, "catalogue history")
 		}
+	})
 
-		res, err = client.DeleteResourceTypeWithResponse(t.Context(), orgId, "s3")
+	t.Run("delete an unused type without retained history", func(t *testing.T) {
+		res, err := client.DeleteResourceTypeWithResponse(t.Context(), orgId, "s3")
 		if assert.NoError(t, err) {
 			assert.Equal(t, http.StatusNoContent, res.StatusCode())
 		}
@@ -388,11 +406,14 @@ func TestResourceTypesCrud(t *testing.T) {
 		}
 	})
 
-	t.Run("no types in the list again", func(t *testing.T) {
+	t.Run("only the history-retaining custom type remains", func(t *testing.T) {
 		res, err := client.ListResourceTypesWithResponse(t.Context(), orgId, &genclient.ListResourceTypesParams{})
 		if assert.NoError(t, err) && assert.Equal(t, http.StatusOK, res.StatusCode()) {
 			assert.Empty(t, res.JSON200.NextPageToken)
-			assert.Empty(t, res.JSON200.Items)
+			if assert.Len(t, res.JSON200.Items, 1) {
+				assert.Equal(t, "my-type", res.JSON200.Items[0].Id)
+				assert.Equal(t, genclient.ResourceTypeCatalogueStatusActive, res.JSON200.Items[0].CatalogueStatus)
+			}
 		}
 	})
 

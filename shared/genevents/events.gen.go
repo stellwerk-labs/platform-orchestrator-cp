@@ -9,18 +9,23 @@ import (
 
 // Defines values for EventType.
 const (
-	IoPlatformOrchestratorEnvironmentCreated     EventType = "io.platform-orchestrator.environment.created"
-	IoPlatformOrchestratorEnvironmentDeleted     EventType = "io.platform-orchestrator.environment.deleted"
-	IoPlatformOrchestratorEnvironmentTypeCreated EventType = "io.platform-orchestrator.environment_type.created"
-	IoPlatformOrchestratorEnvironmentTypeDeleted EventType = "io.platform-orchestrator.environment_type.deleted"
-	IoPlatformOrchestratorEnvironmentTypeUpdated EventType = "io.platform-orchestrator.environment_type.updated"
-	IoPlatformOrchestratorEnvironmentUpdated     EventType = "io.platform-orchestrator.environment.updated"
-	IoPlatformOrchestratorOrganizationCreated    EventType = "io.platform-orchestrator.organization.created"
-	IoPlatformOrchestratorOrganizationDeleted    EventType = "io.platform-orchestrator.organization.deleted"
-	IoPlatformOrchestratorOrganizationUpdated    EventType = "io.platform-orchestrator.organization.updated"
-	IoPlatformOrchestratorProjectCreated         EventType = "io.platform-orchestrator.project.created"
-	IoPlatformOrchestratorProjectDeleted         EventType = "io.platform-orchestrator.project.deleted"
-	IoPlatformOrchestratorProjectUpdated         EventType = "io.platform-orchestrator.project.updated"
+	IoPlatformOrchestratorEnvironmentCreated               EventType = "io.platform-orchestrator.environment.created"
+	IoPlatformOrchestratorEnvironmentDeleted               EventType = "io.platform-orchestrator.environment.deleted"
+	IoPlatformOrchestratorEnvironmentTypeCreated           EventType = "io.platform-orchestrator.environment_type.created"
+	IoPlatformOrchestratorEnvironmentTypeDeleted           EventType = "io.platform-orchestrator.environment_type.deleted"
+	IoPlatformOrchestratorEnvironmentTypeUpdated           EventType = "io.platform-orchestrator.environment_type.updated"
+	IoPlatformOrchestratorEnvironmentUpdated               EventType = "io.platform-orchestrator.environment.updated"
+	IoPlatformOrchestratorModuleCatalogueChanged           EventType = "io.platform-orchestrator.module.catalogue.changed"
+	IoPlatformOrchestratorModuleVersionLifecycleChanged    EventType = "io.platform-orchestrator.module.version.lifecycle-changed"
+	IoPlatformOrchestratorModuleVersionPinLifecycleChanged EventType = "io.platform-orchestrator.module.version.pin-lifecycle-changed"
+	IoPlatformOrchestratorModuleVersionPublished           EventType = "io.platform-orchestrator.module.version.published"
+	IoPlatformOrchestratorOrganizationCreated              EventType = "io.platform-orchestrator.organization.created"
+	IoPlatformOrchestratorOrganizationDeleted              EventType = "io.platform-orchestrator.organization.deleted"
+	IoPlatformOrchestratorOrganizationUpdated              EventType = "io.platform-orchestrator.organization.updated"
+	IoPlatformOrchestratorProjectCreated                   EventType = "io.platform-orchestrator.project.created"
+	IoPlatformOrchestratorProjectDeleted                   EventType = "io.platform-orchestrator.project.deleted"
+	IoPlatformOrchestratorProjectUpdated                   EventType = "io.platform-orchestrator.project.updated"
+	IoPlatformOrchestratorResourceTypeCatalogueChanged     EventType = "io.platform-orchestrator.resource-type.catalogue.changed"
 )
 
 // Valid indicates whether the value is a known member of the EventType enum.
@@ -38,6 +43,14 @@ func (e EventType) Valid() bool {
 		return true
 	case IoPlatformOrchestratorEnvironmentUpdated:
 		return true
+	case IoPlatformOrchestratorModuleCatalogueChanged:
+		return true
+	case IoPlatformOrchestratorModuleVersionLifecycleChanged:
+		return true
+	case IoPlatformOrchestratorModuleVersionPinLifecycleChanged:
+		return true
+	case IoPlatformOrchestratorModuleVersionPublished:
+		return true
 	case IoPlatformOrchestratorOrganizationCreated:
 		return true
 	case IoPlatformOrchestratorOrganizationDeleted:
@@ -49,6 +62,8 @@ func (e EventType) Valid() bool {
 	case IoPlatformOrchestratorProjectDeleted:
 		return true
 	case IoPlatformOrchestratorProjectUpdated:
+		return true
+	case IoPlatformOrchestratorResourceTypeCatalogueChanged:
 		return true
 	default:
 		return false

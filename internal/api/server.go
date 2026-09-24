@@ -15,6 +15,7 @@ import (
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/api/middleware"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/token"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/vault"
 )
@@ -28,6 +29,7 @@ type Server struct {
 	Publisher hmessaging.Publisher
 	DpClient  orchestratordp.ClientWithResponsesInterface
 	IamClient orchestratoriam.ClientWithResponsesInterface
+	Plugins   plugins.Registry
 }
 
 func (s *Server) MapRoutes(e *echo.Echo) {

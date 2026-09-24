@@ -26,7 +26,7 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/genevents"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genevents"
 )
 
 const (

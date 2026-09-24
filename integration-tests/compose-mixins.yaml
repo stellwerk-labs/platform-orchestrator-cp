@@ -1,6 +1,6 @@
 services:
   nats:
-    image: nats:2.11-alpine
+    image: nats:2.12-alpine
     command: ["--jetstream", "--store_dir", "/data", "--http_port", "8222", "--auth", "integration-token"]
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O - http://localhost:8222/healthz | grep -q ok"]
@@ -18,8 +18,8 @@ services:
     depends_on:
       nats:
         condition: service_healthy
-      vault:
-        condition: service_started
+      vault-init:
+        condition: service_completed_successfully
   platform-orchestrator-cp-platform-orchestrator-cp:
     environment:
       DD_AGENT_HOST: ""
@@ -30,15 +30,19 @@ services:
     depends_on:
       nats:
         condition: service_healthy
-      vault:
-        condition: service_started
+      vault-init:
+        condition: service_completed_successfully
       platform-orchestrator-iam-platform-orchestrator-iam:
         condition: service_started
   platform-orchestrator-iam-platform-orchestrator-iam:
     environment:
+      NATS_BOOTSTRAP_STREAMS: "true"
       LOG_LEVEL: debug
       DD_AGENT_HOST: ""
       SHUTDOWN_DELAY: 1s
+    depends_on:
+      nats:
+        condition: service_healthy
   vault:
     image: hashicorp/vault:1.14
     environment:
@@ -48,3 +52,47 @@ services:
       - IPC_LOCK
     ports:
       - "8200:8200"
+  vault-init:
+    image: hashicorp/vault:1.14
+    environment:
+      VAULT_TOKEN: mytoken
+      VAULT_ADDR: http://vault:8200
+    depends_on:
+      vault:
+        condition: service_started
+    command:
+      - sh
+      - -ec
+      - |
+        timeout 60 sh -c 'until vault status >/dev/null; do sleep 1; done'
+        vault secrets list -format=json | grep -q '"transit/"' || vault secrets enable transit
+  platform-orchestrator-dp-ready:
+    image: nats:2.12-alpine
+    entrypoint: ["sh", "-c"]
+    command:
+      - timeout 60 sh -c 'until wget --spider -q http://platform-orchestrator-dp-platform-orchestrator-dp:8080/health; do sleep 1; done'
+    depends_on:
+      platform-orchestrator-dp-platform-orchestrator-dp:
+        condition: service_started
+  runner-gateway:
+    # Build the real gateway from the public candidate, without a release-image cycle.
+    # Infrastructure execution is covered by the DP and Runner suites, not this suite.
+    build:
+      context: https://github.com/stellwerk-labs/platform-orchestrator-runner.git#947b45d7ec1c450084548bc126d672f022ace1b9
+      target: builder
+    entrypoint: ["/opt/runner/runner"]
+    command: ["gateway"]
+    environment:
+      NATS_URL: nats://nats:4222
+      NATS_TOKEN: integration-token
+      CONTROL_PLANE_URL: http://platform-orchestrator-cp-platform-orchestrator-cp:8080
+      RUNNER_TOKEN_SALT: integration-test-runner-token-salt
+      RUNNER_GATEWAY_RECEIPT_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+    depends_on:
+      platform-orchestrator-dp-ready:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/runner-gateway/healthz"]
+      interval: 2s
+      timeout: 5s
+      retries: 30

@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -20,11 +21,13 @@ import (
 	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v2/genclient"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest"
 
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/genclient"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genclient"
 
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 )
 
@@ -44,6 +47,16 @@ var testHttpClient = &http.Client{
 			return dialer.DialContext(ctx, network, address)
 		},
 	},
+}
+
+const testModuleArtifactDigest = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+
+func MustDatabaser(t *testing.T) model.Databaser {
+	t.Helper()
+	database, err := model.NewDatabaser(t.Context(), zaptest.NewLogger(t), os.Getenv("DB_CONNECTION_STRING"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = database.Close() })
+	return database
 }
 
 func MustServerClient(t *testing.T) genclient.ClientWithResponsesInterface {
@@ -269,14 +282,36 @@ func MustCreateResourceType(t *testing.T, cpClient genclient.ClientWithResponses
 func MustCreateEmptyModule(t *testing.T, cpClient genclient.ClientWithResponsesInterface, orgId, id, rt string) *genclient.Module {
 	t.Helper()
 	res, err := cpClient.CreateModuleWithResponse(t.Context(), orgId, genclient.CreateModuleJSONRequestBody{
-		Id:           id,
-		ResourceType: rt,
-		ModuleSource: "git::https://github.com/stellwerk-labs/example-tf-module",
+		Id:              id,
+		ResourceType:    rt,
+		ModuleSource:    "git::https://github.com/stellwerk-labs/example-tf-module",
+		SemanticVersion: ref.Ref("1.0.0"),
+		ArtifactDigest:  ref.Ref(testModuleArtifactDigest),
 		ModuleInputs: map[string]interface{}{
 			"thing": "${context.env_id}",
 		},
 	})
 	require.NoError(t, err)
 	require.Equal(t, http.StatusCreated, res.StatusCode(), "unexpected: %s", string(res.Body))
+	MustPromoteModuleVersion(t, cpClient, orgId, id, "1.0.0")
 	return res.JSON201
+}
+
+func MustPromoteModuleVersion(t *testing.T, cpClient genclient.ClientWithResponsesInterface, orgID, moduleID, semanticVersion string) {
+	t.Helper()
+	versions, err := cpClient.ListModuleVersionsWithResponse(t.Context(), orgID, moduleID, &genclient.ListModuleVersionsParams{})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, versions.StatusCode(), "unexpected: %s", string(versions.Body))
+	require.NotNil(t, versions.JSON200)
+	index := slices.IndexFunc(versions.JSON200.Items, func(detail genclient.CoreModuleVersionDetail) bool {
+		return detail.Version.SemanticVersion != nil && *detail.Version.SemanticVersion == semanticVersion
+	})
+	require.NotEqual(t, -1, index, "managed Module Version %s@%s is missing", moduleID, semanticVersion)
+	version := versions.JSON200.Items[index].Version
+	promoted, err := cpClient.TransitionModuleVersionWithResponse(t.Context(), orgID, moduleID, version.Uuid.String(),
+		genclient.TransitionModuleVersionParamsLifecycleActionPromote,
+		&genclient.TransitionModuleVersionParams{IdempotencyKey: "promote-" + moduleID + "-" + semanticVersion},
+		genclient.ModuleReasonedCommand{ExpectedResourceVersion: version.ResourceVersion, Reason: "Integration fixture baseline"})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, promoted.StatusCode(), "unexpected: %s", string(promoted.Body))
 }

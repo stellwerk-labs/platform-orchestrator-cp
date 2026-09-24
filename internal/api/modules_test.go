@@ -29,10 +29,12 @@ import (
 
 func createModuleDef(mod func(*ModuleCreateBody)) ModuleCreateBody {
 	x := ModuleCreateBody{
-		Id:           "example-definition",
-		Description:  ref.Ref("some example definition of mine"),
-		ResourceType: "s3",
-		ModuleSource: "git::https://github.com/stellwerk-labs/example-tf-module",
+		Id:              "example-definition",
+		Description:     ref.Ref("some example definition of mine"),
+		ResourceType:    "s3",
+		ModuleSource:    "git::https://github.com/stellwerk-labs/example-tf-module",
+		SemanticVersion: ref.Ref("1.0.0"),
+		ArtifactDigest:  ref.Ref("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
 		ModuleInputs: map[string]interface{}{
 			"thing": "${context.env_id}",
 		},
@@ -110,7 +112,9 @@ output "bar" {
 	}{
 		// unauthorized means it past the validation
 		{name: "valid", body: createModuleDef(nil)},
-		{name: "valid with module source code", body: createModuleDef(func(m *ModuleCreateBody) { m.ModuleSource, m.ModuleSourceCode = "inline", ref.Ref(inlineTF) })},
+		{name: "valid with module source code", body: createModuleDef(func(m *ModuleCreateBody) {
+			m.ModuleSource, m.ModuleSourceCode, m.ArtifactDigest = "inline", ref.Ref(inlineTF), nil
+		})},
 		{name: "bad id", body: createModuleDef(func(m *ModuleCreateBody) { m.Id = "BAD Value" }), expectedError: ": module id must be a valid identifier of alphanumerics and hyphens"},
 		{name: "missing resource type", body: createModuleDef(func(m *ModuleCreateBody) { m.ResourceType = "" }), expectedError: `\"/resource_type\": minimum string length is 2"`},
 		{name: "empty module source", body: createModuleDef(func(m *ModuleCreateBody) { m.ModuleSource = "" }), expectedError: `\"/module_source\": minimum string length is 2"`},
@@ -127,7 +131,7 @@ output "bar" {
 			mockIamClient := s.IamClient.(*mockorchestratoriam.MockClientWithResponsesInterface)
 			mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 				UserId: userId,
-				Checks: []orchestratoriam.ResourcePermissionCheck{orgCheck("my-org", PermissionModuleWrite)},
+				Checks: []orchestratoriam.ResourcePermissionCheck{orgCheck("my-org", PermissionModuleVersionPublish)},
 			}).Return(&orchestratoriam.InternalAuthorizeResponse{
 				HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 			}, nil)
@@ -148,8 +152,10 @@ output "bar" {
 
 func updateModuleDef(mod func(body *ModuleUpdateBody)) ModuleUpdateBody {
 	x := ModuleUpdateBody{
-		Description:  ref.Ref("some other example definition of mine"),
-		ModuleSource: ref.Ref("git::https://github.com/stellwerk-labs/example-tf-module"),
+		Description:     ref.Ref("some other example definition of mine"),
+		ModuleSource:    ref.Ref("git::https://github.com/stellwerk-labs/example-tf-module"),
+		SemanticVersion: ref.Ref("1.1.0"),
+		ArtifactDigest:  ref.Ref("sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
 		ModuleInputs: &map[string]interface{}{
 			"thing": "${context.env_id}",
 		},
@@ -208,8 +214,10 @@ func TestDefinitionsValidation_update(t *testing.T) {
 			expectedError: `module source code must not be defined when module source is not 'inline'`,
 		},
 		{
-			name:     "valid with module source code",
-			body:     updateModuleDef(func(m *ModuleUpdateBody) { m.ModuleSource, m.ModuleSourceCode = ref.Ref("inline"), ref.Ref(inlineTF) }),
+			name: "valid with module source code",
+			body: updateModuleDef(func(m *ModuleUpdateBody) {
+				m.ModuleSource, m.ModuleSourceCode, m.ArtifactDigest = ref.Ref("inline"), ref.Ref(inlineTF), nil
+			}),
 			existing: model.ModuleDefinitionVersion{ModuleSource: "inline", ModuleSourceCode: opt.Of(strings.ReplaceAll(inlineTF, "foo", "bar"))},
 		},
 		{
@@ -220,7 +228,7 @@ func TestDefinitionsValidation_update(t *testing.T) {
 		{
 			name: "switch from source to source code",
 			body: updateModuleDef(func(body *ModuleUpdateBody) {
-				body.ModuleSourceCode, body.ModuleSource = ref.Ref(inlineTF), ref.Ref("inline")
+				body.ModuleSourceCode, body.ModuleSource, body.ArtifactDigest = ref.Ref(inlineTF), ref.Ref("inline"), nil
 			}),
 			existing: model.ModuleDefinitionVersion{ModuleSource: "git::https://github.com/stellwerk-labs/old-tf-module"},
 		},
@@ -235,7 +243,7 @@ func TestDefinitionsValidation_update(t *testing.T) {
 			mockIamClient := s.IamClient.(*mockorchestratoriam.MockClientWithResponsesInterface)
 			mockIamClient.EXPECT().InternalAuthorizeWithResponse(gomock.Any(), orchestratoriam.InternalAuthorizeBody{
 				UserId: userId,
-				Checks: []orchestratoriam.ResourcePermissionCheck{orgCheck("my-org", PermissionModuleWrite)},
+				Checks: []orchestratoriam.ResourcePermissionCheck{orgCheck("my-org", PermissionModuleVersionPublish)},
 			}).Return(&orchestratoriam.InternalAuthorizeResponse{
 				HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
 			}, nil)
@@ -275,5 +283,20 @@ func TestValidateModuleInputsAndParamInputs(t *testing.T) {
 				require.EqualError(t, err, tc.expectedError)
 			}
 		})
+	}
+}
+
+func TestValidateManagedModuleVersionArtifactBoundary(t *testing.T) {
+	version := "1.2.3"
+	digest := "sha256:" + strings.Repeat("a", 64)
+	inline := "resource \"example\" \"this\" {}"
+
+	require.NoError(t, validateManagedModuleVersion(&version, nil, &inline))
+	require.EqualError(t, validateManagedModuleVersion(&version, &digest, &inline),
+		"artifact_digest protects referenced external artifacts and must be omitted for inline source")
+	require.NoError(t, validateManagedModuleVersion(&version, nil, nil))
+	require.NoError(t, validateManagedModuleVersion(&version, &digest, nil))
+	for _, malformed := range []string{"", "sha256:abc", "sha256:" + strings.Repeat("A", 64)} {
+		require.Error(t, validateManagedModuleVersion(&version, &malformed, nil))
 	}
 }

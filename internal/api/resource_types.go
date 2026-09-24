@@ -27,9 +27,15 @@ func apiResourceTypeFromModelResourceType(resourceType model.ResourceType) Resou
 		Id:                    resourceType.Id,
 		Description:           ref.RefStringEmptyNil(resourceType.Description),
 		OutputSchema:          resourceType.OutputsSchema,
+		ModuleContract:        optionalJSONObject[ResourceTypeModuleContract](resourceType.ModuleContract),
 		CreatedAt:             resourceType.CreatedAt,
 		BuiltIn:               !resourceType.OrgId.IsSet(),
 		IsDeveloperAccessible: resourceType.IsDeveloperAccessible,
+		CatalogueStatus:       ResourceTypeCatalogueStatus(resourceType.CatalogueStatus),
+		ResourceVersion:       resourceType.ResourceVersion,
+		ArchivedAt:            resourceType.ArchivedAt,
+		ArchivedBy:            resourceType.ArchivedBy,
+		ArchiveReason:         ref.RefStringEmptyNil(resourceType.ArchiveReason),
 	}
 }
 
@@ -58,10 +64,14 @@ func (s *Server) InternalCreateResourceType(ctx context.Context, request Interna
 		Id:                    request.Body.Id,
 		Description:           ref.DerefOr(request.Body.Description, ""),
 		OutputsSchema:         request.Body.OutputSchema,
+		ModuleContract:        ref.DerefOr(request.Body.ModuleContract, nil),
 		CreatedAt:             time.Now().UTC(),
 		IsDeveloperAccessible: ref.DerefOr(request.Body.IsDeveloperAccessible, true),
 	})
 	if err != nil {
+		if me, ok := model.IsErrBadRequest(err); ok {
+			return InternalCreateResourceType400JSONResponse{N400BadRequestJSONResponse: Generate400FromModelErr(me)}, nil
+		}
 		if me, ok := model.IsErrConflict(err); ok {
 			return InternalCreateResourceType409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(me)}, nil
 		}
@@ -112,6 +122,9 @@ func (s *Server) InternalUpdateResourceType(ctx context.Context, request Interna
 	if err != nil {
 		if me, ok := model.IsErrNotFound(err); ok {
 			return InternalUpdateResourceType404JSONResponse{N404NotFoundJSONResponse: Generate404FromModelErr(me)}, nil
+		}
+		if me, ok := model.IsErrConflict(err); ok {
+			return InternalUpdateResourceType409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(me)}, nil
 		}
 		return nil, errors.Wrap(err, "failed to update resource type")
 	}
@@ -180,10 +193,14 @@ func (s *Server) CreateResourceType(ctx context.Context, request CreateResourceT
 		Id:                    request.Body.Id,
 		Description:           ref.DerefOr(request.Body.Description, ""),
 		OutputsSchema:         request.Body.OutputSchema,
+		ModuleContract:        ref.DerefOr(request.Body.ModuleContract, nil),
 		CreatedAt:             time.Now().UTC(),
 		IsDeveloperAccessible: ref.DerefOr(request.Body.IsDeveloperAccessible, true),
 	})
 	if err != nil {
+		if me, ok := model.IsErrBadRequest(err); ok {
+			return CreateResourceType400JSONResponse{N400BadRequestJSONResponse: Generate400FromModelErr(me)}, nil
+		}
 		if me, ok := model.IsErrConflict(err); ok {
 			return CreateResourceType409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(me)}, nil
 		}
@@ -287,6 +304,9 @@ func (s *Server) UpdateResourceType(ctx context.Context, request UpdateResourceT
 		if me, ok := model.IsErrNotFound(err); ok {
 			return UpdateResourceType404JSONResponse{N404NotFoundJSONResponse: Generate404FromModelErr(me)}, nil
 		}
+		if me, ok := model.IsErrConflict(err); ok {
+			return UpdateResourceType409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(me)}, nil
+		}
 		return nil, errors.Wrap(err, "failed to update resource type")
 	}
 	if err := tx.Commit(); err != nil {
@@ -294,4 +314,55 @@ func (s *Server) UpdateResourceType(ctx context.Context, request UpdateResourceT
 	}
 	logger.Info("updated resource type", zap.String("resource_type_id", request.TypeId))
 	return UpdateResourceType200JSONResponse(apiResourceTypeFromModelResourceType(*res)), nil
+}
+
+func (s *Server) ChangeResourceTypeCatalogueStatus(ctx context.Context, request ChangeResourceTypeCatalogueStatusRequestObject) (ChangeResourceTypeCatalogueStatusResponseObject, error) {
+	userID, err := GetAuthenticatedUserIdOr401(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.checkOrgAuthorization(ctx, userID, request.OrgId, PermissionResourceTypeWrite); err != nil {
+		return nil, err
+	}
+	target := string(ResourceTypeCatalogueStatusArchived)
+	if request.CatalogueAction == ChangeResourceTypeCatalogueStatusParamsCatalogueActionUnarchive {
+		target = string(ResourceTypeCatalogueStatusActive)
+	}
+	scope := fmt.Sprintf("resource-type-catalogue:%s:%s", request.TypeId, request.CatalogueAction)
+	fingerprint := commandIdentity(scope, request.Body)
+	tx, err := s.Database.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if response, found, err := readModuleCommand[ResourceType](ctx, s.Database, tx, request.OrgId, scope, request.Params.IdempotencyKey, fingerprint); err != nil {
+		if conflict, ok := model.IsErrConflict(err); ok {
+			return ChangeResourceTypeCatalogueStatus409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(conflict)}, nil
+		}
+		return nil, err
+	} else if found {
+		return ChangeResourceTypeCatalogueStatus200JSONResponse(response), nil
+	}
+	resourceType, err := s.Database.SetResourceTypeCatalogueStatus(ctx, tx, request.OrgId, request.TypeId, target,
+		userID, request.Body.Reason, request.Body.ExpectedResourceVersion)
+	if err != nil {
+		if badRequest, ok := model.IsErrBadRequest(err); ok {
+			return ChangeResourceTypeCatalogueStatus400JSONResponse{N400BadRequestJSONResponse: Generate400FromModelErr(badRequest)}, nil
+		}
+		if notFound, ok := model.IsErrNotFound(err); ok {
+			return ChangeResourceTypeCatalogueStatus404JSONResponse{N404NotFoundJSONResponse: Generate404FromModelErr(notFound)}, nil
+		}
+		if conflict, ok := model.IsErrConflict(err); ok {
+			return ChangeResourceTypeCatalogueStatus409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(conflict)}, nil
+		}
+		return nil, err
+	}
+	response := apiResourceTypeFromModelResourceType(*resourceType)
+	if err := s.Database.StoreModuleCoreCommand(ctx, tx, request.OrgId, scope, request.Params.IdempotencyKey, fingerprint, userID, response); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return ChangeResourceTypeCatalogueStatus200JSONResponse(response), nil
 }
