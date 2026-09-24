@@ -1,13 +1,13 @@
 # Resource Type conformance and Module output declarations
 
-Status: OSS Core release-candidate contract, implementation qualification pending.
+Status: Orchestrator release-candidate contract, implementation qualification pending.
 This document does not claim a published API/client release or completed AC13 / AC39.
 
 ## Ownership and guarantee
 
 `ResourceType.module_contract` is an optional immutable interface contract.
 `ModuleVersion.output_schema` is an immutable author-supplied output declaration.
-Neither is Enterprise-owned or dependent on a Rollout entitlement.
+The Orchestrator stores and validates both declarations.
 
 Publication validates an Orchestrator-owned JSON definition offline. It does not
 download artifacts, inspect Terraform variable/output blocks or run providers.
@@ -90,7 +90,7 @@ an explicit equal declaration, even without `module_contract`. Equality is JSON
 value equality: insignificant whitespace and object order do not matter, but
 descriptions, constraints and omitted fields do. Schema subsumption is not
 implemented. `{}` imposes no output constraint and permits omission, whereas
-`{"type":"object"}` is nonempty. Core must not fill a missing declaration by
+`{"type":"object"}` is nonempty. The Orchestrator must not fill a missing declaration by
 copying the Resource Type. Historical absence is not an empty schema or proof.
 
 The public request/response definitions are in `openapi/spec.yaml` and generated

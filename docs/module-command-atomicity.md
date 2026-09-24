@@ -1,4 +1,4 @@
-# Core Module command atomicity
+# Orchestrator Module command atomicity
 
 Module commands commit their state, lifecycle events, normal outbox records and
 idempotency receipt in one PostgreSQL transaction. An unsuccessful command rolls
@@ -36,6 +36,6 @@ Release regression evidence:
   verifies only one command commits, one receipt scope is retained and one stable
   Proposed successor is created.
 
-These are database/API tests against an isolated compatible Core stack, not
+These are database/API tests against an isolated compatible Orchestrator stack, not
 substituted repository mocks. They do not claim production Runner, distribution
 or cloud-provider availability testing.

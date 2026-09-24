@@ -1,13 +1,13 @@
-# Core Module Version Management traceability
+# Orchestrator Module Version Management traceability
 
-Assertion audit refreshed: 2026-09-08. Criteria refer to section16 of the reviewed Core
+Assertion audit refreshed: 2026-09-08. Criteria refer to section 16 of the reviewed Orchestrator
 Module Version Management specification, with the normative Resource Type
 conformance specification for interface checks. This document summarizes the
-current cross-repo evidence for the public Core export. It is not a public
-publication certificate and it does not claim Enterprise rollout-engine behavior
-as Core OSS proof.
+cross-repository evidence for the Orchestrator release. It records the assertions
+listed below; external services using the extension contracts need their own
+integration evidence.
 
-Core owns Module history, lifecycle and Pins. Add-on boundaries are generic,
+The Orchestrator owns Module history, lifecycle and Pins. Add-on boundaries are generic,
 namespaced contracts and do not require an orchestration add-on to be present.
 
 ## Evidence index
@@ -22,24 +22,24 @@ Paths are repository-relative unless another component is explicitly named.
 | Boundaries | integration-tests/module_lifecycle_boundaries_test.go::TestDistinctConcurrentPublicationsCreateExactlyOneProposedVersion, TestDefectiveDefaultRestorationNeverSkipsTheExactDeprecatedPredecessor and TestConcurrentStableSuccessorCommandsCreateOneStableProposedVersion: distinct publication, exact predecessor restore and simultaneous stable-successor race coverage. |
 | Domain | internal/moduleversions/domain_test.go: selected SemVer, lifecycle and Pin transition tables, not an exhaustive persisted state machine. |
 | Compare | internal/api/module_version_management_test.go: structural key differences and typed before/after snapshots. |
-| Pin persistence | integration-tests/module_version_management_api_test.go::TestEnvironmentModuleVersionPinPersistenceAndOperationLock: real SQL transitions/notes and operation ownership, using generated Deployment UUIDs rather than real Runner outcomes. Full rollout-owned Runner outcome proof remains Enterprise/reference integration. |
+| Pin persistence | integration-tests/module_version_management_api_test.go::TestEnvironmentModuleVersionPinPersistenceAndOperationLock: real SQL transitions/notes and operation ownership, using generated Deployment UUIDs rather than real Runner outcomes. End-to-end Runner outcomes for externally owned operations need separate integration evidence. |
 | Callbacks | internal/api/module_version_management_test.go::TestPinOverrideReconciliationRequiresCurrentOwnedPendingState and TestPinRollbackRestorationRequiresCurrentOwnedOverriddenState: handler tests reject stale or incorrectly owned callback state; not real Runner outcome proof. |
 | Conformance | integration-tests/module_conformance_test.go and internal/moduleconformance: immutable six-field Resource Type contract, explicit output-schema equality, fail-closed validation and graduation rejection. |
 | Type concurrency | integration-tests/resource_type_concurrency_test.go::TestResourceTypeArchiveSerializesWithNewModuleBinding: PostgreSQL lock observation and rejection of late new binding. |
 | Environment deletion | integration-tests/env_deletion_pins_test.go::TestEnvironmentDeletionTerminallyRemovesPinsExceptPendingOverrides: actual deletion removes active/overridden Pins into retained tombstones and blocks pending overrides without mutation. |
-| Pin scope | internal/api/module_version_management_test.go::TestUnpinIsAuthorizedByScopeRatherThanPinCreator plus Data Plane integration-tests/module_pin_bulk_scope_test.go::TestBulkPinsUseFrozenDeployedVersionsAndRealScopedAuthority: scoped Core Unpin/Discard behavior is covered by both handler boundary and real scoped principals. |
+| Pin scope | internal/api/module_version_management_test.go::TestUnpinIsAuthorizedByScopeRatherThanPinCreator plus Data Plane integration-tests/module_pin_bulk_scope_test.go::TestBulkPinsUseFrozenDeployedVersionsAndRealScopedAuthority: scoped Unpin/Discard behavior is covered by both handler boundary and real scoped principals. |
 | Migration | integration-tests/module_version_management_migration_test.go::TestModuleVersionManagementMigrationRoundTrip: populated previous-schema down/up migration preserves opaque history without invented SemVer/digests. |
 | Catalogue | integration-tests/modules_test.go::TestDefinitions and integration-tests/resource_types_test.go::TestResourceTypesCrud: Provider reference validation, immutable Resource Types and archive/delete boundaries. |
 | Empty deletion | integration-tests/module_version_management_api_test.go::TestEmptyModuleHardDeleteReleasesCreateIdempotency: same slug/key can recreate an eligible deleted identity with a new UUID. |
 | Runtime | Data Plane integration-tests/legacy_module_execution_test.go::TestLegacyModuleExecutionAndHistoryRollback and module_pin_execution_test.go::TestManagedModulePinExecutionAndArchivedCarryForward: real Runner, legacy adoption/rollback, encrypted outputs and exact Pin/archive carry-forward. Record compatible revision/command results separately. |
 | Lifecycle runtime | Data Plane integration-tests/module_lifecycle_execution_test.go::TestManagedModuleLifecycleExecutionBoundaries: implicit Proposed non-use, explicit Proposed permission, Deprecated rejection and exact scoped Defective carry-forward. |
-| Bulk scope | Data Plane integration-tests/module_pin_bulk_scope_test.go::TestBulkPinsUseFrozenDeployedVersionsAndRealScopedAuthority: real deployments/scoped principals, frozen Environment set, stale preview and partial-authority no-write failures, successful Pin/replay/concurrent replay, later Environment non-inheritance, bulk Unpin, permission revocation, bulk Discard by another scoped principal, Discard partial-denial/replay/persistence and no infrastructure execution. Focused test and full Data Plane suite passed after the compatible Core image refresh. |
-| Clients | CLI flags/parser tests; Console component/live lifecycle/comparison tests; Provider real Terraform lifecycle/import/retention plus direct Terraform/OpenTofu catalogue/Pin journeys. These prove their asserted flows, not all Core contracts. |
+| Bulk scope | Data Plane integration-tests/module_pin_bulk_scope_test.go::TestBulkPinsUseFrozenDeployedVersionsAndRealScopedAuthority: real deployments/scoped principals, frozen Environment set, stale preview and partial-authority no-write failures, successful Pin/replay/concurrent replay, later Environment non-inheritance, bulk Unpin, permission revocation, bulk Discard by another scoped principal, Discard partial-denial/replay/persistence and no infrastructure execution. Focused test and full Data Plane suite passed after the compatible Orchestrator image refresh. |
+| Clients | CLI flags/parser tests; Console component/live lifecycle/comparison tests; Provider real Terraform lifecycle/import/retention plus direct Terraform/OpenTofu catalogue/Pin journeys. These prove their asserted flows, not all Orchestrator contracts. |
 
 ## Acceptance criteria
 
 Status reflects the current cross-repo assertion audit. "Covered" means the
-release-required OSS Core criterion has direct assertions in at least one
+release-required Orchestrator criterion has direct assertions in at least one
 product surface. Hardening notes are useful follow-up coverage, not release
 blockers unless the product owner asks for stricter proof than the written spec.
 
@@ -53,27 +53,27 @@ blockers unless the product owner asks for stricter proof than the written spec.
 | 6 | Covered | Lifecycle/atomicity/client/provider evidence covers actor/reason/correlation and append-only event expectations. Hardening: one API matrix for every blank-reason/action pair. |
 | 7 | Covered | CP API plus CLI, Provider and Console tests cover history semantics across product surfaces. |
 | 8 | Covered | Comparison, Console before/after rendering, usage panels and runtime explicit-use permissions cover pre-promotion review. Hardening: one populated usage/adoption UI E2E before promotion. |
-| 9 | Covered for Core | Usage source/UI expose Environment/Pin links; runtime evidence gives real Deployment linkage. Add-on navigation population remains plugin/reference integration, not a Core OSS blocker. |
+| 9 | Covered for the Orchestrator | Usage source/UI expose Environment/Pin links; runtime evidence gives real Deployment linkage. Navigation links populated by an external service need separate integration evidence. |
 | 10 | Covered | Migration, Runtime and stock Helm upgrade preserve v0 identity/source/absent declarations, adopt managed v1 and support exact rollback. |
-| 11 | Covered for Core | Public neutral APIs and clients cover version/usage/event/atomic contracts without DB access. An external add-on service using every contract is reference integration. |
-| 12 | Covered | Core lifecycle works without Progressive Rollouts navigation or rollout UI dependency. Plugin uninstall/disable preservation is reference integration. |
+| 11 | Covered for the Orchestrator | Public neutral APIs and clients cover version/usage/event/atomic contracts without DB access. An external add-on service using every contract is reference integration. |
+| 12 | Covered | The Orchestrator's lifecycle and navigation work without an add-on. Plugin uninstall/disable preservation is reference integration. |
 | 13 | Covered | Resource Types now carry a six-field declarative `module_contract`; Module Versions carry explicit `output_schema`; conformance fails closed before Proposed/graduation. The normative contract is declaration validation, not external artifact execution. |
 | 14 | Covered | Empty shell creation/recreation and first publication are covered. Hardening: direct DP no-version deployment denial. |
 | 15 | Covered | Resource Type mutation/deletion conflicts, Module publication conformance and Resource Type archive/new-binding serialization cover immutable type binding and retained identity. |
 | 16 | Covered | Runtime/Provider cover exact effective Pin/Unpin, Deprecated-active Pins, scoped principals and restricted Defective carry-forward permissions. |
 | 17 | Covered | Direct and bulk Pin evidence covers preservation, exact records, no writes on partial denial/stale preview, replay/concurrent replay and audit actor checks. |
-| 18 | Covered for Core | CP validates operation-owned pending state and authoritative Deployment records for callback reconciliation; state-machine failure/cancel/success cases are covered. Full rollout-owned Runner proof is Enterprise/reference integration. |
+| 18 | Covered for the Orchestrator | CP validates operation-owned pending state and authoritative Deployment records for callback reconciliation; state-machine failure/cancel/success cases are covered. Runner outcomes for externally owned operations need separate integration evidence. |
 | 19 | Covered | Real scoped Unpin by another actor, event actor/reason/boundary and unchanged deployment count are covered. |
 | 20 | Covered | Retained published history, archive instead of delete, SemVer reuse barriers, Provider import and empty-shell residue absence are covered. |
 | 21 | Covered | Defective Default clears the pointer and exact predecessor restore is enforced by direct API/SQL and client evidence. |
-| 22 | Covered for Core | CP requires current operation-owned `overridden` state and validates authoritative rollback Deployment target; real rollout rollback production is Enterprise/reference integration. |
-| 23 | Covered for Core | Operation ownership, pending locks, stale callbacks, terminal removed state, Environment deletion pending blocker and exposed bulk Discard are covered. Restart/out-of-order rollout callbacks remain reference integration. |
+| 22 | Covered for the Orchestrator | CP requires current operation-owned `overridden` state and validates authoritative rollback Deployment target; rollback initiated by an external service needs separate integration evidence. |
+| 23 | Covered for the Orchestrator | Operation ownership, pending locks, stale callbacks, terminal removed state, Environment deletion pending blocker and exposed bulk Discard are covered. Restart/out-of-order external callbacks remain reference integration. |
 | 24 | Covered | Runtime proves Defective Pin persistence, exact confirmation and scoped capability requirements. |
 | 25 | Covered | Publication floor, rollback/restore lineage and lower/stale rejection cases are covered. Build-metadata identity denial through every selector is hardening. |
 | 26 | Covered | Data Plane bulk test covers frozen atomic multi-Environment Pin/Unpin/Discard, including successful replay/concurrent replay and real exposed Discard. |
 | 27 | Covered | Deletion preview plus actual delete path cover active/overridden tombstones, pending blocker and unchanged state on conflict. Async DP destroy completion is broader Environment lifecycle evidence. |
 | 28 | Covered | Prerelease promotion rejection, explicit Proposed use permission and stable-successor stable-target rules are covered. |
-| 29 | Covered | Note boundary stability, restoration boundary changes, recreated Pin boundary and removed Unpin/Discard event retention are covered. Enterprise approval invalidation is reference integration. |
+| 29 | Covered | Note boundary stability, restoration boundary changes, recreated Pin boundary and removed Unpin/Discard event retention are covered. Approval invalidation by an external service needs separate integration evidence. |
 | 30 | Covered | Bulk runtime creates a later Environment, deploys it and asserts no inherited Pin. |
 | 31 | Covered | No scheduler mutates Proposed by age; UI renders activity timestamps; Proposed persists until explicit transition. Hardening: clock-advanced long-lived Proposed test. |
 | 32 | Covered | Optional notes, mandatory reasons, optional digest omission and no invented legacy digest/declaration are covered. Hardening: explicit release-note immutability after metadata/lifecycle update. |
@@ -87,15 +87,15 @@ blockers unless the product owner asks for stricter proof than the written spec.
 | 40 | Covered | v0 migration, managed v1 successor and normal managed lineage after v1 are covered. |
 | 41 | Covered | Archived Pin persistence and real new Pin on archived effective version are covered; restricted new Environment/version-switch paths are rejected. |
 | 42 | Covered | Handler and runtime evidence prove other scoped principals may Unpin/Discard, unauthorized scopes cannot mutate and actor/reason persist. |
-| 43 | Covered | IAM scopes, legacy grants and runtime revocation checks prove rollout/override rights do not grant direct Core Unpin/Discard. Full Enterprise rollout identity remains reference integration. |
-| 44 | Covered | Note append preserves Pin resource version/protection/boundary and removed-note rejection is covered. Approval non-invalidation is Enterprise evidence. |
+| 43 | Covered | IAM scopes, legacy grants and runtime revocation checks prove operation-override rights do not grant direct Orchestrator Unpin/Discard. Delegated external-service identities need separate integration evidence. |
+| 44 | Covered | Note append preserves Pin resource version/protection/boundary and removed-note rejection is covered. Approval preservation by an external service needs separate integration evidence. |
 
-## Genuine remaining OSS work
+## Genuine remaining Orchestrator work
 
-None identified in the audited AC1-AC44 Core OSS release criteria after the
-CP/Data Plane reruns and distinct scoped bulk Discard proof. Full rollout-owned
-success/failure/cancel/rollback outcome proof remains an Enterprise/reference
-integration requirement, not a Core OSS blocker.
+None identified in the audited AC1-AC44 Orchestrator release criteria after the
+CP/Data Plane reruns and distinct scoped bulk Discard proof. External services
+using the operation contracts need separate evidence for success, failure,
+cancellation and rollback outcomes.
 
 ## Non-blocking hardening candidates
 
@@ -112,7 +112,7 @@ build against the compatible component set. Use the CI-pinned linter and Go
 toolchain. Record each command, revision and result, including environment
 failures. Never count unexecuted suites or mocked handlers as runtime proof.
 
-The refreshed Core integration suite passed 300 tests in 9.188s with the
+The refreshed Orchestrator integration suite passed 300 tests in 9.188s with the
 Resource Type archive/new-binding lock and stable-successor race tests included.
 The refreshed Data Plane suite passed 501 tests in 117.663s, including real
 scoped bulk Pin/Unpin/Discard coverage. These local/private gates do not replace
