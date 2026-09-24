@@ -16,16 +16,18 @@ import (
 )
 
 type EnvType struct {
-	OrgId       string
-	OrgUuid     uuid.UUID
-	Id          string
-	Uuid        uuid.UUID
-	DisplayName string
-	CreatedAt   time.Time
+	OrgId        string
+	OrgUuid      uuid.UUID
+	Id           string
+	Uuid         uuid.UUID
+	DisplayName  string
+	IsProduction bool
+	CreatedAt    time.Time
 }
 
 type UpdateEnvTypeParams struct {
-	DisplayName opt.Opt[string]
+	DisplayName  opt.Opt[string]
+	IsProduction opt.Opt[bool]
 }
 
 func (d *databaser) ListEnvironmentTypes(ctx context.Context, optionalTx Tx, orgId string, pageToken string, perPage int) (items []EnvType, nextPageToken string, err error) {
@@ -38,7 +40,7 @@ func (d *databaser) ListEnvironmentTypes(ctx context.Context, optionalTx Tx, org
 
 	if rs, err := d.txOrDb(optionalTx).QueryContext(ctx,
 		`WITH org_check AS (SELECT EXISTS (SELECT 1 FROM orgs WHERE id = $1) AS org_exists)
-		 SELECT org_check.org_exists, e.org_uuid, e.id, e.uuid, e.display_name, e.created_at
+		 SELECT org_check.org_exists, e.org_uuid, e.id, e.uuid, e.display_name, e.is_production, e.created_at
 		 FROM org_check
 		 LEFT JOIN env_types e ON org_check.org_exists AND e.org_id = $1
 		 WHERE e.id > $2 
@@ -55,7 +57,7 @@ func (d *databaser) ListEnvironmentTypes(ctx context.Context, optionalTx Tx, org
 		for rs.Next() {
 			var orgExists bool
 			next := EnvType{OrgId: orgId}
-			if err := rs.Scan(&orgExists, &next.OrgUuid, &next.Id, &next.Uuid, &next.DisplayName, &next.CreatedAt); err != nil {
+			if err := rs.Scan(&orgExists, &next.OrgUuid, &next.Id, &next.Uuid, &next.DisplayName, &next.IsProduction, &next.CreatedAt); err != nil {
 				return nil, "", errors.Wrap(err, "failed to scan row")
 			}
 			if !orgExists {
@@ -76,8 +78,8 @@ func (d *databaser) ListEnvironmentTypes(ctx context.Context, optionalTx Tx, org
 func (d *databaser) CreateEnvironmentType(ctx context.Context, optionalTx Tx, request *EnvType) (*EnvType, error) {
 	logger := hlogger.TraceScopedLoggerFromCtx(d.logger, ctx).With(logging.ZapOrgId(request.OrgId), logging.ZapEnvTypeId(request.Id))
 	ret := *request
-	if err := d.txOrDb(optionalTx).QueryRowContext(ctx, `INSERT INTO env_types (org_id, org_uuid, id, display_name, created_at) VALUES ($1, $2, $3, $4, $5) RETURNING created_at, uuid`,
-		request.OrgId, request.OrgUuid, request.Id, request.DisplayName, request.CreatedAt).Scan(&ret.CreatedAt, &ret.Uuid); err != nil {
+	if err := d.txOrDb(optionalTx).QueryRowContext(ctx, `INSERT INTO env_types (org_id, org_uuid, id, display_name, is_production, created_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING created_at, uuid`,
+		request.OrgId, request.OrgUuid, request.Id, request.DisplayName, request.IsProduction, request.CreatedAt).Scan(&ret.CreatedAt, &ret.Uuid); err != nil {
 		if pqe := new(pq.Error); errors.As(err, &pqe) {
 			if pqe.Code.Name() == UniqueViolationErrorCode {
 				return nil, NewErrConflict("environment type already exists")
@@ -94,7 +96,7 @@ func (d *databaser) CreateEnvironmentType(ctx context.Context, optionalTx Tx, re
 
 func (d *databaser) GetEnvironmentType(ctx context.Context, optionalTx Tx, orgId, id string, mode GetMode) (*EnvType, error) {
 	ret := EnvType{OrgId: orgId}
-	if err := d.txOrDb(optionalTx).QueryRowContext(ctx, `SELECT org_uuid, id, uuid, display_name, created_at FROM env_types WHERE org_id = $1 AND id = $2`, orgId, id).Scan(&ret.OrgUuid, &ret.Id, &ret.Uuid, &ret.DisplayName, &ret.CreatedAt); err != nil {
+	if err := d.txOrDb(optionalTx).QueryRowContext(ctx, `SELECT org_uuid, id, uuid, display_name, is_production, created_at FROM env_types WHERE org_id = $1 AND id = $2`, orgId, id).Scan(&ret.OrgUuid, &ret.Id, &ret.Uuid, &ret.DisplayName, &ret.IsProduction, &ret.CreatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, NewErrNotFound("environment type not found")
 		}
@@ -111,11 +113,11 @@ func (d *databaser) UpdateEnvironmentType(ctx context.Context, optionalTx Tx, or
 	}
 	if err := d.txOrDb(optionalTx).QueryRowContext(
 		ctx, `UPDATE env_types
-			  SET display_name = COALESCE($3, display_name)
+			  SET display_name = COALESCE($3, display_name), is_production = COALESCE($4, is_production)
 			  WHERE org_id = $1 AND id = $2
-			  RETURNING org_uuid, uuid, display_name, created_at`,
-		orgId, id, params.DisplayName.Ref(),
-	).Scan(&ret.OrgUuid, &ret.Uuid, &ret.DisplayName, &ret.CreatedAt); err != nil {
+			  RETURNING org_uuid, uuid, display_name, is_production, created_at`,
+		orgId, id, params.DisplayName.Ref(), params.IsProduction.Ref(),
+	).Scan(&ret.OrgUuid, &ret.Uuid, &ret.DisplayName, &ret.IsProduction, &ret.CreatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, NewErrNotFound("environment type not found")
 		}

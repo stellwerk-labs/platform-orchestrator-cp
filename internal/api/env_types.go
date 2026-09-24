@@ -16,15 +16,16 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/opt"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/genevents"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genevents"
 )
 
 func envTypeFromDbEnvType(et *model.EnvType) EnvironmentType {
 	return EnvironmentType{
-		Id:          et.Id,
-		Uuid:        et.Uuid,
-		DisplayName: et.DisplayName,
-		CreatedAt:   et.CreatedAt,
+		Id:           et.Id,
+		Uuid:         et.Uuid,
+		DisplayName:  et.DisplayName,
+		IsProduction: et.IsProduction,
+		CreatedAt:    et.CreatedAt,
 	}
 }
 
@@ -79,7 +80,7 @@ func (s *Server) CreateEnvironmentType(ctx context.Context, request CreateEnviro
 		return nil, errors.Wrap(err, "failed to get organization")
 	}
 
-	et, err := s.Database.CreateEnvironmentType(ctx, tx, &model.EnvType{OrgId: request.OrgId, OrgUuid: org.Uuid, Id: request.Body.Id, DisplayName: ref.DerefOr(request.Body.DisplayName, request.Body.Id), CreatedAt: time.Now().UTC()})
+	et, err := s.Database.CreateEnvironmentType(ctx, tx, &model.EnvType{OrgId: request.OrgId, OrgUuid: org.Uuid, Id: request.Body.Id, DisplayName: ref.DerefOr(request.Body.DisplayName, request.Body.Id), IsProduction: ref.DerefOr(request.Body.IsProduction, false), CreatedAt: time.Now().UTC()})
 	if err != nil {
 		if me, ok := model.IsErrConflict(err); ok {
 			return CreateEnvironmentType409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(me)}, nil
@@ -125,7 +126,7 @@ func (s *Server) UpdateEnvironmentType(ctx context.Context, request UpdateEnviro
 	}
 
 	out, err := s.Database.UpdateEnvironmentType(ctx, nil, request.OrgId, request.EnvTypeId, model.UpdateEnvTypeParams{
-		DisplayName: opt.Of(request.Body.DisplayName),
+		DisplayName: opt.OfRef(request.Body.DisplayName), IsProduction: opt.OfRef(request.Body.IsProduction),
 	})
 	if err != nil {
 		if me, ok := model.IsErrNotFound(err); ok {

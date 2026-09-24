@@ -8,12 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/genclient"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genclient"
 )
 
 func TestDefinitions(t *testing.T) {
@@ -48,9 +47,8 @@ func TestDefinitions(t *testing.T) {
 
 	t.Run("unknown resource-type", func(t *testing.T) {
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId+orgId, genclient.CreateModuleJSONRequestBody{
-			Id:           s3ModuleId,
-			ResourceType: "unknown",
-			ModuleSource: "/modules/my-s3",
+			Id: s3ModuleId, ResourceType: "unknown", ModuleSource: "/modules/my-s3",
+			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
 		})
 		if assert.NoError(t, err) && assert.Equal(t, http.StatusConflict, res.StatusCode(), string(res.Body)) {
 			assert.Equal(t, "the following types referenced by the module do not exist as builtin or custom types: [unknown]", res.JSON409.Message)
@@ -59,9 +57,8 @@ func TestDefinitions(t *testing.T) {
 
 	t.Run("unknown resource-types in definition dependencies and coprovisioned", func(t *testing.T) {
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.CreateModuleJSONRequestBody{
-			Id:           s3ModuleId,
-			ResourceType: orgResourceType,
-			ModuleSource: "/modules/my-s3",
+			Id: s3ModuleId, ResourceType: orgResourceType, ModuleSource: "/modules/my-s3",
+			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
 			ProviderMapping: map[string]string{
 				provType: provType + "." + provId,
 			},
@@ -116,9 +113,8 @@ func TestDefinitions(t *testing.T) {
 
 	t.Run("unknown providers", func(t *testing.T) {
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.CreateModuleJSONRequestBody{
-			Id:           s3ModuleId,
-			ResourceType: orgResourceType,
-			ModuleSource: "/modules/my-s3",
+			Id: s3ModuleId, ResourceType: orgResourceType, ModuleSource: "/modules/my-s3",
+			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
 			ProviderMapping: map[string]string{
 				"aws": "aws.unknown",
 			},
@@ -131,9 +127,8 @@ func TestDefinitions(t *testing.T) {
 	var createdRes genclient.Module
 	t.Run("create definition", func(t *testing.T) {
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.CreateModuleJSONRequestBody{
-			Id:           s3ModuleId,
-			ResourceType: orgResourceType,
-			ModuleSource: "/modules/my-s3",
+			Id: s3ModuleId, ResourceType: orgResourceType, ModuleSource: "/modules/my-s3",
+			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
 			ProviderMapping: map[string]string{
 				provType: provType + "." + provId,
 			},
@@ -176,12 +171,12 @@ func TestDefinitions(t *testing.T) {
 
 		}
 	})
+	MustPromoteModuleVersion(t, client, orgId, s3ModuleId, "1.0.0")
 
 	t.Run("cannot create another definition with the same id", func(t *testing.T) {
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.CreateModuleJSONRequestBody{
-			Id:           s3ModuleId,
-			ResourceType: orgResourceType,
-			ModuleSource: "/modules/my-s3",
+			Id: s3ModuleId, ResourceType: orgResourceType, ModuleSource: "/modules/my-s3",
+			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
 			ProviderMapping: map[string]string{
 				provType: provType + "." + provId,
 			},
@@ -252,12 +247,12 @@ func TestDefinitions(t *testing.T) {
 			assert.Equal(t, createdRes, *res.JSON200)
 		}
 	})
-
 	var updatedRes genclient.Module
 	t.Run("update definition with no description updates", func(t *testing.T) {
 		res, err := client.UpdateModuleWithResponse(t.Context(), orgId, "my-s3-module",
 			genclient.UpdateModuleJSONRequestBody{
-				ModuleInputs: &map[string]interface{}{"x": "y"},
+				ModuleInputs: &map[string]interface{}{"x": "y"}, SemanticVersion: ref.Ref("1.1.0"),
+				ArtifactDigest: ref.Ref(testModuleArtifactDigest),
 			})
 		if assert.NoError(t, err) && assert.Equal(t, http.StatusOK, res.StatusCode(), string(res.Body)) {
 			res.JSON200.VersionId = ""
@@ -288,6 +283,7 @@ func TestDefinitions(t *testing.T) {
 
 	t.Run("unknown resource-types update in definition dependencies and coprovisioned", func(t *testing.T) {
 		res, err := client.UpdateModuleWithResponse(t.Context(), orgId, "my-s3-module", genclient.UpdateModuleJSONRequestBody{
+			SemanticVersion: ref.Ref("1.1.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
 			Dependencies: &map[string]genclient.ModuleDependencyManifest{
 				"thing": {
 					Type:  "some-type",
@@ -313,6 +309,7 @@ func TestDefinitions(t *testing.T) {
 			assert.Equal(t, "the following types referenced by the module do not exist as builtin or custom types: [another-type some-type unknown]", res.JSON409.Message)
 		}
 	})
+	MustPromoteModuleVersion(t, client, orgId, s3ModuleId, "1.1.0")
 
 	t.Run("update definition with full updates", func(t *testing.T) {
 		{
@@ -325,6 +322,7 @@ func TestDefinitions(t *testing.T) {
 			require.Equal(t, http.StatusCreated, res.StatusCode(), string(res.Body))
 		}
 		res, err := client.UpdateModuleWithResponse(t.Context(), orgId, "my-s3-module", genclient.UpdateModuleJSONRequestBody{
+			SemanticVersion: ref.Ref("1.2.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
 			Dependencies: &map[string]genclient.ModuleDependencyManifest{
 				"thing": {
 					Type:   "some-type",
@@ -370,6 +368,7 @@ func TestDefinitions(t *testing.T) {
 			}, *res.JSON200)
 		}
 	})
+	MustPromoteModuleVersion(t, client, orgId, s3ModuleId, "1.2.0")
 
 	t.Run("get updated module", func(t *testing.T) {
 		res, err := client.GetModuleWithResponse(t.Context(), orgId, "my-s3-module")
@@ -379,7 +378,7 @@ func TestDefinitions(t *testing.T) {
 	})
 
 	t.Run("get updated module version", func(t *testing.T) {
-		res, err := client.GetModuleVersionWithResponse(t.Context(), orgId, "my-s3-module", uuid.MustParse(updatedRes.VersionId))
+		res, err := client.GetModuleVersionWithResponse(t.Context(), orgId, "my-s3-module", updatedRes.VersionId)
 		if assert.NoError(t, err) && assert.Equal(t, http.StatusOK, res.StatusCode(), string(res.Body)) {
 			assert.Equal(t, updatedRes.VersionId, res.JSON200.VersionId)
 			assert.Equal(t, updatedRes.UpdatedAt, res.JSON200.CreatedAt)
@@ -394,7 +393,8 @@ func TestDefinitions(t *testing.T) {
 	})
 
 	t.Run("updated module has multiple versions", func(t *testing.T) {
-		res, err := client.ListModuleVersionsWithResponse(t.Context(), orgId, "my-s3-module", &genclient.ListModuleVersionsParams{})
+		includeDeprecated := true
+		res, err := client.ListModuleVersionsWithResponse(t.Context(), orgId, "my-s3-module", &genclient.ListModuleVersionsParams{IncludeDeprecated: &includeDeprecated})
 		if assert.NoError(t, err) && assert.Equal(t, http.StatusOK, res.StatusCode(), string(res.Body)) {
 			if assert.Len(t, res.JSON200.Items, 3) {
 				assert.Equal(t, updatedRes.VersionId, res.JSON200.Items[0].VersionId)
@@ -416,10 +416,10 @@ func TestDefinitions(t *testing.T) {
 		}
 	})
 
-	t.Run("delete module", func(t *testing.T) {
+	t.Run("published module cannot be hard deleted", func(t *testing.T) {
 		res, err := client.DeleteModuleWithResponse(t.Context(), orgId, "my-s3-module")
 		if assert.NoError(t, err) {
-			assert.Equal(t, http.StatusNoContent, res.StatusCode(), string(res.Body))
+			assert.Equal(t, http.StatusConflict, res.StatusCode(), string(res.Body))
 		}
 	})
 
@@ -439,13 +439,18 @@ func TestDefinitions(t *testing.T) {
 	t.Run("create and update module def with dependencies", func(t *testing.T) {
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.ModuleCreateBody{
 			Id: "parent", ResourceType: "thing", ModuleSource: "acme/k8ss/generic@v1", Description: ref.Ref("parent def"),
+			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
+			OutputSchema: ref.Ref(genclient.ModuleOutputSchema{"type": "object", "properties": map[string]interface{}{}}),
 			Dependencies: map[string]genclient.ModuleDependencyManifest{"child": {Type: "thing", Class: ref.Ref("child")}},
 		})
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, res.StatusCode(), string(res.Body))
 		assert.Len(t, res.JSON201.Dependencies, 1)
+		MustPromoteModuleVersion(t, client, orgId, "parent", "1.0.0")
 
 		res2, err := client.UpdateModuleWithResponse(t.Context(), orgId, "parent", genclient.UpdateModuleJSONRequestBody{
+			SemanticVersion: ref.Ref("1.1.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
+			OutputSchema: ref.Ref(genclient.ModuleOutputSchema{"type": "object", "properties": map[string]interface{}{}}),
 			Dependencies: &map[string]genclient.ModuleDependencyManifest{"child": {Type: "thing", Class: ref.Ref("child"), Id: ref.Ref("child-id")}},
 		})
 		require.NoError(t, err)
@@ -456,13 +461,18 @@ func TestDefinitions(t *testing.T) {
 	t.Run("create and update module def with coprovisioned items", func(t *testing.T) {
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.ModuleCreateBody{
 			Id: "parent2", ResourceType: "thing", ModuleSource: "acme/k8ss/generic@v1", Description: ref.Ref("parent def"),
+			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
+			OutputSchema:  ref.Ref(genclient.ModuleOutputSchema{"type": "object", "properties": map[string]interface{}{}}),
 			Coprovisioned: []genclient.ModuleCoProvisionManifest{{Type: "thing", Class: ref.Ref("remote"), Id: ref.Ref("remote-id"), CopyDependentsFromCurrent: true, IsDependentOnCurrent: true, Params: map[string]interface{}{"param1": "value1"}}},
 		})
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, res.StatusCode(), string(res.Body))
 		assert.Equal(t, genclient.ModuleCoProvisionManifest{Type: "thing", Class: ref.Ref("remote"), Id: ref.Ref("remote-id"), CopyDependentsFromCurrent: true, IsDependentOnCurrent: true, Params: map[string]interface{}{"param1": "value1"}}, res.JSON201.Coprovisioned[0])
+		MustPromoteModuleVersion(t, client, orgId, "parent2", "1.0.0")
 
 		res2, err := client.UpdateModuleWithResponse(t.Context(), orgId, res.JSON201.Id, genclient.UpdateModuleJSONRequestBody{
+			SemanticVersion: ref.Ref("1.1.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
+			OutputSchema:  ref.Ref(genclient.ModuleOutputSchema{"type": "object", "properties": map[string]interface{}{}}),
 			Coprovisioned: &[]genclient.ModuleCoProvisionManifest{{Type: "thing", CopyDependentsFromCurrent: false, IsDependentOnCurrent: false}},
 		})
 		require.NoError(t, err)
@@ -473,7 +483,8 @@ func TestDefinitions(t *testing.T) {
 	t.Run("can create module with inline code", func(t *testing.T) {
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.ModuleCreateBody{
 			Id: "inline-eg", ResourceType: "thing",
-			ModuleSource: "inline",
+			ModuleSource: "inline", SemanticVersion: ref.Ref("1.0.0"),
+			OutputSchema: ref.Ref(genclient.ModuleOutputSchema{"type": "object", "properties": map[string]interface{}{}}),
 			ModuleSourceCode: ref.Ref(`
 output "foo" {
   value = "bar"
@@ -487,6 +498,7 @@ output "foo" {
   value = "bar"
 }
 `, *res.JSON201.ModuleSourceCode)
+		MustPromoteModuleVersion(t, client, orgId, res.JSON201.Id, "1.0.0")
 
 		t.Run("can get", func(t *testing.T) {
 			r, err := client.GetModuleWithResponse(t.Context(), orgId, res.JSON201.Id)
@@ -512,7 +524,8 @@ output "foo" {
 	t.Run("can't conflict params and inputs", func(t *testing.T) {
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.ModuleCreateBody{
 			Id: "conflict", ResourceType: "thing",
-			ModuleSource: "acme/k8ss/generic@v1",
+			ModuleSource: "acme/k8ss/generic@v1", SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
+			OutputSchema: ref.Ref(genclient.ModuleOutputSchema{"type": "object", "properties": map[string]interface{}{}}),
 			ModuleParams: map[string]genclient.ModuleParamItem{"x": {Type: "string"}},
 			ModuleInputs: map[string]interface{}{"x": "y"},
 		})
@@ -526,7 +539,8 @@ output "foo" {
 		t.Run(fmt.Sprintf("can create an inline module with %d chars", i), func(t *testing.T) {
 			res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.ModuleCreateBody{
 				Id: fmt.Sprintf("inline-%d", i), ResourceType: "thing",
-				ModuleSource:     "inline",
+				ModuleSource: "inline", SemanticVersion: ref.Ref("1.0.0"),
+				OutputSchema:     ref.Ref(genclient.ModuleOutputSchema{"type": "object", "properties": map[string]interface{}{}}),
 				ModuleSourceCode: ref.Ref(strings.Repeat(" ", i)),
 			})
 			require.NoError(t, err)
@@ -538,7 +552,8 @@ output "foo" {
 	t.Run("cannot create a module with a module source that is too long", func(t *testing.T) {
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.ModuleCreateBody{
 			Id: "inline-too-long", ResourceType: "thing",
-			ModuleSource:     "inline",
+			ModuleSource: "inline", SemanticVersion: ref.Ref("1.0.0"),
+			OutputSchema:     ref.Ref(genclient.ModuleOutputSchema{"type": "object", "properties": map[string]interface{}{}}),
 			ModuleSourceCode: ref.Ref(strings.Repeat(" ", 10_001)),
 		})
 		require.NoError(t, err)

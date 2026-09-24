@@ -5,7 +5,6 @@ info:
 paths: {}
 components:
   schemas:
-
     EventType:
       type: string
       enum:
@@ -21,7 +20,11 @@ components:
         - io.platform-orchestrator.environment.created
         - io.platform-orchestrator.environment.updated
         - io.platform-orchestrator.environment.deleted
-
+        - io.platform-orchestrator.module.version.published
+        - io.platform-orchestrator.module.version.lifecycle-changed
+        - io.platform-orchestrator.module.version.pin-lifecycle-changed
+        - io.platform-orchestrator.module.catalogue.changed
+        - io.platform-orchestrator.resource-type.catalogue.changed
     OrgId:
       type: string
     OrgUuid:
@@ -42,7 +45,6 @@ components:
     EnvTypeUuid:
       type: string
       format: uuid
-
     OrgLevelCommonData:
       required:
         - org_id
@@ -52,7 +54,6 @@ components:
           $ref: "#/components/schemas/OrgId"
         org_uuid:
           $ref: "#/components/schemas/OrgUuid"
-
     ProjectLevelCommonData:
       allOf:
         - $ref: "#/components/schemas/OrgLevelCommonData"
@@ -64,7 +65,6 @@ components:
               $ref: "#/components/schemas/ProjectId"
             project_uuid:
               $ref: "#/components/schemas/ProjectUuid"
-
     EnvLevelCommonData:
       allOf:
         - $ref: "#/components/schemas/ProjectLevelCommonData"
@@ -76,18 +76,15 @@ components:
               $ref: "#/components/schemas/EnvId"
             env_uuid:
               $ref: "#/components/schemas/EnvUuid"
-
     OrgChangedData:
       allOf:
         - $ref: "#/components/schemas/OrgLevelCommonData"
-
     ProjectChangedData:
       allOf:
         - $ref: "#/components/schemas/ProjectLevelCommonData"
         - properties:
             status:
               type: string
-
     EnvTypeChangedData:
       allOf:
         - $ref: "#/components/schemas/OrgLevelCommonData"
@@ -99,7 +96,6 @@ components:
               $ref: "#/components/schemas/EnvTypeId"
             env_type_uuid:
               $ref: "#/components/schemas/EnvTypeUuid"
-
     EnvChangedData:
       allOf:
         - $ref: "#/components/schemas/EnvLevelCommonData"

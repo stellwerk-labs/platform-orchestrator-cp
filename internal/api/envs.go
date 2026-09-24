@@ -17,10 +17,11 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/events"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/logging"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/opt"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/genevents"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genevents"
 )
 
 const (
@@ -84,6 +85,7 @@ func envFromDbModel(e *model.Environment) Environment {
 		RunnerId:      e.RunnerId.Ref(),
 		Status:        EnvironmentStatus(e.Status),
 		StatusMessage: e.StatusMessage.Ref(),
+		Labels:        e.Labels,
 	}
 }
 
@@ -166,6 +168,7 @@ func (s *Server) ListEnvironmentsInOrg(ctx context.Context, request ListEnvironm
 func (s *Server) createEnvAndMessageInDatabase(
 	ctx context.Context, tx model.Tx, proj *model.Project, envType *model.EnvType,
 	envId, displayName string,
+	labels map[string]string,
 ) (*model.Environment, []*hstandardoutbox.PendingEventMessage, error) {
 
 	timeNow := time.Now().UTC()
@@ -175,7 +178,7 @@ func (s *Server) createEnvAndMessageInDatabase(
 		ProjectId: proj.Id, ProjectUuid: proj.Uuid,
 		EnvTypeId: envType.Id, EnvTypeUuid: envType.Uuid,
 		Id: envId, DisplayName: displayName, CreatedAt: timeNow, UpdatedAt: timeNow,
-		Status: model.EnvironmentStatusActive,
+		Status: model.EnvironmentStatusActive, Labels: labels,
 	})
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to create environment")
@@ -204,12 +207,27 @@ func DeleteEnvironmentAndCreateMessage(
 	if err != nil {
 		return nil, nil, err
 	}
+	pins, err := db.ListEnvironmentModuleVersionPins(ctx, tx, orgId, &env.Uuid, nil, false)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to inspect Environment Pins before deletion")
+	}
+	for _, pin := range pins {
+		if pin.Status == moduleversions.PinOverridePending {
+			return nil, nil, model.NewErrConflict(fmt.Sprintf(
+				"environment deletion is blocked by override-pending Pin %s owned by operation %s",
+				pin.ID, pin.OverrideOperationID,
+			))
+		}
+	}
 
-	// Unless we use force mode: only continue when status is: active or delete_failed
+	// Repeating an asynchronous delete is intentionally idempotent. Re-emitting
+	// the event lets the Data Plane reconcile a completed destroy after a
+	// transient worker failure or exhausted message delivery.
 	if !opts.Force {
 		switch env.Status {
 		case model.EnvironmentStatusActive:
 		case model.EnvironmentStatusDeleteFailed:
+		case model.EnvironmentStatusDeleting:
 		default:
 			return nil, nil, model.NewErrConflict(fmt.Sprintf("cannot delete environment in status '%s'", env.Status))
 		}
@@ -281,7 +299,7 @@ func (s *Server) CreateEnvironment(ctx context.Context, request CreateEnvironmen
 			return nil, errors.Wrap(err, "failed to get environment type")
 		}
 
-		env, messages, err := s.createEnvAndMessageInDatabase(ctx, tx, proj, et, request.Body.Id, ref.DerefOr(request.Body.DisplayName, request.Body.Id))
+		env, messages, err := s.createEnvAndMessageInDatabase(ctx, tx, proj, et, request.Body.Id, ref.DerefOr(request.Body.DisplayName, request.Body.Id), request.Body.Labels)
 		if err != nil {
 			if me, ok := model.IsErrConflict(err); ok {
 				return CreateEnvironment409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(me)}, nil
@@ -324,6 +342,7 @@ func (s *Server) UpdateEnvironment(ctx context.Context, request UpdateEnvironmen
 
 	out, err := s.Database.UpdateEnvironment(ctx, nil, request.OrgId, request.ProjectId, request.EnvId, &model.EnvironmentPatch{
 		DisplayName: opt.Of(request.Body.DisplayName),
+		Labels:      request.Body.Labels,
 		UpdatedAt:   time.Now().UTC(),
 	})
 	if err != nil {
@@ -401,6 +420,53 @@ func (s *Server) DeleteEnvironment(ctx context.Context, request DeleteEnvironmen
 	return DeleteEnvironment202JSONResponse(envFromDbModel(env)), nil
 }
 
+func (s *Server) GetEnvironmentDeletionImpact(ctx context.Context, request GetEnvironmentDeletionImpactRequestObject) (GetEnvironmentDeletionImpactResponseObject, error) {
+	uid, err := GetAuthenticatedUserIdOr401(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.checkProjectAuthorization(ctx, uid, request.OrgId, request.ProjectId, PermissionEnvironmentWrite); err != nil {
+		return nil, err
+	}
+	environment, err := s.Database.GetEnvironment(ctx, nil, request.OrgId, request.ProjectId, request.EnvId, model.GetModeDefault)
+	if err != nil {
+		if notFound, ok := model.IsErrNotFound(err); ok {
+			return GetEnvironmentDeletionImpact404JSONResponse{N404NotFoundJSONResponse: Generate404FromModelErr(notFound)}, nil
+		}
+		return nil, err
+	}
+	pins, err := s.Database.ListEnvironmentModuleVersionPins(ctx, nil, request.OrgId, &environment.Uuid, nil, false)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to inspect Environment Pins")
+	}
+	contributions, err := s.Database.ListModuleExtensionContributionsForEnvironment(ctx, nil, request.OrgId, environment.Uuid, true, false)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to inspect Environment add-on resources")
+	}
+
+	response := EnvironmentDeletionImpact{
+		EnvironmentUuid:  environment.Uuid,
+		Blockers:         make([]string, 0),
+		Pins:             make([]EnvironmentModuleVersionPin, 0, len(pins)),
+		RelatedResources: make([]ModuleExtensionContribution, 0, len(contributions)),
+	}
+	for _, pin := range pins {
+		response.Pins = append(response.Pins, modulePinToAPI(pin))
+		if pin.Status == moduleversions.PinOverridePending {
+			response.Blockers = append(response.Blockers, fmt.Sprintf(
+				"Pin %s is owned by operation %s", pin.ID, pin.OverrideOperationID,
+			))
+		}
+	}
+	for _, contribution := range contributions {
+		if contribution.Kind == "related_resource" {
+			response.RelatedResources = append(response.RelatedResources, moduleExtensionContributionToAPI(contribution))
+		}
+	}
+	response.Blocked = len(response.Blockers) > 0
+	return GetEnvironmentDeletionImpact200JSONResponse(response), nil
+}
+
 func (s *Server) InternalForceDeleteEnvironment(ctx context.Context, request InternalForceDeleteEnvironmentRequestObject) (InternalForceDeleteEnvironmentResponseObject, error) {
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
@@ -430,7 +496,12 @@ func (s *Server) InternalForceDeleteEnvironment(ctx context.Context, request Int
 		}
 		return nil, err
 	}
-
+	if _, err := s.Database.RemoveEnvironmentModuleVersionPinsForDeletion(ctx, tx, request.OrgId, env.Uuid, uid, "system"); err != nil {
+		if conflict, ok := model.IsErrConflict(err); ok {
+			return InternalForceDeleteEnvironment409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(conflict)}, nil
+		}
+		return nil, errors.Wrap(err, "failed to remove Environment Pins during deletion")
+	}
 	if request.Params.DeleteRules != nil && *request.Params.DeleteRules {
 		if deletedRuleIds, err := s.Database.BulkDeleteModuleRuleDefinitions(ctx, tx, request.OrgId, model.DeleteModuleRulesParams{
 			ByProjectId: &request.ProjectId,
@@ -446,9 +517,10 @@ func (s *Server) InternalForceDeleteEnvironment(ctx context.Context, request Int
 		return nil, err
 	}
 
+	deletedAt := time.Now().UTC()
 	messages, err := s.Database.InsertPendingEventMessages(ctx, tx, events.AsMessages(events.CloudEvent[any]{
 		Type: genevents.IoPlatformOrchestratorEnvironmentDeleted,
-		Time: time.Now().UTC(),
+		Time: deletedAt,
 		Data: envEventFromDbModel(env),
 	}))
 	if err != nil {

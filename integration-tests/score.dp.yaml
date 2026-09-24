@@ -27,8 +27,8 @@ containers:
     variables:
       NATS_URL: ${resources.nats.url}
       NATS_TOKEN: ${resources.nats.token}
-      RUNNER_NATS_URL: ${resources.nats.url}
-      RUNNER_NATS_TOKEN: ${resources.nats.token}
+      RUNNER_GATEWAY_URL: http://runner-gateway:8080/runner-gateway
+      RUNNER_GATEWAY_INTERNAL_URL: http://runner-gateway:8080/runner-gateway
       RUNNER_TOKEN_SALT: ${resources.env.RUNNER_TOKEN_SALT}
       DD_AGENT_HOST: $${pod.status.hostIP}
       DD_ENABLE: ${resources.env.DATADOG_ENABLED}
@@ -47,8 +47,6 @@ containers:
       IAM_URL: http://${resources.platform-orchestrator-iam.name}:8080
       VAULT_URL: ${resources.env.VAULT_URL}
       VAULT_AUTH: kubernetes:platform-orchestrator-dp
-      SERVER_BASE_URL: ${resources.env.SERVER_BASE_URL}
-      INTERNAL_DATAPLANE_HOSTNAME: ${resources.env.INTERNAL_DATAPLANE_HOSTNAME}
 
 resources:
   env:

@@ -11,7 +11,7 @@ import (
 	"github.com/stellwerk-labs/golib/hecho"
 	"github.com/stellwerk-labs/golib/herrors"
 	"github.com/stellwerk-labs/golib/hmessaging"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/genevents"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genevents"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/assert"

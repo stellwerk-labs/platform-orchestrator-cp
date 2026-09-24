@@ -10,13 +10,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/genclient"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genclient"
 )
 
 func TestAvailableResourceTypesCrud(t *testing.T) {
 	client := MustServerClient(t)
 	internalClient := MustInternalServerClient(t)
 	orgId := MustCreateOrg(t, internalClient).Id
+	database := lifecycleSQLDatabase(t)
+	const myTypeModuleId = "my-type-definition"
 	_ = MustCreateRunnerWithRule(t, client, orgId, "", "", "runner-"+strings.ToLower(rand.Text()))
 
 	{
@@ -159,9 +161,27 @@ func TestAvailableResourceTypesCrud(t *testing.T) {
 		require.Equal(t, http.StatusCreated, res.StatusCode())
 	}
 	defer func() {
+		// Published history correctly prevents API deletion of the built-in.
+		// Remove only this isolated test's binding and history, including on a
+		// failed assertion, before cleaning up the global fixture through the API.
+		tx, err := database.BeginTx(t.Context(), nil)
+		require.NoError(t, err)
+		defer func() { _ = tx.Rollback() }()
+		for _, statement := range []string{
+			`DELETE FROM module_version_lifecycle_events e USING definitions d
+			 WHERE e.module_uuid = d.uuid AND d.org_id = $1 AND d.id = $2`,
+			`DELETE FROM module_catalogue_events e USING definitions d
+			 WHERE e.module_uuid = d.uuid AND d.org_id = $1 AND d.id = $2`,
+			`DELETE FROM definition_versions WHERE org_id = $1 AND definition_id = $2`,
+			`DELETE FROM definitions WHERE org_id = $1 AND id = $2`,
+		} {
+			_, err = tx.ExecContext(t.Context(), statement, orgId, myTypeModuleId)
+			require.NoError(t, err)
+		}
+		require.NoError(t, tx.Commit())
 		res, err := internalClient.InternalDeleteResourceTypeWithResponse(t.Context(), "my-type")
 		require.NoError(t, err)
-		require.Equal(t, http.StatusNoContent, res.StatusCode())
+		require.Equal(t, http.StatusNoContent, res.StatusCode(), string(res.Body))
 	}()
 
 	const provType = "aws"
@@ -180,9 +200,15 @@ func TestAvailableResourceTypesCrud(t *testing.T) {
 	const k8sClusterModuleId = "my-k8s-cluster-definition"
 	{
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.CreateModuleJSONRequestBody{
-			Id:           k8sClusterModuleId,
-			ResourceType: "k8s-cluster",
-			ModuleSource: "/modules/my-module",
+			Id:              k8sClusterModuleId,
+			ResourceType:    "k8s-cluster",
+			ModuleSource:    "/modules/my-module",
+			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
+			OutputSchema: ref.Ref(genclient.ModuleOutputSchema{
+				"type": "object", "properties": map[string]interface{}{
+					"cluster_name": map[string]interface{}{"type": "string"},
+				},
+			}),
 			ProviderMapping: map[string]string{
 				provType: provType + "." + provId,
 			},
@@ -197,13 +223,20 @@ func TestAvailableResourceTypesCrud(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, res.StatusCode())
 	}
+	MustPromoteModuleVersion(t, client, orgId, k8sClusterModuleId, "1.0.0")
 
 	const s3ModuleId = "my-s3-definition"
 	{
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.CreateModuleJSONRequestBody{
-			Id:           s3ModuleId,
-			ResourceType: "s3",
-			ModuleSource: "/modules/my-s3",
+			Id:              s3ModuleId,
+			ResourceType:    "s3",
+			ModuleSource:    "/modules/my-s3",
+			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
+			OutputSchema: ref.Ref(genclient.ModuleOutputSchema{
+				"type": "object", "properties": map[string]interface{}{
+					"name": map[string]interface{}{"type": "string"},
+				},
+			}),
 			ProviderMapping: map[string]string{
 				provType: provType + "." + provId,
 			},
@@ -211,13 +244,20 @@ func TestAvailableResourceTypesCrud(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, res.StatusCode())
 	}
+	MustPromoteModuleVersion(t, client, orgId, s3ModuleId, "1.0.0")
 
 	const anotherS3ModuleId = "my-another-s3-definition"
 	{
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.CreateModuleJSONRequestBody{
-			Id:           anotherS3ModuleId,
-			ResourceType: "s3",
-			ModuleSource: "/modules/another-my-s3",
+			Id:              anotherS3ModuleId,
+			ResourceType:    "s3",
+			ModuleSource:    "/modules/another-my-s3",
+			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
+			OutputSchema: ref.Ref(genclient.ModuleOutputSchema{
+				"type": "object", "properties": map[string]interface{}{
+					"name": map[string]interface{}{"type": "string"},
+				},
+			}),
 			ProviderMapping: map[string]string{
 				provType: provType + "." + provId,
 			},
@@ -225,13 +265,20 @@ func TestAvailableResourceTypesCrud(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, res.StatusCode())
 	}
+	MustPromoteModuleVersion(t, client, orgId, anotherS3ModuleId, "1.0.0")
 
 	const postgresModuleId = "my-postgres-definition"
 	{
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.CreateModuleJSONRequestBody{
-			Id:           postgresModuleId,
-			ResourceType: "postgres",
-			ModuleSource: "/modules/my-postgres",
+			Id:              postgresModuleId,
+			ResourceType:    "postgres",
+			ModuleSource:    "/modules/my-postgres",
+			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
+			OutputSchema: ref.Ref(genclient.ModuleOutputSchema{
+				"type": "object", "properties": map[string]interface{}{
+					"db_name": map[string]interface{}{"type": "string"},
+				},
+			}),
 			ProviderMapping: map[string]string{
 				provType: provType + "." + provId,
 			},
@@ -239,13 +286,19 @@ func TestAvailableResourceTypesCrud(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, res.StatusCode())
 	}
+	MustPromoteModuleVersion(t, client, orgId, postgresModuleId, "1.0.0")
 
-	const myTypeModuleId = "my-type-definition"
 	{
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId, genclient.CreateModuleJSONRequestBody{
-			Id:           myTypeModuleId,
-			ResourceType: "my-type",
-			ModuleSource: "/modules/my-type",
+			Id:              myTypeModuleId,
+			ResourceType:    "my-type",
+			ModuleSource:    "/modules/my-type",
+			SemanticVersion: ref.Ref("1.0.0"), ArtifactDigest: ref.Ref(testModuleArtifactDigest),
+			OutputSchema: ref.Ref(genclient.ModuleOutputSchema{
+				"type": "object", "properties": map[string]interface{}{
+					"property": map[string]interface{}{"type": "string"},
+				},
+			}),
 			ProviderMapping: map[string]string{
 				provType: provType + "." + provId,
 			},
@@ -253,6 +306,13 @@ func TestAvailableResourceTypesCrud(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, res.StatusCode())
 	}
+	MustPromoteModuleVersion(t, client, orgId, myTypeModuleId, "1.0.0")
+
+	t.Run("cannot delete a built-in type with published module history", func(t *testing.T) {
+		res, err := internalClient.InternalDeleteResourceTypeWithResponse(t.Context(), "my-type")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusConflict, res.StatusCode(), string(res.Body))
+	})
 
 	var defaultK8sClusterRuleId string
 	{

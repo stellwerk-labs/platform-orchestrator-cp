@@ -28,6 +28,27 @@ const (
 	UserIdHeaderScopes = "userIdHeader.Scopes"
 )
 
+// Defines values for CoreModuleVersionMigrationGeneration.
+const (
+	CoreModuleVersionMigrationGenerationManaged CoreModuleVersionMigrationGeneration = "managed"
+	CoreModuleVersionMigrationGenerationV0      CoreModuleVersionMigrationGeneration = "v0"
+	CoreModuleVersionMigrationGenerationV1      CoreModuleVersionMigrationGeneration = "v1"
+)
+
+// Valid indicates whether the value is a known member of the CoreModuleVersionMigrationGeneration enum.
+func (e CoreModuleVersionMigrationGeneration) Valid() bool {
+	switch e {
+	case CoreModuleVersionMigrationGenerationManaged:
+		return true
+	case CoreModuleVersionMigrationGenerationV0:
+		return true
+	case CoreModuleVersionMigrationGenerationV1:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for EnvironmentStatus.
 const (
 	EnvironmentStatusActive       EnvironmentStatus = "active"
@@ -43,6 +64,27 @@ func (e EnvironmentStatus) Valid() bool {
 	case EnvironmentStatusDeleteFailed:
 		return true
 	case EnvironmentStatusDeleting:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for InternalModuleCatalogueModuleMigrationGeneration.
+const (
+	InternalModuleCatalogueModuleMigrationGenerationManaged InternalModuleCatalogueModuleMigrationGeneration = "managed"
+	InternalModuleCatalogueModuleMigrationGenerationV0      InternalModuleCatalogueModuleMigrationGeneration = "v0"
+	InternalModuleCatalogueModuleMigrationGenerationV1      InternalModuleCatalogueModuleMigrationGeneration = "v1"
+)
+
+// Valid indicates whether the value is a known member of the InternalModuleCatalogueModuleMigrationGeneration enum.
+func (e InternalModuleCatalogueModuleMigrationGeneration) Valid() bool {
+	switch e {
+	case InternalModuleCatalogueModuleMigrationGenerationManaged:
+		return true
+	case InternalModuleCatalogueModuleMigrationGenerationV0:
+		return true
+	case InternalModuleCatalogueModuleMigrationGenerationV1:
 		return true
 	default:
 		return false
@@ -91,6 +133,102 @@ func (e InternalOrganizationStatus) Valid() bool {
 	}
 }
 
+// Defines values for ModuleCatalogueStatus.
+const (
+	ModuleCatalogueStatusActive   ModuleCatalogueStatus = "active"
+	ModuleCatalogueStatusArchived ModuleCatalogueStatus = "archived"
+)
+
+// Valid indicates whether the value is a known member of the ModuleCatalogueStatus enum.
+func (e ModuleCatalogueStatus) Valid() bool {
+	switch e {
+	case ModuleCatalogueStatusActive:
+		return true
+	case ModuleCatalogueStatusArchived:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ModuleExtensionContributionKind.
+const (
+	ModuleExtensionContributionKindContextualAction ModuleExtensionContributionKind = "contextual_action"
+	ModuleExtensionContributionKindRelatedResource  ModuleExtensionContributionKind = "related_resource"
+)
+
+// Valid indicates whether the value is a known member of the ModuleExtensionContributionKind enum.
+func (e ModuleExtensionContributionKind) Valid() bool {
+	switch e {
+	case ModuleExtensionContributionKindContextualAction:
+		return true
+	case ModuleExtensionContributionKindRelatedResource:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ModuleExtensionContributionLifecycleState.
+const (
+	ModuleExtensionContributionLifecycleStateActive   ModuleExtensionContributionLifecycleState = "active"
+	ModuleExtensionContributionLifecycleStateDraft    ModuleExtensionContributionLifecycleState = "draft"
+	ModuleExtensionContributionLifecycleStateTerminal ModuleExtensionContributionLifecycleState = "terminal"
+)
+
+// Valid indicates whether the value is a known member of the ModuleExtensionContributionLifecycleState enum.
+func (e ModuleExtensionContributionLifecycleState) Valid() bool {
+	switch e {
+	case ModuleExtensionContributionLifecycleStateActive:
+		return true
+	case ModuleExtensionContributionLifecycleStateDraft:
+		return true
+	case ModuleExtensionContributionLifecycleStateTerminal:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ModuleExtensionContributionUpsertBodyKind.
+const (
+	ModuleExtensionContributionUpsertBodyKindContextualAction ModuleExtensionContributionUpsertBodyKind = "contextual_action"
+	ModuleExtensionContributionUpsertBodyKindRelatedResource  ModuleExtensionContributionUpsertBodyKind = "related_resource"
+)
+
+// Valid indicates whether the value is a known member of the ModuleExtensionContributionUpsertBodyKind enum.
+func (e ModuleExtensionContributionUpsertBodyKind) Valid() bool {
+	switch e {
+	case ModuleExtensionContributionUpsertBodyKindContextualAction:
+		return true
+	case ModuleExtensionContributionUpsertBodyKindRelatedResource:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ModuleExtensionContributionUpsertBodyLifecycleState.
+const (
+	ModuleExtensionContributionUpsertBodyLifecycleStateActive   ModuleExtensionContributionUpsertBodyLifecycleState = "active"
+	ModuleExtensionContributionUpsertBodyLifecycleStateDraft    ModuleExtensionContributionUpsertBodyLifecycleState = "draft"
+	ModuleExtensionContributionUpsertBodyLifecycleStateTerminal ModuleExtensionContributionUpsertBodyLifecycleState = "terminal"
+)
+
+// Valid indicates whether the value is a known member of the ModuleExtensionContributionUpsertBodyLifecycleState enum.
+func (e ModuleExtensionContributionUpsertBodyLifecycleState) Valid() bool {
+	switch e {
+	case ModuleExtensionContributionUpsertBodyLifecycleStateActive:
+		return true
+	case ModuleExtensionContributionUpsertBodyLifecycleStateDraft:
+		return true
+	case ModuleExtensionContributionUpsertBodyLifecycleStateTerminal:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ModuleParamItemType.
 const (
 	Any    ModuleParamItemType = "any"
@@ -121,6 +259,135 @@ func (e ModuleParamItemType) Valid() bool {
 	}
 }
 
+// Defines values for ModuleVerificationStatus.
+const (
+	ModuleVerificationStatusUnverified ModuleVerificationStatus = "unverified"
+)
+
+// Valid indicates whether the value is a known member of the ModuleVerificationStatus enum.
+func (e ModuleVerificationStatus) Valid() bool {
+	switch e {
+	case ModuleVerificationStatusUnverified:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ModuleVersionLifecycleTransactionItemAction.
+const (
+	ModuleVersionLifecycleTransactionItemActionDeprecate     ModuleVersionLifecycleTransactionItemAction = "deprecate"
+	ModuleVersionLifecycleTransactionItemActionMarkDefective ModuleVersionLifecycleTransactionItemAction = "mark-defective"
+	ModuleVersionLifecycleTransactionItemActionPromote       ModuleVersionLifecycleTransactionItemAction = "promote"
+	ModuleVersionLifecycleTransactionItemActionRestore       ModuleVersionLifecycleTransactionItemAction = "restore"
+)
+
+// Valid indicates whether the value is a known member of the ModuleVersionLifecycleTransactionItemAction enum.
+func (e ModuleVersionLifecycleTransactionItemAction) Valid() bool {
+	switch e {
+	case ModuleVersionLifecycleTransactionItemActionDeprecate:
+		return true
+	case ModuleVersionLifecycleTransactionItemActionMarkDefective:
+		return true
+	case ModuleVersionLifecycleTransactionItemActionPromote:
+		return true
+	case ModuleVersionLifecycleTransactionItemActionRestore:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ModuleVersionPinBulkAction.
+const (
+	ModuleVersionPinBulkActionDiscard ModuleVersionPinBulkAction = "discard"
+	ModuleVersionPinBulkActionPin     ModuleVersionPinBulkAction = "pin"
+	ModuleVersionPinBulkActionUnpin   ModuleVersionPinBulkAction = "unpin"
+)
+
+// Valid indicates whether the value is a known member of the ModuleVersionPinBulkAction enum.
+func (e ModuleVersionPinBulkAction) Valid() bool {
+	switch e {
+	case ModuleVersionPinBulkActionDiscard:
+		return true
+	case ModuleVersionPinBulkActionPin:
+		return true
+	case ModuleVersionPinBulkActionUnpin:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ModuleVersionPinOverrideReconcileBodyOutcome.
+const (
+	ModuleVersionPinOverrideReconcileBodyOutcomeCancelled ModuleVersionPinOverrideReconcileBodyOutcome = "cancelled"
+	ModuleVersionPinOverrideReconcileBodyOutcomeFailed    ModuleVersionPinOverrideReconcileBodyOutcome = "failed"
+	ModuleVersionPinOverrideReconcileBodyOutcomeSucceeded ModuleVersionPinOverrideReconcileBodyOutcome = "succeeded"
+)
+
+// Valid indicates whether the value is a known member of the ModuleVersionPinOverrideReconcileBodyOutcome enum.
+func (e ModuleVersionPinOverrideReconcileBodyOutcome) Valid() bool {
+	switch e {
+	case ModuleVersionPinOverrideReconcileBodyOutcomeCancelled:
+		return true
+	case ModuleVersionPinOverrideReconcileBodyOutcomeFailed:
+		return true
+	case ModuleVersionPinOverrideReconcileBodyOutcomeSucceeded:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ModuleVersionPinStatus.
+const (
+	ModuleVersionPinStatusActive          ModuleVersionPinStatus = "active"
+	ModuleVersionPinStatusOverridden      ModuleVersionPinStatus = "overridden"
+	ModuleVersionPinStatusOverridePending ModuleVersionPinStatus = "override_pending"
+	ModuleVersionPinStatusRemoved         ModuleVersionPinStatus = "removed"
+)
+
+// Valid indicates whether the value is a known member of the ModuleVersionPinStatus enum.
+func (e ModuleVersionPinStatus) Valid() bool {
+	switch e {
+	case ModuleVersionPinStatusActive:
+		return true
+	case ModuleVersionPinStatusOverridden:
+		return true
+	case ModuleVersionPinStatusOverridePending:
+		return true
+	case ModuleVersionPinStatusRemoved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ModuleVersionSemanticStatus.
+const (
+	ModuleVersionSemanticStatusDefault    ModuleVersionSemanticStatus = "default"
+	ModuleVersionSemanticStatusDefective  ModuleVersionSemanticStatus = "defective"
+	ModuleVersionSemanticStatusDeprecated ModuleVersionSemanticStatus = "deprecated"
+	ModuleVersionSemanticStatusProposed   ModuleVersionSemanticStatus = "proposed"
+)
+
+// Valid indicates whether the value is a known member of the ModuleVersionSemanticStatus enum.
+func (e ModuleVersionSemanticStatus) Valid() bool {
+	switch e {
+	case ModuleVersionSemanticStatusDefault:
+		return true
+	case ModuleVersionSemanticStatusDefective:
+		return true
+	case ModuleVersionSemanticStatusDeprecated:
+		return true
+	case ModuleVersionSemanticStatusProposed:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OrganizationStatus.
 const (
 	OrganizationStatusActive       OrganizationStatus = "active"
@@ -145,6 +412,36 @@ func (e OrganizationStatus) Valid() bool {
 	}
 }
 
+// Defines values for PluginAvailabilityState.
+const (
+	PluginAvailabilityStateAvailable    PluginAvailabilityState = "available"
+	PluginAvailabilityStateIncompatible PluginAvailabilityState = "incompatible"
+	PluginAvailabilityStateNotEnabled   PluginAvailabilityState = "not_enabled"
+	PluginAvailabilityStateNotEntitled  PluginAvailabilityState = "not_entitled"
+	PluginAvailabilityStateNotInstalled PluginAvailabilityState = "not_installed"
+	PluginAvailabilityStateUnavailable  PluginAvailabilityState = "unavailable"
+)
+
+// Valid indicates whether the value is a known member of the PluginAvailabilityState enum.
+func (e PluginAvailabilityState) Valid() bool {
+	switch e {
+	case PluginAvailabilityStateAvailable:
+		return true
+	case PluginAvailabilityStateIncompatible:
+		return true
+	case PluginAvailabilityStateNotEnabled:
+		return true
+	case PluginAvailabilityStateNotEntitled:
+		return true
+	case PluginAvailabilityStateNotInstalled:
+		return true
+	case PluginAvailabilityStateUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ProjectStatus.
 const (
 	ProjectStatusActive   ProjectStatus = "active"
@@ -157,6 +454,24 @@ func (e ProjectStatus) Valid() bool {
 	case ProjectStatusActive:
 		return true
 	case ProjectStatusDeleting:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ResourceTypeCatalogueStatus.
+const (
+	ResourceTypeCatalogueStatusActive   ResourceTypeCatalogueStatus = "active"
+	ResourceTypeCatalogueStatusArchived ResourceTypeCatalogueStatus = "archived"
+)
+
+// Valid indicates whether the value is a known member of the ResourceTypeCatalogueStatus enum.
+func (e ResourceTypeCatalogueStatus) Valid() bool {
+	switch e {
+	case ResourceTypeCatalogueStatusActive:
+		return true
+	case ResourceTypeCatalogueStatusArchived:
 		return true
 	default:
 		return false
@@ -208,6 +523,84 @@ func (e StateStorageType) Valid() bool {
 	case StateStorageTypeKubernetes:
 		return true
 	case StateStorageTypeS3:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TransitionEnvironmentModuleVersionPinParamsPinAction.
+const (
+	TransitionEnvironmentModuleVersionPinParamsPinActionDiscard TransitionEnvironmentModuleVersionPinParamsPinAction = "discard"
+	TransitionEnvironmentModuleVersionPinParamsPinActionUnpin   TransitionEnvironmentModuleVersionPinParamsPinAction = "unpin"
+)
+
+// Valid indicates whether the value is a known member of the TransitionEnvironmentModuleVersionPinParamsPinAction enum.
+func (e TransitionEnvironmentModuleVersionPinParamsPinAction) Valid() bool {
+	switch e {
+	case TransitionEnvironmentModuleVersionPinParamsPinActionDiscard:
+		return true
+	case TransitionEnvironmentModuleVersionPinParamsPinActionUnpin:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ChangeModuleCatalogueStatusParamsCatalogueAction.
+const (
+	ChangeModuleCatalogueStatusParamsCatalogueActionArchive   ChangeModuleCatalogueStatusParamsCatalogueAction = "archive"
+	ChangeModuleCatalogueStatusParamsCatalogueActionUnarchive ChangeModuleCatalogueStatusParamsCatalogueAction = "unarchive"
+)
+
+// Valid indicates whether the value is a known member of the ChangeModuleCatalogueStatusParamsCatalogueAction enum.
+func (e ChangeModuleCatalogueStatusParamsCatalogueAction) Valid() bool {
+	switch e {
+	case ChangeModuleCatalogueStatusParamsCatalogueActionArchive:
+		return true
+	case ChangeModuleCatalogueStatusParamsCatalogueActionUnarchive:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TransitionModuleVersionParamsLifecycleAction.
+const (
+	TransitionModuleVersionParamsLifecycleActionDeprecate     TransitionModuleVersionParamsLifecycleAction = "deprecate"
+	TransitionModuleVersionParamsLifecycleActionMarkDefective TransitionModuleVersionParamsLifecycleAction = "mark-defective"
+	TransitionModuleVersionParamsLifecycleActionPromote       TransitionModuleVersionParamsLifecycleAction = "promote"
+	TransitionModuleVersionParamsLifecycleActionRestore       TransitionModuleVersionParamsLifecycleAction = "restore"
+)
+
+// Valid indicates whether the value is a known member of the TransitionModuleVersionParamsLifecycleAction enum.
+func (e TransitionModuleVersionParamsLifecycleAction) Valid() bool {
+	switch e {
+	case TransitionModuleVersionParamsLifecycleActionDeprecate:
+		return true
+	case TransitionModuleVersionParamsLifecycleActionMarkDefective:
+		return true
+	case TransitionModuleVersionParamsLifecycleActionPromote:
+		return true
+	case TransitionModuleVersionParamsLifecycleActionRestore:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ChangeResourceTypeCatalogueStatusParamsCatalogueAction.
+const (
+	ChangeResourceTypeCatalogueStatusParamsCatalogueActionArchive   ChangeResourceTypeCatalogueStatusParamsCatalogueAction = "archive"
+	ChangeResourceTypeCatalogueStatusParamsCatalogueActionUnarchive ChangeResourceTypeCatalogueStatusParamsCatalogueAction = "unarchive"
+)
+
+// Valid indicates whether the value is a known member of the ChangeResourceTypeCatalogueStatusParamsCatalogueAction enum.
+func (e ChangeResourceTypeCatalogueStatusParamsCatalogueAction) Valid() bool {
+	switch e {
+	case ChangeResourceTypeCatalogueStatusParamsCatalogueActionArchive:
+		return true
+	case ChangeResourceTypeCatalogueStatusParamsCatalogueActionUnarchive:
 		return true
 	default:
 		return false
@@ -298,6 +691,81 @@ type ConfigurationSecret struct {
 	Version int `json:"version"`
 }
 
+// CoreModuleVersion defines model for CoreModuleVersion.
+type CoreModuleVersion struct {
+	ArtifactDigest      string                               `json:"artifact_digest"`
+	CreatedAt           time.Time                            `json:"created_at"`
+	LifecycleStatus     ModuleVersionSemanticStatus          `json:"lifecycle_status"`
+	MigrationGeneration CoreModuleVersionMigrationGeneration `json:"migration_generation"`
+	ModuleSlug          string                               `json:"module_slug"`
+	ModuleUuid          openapi_types.UUID                   `json:"module_uuid"`
+	OpaqueVersionId     string                               `json:"opaque_version_id"`
+	OrgId               string                               `json:"org_id"`
+	PublishedBy         *openapi_types.UUID                  `json:"published_by,omitempty"`
+	ReleaseNotes        *string                              `json:"release_notes,omitempty"`
+	ResourceVersion     int64                                `json:"resource_version"`
+	SemanticVersion     *string                              `json:"semantic_version,omitempty"`
+	SourceRevision      string                               `json:"source_revision"`
+	Uuid                openapi_types.UUID                   `json:"uuid"`
+	VerificationStatus  ModuleVerificationStatus             `json:"verification_status"`
+}
+
+// CoreModuleVersionMigrationGeneration defines model for CoreModuleVersion.MigrationGeneration.
+type CoreModuleVersionMigrationGeneration string
+
+// CoreModuleVersionDetail defines model for CoreModuleVersionDetail.
+type CoreModuleVersionDetail struct {
+	// Coprovisioned A set of resources to provision after or in parallel with the resource of the current module.
+	Coprovisioned []ModuleCoProvisionManifest `json:"coprovisioned"`
+
+	// CreatedAt The date and time when the module version was created.
+	CreatedAt time.Time `json:"created_at"`
+
+	// Definition Configuration for an OpenTofu provider that will be used in modules
+	Definition ModuleVersion `json:"definition"`
+
+	// Dependencies A mapping of alias to resource dependencies that must be provisioned with this module
+	Dependencies map[string]ModuleDependencyManifest `json:"dependencies"`
+
+	// Description An optional text description for this module
+	Description *string `json:"description,omitempty"`
+
+	// ModuleInputs The fixed inputs to this module. These may contain expressions referencing the modules context.
+	ModuleInputs map[string]interface{} `json:"module_inputs"`
+
+	// ModuleParams The parameters supported by this module. The orchestrator enforces that any required parameters are
+	// provided and that they keys do not overlap with the 'module_inputs'.
+	ModuleParams map[string]ModuleParamItem `json:"module_params"`
+
+	// ModuleSource The source of the OpenTofu module backing this module.
+	ModuleSource string `json:"module_source"`
+
+	// ModuleSourceCode The source code of the OpenTofu module backing this module if the module_source is 'inline'.
+	ModuleSourceCode *string `json:"module_source_code,omitempty"`
+
+	// OutputSchema Immutable author-declared output interface. Required on new managed
+	// publication when the Resource Type output_schema is nonempty, and must
+	// equal that contract as a JSON value. Never inferred from external source.
+	// Historical absence is preserved and does not imply artifact verification.
+	OutputSchema *ModuleOutputSchema `json:"output_schema,omitempty"`
+
+	// ProviderMapping A mapping of module providers to use when provisioning using this module
+	ProviderMapping map[string]string `json:"provider_mapping"`
+
+	// ResourceType The resource type that this module provisions.
+	ResourceType string            `json:"resource_type"`
+	Version      CoreModuleVersion `json:"version"`
+
+	// VersionId A unique identifier for this version of the module
+	VersionId string `json:"version_id"`
+}
+
+// CoreModuleVersionPage defines model for CoreModuleVersionPage.
+type CoreModuleVersionPage struct {
+	Items         []CoreModuleVersionDetail `json:"items"`
+	NextPageToken *string                   `json:"next_page_token,omitempty"`
+}
+
 // Environment An environment.
 type Environment struct {
 	// CreatedAt The date and time when the resource type was created
@@ -311,6 +779,9 @@ type Environment struct {
 
 	// Id Environment identifier
 	Id string `json:"id"`
+
+	// Labels Labels used by module policy and add-on selectors.
+	Labels map[string]string `json:"labels,omitempty"`
 
 	// ProjectId Project identifier
 	ProjectId string `json:"project_id"`
@@ -344,6 +815,18 @@ type EnvironmentCreateBody struct {
 
 	// Id Environment identifier
 	Id string `json:"id"`
+
+	// Labels Labels used by module policy and add-on selectors.
+	Labels map[string]string `json:"labels,omitempty"`
+}
+
+// EnvironmentDeletionImpact defines model for EnvironmentDeletionImpact.
+type EnvironmentDeletionImpact struct {
+	Blocked          bool                          `json:"blocked"`
+	Blockers         []string                      `json:"blockers"`
+	EnvironmentUuid  openapi_types.UUID            `json:"environment_uuid"`
+	Pins             []EnvironmentModuleVersionPin `json:"pins"`
+	RelatedResources []ModuleExtensionContribution `json:"related_resources"`
 }
 
 // EnvironmentInternalUpdateBody defines model for EnvironmentInternalUpdateBody.
@@ -351,6 +834,41 @@ type EnvironmentInternalUpdateBody struct {
 	// Status The status of the environment. Environments are normally active unless they have been deleted. A delete_failed status indicates that the destroy failed and a delete can be re-issued.
 	Status        *EnvironmentStatus `json:"status,omitempty"`
 	StatusMessage *string            `json:"status_message,omitempty"`
+}
+
+// EnvironmentModuleVersionPin defines model for EnvironmentModuleVersionPin.
+type EnvironmentModuleVersionPin struct {
+	ActivationEventId         openapi_types.UUID     `json:"activation_event_id"`
+	BulkOperationId           *openapi_types.UUID    `json:"bulk_operation_id,omitempty"`
+	CreatedAt                 time.Time              `json:"created_at"`
+	CreatedBy                 openapi_types.UUID     `json:"created_by"`
+	EnvironmentId             string                 `json:"environment_id"`
+	EnvironmentUuid           openapi_types.UUID     `json:"environment_uuid"`
+	Id                        openapi_types.UUID     `json:"id"`
+	ModuleUuid                openapi_types.UUID     `json:"module_uuid"`
+	OrgId                     string                 `json:"org_id"`
+	OverrideActor             *openapi_types.UUID    `json:"override_actor,omitempty"`
+	OverrideDeploymentId      *openapi_types.UUID    `json:"override_deployment_id,omitempty"`
+	OverrideOperationId       *openapi_types.UUID    `json:"override_operation_id,omitempty"`
+	OverrideReason            *string                `json:"override_reason,omitempty"`
+	OverrideTargetVersionUuid *openapi_types.UUID    `json:"override_target_version_uuid,omitempty"`
+	ProjectId                 string                 `json:"project_id"`
+	ProjectUuid               openapi_types.UUID     `json:"project_uuid"`
+	RemovedAt                 *time.Time             `json:"removed_at,omitempty"`
+	ResourceVersion           int64                  `json:"resource_version"`
+	Status                    ModuleVersionPinStatus `json:"status"`
+	UpdatedAt                 time.Time              `json:"updated_at"`
+	VersionUuid               openapi_types.UUID     `json:"version_uuid"`
+}
+
+// EnvironmentModuleVersionPinCreateBody defines model for EnvironmentModuleVersionPinCreateBody.
+type EnvironmentModuleVersionPinCreateBody struct {
+	ConfirmDefectiveVersionUuid *openapi_types.UUID `json:"confirm_defective_version_uuid,omitempty"`
+	EnvironmentUuid             openapi_types.UUID  `json:"environment_uuid"`
+	ModuleUuid                  openapi_types.UUID  `json:"module_uuid"`
+	ProjectUuid                 openapi_types.UUID  `json:"project_uuid"`
+	Reason                      string              `json:"reason"`
+	VersionUuid                 openapi_types.UUID  `json:"version_uuid"`
 }
 
 // EnvironmentPage A page of environments returned from the list api.
@@ -375,6 +893,9 @@ type EnvironmentTypeCreateBody struct {
 
 	// Id Environment type identifier
 	Id string `json:"id"`
+
+	// IsProduction Whether Environments of this type are Production targets.
+	IsProduction *bool `json:"is_production,omitempty"`
 }
 
 // EnvironmentTypePage A page of environment types returned from the list api.
@@ -397,6 +918,9 @@ type EnvironmentTypeSummary struct {
 	// Id The unique id of the environment type in this org.
 	Id string `json:"id"`
 
+	// IsProduction Authoritative Production classification. Clients must not infer this from IDs, names or labels.
+	IsProduction bool `json:"is_production"`
+
 	// Uuid Unique uid for the environment type to identify a unique lifecycle
 	Uuid openapi_types.UUID `json:"uuid"`
 }
@@ -404,13 +928,19 @@ type EnvironmentTypeSummary struct {
 // EnvironmentTypeUpdateBody A request to update an environment type in the org.
 type EnvironmentTypeUpdateBody struct {
 	// DisplayName Human readable name for the environment type. This will be generated if not provided.
-	DisplayName string `json:"display_name"`
+	DisplayName *string `json:"display_name,omitempty"`
+
+	// IsProduction Whether Environments of this type are Production targets.
+	IsProduction *bool `json:"is_production,omitempty"`
 }
 
 // EnvironmentUpdateBody A request to update an environment.
 type EnvironmentUpdateBody struct {
 	// DisplayName Environment human readable name. The id is used if this is not specified.
 	DisplayName string `json:"display_name"`
+
+	// Labels Complete replacement label set used by module policy and add-on selectors.
+	Labels *map[string]string `json:"labels,omitempty"`
 }
 
 // Error A standard error response
@@ -448,18 +978,20 @@ type InternalModuleCatalogue struct {
 
 // InternalModuleCatalogueGenerateBody The request contents to generate a module catalogue
 type InternalModuleCatalogueGenerateBody struct {
-	// AreRulesIgnored When running a destroy deployment, we only care about pinned module version and do not need to check the rules. This option can be used to skip rule evaluation.
+	// AreRulesIgnored When running a destroy deployment, only pinned module versions are required and rule evaluation is skipped.
 	AreRulesIgnored bool `json:"are_rules_ignored,omitempty"`
 
 	// PinnedModuleVersions The normal response body only includes the latest versions for modules. However if there are pinned resources, we need to request the pinned versions as well which may no longer have rules associated with them.
 	PinnedModuleVersions []string `json:"pinned_module_versions,omitempty"`
 
-	// PinnedProviders The normal response body only includes the modules and providers currently configured. However if we are removing nodes that still rely on providers we need to fetch their details without having the modules.
+	// PinnedProviders The normal response body only includes the latest versions for modules. However if there are pinned resources, we need to request providers retained by the previous graph.
 	PinnedProviders []string `json:"pinned_providers,omitempty"`
 }
 
 // InternalModuleCatalogueModule defines model for InternalModuleCatalogueModule.
 type InternalModuleCatalogueModule struct {
+	ArtifactDigest string `json:"artifact_digest"`
+
 	// Coprovisioned A set of resources to provision after or in parallel with the resource of the current module.
 	Coprovisioned []ModuleCoProvisionManifest `json:"coprovisioned"`
 
@@ -475,6 +1007,9 @@ type InternalModuleCatalogueModule struct {
 	// Id The unique identifier for a module
 	Id ModuleId `json:"id"`
 
+	// MigrationGeneration Authoritative persisted migration provenance. External digest claims are optional for both managed and migrated versions; v0 must not acquire invented metadata.
+	MigrationGeneration InternalModuleCatalogueModuleMigrationGeneration `json:"migration_generation"`
+
 	// ModuleInputs The fixed inputs to this module. These may contain expressions referencing the modules context.
 	ModuleInputs map[string]interface{} `json:"module_inputs"`
 
@@ -486,24 +1021,40 @@ type InternalModuleCatalogueModule struct {
 	ModuleSource string `json:"module_source"`
 
 	// ModuleSourceCode The source code of the OpenTofu module backing this module if the module_source is 'inline'.
-	ModuleSourceCode *string `json:"module_source_code,omitempty"`
+	ModuleSourceCode *string            `json:"module_source_code,omitempty"`
+	ModuleUuid       openapi_types.UUID `json:"module_uuid"`
 
 	// OrgId The Organization ID
 	OrgId string `json:"org_id"`
+
+	// OutputSchema Immutable author-declared output interface. Required on new managed
+	// publication when the Resource Type output_schema is nonempty, and must
+	// equal that contract as a JSON value. Never inferred from external source.
+	// Historical absence is preserved and does not imply artifact verification.
+	OutputSchema *ModuleOutputSchema `json:"output_schema,omitempty"`
 
 	// ProviderMapping A mapping of module providers to use when provisioning using this module
 	ProviderMapping map[string]string `json:"provider_mapping"`
 
 	// ResourceType The resource type that this module provisions.
-	ResourceType string                              `json:"resource_type"`
-	Rules        []InternalModuleCatalogueModuleRule `json:"rules"`
+	ResourceType   string                              `json:"resource_type"`
+	Rules          []InternalModuleCatalogueModuleRule `json:"rules"`
+	SemanticStatus ModuleVersionSemanticStatus         `json:"semantic_status"`
+
+	// SemanticVersion Canonical SemVer for managed versions; empty only for migrated v0 versions.
+	SemanticVersion string `json:"semantic_version"`
 
 	// UpdatedAt The date and time when the module was updated to this version.
-	UpdatedAt time.Time `json:"updated_at"`
+	UpdatedAt          time.Time                `json:"updated_at"`
+	VerificationStatus ModuleVerificationStatus `json:"verification_status"`
 
 	// VersionId A unique identifier for this version of the module
-	VersionId string `json:"version_id"`
+	VersionId   string             `json:"version_id"`
+	VersionUuid openapi_types.UUID `json:"version_uuid"`
 }
+
+// InternalModuleCatalogueModuleMigrationGeneration Authoritative persisted migration provenance. External digest claims are optional for both managed and migrated versions; v0 must not acquire invented metadata.
+type InternalModuleCatalogueModuleMigrationGeneration string
 
 // InternalModuleCatalogueModuleRule A rule within a module
 type InternalModuleCatalogueModuleRule struct {
@@ -828,6 +1379,12 @@ type Module struct {
 	// OrgId The Organization ID
 	OrgId string `json:"org_id"`
 
+	// OutputSchema Immutable author-declared output interface. Required on new managed
+	// publication when the Resource Type output_schema is nonempty, and must
+	// equal that contract as a JSON value. Never inferred from external source.
+	// Historical absence is preserved and does not imply artifact verification.
+	OutputSchema *ModuleOutputSchema `json:"output_schema,omitempty"`
+
 	// ProviderMapping A mapping of module providers to use when provisioning using this module
 	ProviderMapping map[string]string `json:"provider_mapping"`
 
@@ -839,6 +1396,48 @@ type Module struct {
 
 	// VersionId A unique identifier for this version of the module
 	VersionId string `json:"version_id"`
+}
+
+// ModuleCatalogueCreateBody defines model for ModuleCatalogueCreateBody.
+type ModuleCatalogueCreateBody struct {
+	Description  *string `json:"description,omitempty"`
+	DisplayName  *string `json:"display_name,omitempty"`
+	ResourceType string  `json:"resource_type"`
+
+	// Slug The unique identifier for a module
+	Slug ModuleId           `json:"slug"`
+	Tags *map[string]string `json:"tags,omitempty"`
+}
+
+// ModuleCatalogueEntry defines model for ModuleCatalogueEntry.
+type ModuleCatalogueEntry struct {
+	ArchiveReason              *string               `json:"archive_reason,omitempty"`
+	ArchivedAt                 *time.Time            `json:"archived_at,omitempty"`
+	ArchivedBy                 *openapi_types.UUID   `json:"archived_by,omitempty"`
+	CreatedAt                  time.Time             `json:"created_at"`
+	CurrentDefaultVersionUuid  *openapi_types.UUID   `json:"current_default_version_uuid,omitempty"`
+	Description                string                `json:"description"`
+	DisplayName                string                `json:"display_name"`
+	ManagedDefaultGeneration   int64                 `json:"managed_default_generation"`
+	OrgId                      string                `json:"org_id"`
+	PreviousDefaultVersionUuid *openapi_types.UUID   `json:"previous_default_version_uuid,omitempty"`
+	ResourceType               string                `json:"resource_type"`
+	ResourceVersion            int64                 `json:"resource_version"`
+	Slug                       string                `json:"slug"`
+	Status                     ModuleCatalogueStatus `json:"status"`
+	Tags                       map[string]string     `json:"tags"`
+	Uuid                       openapi_types.UUID    `json:"uuid"`
+}
+
+// ModuleCatalogueStatus defines model for ModuleCatalogueStatus.
+type ModuleCatalogueStatus string
+
+// ModuleCatalogueUpdateBody defines model for ModuleCatalogueUpdateBody.
+type ModuleCatalogueUpdateBody struct {
+	Description             string            `json:"description"`
+	DisplayName             string            `json:"display_name"`
+	ExpectedResourceVersion int64             `json:"expected_resource_version"`
+	Tags                    map[string]string `json:"tags"`
 }
 
 // ModuleCoProvisionManifest A resource to provision after or in parallel with the resource of the current module.
@@ -880,10 +1479,19 @@ type ModuleCoreFields struct {
 
 	// ModuleSourceCode The source code of the OpenTofu module backing this module if the module_source is 'inline'.
 	ModuleSourceCode *string `json:"module_source_code,omitempty"`
+
+	// OutputSchema Immutable author-declared output interface. Required on new managed
+	// publication when the Resource Type output_schema is nonempty, and must
+	// equal that contract as a JSON value. Never inferred from external source.
+	// Historical absence is preserved and does not imply artifact verification.
+	OutputSchema *ModuleOutputSchema `json:"output_schema,omitempty"`
 }
 
 // ModuleCreateBody A request to create a new module
 type ModuleCreateBody struct {
+	// ArtifactDigest Optional immutable external artifact digest claim, not verification evidence. Omitted for inline source.
+	ArtifactDigest *string `json:"artifact_digest,omitempty"`
+
 	// Coprovisioned A set of resources to provision after or in parallel with the resource of the current module.
 	Coprovisioned []ModuleCoProvisionManifest `json:"coprovisioned,omitempty"`
 
@@ -909,11 +1517,20 @@ type ModuleCreateBody struct {
 	// ModuleSourceCode The source code of the OpenTofu module backing this module. Required, if module_source is 'inline'.
 	ModuleSourceCode *string `json:"module_source_code,omitempty"`
 
+	// OutputSchema Immutable author-declared output interface. Required on new managed
+	// publication when the Resource Type output_schema is nonempty, and must
+	// equal that contract as a JSON value. Never inferred from external source.
+	// Historical absence is preserved and does not imply artifact verification.
+	OutputSchema *ModuleOutputSchema `json:"output_schema,omitempty"`
+
 	// ProviderMapping A mapping of module providers to use when provisioning using this module.
 	ProviderMapping map[string]string `json:"provider_mapping,omitempty"`
 
 	// ResourceType The resource type that this module provisions.
 	ResourceType string `json:"resource_type"`
+
+	// SemanticVersion Canonical SemVer identity of the immutable Core Module Version.
+	SemanticVersion *string `json:"semantic_version,omitempty"`
 }
 
 // ModuleDependencyManifest A dependency to provision before the current resource is provisioned
@@ -931,8 +1548,81 @@ type ModuleDependencyManifest struct {
 	Type string `json:"type"`
 }
 
+// ModuleExtensionContribution defines model for ModuleExtensionContribution.
+type ModuleExtensionContribution struct {
+	CreatedAt          time.Time                                 `json:"created_at"`
+	CreatedBy          openapi_types.UUID                        `json:"created_by"`
+	EnvironmentUuid    *openapi_types.UUID                       `json:"environment_uuid,omitempty"`
+	ExternalResourceId string                                    `json:"external_resource_id"`
+	Id                 openapi_types.UUID                        `json:"id"`
+	Kind               ModuleExtensionContributionKind           `json:"kind"`
+	Label              string                                    `json:"label"`
+	LifecycleState     ModuleExtensionContributionLifecycleState `json:"lifecycle_state"`
+	ModuleUuid         openapi_types.UUID                        `json:"module_uuid"`
+	Namespace          string                                    `json:"namespace"`
+	Payload            map[string]interface{}                    `json:"payload"`
+	TargetUrl          *string                                   `json:"target_url,omitempty"`
+	UpdatedAt          time.Time                                 `json:"updated_at"`
+	VersionUuid        *openapi_types.UUID                       `json:"version_uuid,omitempty"`
+}
+
+// ModuleExtensionContributionKind defines model for ModuleExtensionContribution.Kind.
+type ModuleExtensionContributionKind string
+
+// ModuleExtensionContributionLifecycleState defines model for ModuleExtensionContribution.LifecycleState.
+type ModuleExtensionContributionLifecycleState string
+
+// ModuleExtensionContributionUpsertBody defines model for ModuleExtensionContributionUpsertBody.
+type ModuleExtensionContributionUpsertBody struct {
+	EnvironmentUuid    *openapi_types.UUID                                 `json:"environment_uuid,omitempty"`
+	ExternalResourceId string                                              `json:"external_resource_id"`
+	Kind               ModuleExtensionContributionUpsertBodyKind           `json:"kind"`
+	Label              string                                              `json:"label"`
+	LifecycleState     ModuleExtensionContributionUpsertBodyLifecycleState `json:"lifecycle_state"`
+	Namespace          string                                              `json:"namespace"`
+	Payload            map[string]interface{}                              `json:"payload"`
+	TargetUrl          *string                                             `json:"target_url,omitempty"`
+	VersionUuid        *openapi_types.UUID                                 `json:"version_uuid,omitempty"`
+}
+
+// ModuleExtensionContributionUpsertBodyKind defines model for ModuleExtensionContributionUpsertBody.Kind.
+type ModuleExtensionContributionUpsertBodyKind string
+
+// ModuleExtensionContributionUpsertBodyLifecycleState defines model for ModuleExtensionContributionUpsertBody.LifecycleState.
+type ModuleExtensionContributionUpsertBodyLifecycleState string
+
 // ModuleId The unique identifier for a module
 type ModuleId = string
+
+// ModuleOperationReservation defines model for ModuleOperationReservation.
+type ModuleOperationReservation struct {
+	AcquiredAt        time.Time           `json:"acquired_at"`
+	AcquiredBy        openapi_types.UUID  `json:"acquired_by"`
+	Id                openapi_types.UUID  `json:"id"`
+	ModuleUuid        openapi_types.UUID  `json:"module_uuid"`
+	Namespace         string              `json:"namespace"`
+	OperationId       openapi_types.UUID  `json:"operation_id"`
+	Reason            string              `json:"reason"`
+	RelatedResourceId string              `json:"related_resource_id"`
+	ReleaseReason     *string             `json:"release_reason,omitempty"`
+	ReleasedAt        *time.Time          `json:"released_at,omitempty"`
+	ReleasedBy        *openapi_types.UUID `json:"released_by,omitempty"`
+	ResourceVersion   int64               `json:"resource_version"`
+}
+
+// ModuleOperationReservationAcquireBody defines model for ModuleOperationReservationAcquireBody.
+type ModuleOperationReservationAcquireBody struct {
+	Namespace         string             `json:"namespace"`
+	OperationId       openapi_types.UUID `json:"operation_id"`
+	Reason            string             `json:"reason"`
+	RelatedResourceId string             `json:"related_resource_id"`
+}
+
+// ModuleOutputSchema Immutable author-declared output interface. Required on new managed
+// publication when the Resource Type output_schema is nonempty, and must
+// equal that contract as a JSON value. Never inferred from external source.
+// Historical absence is preserved and does not imply artifact verification.
+type ModuleOutputSchema map[string]interface{}
 
 // ModulePage A page of the list modules response.
 type ModulePage struct {
@@ -1050,6 +1740,12 @@ type ModuleProviderUpdateBody struct {
 	VersionConstraint *string `json:"version_constraint,omitempty"`
 }
 
+// ModuleReasonedCommand defines model for ModuleReasonedCommand.
+type ModuleReasonedCommand struct {
+	ExpectedResourceVersion int64  `json:"expected_resource_version"`
+	Reason                  string `json:"reason"`
+}
+
 // ModuleSummary defines model for ModuleSummary.
 type ModuleSummary struct {
 	// CreatedAt The date and time when the module was created.
@@ -1082,6 +1778,8 @@ type ModuleSummary struct {
 
 // ModuleUpdateBody A request to update an existing module
 type ModuleUpdateBody struct {
+	ArtifactDigest *string `json:"artifact_digest,omitempty"`
+
 	// Coprovisioned A set of resources to provision after or in parallel with the resource of the current module.
 	Coprovisioned *[]ModuleCoProvisionManifest `json:"coprovisioned,omitempty"`
 
@@ -1104,9 +1802,21 @@ type ModuleUpdateBody struct {
 	// ModuleSourceCode The source code of the OpenTofu module backing this module.
 	ModuleSourceCode *string `json:"module_source_code,omitempty"`
 
+	// OutputSchema Immutable author-declared output interface. Required on new managed
+	// publication when the Resource Type output_schema is nonempty, and must
+	// equal that contract as a JSON value. Never inferred from external source.
+	// Historical absence is preserved and does not imply artifact verification.
+	OutputSchema *ModuleOutputSchema `json:"output_schema,omitempty"`
+
 	// ProviderMapping A mapping of module providers to use when provisioning using this module.
 	ProviderMapping *map[string]string `json:"provider_mapping,omitempty"`
+
+	// SemanticVersion Canonical SemVer identity for the immutable Proposed version.
+	SemanticVersion *string `json:"semantic_version,omitempty"`
 }
+
+// ModuleVerificationStatus defines model for ModuleVerificationStatus.
+type ModuleVerificationStatus string
 
 // ModuleVersion defines model for ModuleVersion.
 type ModuleVersion struct {
@@ -1135,6 +1845,12 @@ type ModuleVersion struct {
 	// ModuleSourceCode The source code of the OpenTofu module backing this module if the module_source is 'inline'.
 	ModuleSourceCode *string `json:"module_source_code,omitempty"`
 
+	// OutputSchema Immutable author-declared output interface. Required on new managed
+	// publication when the Resource Type output_schema is nonempty, and must
+	// equal that contract as a JSON value. Never inferred from external source.
+	// Historical absence is preserved and does not imply artifact verification.
+	OutputSchema *ModuleOutputSchema `json:"output_schema,omitempty"`
+
 	// ProviderMapping A mapping of module providers to use when provisioning using this module
 	ProviderMapping map[string]string `json:"provider_mapping"`
 
@@ -1145,6 +1861,94 @@ type ModuleVersion struct {
 	VersionId string `json:"version_id"`
 }
 
+// ModuleVersionComparison defines model for ModuleVersionComparison.
+type ModuleVersionComparison struct {
+	AddedDependencies       []string                        `json:"added_dependencies"`
+	AddedModuleInputs       []string                        `json:"added_module_inputs"`
+	AddedModuleParams       []string                        `json:"added_module_params"`
+	AddedProviderMappings   []string                        `json:"added_provider_mappings"`
+	After                   ModuleVersionComparisonSnapshot `json:"after"`
+	ArtifactDigestChanged   bool                            `json:"artifact_digest_changed"`
+	Before                  ModuleVersionComparisonSnapshot `json:"before"`
+	ChangedDependencies     []string                        `json:"changed_dependencies"`
+	ChangedModuleInputs     []string                        `json:"changed_module_inputs"`
+	ChangedModuleParams     []string                        `json:"changed_module_params"`
+	ChangedProviderMappings []string                        `json:"changed_provider_mappings"`
+	CoprovisioningChanged   bool                            `json:"coprovisioning_changed"`
+	FromVersionUuid         openapi_types.UUID              `json:"from_version_uuid"`
+	ModuleSourceChanged     bool                            `json:"module_source_changed"`
+	ModuleSourceCodeChanged bool                            `json:"module_source_code_changed"`
+	OutputSchemaChanged     bool                            `json:"output_schema_changed"`
+	RemovedDependencies     []string                        `json:"removed_dependencies"`
+	RemovedModuleInputs     []string                        `json:"removed_module_inputs"`
+	RemovedModuleParams     []string                        `json:"removed_module_params"`
+	RemovedProviderMappings []string                        `json:"removed_provider_mappings"`
+	ResourceTypeChanged     bool                            `json:"resource_type_changed"`
+	SourceRevisionChanged   bool                            `json:"source_revision_changed"`
+	ToVersionUuid           openapi_types.UUID              `json:"to_version_uuid"`
+}
+
+// ModuleVersionComparisonSnapshot defines model for ModuleVersionComparisonSnapshot.
+type ModuleVersionComparisonSnapshot struct {
+	ArtifactDigest   string                              `json:"artifact_digest"`
+	Coprovisioned    []ModuleCoProvisionManifest         `json:"coprovisioned"`
+	Dependencies     map[string]ModuleDependencyManifest `json:"dependencies"`
+	ModuleInputs     map[string]interface{}              `json:"module_inputs"`
+	ModuleParams     map[string]ModuleParamItem          `json:"module_params"`
+	ModuleSource     string                              `json:"module_source"`
+	ModuleSourceCode *string                             `json:"module_source_code"`
+
+	// OutputSchema Immutable author-declared output interface. Required on new managed
+	// publication when the Resource Type output_schema is nonempty, and must
+	// equal that contract as a JSON value. Never inferred from external source.
+	// Historical absence is preserved and does not imply artifact verification.
+	OutputSchema    *ModuleOutputSchema `json:"output_schema,omitempty"`
+	ProviderMapping map[string]string   `json:"provider_mapping"`
+	ResourceType    string              `json:"resource_type"`
+	SourceRevision  string              `json:"source_revision"`
+}
+
+// ModuleVersionLifecycleEvent defines model for ModuleVersionLifecycleEvent.
+type ModuleVersionLifecycleEvent struct {
+	Actor                  openapi_types.UUID           `json:"actor"`
+	CorrelationId          *openapi_types.UUID          `json:"correlation_id,omitempty"`
+	CreatedAt              time.Time                    `json:"created_at"`
+	FromStatus             *ModuleVersionSemanticStatus `json:"from_status,omitempty"`
+	Id                     openapi_types.UUID           `json:"id"`
+	ModuleUuid             openapi_types.UUID           `json:"module_uuid"`
+	Payload                map[string]interface{}       `json:"payload"`
+	Reason                 *string                      `json:"reason,omitempty"`
+	Sequence               int64                        `json:"sequence"`
+	ToStatus               ModuleVersionSemanticStatus  `json:"to_status"`
+	VersionResourceVersion int64                        `json:"version_resource_version"`
+	VersionUuid            openapi_types.UUID           `json:"version_uuid"`
+}
+
+// ModuleVersionLifecycleTransactionBody defines model for ModuleVersionLifecycleTransactionBody.
+type ModuleVersionLifecycleTransactionBody struct {
+	Transitions []ModuleVersionLifecycleTransactionItem `json:"transitions"`
+}
+
+// ModuleVersionLifecycleTransactionItem defines model for ModuleVersionLifecycleTransactionItem.
+type ModuleVersionLifecycleTransactionItem struct {
+	Action                  ModuleVersionLifecycleTransactionItemAction `json:"action"`
+	ExpectedResourceVersion int64                                       `json:"expected_resource_version"`
+
+	// ModuleId The unique identifier for a module
+	ModuleId        ModuleId `json:"module_id"`
+	ModuleVersionId string   `json:"module_version_id"`
+	Reason          string   `json:"reason"`
+}
+
+// ModuleVersionLifecycleTransactionItemAction defines model for ModuleVersionLifecycleTransactionItem.Action.
+type ModuleVersionLifecycleTransactionItemAction string
+
+// ModuleVersionLifecycleTransactionResult defines model for ModuleVersionLifecycleTransactionResult.
+type ModuleVersionLifecycleTransactionResult struct {
+	CorrelationId openapi_types.UUID  `json:"correlation_id"`
+	Versions      []CoreModuleVersion `json:"versions"`
+}
+
 // ModuleVersionPage A page of the list modules versions response.
 type ModuleVersionPage struct {
 	// Items The items in this page
@@ -1153,6 +1957,145 @@ type ModuleVersionPage struct {
 	// NextPageToken The page token to use to request the next page of items
 	NextPageToken *string `json:"next_page_token,omitempty"`
 }
+
+// ModuleVersionPinBulkAction defines model for ModuleVersionPinBulkAction.
+type ModuleVersionPinBulkAction string
+
+// ModuleVersionPinBulkCommandBody defines model for ModuleVersionPinBulkCommandBody.
+type ModuleVersionPinBulkCommandBody struct {
+	Action                       ModuleVersionPinBulkAction `json:"action"`
+	ConfirmDefectiveVersionUuids *[]openapi_types.UUID      `json:"confirm_defective_version_uuids,omitempty"`
+	EnvironmentUuids             []openapi_types.UUID       `json:"environment_uuids"`
+	ModuleUuid                   openapi_types.UUID         `json:"module_uuid"`
+	PreviewFingerprint           string                     `json:"preview_fingerprint"`
+	Reason                       string                     `json:"reason"`
+}
+
+// ModuleVersionPinBulkPreview defines model for ModuleVersionPinBulkPreview.
+type ModuleVersionPinBulkPreview struct {
+	Action      ModuleVersionPinBulkAction        `json:"action"`
+	Eligible    bool                              `json:"eligible"`
+	Fingerprint string                            `json:"fingerprint"`
+	Items       []ModuleVersionPinBulkPreviewItem `json:"items"`
+	ModuleUuid  openapi_types.UUID                `json:"module_uuid"`
+	OperationId openapi_types.UUID                `json:"operation_id"`
+}
+
+// ModuleVersionPinBulkPreviewBody defines model for ModuleVersionPinBulkPreviewBody.
+type ModuleVersionPinBulkPreviewBody struct {
+	Action                       ModuleVersionPinBulkAction `json:"action"`
+	ConfirmDefectiveVersionUuids *[]openapi_types.UUID      `json:"confirm_defective_version_uuids,omitempty"`
+	EnvironmentUuids             []openapi_types.UUID       `json:"environment_uuids"`
+	ModuleUuid                   openapi_types.UUID         `json:"module_uuid"`
+}
+
+// ModuleVersionPinBulkPreviewItem defines model for ModuleVersionPinBulkPreviewItem.
+type ModuleVersionPinBulkPreviewItem struct {
+	Eligible           bool                `json:"eligible"`
+	EnvironmentId      string              `json:"environment_id"`
+	EnvironmentType    *string             `json:"environment_type,omitempty"`
+	EnvironmentUuid    openapi_types.UUID  `json:"environment_uuid"`
+	IdempotentMatch    *bool               `json:"idempotent_match,omitempty"`
+	PinId              *openapi_types.UUID `json:"pin_id,omitempty"`
+	PinResourceVersion *int64              `json:"pin_resource_version,omitempty"`
+	Problem            *string             `json:"problem,omitempty"`
+	Production         bool                `json:"production"`
+	ProjectId          string              `json:"project_id"`
+	ProjectUuid        openapi_types.UUID  `json:"project_uuid"`
+	VersionUuid        *openapi_types.UUID `json:"version_uuid,omitempty"`
+}
+
+// ModuleVersionPinBulkResult defines model for ModuleVersionPinBulkResult.
+type ModuleVersionPinBulkResult struct {
+	Action      ModuleVersionPinBulkAction    `json:"action"`
+	OperationId openapi_types.UUID            `json:"operation_id"`
+	Pins        []EnvironmentModuleVersionPin `json:"pins"`
+}
+
+// ModuleVersionPinEvent defines model for ModuleVersionPinEvent.
+type ModuleVersionPinEvent struct {
+	ActivationEventId openapi_types.UUID      `json:"activation_event_id"`
+	Actor             openapi_types.UUID      `json:"actor"`
+	ActorType         string                  `json:"actor_type"`
+	BulkOperationId   *openapi_types.UUID     `json:"bulk_operation_id,omitempty"`
+	CreatedAt         time.Time               `json:"created_at"`
+	DeploymentId      *openapi_types.UUID     `json:"deployment_id,omitempty"`
+	EventType         string                  `json:"event_type"`
+	FromStatus        *ModuleVersionPinStatus `json:"from_status,omitempty"`
+	Id                openapi_types.UUID      `json:"id"`
+
+	// Note Immutable note text, present only when event_type is note_added.
+	Note        *string                `json:"note,omitempty"`
+	OperationId *openapi_types.UUID    `json:"operation_id,omitempty"`
+	PinId       openapi_types.UUID     `json:"pin_id"`
+	Reason      *string                `json:"reason,omitempty"`
+	Revision    int64                  `json:"revision"`
+	Sequence    int64                  `json:"sequence"`
+	ToStatus    ModuleVersionPinStatus `json:"to_status"`
+}
+
+// ModuleVersionPinNoteBody defines model for ModuleVersionPinNoteBody.
+type ModuleVersionPinNoteBody struct {
+	Note string `json:"note"`
+}
+
+// ModuleVersionPinOverrideBody defines model for ModuleVersionPinOverrideBody.
+type ModuleVersionPinOverrideBody struct {
+	ExpectedResourceVersion int64              `json:"expected_resource_version"`
+	OperationId             openapi_types.UUID `json:"operation_id"`
+	Reason                  string             `json:"reason"`
+	TargetVersionUuid       openapi_types.UUID `json:"target_version_uuid"`
+}
+
+// ModuleVersionPinOverrideReconcileBody defines model for ModuleVersionPinOverrideReconcileBody.
+type ModuleVersionPinOverrideReconcileBody struct {
+	DeploymentId            openapi_types.UUID                           `json:"deployment_id"`
+	ExpectedResourceVersion int64                                        `json:"expected_resource_version"`
+	OperationId             openapi_types.UUID                           `json:"operation_id"`
+	Outcome                 ModuleVersionPinOverrideReconcileBodyOutcome `json:"outcome"`
+	Reason                  string                                       `json:"reason"`
+}
+
+// ModuleVersionPinOverrideReconcileBodyOutcome defines model for ModuleVersionPinOverrideReconcileBody.Outcome.
+type ModuleVersionPinOverrideReconcileBodyOutcome string
+
+// ModuleVersionPinRollbackRestoreBody defines model for ModuleVersionPinRollbackRestoreBody.
+type ModuleVersionPinRollbackRestoreBody struct {
+	DeploymentId            openapi_types.UUID `json:"deployment_id"`
+	ExpectedResourceVersion int64              `json:"expected_resource_version"`
+	OperationId             openapi_types.UUID `json:"operation_id"`
+	Reason                  string             `json:"reason"`
+	RestoredVersionUuid     openapi_types.UUID `json:"restored_version_uuid"`
+}
+
+// ModuleVersionPinStatus defines model for ModuleVersionPinStatus.
+type ModuleVersionPinStatus string
+
+// ModuleVersionPublishBody defines model for ModuleVersionPublishBody.
+type ModuleVersionPublishBody struct {
+	// ArtifactDigest Optional immutable external artifact digest claim. Omit for inline source. Absence never implies verification.
+	ArtifactDigest   *string                             `json:"artifact_digest,omitempty"`
+	Coprovisioned    []ModuleCoProvisionManifest         `json:"coprovisioned"`
+	Dependencies     map[string]ModuleDependencyManifest `json:"dependencies"`
+	Description      *string                             `json:"description,omitempty"`
+	ModuleInputs     map[string]interface{}              `json:"module_inputs"`
+	ModuleParams     map[string]ModuleParamItem          `json:"module_params"`
+	ModuleSource     string                              `json:"module_source"`
+	ModuleSourceCode *string                             `json:"module_source_code,omitempty"`
+
+	// OutputSchema Immutable author-declared output interface. Required on new managed
+	// publication when the Resource Type output_schema is nonempty, and must
+	// equal that contract as a JSON value. Never inferred from external source.
+	// Historical absence is preserved and does not imply artifact verification.
+	OutputSchema    *ModuleOutputSchema `json:"output_schema,omitempty"`
+	ProviderMapping map[string]string   `json:"provider_mapping"`
+	ReleaseNotes    *string             `json:"release_notes,omitempty"`
+	SemanticVersion string              `json:"semantic_version"`
+	SourceRevision  *string             `json:"source_revision,omitempty"`
+}
+
+// ModuleVersionSemanticStatus defines model for ModuleVersionSemanticStatus.
+type ModuleVersionSemanticStatus string
 
 // ModuleVersionSummary defines model for ModuleVersionSummary.
 type ModuleVersionSummary struct {
@@ -1193,6 +2136,32 @@ type ModuleVersionSummaryCoreFields struct {
 	VersionId string `json:"version_id"`
 }
 
+// ModuleVersionUsage defines model for ModuleVersionUsage.
+type ModuleVersionUsage struct {
+	ActiveEnvironmentCount int                             `json:"active_environment_count"`
+	ActivePins             int                             `json:"active_pins"`
+	ByEnvironmentType      map[string]int                  `json:"by_environment_type"`
+	ByProject              map[string]int                  `json:"by_project"`
+	Environments           []ModuleVersionUsageEnvironment `json:"environments"`
+	HistoricalPins         int                             `json:"historical_pins"`
+	ModuleUuid             openapi_types.UUID              `json:"module_uuid"`
+	ObservedAt             time.Time                       `json:"observed_at"`
+	OverridePendingPins    int                             `json:"override_pending_pins"`
+	SemanticVersion        string                          `json:"semantic_version"`
+	UnknownEnvironments    []openapi_types.UUID            `json:"unknown_environments"`
+	VersionUuid            openapi_types.UUID              `json:"version_uuid"`
+}
+
+// ModuleVersionUsageEnvironment defines model for ModuleVersionUsageEnvironment.
+type ModuleVersionUsageEnvironment struct {
+	DeploymentId    openapi_types.UUID `json:"deployment_id"`
+	EnvironmentId   string             `json:"environment_id"`
+	EnvironmentType string             `json:"environment_type"`
+	EnvironmentUuid openapi_types.UUID `json:"environment_uuid"`
+	ObservedAt      time.Time          `json:"observed_at"`
+	ProjectId       string             `json:"project_id"`
+}
+
 // Organization The internal state of an organization known by the control plane.
 type Organization struct {
 	// CreatedAt The date and time when the org state was created.
@@ -1219,6 +2188,24 @@ type Organization struct {
 
 // OrganizationStatus The current status of the org.
 type OrganizationStatus string
+
+// PluginAvailabilityState defines model for PluginAvailabilityState.
+type PluginAvailabilityState string
+
+// PluginCapability defines model for PluginCapability.
+type PluginCapability struct {
+	// AdminAction Scope-safe remediation guidance for an administrator.
+	AdminAction  *string  `json:"admin_action,omitempty"`
+	Capabilities []string `json:"capabilities"`
+	DisplayName  string   `json:"display_name"`
+
+	// Id Immutable reverse-DNS plugin identity.
+	Id    string                  `json:"id"`
+	State PluginAvailabilityState `json:"state"`
+
+	// Version Immutable installed plugin artifact version when installed.
+	Version *string `json:"version,omitempty"`
+}
 
 // Project A project.
 type Project struct {
@@ -1285,8 +2272,13 @@ type ResourceId = string
 
 // ResourceType A resource type that can be used in modules.
 type ResourceType struct {
+	ArchiveReason *string             `json:"archive_reason,omitempty"`
+	ArchivedAt    *time.Time          `json:"archived_at,omitempty"`
+	ArchivedBy    *openapi_types.UUID `json:"archived_by,omitempty"`
+
 	// BuiltIn Indicates if this is a built-in resource type
-	BuiltIn bool `json:"built_in"`
+	BuiltIn         bool                        `json:"built_in"`
+	CatalogueStatus ResourceTypeCatalogueStatus `json:"catalogue_status"`
 
 	// CreatedAt The date and time when the resource type was created
 	CreatedAt time.Time `json:"created_at"`
@@ -1300,9 +2292,20 @@ type ResourceType struct {
 	// IsDeveloperAccessible Indicates if this resource type is for developers to use in the manifest. Resource types with this flag set to false will not be available as types of resources in a manifest.
 	IsDeveloperAccessible bool `json:"is_developer_accessible"`
 
+	// ModuleContract Immutable, offline OpenAPI 3.0 Schema Object subset over module_inputs,
+	// module_params, provider_mapping, dependencies, coprovisioned and output_schema.
+	// Root type must be object. References and unsupported keywords are rejected.
+	// Maximum 64 KiB, 16 schema levels and 64 schema nodes. This validates author
+	// declarations, not external artifacts or resolved runtime values.
+	ModuleContract *ResourceTypeModuleContract `json:"module_contract,omitempty"`
+
 	// OutputSchema Schema for output parameters
-	OutputSchema map[string]interface{} `json:"output_schema"`
+	OutputSchema    map[string]interface{} `json:"output_schema"`
+	ResourceVersion int64                  `json:"resource_version"`
 }
+
+// ResourceTypeCatalogueStatus defines model for ResourceType.CatalogueStatus.
+type ResourceTypeCatalogueStatus string
 
 // ResourceTypeCreateBody A request to create a new resource type.
 type ResourceTypeCreateBody struct {
@@ -1315,9 +2318,23 @@ type ResourceTypeCreateBody struct {
 	// IsDeveloperAccessible Indicates if this resource type is for developers to use in the manifest. Resource types with this flag set to false, will not be available as types of resources in a manifest. If omitted, this property defaults to true.
 	IsDeveloperAccessible *bool `json:"is_developer_accessible,omitempty"`
 
+	// ModuleContract Immutable, offline OpenAPI 3.0 Schema Object subset over module_inputs,
+	// module_params, provider_mapping, dependencies, coprovisioned and output_schema.
+	// Root type must be object. References and unsupported keywords are rejected.
+	// Maximum 64 KiB, 16 schema levels and 64 schema nodes. This validates author
+	// declarations, not external artifacts or resolved runtime values.
+	ModuleContract *ResourceTypeModuleContract `json:"module_contract,omitempty"`
+
 	// OutputSchema Schema for output parameters
 	OutputSchema map[string]interface{} `json:"output_schema"`
 }
+
+// ResourceTypeModuleContract Immutable, offline OpenAPI 3.0 Schema Object subset over module_inputs,
+// module_params, provider_mapping, dependencies, coprovisioned and output_schema.
+// Root type must be object. References and unsupported keywords are rejected.
+// Maximum 64 KiB, 16 schema levels and 64 schema nodes. This validates author
+// declarations, not external artifacts or resolved runtime values.
+type ResourceTypeModuleContract map[string]interface{}
 
 // ResourceTypePage A page of resource types returned from the list api.
 type ResourceTypePage struct {
@@ -1628,6 +2645,20 @@ type ServerlessEcsRunnerJob struct {
 	TaskRoleArn *string `json:"task_role_arn,omitempty"`
 }
 
+// StableModuleVersionSuccessorBody defines model for StableModuleVersionSuccessorBody.
+type StableModuleVersionSuccessorBody struct {
+	ExpectedPrereleaseResourceVersion int64                    `json:"expected_prerelease_resource_version"`
+	Reason                            string                   `json:"reason"`
+	Version                           ModuleVersionPublishBody `json:"version"`
+}
+
+// StableModuleVersionSuccessorResult defines model for StableModuleVersionSuccessorResult.
+type StableModuleVersionSuccessorResult struct {
+	CorrelationId openapi_types.UUID `json:"correlation_id"`
+	Prerelease    CoreModuleVersion  `json:"prerelease"`
+	Stable        CoreModuleVersion  `json:"stable"`
+}
+
 // StateStorageConfiguration Configuration for the Terraform Backend used by the runner.
 type StateStorageConfiguration struct {
 	union json.RawMessage
@@ -1657,6 +2688,9 @@ type EnvUuidPathParam = openapi_types.UUID
 // ForceQueryParam defines model for forceQueryParam.
 type ForceQueryParam = bool
 
+// IdempotencyKeyHeader defines model for idempotencyKeyHeader.
+type IdempotencyKeyHeader = string
+
 // IncludeNonDeveloperAccessibleQueryParam defines model for includeNonDeveloperAccessibleQueryParam.
 type IncludeNonDeveloperAccessibleQueryParam = bool
 
@@ -1664,7 +2698,7 @@ type IncludeNonDeveloperAccessibleQueryParam = bool
 type ModuleIdPathParam = string
 
 // ModuleVersionIdPathParam defines model for moduleVersionIdPathParam.
-type ModuleVersionIdPathParam = openapi_types.UUID
+type ModuleVersionIdPathParam = string
 
 // OrgIdPathParam defines model for orgIdPathParam.
 type OrgIdPathParam = string
@@ -1723,10 +2757,75 @@ type ListInternalOrganizationsParams struct {
 	Page *PageTokenQueryParam `form:"page,omitempty" json:"page,omitempty"`
 }
 
+// BeginEnvironmentModuleVersionPinOverrideParams defines parameters for BeginEnvironmentModuleVersionPinOverride.
+type BeginEnvironmentModuleVersionPinOverrideParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// ReconcileEnvironmentModuleVersionPinOverrideParams defines parameters for ReconcileEnvironmentModuleVersionPinOverride.
+type ReconcileEnvironmentModuleVersionPinOverrideParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// RestoreEnvironmentModuleVersionPinAfterRollbackParams defines parameters for RestoreEnvironmentModuleVersionPinAfterRollback.
+type RestoreEnvironmentModuleVersionPinAfterRollbackParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// ListModuleExtensionContributionsParams defines parameters for ListModuleExtensionContributions.
+type ListModuleExtensionContributionsParams struct {
+	IncludeDraft    *bool `form:"include_draft,omitempty" json:"include_draft,omitempty"`
+	IncludeTerminal *bool `form:"include_terminal,omitempty" json:"include_terminal,omitempty"`
+}
+
+// UpsertModuleExtensionContributionParams defines parameters for UpsertModuleExtensionContribution.
+type UpsertModuleExtensionContributionParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// ListModuleOperationReservationsParams defines parameters for ListModuleOperationReservations.
+type ListModuleOperationReservationsParams struct {
+	IncludeReleased *bool `form:"include_released,omitempty" json:"include_released,omitempty"`
+}
+
+// AcquireModuleOperationReservationParams defines parameters for AcquireModuleOperationReservation.
+type AcquireModuleOperationReservationParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// ReleaseModuleOperationReservationParams defines parameters for ReleaseModuleOperationReservation.
+type ReleaseModuleOperationReservationParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
 // InternalForceDeleteEnvironmentParams defines parameters for InternalForceDeleteEnvironment.
 type InternalForceDeleteEnvironmentParams struct {
 	// DeleteRules Whether to delete all rules associated with the environment
 	DeleteRules *bool `form:"deleteRules,omitempty" json:"deleteRules,omitempty"`
+}
+
+// GenerateInternalModuleCatalogueParams defines parameters for GenerateInternalModuleCatalogue.
+type GenerateInternalModuleCatalogueParams struct {
+	// XStellwerkRollback Internal audited exception allowing retained Deprecated or Defective artifacts during rollback.
+	XStellwerkRollback *bool `json:"X-Stellwerk-Rollback,omitempty"`
+
+	// XStellwerkModuleOperationId Exact add-on operation allowed to consume its own override-pending Pin target.
+	XStellwerkModuleOperationId *openapi_types.UUID `json:"X-Stellwerk-Module-Operation-Id,omitempty"`
+
+	// XStellwerkModuleOperationPlanning Internal dry-run compilation for an add-on Module operation. It does not mutate or override Core Pins.
+	XStellwerkModuleOperationPlanning *bool `json:"X-Stellwerk-Module-Operation-Planning,omitempty"`
+
+	// XStellwerkRestrictedVersionConfirmations Exact Defective Module Version UUIDs confirmed by an authorised deployment caller.
+	XStellwerkRestrictedVersionConfirmations *[]openapi_types.UUID `json:"X-Stellwerk-Restricted-Version-Confirmations,omitempty"`
+
+	// XStellwerkActiveModuleVersions Exact Module coordinates observed in the Environment's last graph. This evidence permits an archived Module to carry forward only the version already active there.
+	XStellwerkActiveModuleVersions *[]string `json:"X-Stellwerk-Active-Module-Versions,omitempty"`
 }
 
 // ListInternalEnvironmentsByProjectUuidParams defines parameters for ListInternalEnvironmentsByProjectUuid.
@@ -1768,6 +2867,17 @@ type ListEnvironmentsInOrgParams struct {
 	ByEnvTypeId *[]string `form:"byEnvTypeId,omitempty" json:"byEnvTypeId,omitempty"`
 }
 
+// ListModuleCatalogueEntriesParams defines parameters for ListModuleCatalogueEntries.
+type ListModuleCatalogueEntriesParams struct {
+	IncludeArchived *bool `form:"include_archived,omitempty" json:"include_archived,omitempty"`
+}
+
+// CreateModuleCatalogueEntryParams defines parameters for CreateModuleCatalogueEntry.
+type CreateModuleCatalogueEntryParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
 // ListModuleProvidersParams defines parameters for ListModuleProviders.
 type ListModuleProvidersParams struct {
 	// PerPage The maximum number of items to return in a page of results
@@ -1801,6 +2911,46 @@ type ListModuleRulesInOrgParams struct {
 	ByEnvId *string `form:"byEnvId,omitempty" json:"byEnvId,omitempty"`
 }
 
+// TransactModuleVersionLifecyclesParams defines parameters for TransactModuleVersionLifecycles.
+type TransactModuleVersionLifecyclesParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// ListEnvironmentModuleVersionPinsParams defines parameters for ListEnvironmentModuleVersionPins.
+type ListEnvironmentModuleVersionPinsParams struct {
+	EnvironmentUuid *openapi_types.UUID `form:"environment_uuid,omitempty" json:"environment_uuid,omitempty"`
+	ModuleUuid      *openapi_types.UUID `form:"module_uuid,omitempty" json:"module_uuid,omitempty"`
+	IncludeRemoved  *bool               `form:"include_removed,omitempty" json:"include_removed,omitempty"`
+}
+
+// CreateEnvironmentModuleVersionPinParams defines parameters for CreateEnvironmentModuleVersionPin.
+type CreateEnvironmentModuleVersionPinParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// ExecuteEnvironmentModuleVersionPinBulkOperationParams defines parameters for ExecuteEnvironmentModuleVersionPinBulkOperation.
+type ExecuteEnvironmentModuleVersionPinBulkOperationParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// TransitionEnvironmentModuleVersionPinParams defines parameters for TransitionEnvironmentModuleVersionPin.
+type TransitionEnvironmentModuleVersionPinParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// TransitionEnvironmentModuleVersionPinParamsPinAction defines parameters for TransitionEnvironmentModuleVersionPin.
+type TransitionEnvironmentModuleVersionPinParamsPinAction string
+
+// AppendEnvironmentModuleVersionPinNoteParams defines parameters for AppendEnvironmentModuleVersionPinNote.
+type AppendEnvironmentModuleVersionPinNoteParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
 // ListModulesParams defines parameters for ListModules.
 type ListModulesParams struct {
 	// PerPage The maximum number of items to return in a page of results
@@ -1813,13 +2963,45 @@ type ListModulesParams struct {
 	ByResourceType *string `form:"byResourceType,omitempty" json:"byResourceType,omitempty"`
 }
 
+// ChangeModuleCatalogueStatusParams defines parameters for ChangeModuleCatalogueStatus.
+type ChangeModuleCatalogueStatusParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// ChangeModuleCatalogueStatusParamsCatalogueAction defines parameters for ChangeModuleCatalogueStatus.
+type ChangeModuleCatalogueStatusParamsCatalogueAction string
+
 // ListModuleVersionsParams defines parameters for ListModuleVersions.
 type ListModuleVersionsParams struct {
 	// PerPage The maximum number of items to return in a page of results
 	PerPage *PerPageQueryParam `form:"per_page,omitempty" json:"per_page,omitempty"`
 
 	// Page The page token to request from
-	Page *PageTokenQueryParam `form:"page,omitempty" json:"page,omitempty"`
+	Page              *PageTokenQueryParam `form:"page,omitempty" json:"page,omitempty"`
+	IncludeDeprecated *bool                `form:"include_deprecated,omitempty" json:"include_deprecated,omitempty"`
+	IncludeDefective  *bool                `form:"include_defective,omitempty" json:"include_defective,omitempty"`
+}
+
+// PublishModuleVersionParams defines parameters for PublishModuleVersion.
+type PublishModuleVersionParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// TransitionModuleVersionParams defines parameters for TransitionModuleVersion.
+type TransitionModuleVersionParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// TransitionModuleVersionParamsLifecycleAction defines parameters for TransitionModuleVersion.
+type TransitionModuleVersionParamsLifecycleAction string
+
+// PublishStableModuleVersionSuccessorParams defines parameters for PublishStableModuleVersionSuccessor.
+type PublishStableModuleVersionSuccessorParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
 }
 
 // ListProjectsParams defines parameters for ListProjects.
@@ -1888,6 +3070,15 @@ type ListResourceTypesParams struct {
 	Page *PageTokenQueryParam `form:"page,omitempty" json:"page,omitempty"`
 }
 
+// ChangeResourceTypeCatalogueStatusParams defines parameters for ChangeResourceTypeCatalogueStatus.
+type ChangeResourceTypeCatalogueStatusParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// ChangeResourceTypeCatalogueStatusParamsCatalogueAction defines parameters for ChangeResourceTypeCatalogueStatus.
+type ChangeResourceTypeCatalogueStatusParamsCatalogueAction string
+
 // ListRunnerRulesInOrgParams defines parameters for ListRunnerRulesInOrg.
 type ListRunnerRulesInOrgParams struct {
 	// PerPage The maximum number of items to return in a page of results
@@ -1921,6 +3112,24 @@ type ListRunnersParams struct {
 // CreateInternalOrganizationJSONRequestBody defines body for CreateInternalOrganization for application/json ContentType.
 type CreateInternalOrganizationJSONRequestBody = InternalOrganizationCreateBody
 
+// BeginEnvironmentModuleVersionPinOverrideJSONRequestBody defines body for BeginEnvironmentModuleVersionPinOverride for application/json ContentType.
+type BeginEnvironmentModuleVersionPinOverrideJSONRequestBody = ModuleVersionPinOverrideBody
+
+// ReconcileEnvironmentModuleVersionPinOverrideJSONRequestBody defines body for ReconcileEnvironmentModuleVersionPinOverride for application/json ContentType.
+type ReconcileEnvironmentModuleVersionPinOverrideJSONRequestBody = ModuleVersionPinOverrideReconcileBody
+
+// RestoreEnvironmentModuleVersionPinAfterRollbackJSONRequestBody defines body for RestoreEnvironmentModuleVersionPinAfterRollback for application/json ContentType.
+type RestoreEnvironmentModuleVersionPinAfterRollbackJSONRequestBody = ModuleVersionPinRollbackRestoreBody
+
+// UpsertModuleExtensionContributionJSONRequestBody defines body for UpsertModuleExtensionContribution for application/json ContentType.
+type UpsertModuleExtensionContributionJSONRequestBody = ModuleExtensionContributionUpsertBody
+
+// AcquireModuleOperationReservationJSONRequestBody defines body for AcquireModuleOperationReservation for application/json ContentType.
+type AcquireModuleOperationReservationJSONRequestBody = ModuleOperationReservationAcquireBody
+
+// ReleaseModuleOperationReservationJSONRequestBody defines body for ReleaseModuleOperationReservation for application/json ContentType.
+type ReleaseModuleOperationReservationJSONRequestBody = ModuleReasonedCommand
+
 // InternalUpdateEnvironmentJSONRequestBody defines body for InternalUpdateEnvironment for application/json ContentType.
 type InternalUpdateEnvironmentJSONRequestBody = EnvironmentInternalUpdateBody
 
@@ -1939,6 +3148,9 @@ type CreateEnvironmentTypeJSONRequestBody = EnvironmentTypeCreateBody
 // UpdateEnvironmentTypeJSONRequestBody defines body for UpdateEnvironmentType for application/json ContentType.
 type UpdateEnvironmentTypeJSONRequestBody = EnvironmentTypeUpdateBody
 
+// CreateModuleCatalogueEntryJSONRequestBody defines body for CreateModuleCatalogueEntry for application/json ContentType.
+type CreateModuleCatalogueEntryJSONRequestBody = ModuleCatalogueCreateBody
+
 // CreateModuleProviderJSONRequestBody defines body for CreateModuleProvider for application/json ContentType.
 type CreateModuleProviderJSONRequestBody = ModuleProviderCreateBody
 
@@ -1948,11 +3160,44 @@ type UpdateModuleProviderJSONRequestBody = ModuleProviderUpdateBody
 // CreateModuleRuleInOrgJSONRequestBody defines body for CreateModuleRuleInOrg for application/json ContentType.
 type CreateModuleRuleInOrgJSONRequestBody = RuleCreateBody
 
+// TransactModuleVersionLifecyclesJSONRequestBody defines body for TransactModuleVersionLifecycles for application/json ContentType.
+type TransactModuleVersionLifecyclesJSONRequestBody = ModuleVersionLifecycleTransactionBody
+
+// CreateEnvironmentModuleVersionPinJSONRequestBody defines body for CreateEnvironmentModuleVersionPin for application/json ContentType.
+type CreateEnvironmentModuleVersionPinJSONRequestBody = EnvironmentModuleVersionPinCreateBody
+
+// ExecuteEnvironmentModuleVersionPinBulkOperationJSONRequestBody defines body for ExecuteEnvironmentModuleVersionPinBulkOperation for application/json ContentType.
+type ExecuteEnvironmentModuleVersionPinBulkOperationJSONRequestBody = ModuleVersionPinBulkCommandBody
+
+// PreviewEnvironmentModuleVersionPinBulkOperationJSONRequestBody defines body for PreviewEnvironmentModuleVersionPinBulkOperation for application/json ContentType.
+type PreviewEnvironmentModuleVersionPinBulkOperationJSONRequestBody = ModuleVersionPinBulkPreviewBody
+
+// TransitionEnvironmentModuleVersionPinJSONRequestBody defines body for TransitionEnvironmentModuleVersionPin for application/json ContentType.
+type TransitionEnvironmentModuleVersionPinJSONRequestBody = ModuleReasonedCommand
+
+// AppendEnvironmentModuleVersionPinNoteJSONRequestBody defines body for AppendEnvironmentModuleVersionPinNote for application/json ContentType.
+type AppendEnvironmentModuleVersionPinNoteJSONRequestBody = ModuleVersionPinNoteBody
+
 // CreateModuleJSONRequestBody defines body for CreateModule for application/json ContentType.
 type CreateModuleJSONRequestBody = ModuleCreateBody
 
 // UpdateModuleJSONRequestBody defines body for UpdateModule for application/json ContentType.
 type UpdateModuleJSONRequestBody = ModuleUpdateBody
+
+// UpdateModuleCatalogueEntryJSONRequestBody defines body for UpdateModuleCatalogueEntry for application/json ContentType.
+type UpdateModuleCatalogueEntryJSONRequestBody = ModuleCatalogueUpdateBody
+
+// ChangeModuleCatalogueStatusJSONRequestBody defines body for ChangeModuleCatalogueStatus for application/json ContentType.
+type ChangeModuleCatalogueStatusJSONRequestBody = ModuleReasonedCommand
+
+// PublishModuleVersionJSONRequestBody defines body for PublishModuleVersion for application/json ContentType.
+type PublishModuleVersionJSONRequestBody = ModuleVersionPublishBody
+
+// TransitionModuleVersionJSONRequestBody defines body for TransitionModuleVersion for application/json ContentType.
+type TransitionModuleVersionJSONRequestBody = ModuleReasonedCommand
+
+// PublishStableModuleVersionSuccessorJSONRequestBody defines body for PublishStableModuleVersionSuccessor for application/json ContentType.
+type PublishStableModuleVersionSuccessorJSONRequestBody = StableModuleVersionSuccessorBody
 
 // CreateProjectJSONRequestBody defines body for CreateProject for application/json ContentType.
 type CreateProjectJSONRequestBody = ProjectCreateBody
@@ -1971,6 +3216,9 @@ type CreateResourceTypeJSONRequestBody = ResourceTypeCreateBody
 
 // UpdateResourceTypeJSONRequestBody defines body for UpdateResourceType for application/json ContentType.
 type UpdateResourceTypeJSONRequestBody = ResourceTypeUpdateBody
+
+// ChangeResourceTypeCatalogueStatusJSONRequestBody defines body for ChangeResourceTypeCatalogueStatus for application/json ContentType.
+type ChangeResourceTypeCatalogueStatusJSONRequestBody = ModuleReasonedCommand
 
 // CreateRunnerRuleInOrgJSONRequestBody defines body for CreateRunnerRuleInOrg for application/json ContentType.
 type CreateRunnerRuleInOrgJSONRequestBody = RunnerRuleCreateBody
@@ -2502,6 +3750,30 @@ type ServerInterface interface {
 	// Get an Environment by UUID
 	// (GET /internal/orgs/{orgId}/envs/{envUuid})
 	GetInternalEnvironmentByUuid(ctx echo.Context, orgId OrgIdPathParam, envUuid EnvUuidPathParam) error
+
+	// (POST /internal/orgs/{orgId}/module-version-pins/{pinId}/actions/override)
+	BeginEnvironmentModuleVersionPinOverride(ctx echo.Context, orgId OrgIdPathParam, pinId openapi_types.UUID, params BeginEnvironmentModuleVersionPinOverrideParams) error
+
+	// (POST /internal/orgs/{orgId}/module-version-pins/{pinId}/actions/reconcile-override)
+	ReconcileEnvironmentModuleVersionPinOverride(ctx echo.Context, orgId OrgIdPathParam, pinId openapi_types.UUID, params ReconcileEnvironmentModuleVersionPinOverrideParams) error
+
+	// (POST /internal/orgs/{orgId}/module-version-pins/{pinId}/actions/restore-after-rollback)
+	RestoreEnvironmentModuleVersionPinAfterRollback(ctx echo.Context, orgId OrgIdPathParam, pinId openapi_types.UUID, params RestoreEnvironmentModuleVersionPinAfterRollbackParams) error
+	// List namespaced related resources and contextual actions registered by add-ons
+	// (GET /internal/orgs/{orgId}/modules/{moduleId}/extension-contributions)
+	ListModuleExtensionContributions(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, params ListModuleExtensionContributionsParams) error
+	// Register or update a namespaced related resource or contextual action
+	// (POST /internal/orgs/{orgId}/modules/{moduleId}/extension-contributions)
+	UpsertModuleExtensionContribution(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, params UpsertModuleExtensionContributionParams) error
+	// List add-on reservations that exclusively protect a Module operation
+	// (GET /internal/orgs/{orgId}/modules/{moduleId}/operation-reservations)
+	ListModuleOperationReservations(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, params ListModuleOperationReservationsParams) error
+	// Acquire the Module's exclusive add-on operation reservation
+	// (POST /internal/orgs/{orgId}/modules/{moduleId}/operation-reservations)
+	AcquireModuleOperationReservation(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, params AcquireModuleOperationReservationParams) error
+	// Release an exact add-on operation reservation
+	// (POST /internal/orgs/{orgId}/modules/{moduleId}/operation-reservations/{reservationId}/actions/release)
+	ReleaseModuleOperationReservation(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, reservationId openapi_types.UUID, params ReleaseModuleOperationReservationParams) error
 	// An internal API for updating fields on an environment
 	// (PATCH /internal/orgs/{orgId}/projects/{projectId}/envs/{envId})
 	InternalUpdateEnvironment(ctx echo.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam) error
@@ -2510,7 +3782,7 @@ type ServerInterface interface {
 	InternalForceDeleteEnvironment(ctx echo.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam, params InternalForceDeleteEnvironmentParams) error
 	// An internal API to get all of the modules, rules, and providers that match an environment as well as any declared pinned versions.
 	// (POST /internal/orgs/{orgId}/projects/{projectId}/envs/{envId}/module-catalogue)
-	GenerateInternalModuleCatalogue(ctx echo.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam) error
+	GenerateInternalModuleCatalogue(ctx echo.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam, params GenerateInternalModuleCatalogueParams) error
 	// Get a Project by UUID
 	// (GET /internal/orgs/{orgId}/projects/{projectUuid})
 	GetInternalProjectByUuid(ctx echo.Context, orgId OrgIdPathParam, projectUuid ProjectUuidPathParam) error
@@ -2529,7 +3801,7 @@ type ServerInterface interface {
 	// Delete a built-in resource type
 	// (DELETE /internal/resource-types/{typeId})
 	InternalDeleteResourceType(ctx echo.Context, typeId ResourceTypeIdPathParam) error
-	// Update a built-in resource type
+	// Reject mutation of an immutable built-in resource type contract
 	// (PATCH /internal/resource-types/{typeId})
 	InternalUpdateResourceType(ctx echo.Context, typeId ResourceTypeIdPathParam) error
 	// Create a new organization with a random name and suffix.
@@ -2556,6 +3828,12 @@ type ServerInterface interface {
 	// List environments in an organization
 	// (GET /orgs/{orgId}/envs)
 	ListEnvironmentsInOrg(ctx echo.Context, orgId OrgIdPathParam, params ListEnvironmentsInOrgParams) error
+	// List stable Module identities, including empty shells
+	// (GET /orgs/{orgId}/module-catalogue)
+	ListModuleCatalogueEntries(ctx echo.Context, orgId OrgIdPathParam, params ListModuleCatalogueEntriesParams) error
+	// Create an empty stable Module identity without publishing a version
+	// (POST /orgs/{orgId}/module-catalogue)
+	CreateModuleCatalogueEntry(ctx echo.Context, orgId OrgIdPathParam, params CreateModuleCatalogueEntryParams) error
 	// List module providers in the org
 	// (GET /orgs/{orgId}/module-providers)
 	ListModuleProviders(ctx echo.Context, orgId OrgIdPathParam, params ListModuleProvidersParams) error
@@ -2583,27 +3861,84 @@ type ServerInterface interface {
 	// Get an existing module rule in the org
 	// (GET /orgs/{orgId}/module-rules/{ruleId})
 	GetModuleRuleInOrg(ctx echo.Context, orgId OrgIdPathParam, ruleId RuleIdPathParam) error
+	// Apply lifecycle changes across Modules in one atomic Core transaction
+	// (POST /orgs/{orgId}/module-version-lifecycle-transactions)
+	TransactModuleVersionLifecycles(ctx echo.Context, orgId OrgIdPathParam, params TransactModuleVersionLifecyclesParams) error
+
+	// (GET /orgs/{orgId}/module-version-pins)
+	ListEnvironmentModuleVersionPins(ctx echo.Context, orgId OrgIdPathParam, params ListEnvironmentModuleVersionPinsParams) error
+
+	// (POST /orgs/{orgId}/module-version-pins)
+	CreateEnvironmentModuleVersionPin(ctx echo.Context, orgId OrgIdPathParam, params CreateEnvironmentModuleVersionPinParams) error
+
+	// (POST /orgs/{orgId}/module-version-pins/bulk)
+	ExecuteEnvironmentModuleVersionPinBulkOperation(ctx echo.Context, orgId OrgIdPathParam, params ExecuteEnvironmentModuleVersionPinBulkOperationParams) error
+
+	// (POST /orgs/{orgId}/module-version-pins/bulk-preview)
+	PreviewEnvironmentModuleVersionPinBulkOperation(ctx echo.Context, orgId OrgIdPathParam) error
+
+	// (GET /orgs/{orgId}/module-version-pins/{pinId})
+	GetEnvironmentModuleVersionPin(ctx echo.Context, orgId OrgIdPathParam, pinId openapi_types.UUID) error
+
+	// (POST /orgs/{orgId}/module-version-pins/{pinId}/actions/{pinAction})
+	TransitionEnvironmentModuleVersionPin(ctx echo.Context, orgId OrgIdPathParam, pinId openapi_types.UUID, pinAction TransitionEnvironmentModuleVersionPinParamsPinAction, params TransitionEnvironmentModuleVersionPinParams) error
+
+	// (GET /orgs/{orgId}/module-version-pins/{pinId}/events)
+	ListEnvironmentModuleVersionPinEvents(ctx echo.Context, orgId OrgIdPathParam, pinId openapi_types.UUID) error
+
+	// (POST /orgs/{orgId}/module-version-pins/{pinId}/notes)
+	AppendEnvironmentModuleVersionPinNote(ctx echo.Context, orgId OrgIdPathParam, pinId openapi_types.UUID, params AppendEnvironmentModuleVersionPinNoteParams) error
 	// List modules in the org
 	// (GET /orgs/{orgId}/modules)
 	ListModules(ctx echo.Context, orgId OrgIdPathParam, params ListModulesParams) error
-	// Create a new modules in the org
+	// Create a Module with an initial immutable Proposed version
 	// (POST /orgs/{orgId}/modules)
 	CreateModule(ctx echo.Context, orgId OrgIdPathParam) error
-	// Delete an existing module in the org if it is unused
+	// Delete an unused empty Module catalogue entry
 	// (DELETE /orgs/{orgId}/modules/{moduleId})
 	DeleteModule(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam) error
 	// Get an existing module in the org
 	// (GET /orgs/{orgId}/modules/{moduleId})
 	GetModule(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam) error
-	// Update an existing module
+	// Publish a new immutable Proposed version for an existing Module
 	// (PATCH /orgs/{orgId}/modules/{moduleId})
 	UpdateModule(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam) error
+
+	// (GET /orgs/{orgId}/modules/{moduleId}/catalogue)
+	GetModuleCatalogueEntry(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam) error
+
+	// (PATCH /orgs/{orgId}/modules/{moduleId}/catalogue)
+	UpdateModuleCatalogueEntry(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam) error
+
+	// (POST /orgs/{orgId}/modules/{moduleId}/catalogue/actions/{catalogueAction})
+	ChangeModuleCatalogueStatus(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, catalogueAction ChangeModuleCatalogueStatusParamsCatalogueAction, params ChangeModuleCatalogueStatusParams) error
 	// List the versions of a module
 	// (GET /orgs/{orgId}/modules/{moduleId}/versions)
 	ListModuleVersions(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, params ListModuleVersionsParams) error
+	// Publish a complete immutable Proposed Module Version
+	// (POST /orgs/{orgId}/modules/{moduleId}/versions)
+	PublishModuleVersion(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, params PublishModuleVersionParams) error
 	// Get a previous module version in the org
 	// (GET /orgs/{orgId}/modules/{moduleId}/versions/{moduleVersionId})
 	GetModuleVersion(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, moduleVersionId ModuleVersionIdPathParam) error
+
+	// (POST /orgs/{orgId}/modules/{moduleId}/versions/{moduleVersionId}/actions/{lifecycleAction})
+	TransitionModuleVersion(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, moduleVersionId ModuleVersionIdPathParam, lifecycleAction TransitionModuleVersionParamsLifecycleAction, params TransitionModuleVersionParams) error
+	// Structurally compare two immutable versions of one Module
+	// (GET /orgs/{orgId}/modules/{moduleId}/versions/{moduleVersionId}/compare/{otherModuleVersionId})
+	CompareModuleVersions(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, moduleVersionId ModuleVersionIdPathParam, otherModuleVersionId string) error
+
+	// (GET /orgs/{orgId}/modules/{moduleId}/versions/{moduleVersionId}/events)
+	ListModuleVersionLifecycleEvents(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, moduleVersionId ModuleVersionIdPathParam) error
+	// Atomically publish a stable successor and deprecate the exact Proposed prerelease
+	// (POST /orgs/{orgId}/modules/{moduleId}/versions/{moduleVersionId}/stable-successor)
+	PublishStableModuleVersionSuccessor(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, moduleVersionId ModuleVersionIdPathParam, params PublishStableModuleVersionSuccessorParams) error
+	// Inspect observed Environment adoption and Pin usage for one immutable Module Version
+	// (GET /orgs/{orgId}/modules/{moduleId}/versions/{moduleVersionId}/usage)
+	GetModuleVersionUsage(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, moduleVersionId ModuleVersionIdPathParam) error
+	// Discover an installed plugin and its availability for this organization.
+	// (GET /orgs/{orgId}/plugins/{pluginId})
+	GetPluginCapability(ctx echo.Context, orgId OrgIdPathParam, pluginId string) error
 	// List projects
 	// (GET /orgs/{orgId}/projects)
 	ListProjects(ctx echo.Context, orgId OrgIdPathParam, params ListProjectsParams) error
@@ -2640,6 +3975,9 @@ type ServerInterface interface {
 	// List available resource types for an environment in project
 	// (GET /orgs/{orgId}/projects/{projectId}/envs/{envId}/available-resource-types)
 	ListAvailableResourceTypes(ctx echo.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam, params ListAvailableResourceTypesParams) error
+	// Preview retained Module Pins and add-on resources affected by Environment deletion.
+	// (GET /orgs/{orgId}/projects/{projectId}/envs/{envId}/deletion-impact)
+	GetEnvironmentDeletionImpact(ctx echo.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam) error
 	// List available resource types
 	// (GET /orgs/{orgId}/resource-types)
 	ListResourceTypes(ctx echo.Context, orgId OrgIdPathParam, params ListResourceTypesParams) error
@@ -2652,9 +3990,12 @@ type ServerInterface interface {
 	// Get a resource type
 	// (GET /orgs/{orgId}/resource-types/{typeId})
 	GetResourceType(ctx echo.Context, orgId OrgIdPathParam, typeId ResourceTypeIdPathParam) error
-	// Update a resource type
+	// Reject mutation of an immutable resource type contract
 	// (PATCH /orgs/{orgId}/resource-types/{typeId})
 	UpdateResourceType(ctx echo.Context, orgId OrgIdPathParam, typeId ResourceTypeIdPathParam) error
+	// Archive or unarchive an immutable resource type identity
+	// (POST /orgs/{orgId}/resource-types/{typeId}/actions/{catalogueAction})
+	ChangeResourceTypeCatalogueStatus(ctx echo.Context, orgId OrgIdPathParam, typeId ResourceTypeIdPathParam, catalogueAction ChangeResourceTypeCatalogueStatusParamsCatalogueAction, params ChangeResourceTypeCatalogueStatusParams) error
 	// List runner rules in the org
 	// (GET /orgs/{orgId}/runner-rules)
 	ListRunnerRulesInOrg(ctx echo.Context, orgId OrgIdPathParam, params ListRunnerRulesInOrgParams) error
@@ -2771,6 +4112,379 @@ func (w *ServerInterfaceWrapper) GetInternalEnvironmentByUuid(ctx echo.Context) 
 	return err
 }
 
+// BeginEnvironmentModuleVersionPinOverride converts echo context to params.
+func (w *ServerInterfaceWrapper) BeginEnvironmentModuleVersionPinOverride(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pinId" -------------
+	var pinId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pinId", ctx.Param("pinId"), &pinId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pinId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params BeginEnvironmentModuleVersionPinOverrideParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.BeginEnvironmentModuleVersionPinOverride(ctx, orgId, pinId, params)
+	return err
+}
+
+// ReconcileEnvironmentModuleVersionPinOverride converts echo context to params.
+func (w *ServerInterfaceWrapper) ReconcileEnvironmentModuleVersionPinOverride(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pinId" -------------
+	var pinId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pinId", ctx.Param("pinId"), &pinId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pinId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ReconcileEnvironmentModuleVersionPinOverrideParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ReconcileEnvironmentModuleVersionPinOverride(ctx, orgId, pinId, params)
+	return err
+}
+
+// RestoreEnvironmentModuleVersionPinAfterRollback converts echo context to params.
+func (w *ServerInterfaceWrapper) RestoreEnvironmentModuleVersionPinAfterRollback(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pinId" -------------
+	var pinId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pinId", ctx.Param("pinId"), &pinId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pinId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RestoreEnvironmentModuleVersionPinAfterRollbackParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.RestoreEnvironmentModuleVersionPinAfterRollback(ctx, orgId, pinId, params)
+	return err
+}
+
+// ListModuleExtensionContributions converts echo context to params.
+func (w *ServerInterfaceWrapper) ListModuleExtensionContributions(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "moduleId" -------------
+	var moduleId ModuleIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "moduleId", ctx.Param("moduleId"), &moduleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter moduleId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListModuleExtensionContributionsParams
+	// ------------- Optional query parameter "include_draft" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "include_draft", ctx.QueryParams(), &params.IncludeDraft, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter include_draft: %s", err))
+	}
+
+	// ------------- Optional query parameter "include_terminal" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "include_terminal", ctx.QueryParams(), &params.IncludeTerminal, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter include_terminal: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ListModuleExtensionContributions(ctx, orgId, moduleId, params)
+	return err
+}
+
+// UpsertModuleExtensionContribution converts echo context to params.
+func (w *ServerInterfaceWrapper) UpsertModuleExtensionContribution(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "moduleId" -------------
+	var moduleId ModuleIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "moduleId", ctx.Param("moduleId"), &moduleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter moduleId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpsertModuleExtensionContributionParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.UpsertModuleExtensionContribution(ctx, orgId, moduleId, params)
+	return err
+}
+
+// ListModuleOperationReservations converts echo context to params.
+func (w *ServerInterfaceWrapper) ListModuleOperationReservations(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "moduleId" -------------
+	var moduleId ModuleIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "moduleId", ctx.Param("moduleId"), &moduleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter moduleId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListModuleOperationReservationsParams
+	// ------------- Optional query parameter "include_released" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "include_released", ctx.QueryParams(), &params.IncludeReleased, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter include_released: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ListModuleOperationReservations(ctx, orgId, moduleId, params)
+	return err
+}
+
+// AcquireModuleOperationReservation converts echo context to params.
+func (w *ServerInterfaceWrapper) AcquireModuleOperationReservation(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "moduleId" -------------
+	var moduleId ModuleIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "moduleId", ctx.Param("moduleId"), &moduleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter moduleId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AcquireModuleOperationReservationParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.AcquireModuleOperationReservation(ctx, orgId, moduleId, params)
+	return err
+}
+
+// ReleaseModuleOperationReservation converts echo context to params.
+func (w *ServerInterfaceWrapper) ReleaseModuleOperationReservation(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "moduleId" -------------
+	var moduleId ModuleIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "moduleId", ctx.Param("moduleId"), &moduleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter moduleId: %s", err))
+	}
+
+	// ------------- Path parameter "reservationId" -------------
+	var reservationId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "reservationId", ctx.Param("reservationId"), &reservationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter reservationId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ReleaseModuleOperationReservationParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ReleaseModuleOperationReservation(ctx, orgId, moduleId, reservationId, params)
+	return err
+}
+
 // InternalUpdateEnvironment converts echo context to params.
 func (w *ServerInterfaceWrapper) InternalUpdateEnvironment(ctx echo.Context) error {
 	var err error
@@ -2877,8 +4591,88 @@ func (w *ServerInterfaceWrapper) GenerateInternalModuleCatalogue(ctx echo.Contex
 
 	ctx.Set(UserIdHeaderScopes, []string{})
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GenerateInternalModuleCatalogueParams
+
+	headers := ctx.Request().Header
+	// ------------- Optional header parameter "X-Stellwerk-Rollback" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Stellwerk-Rollback")]; found {
+		var XStellwerkRollback bool
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for X-Stellwerk-Rollback, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Stellwerk-Rollback", valueList[0], &XStellwerkRollback, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "boolean", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter X-Stellwerk-Rollback: %s", err))
+		}
+
+		params.XStellwerkRollback = &XStellwerkRollback
+	}
+	// ------------- Optional header parameter "X-Stellwerk-Module-Operation-Id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Stellwerk-Module-Operation-Id")]; found {
+		var XStellwerkModuleOperationId openapi_types.UUID
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for X-Stellwerk-Module-Operation-Id, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Stellwerk-Module-Operation-Id", valueList[0], &XStellwerkModuleOperationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter X-Stellwerk-Module-Operation-Id: %s", err))
+		}
+
+		params.XStellwerkModuleOperationId = &XStellwerkModuleOperationId
+	}
+	// ------------- Optional header parameter "X-Stellwerk-Module-Operation-Planning" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Stellwerk-Module-Operation-Planning")]; found {
+		var XStellwerkModuleOperationPlanning bool
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for X-Stellwerk-Module-Operation-Planning, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Stellwerk-Module-Operation-Planning", valueList[0], &XStellwerkModuleOperationPlanning, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "boolean", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter X-Stellwerk-Module-Operation-Planning: %s", err))
+		}
+
+		params.XStellwerkModuleOperationPlanning = &XStellwerkModuleOperationPlanning
+	}
+	// ------------- Optional header parameter "X-Stellwerk-Restricted-Version-Confirmations" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Stellwerk-Restricted-Version-Confirmations")]; found {
+		var XStellwerkRestrictedVersionConfirmations []openapi_types.UUID
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for X-Stellwerk-Restricted-Version-Confirmations, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Stellwerk-Restricted-Version-Confirmations", valueList[0], &XStellwerkRestrictedVersionConfirmations, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "array", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter X-Stellwerk-Restricted-Version-Confirmations: %s", err))
+		}
+
+		params.XStellwerkRestrictedVersionConfirmations = &XStellwerkRestrictedVersionConfirmations
+	}
+	// ------------- Optional header parameter "X-Stellwerk-Active-Module-Versions" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Stellwerk-Active-Module-Versions")]; found {
+		var XStellwerkActiveModuleVersions []string
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for X-Stellwerk-Active-Module-Versions, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Stellwerk-Active-Module-Versions", valueList[0], &XStellwerkActiveModuleVersions, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "array", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter X-Stellwerk-Active-Module-Versions: %s", err))
+		}
+
+		params.XStellwerkActiveModuleVersions = &XStellwerkActiveModuleVersions
+	}
+
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.GenerateInternalModuleCatalogue(ctx, orgId, projectId, envId)
+	err = w.Handler.GenerateInternalModuleCatalogue(ctx, orgId, projectId, envId, params)
 	return err
 }
 
@@ -3248,6 +5042,73 @@ func (w *ServerInterfaceWrapper) ListEnvironmentsInOrg(ctx echo.Context) error {
 	return err
 }
 
+// ListModuleCatalogueEntries converts echo context to params.
+func (w *ServerInterfaceWrapper) ListModuleCatalogueEntries(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListModuleCatalogueEntriesParams
+	// ------------- Optional query parameter "include_archived" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "include_archived", ctx.QueryParams(), &params.IncludeArchived, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter include_archived: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ListModuleCatalogueEntries(ctx, orgId, params)
+	return err
+}
+
+// CreateModuleCatalogueEntry converts echo context to params.
+func (w *ServerInterfaceWrapper) CreateModuleCatalogueEntry(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateModuleCatalogueEntryParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.CreateModuleCatalogueEntry(ctx, orgId, params)
+	return err
+}
+
 // ListModuleProviders converts echo context to params.
 func (w *ServerInterfaceWrapper) ListModuleProviders(ctx echo.Context) error {
 	var err error
@@ -3541,6 +5402,341 @@ func (w *ServerInterfaceWrapper) GetModuleRuleInOrg(ctx echo.Context) error {
 	return err
 }
 
+// TransactModuleVersionLifecycles converts echo context to params.
+func (w *ServerInterfaceWrapper) TransactModuleVersionLifecycles(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params TransactModuleVersionLifecyclesParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.TransactModuleVersionLifecycles(ctx, orgId, params)
+	return err
+}
+
+// ListEnvironmentModuleVersionPins converts echo context to params.
+func (w *ServerInterfaceWrapper) ListEnvironmentModuleVersionPins(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListEnvironmentModuleVersionPinsParams
+	// ------------- Optional query parameter "environment_uuid" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "environment_uuid", ctx.QueryParams(), &params.EnvironmentUuid, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter environment_uuid: %s", err))
+	}
+
+	// ------------- Optional query parameter "module_uuid" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "module_uuid", ctx.QueryParams(), &params.ModuleUuid, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter module_uuid: %s", err))
+	}
+
+	// ------------- Optional query parameter "include_removed" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "include_removed", ctx.QueryParams(), &params.IncludeRemoved, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter include_removed: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ListEnvironmentModuleVersionPins(ctx, orgId, params)
+	return err
+}
+
+// CreateEnvironmentModuleVersionPin converts echo context to params.
+func (w *ServerInterfaceWrapper) CreateEnvironmentModuleVersionPin(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateEnvironmentModuleVersionPinParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.CreateEnvironmentModuleVersionPin(ctx, orgId, params)
+	return err
+}
+
+// ExecuteEnvironmentModuleVersionPinBulkOperation converts echo context to params.
+func (w *ServerInterfaceWrapper) ExecuteEnvironmentModuleVersionPinBulkOperation(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ExecuteEnvironmentModuleVersionPinBulkOperationParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ExecuteEnvironmentModuleVersionPinBulkOperation(ctx, orgId, params)
+	return err
+}
+
+// PreviewEnvironmentModuleVersionPinBulkOperation converts echo context to params.
+func (w *ServerInterfaceWrapper) PreviewEnvironmentModuleVersionPinBulkOperation(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.PreviewEnvironmentModuleVersionPinBulkOperation(ctx, orgId)
+	return err
+}
+
+// GetEnvironmentModuleVersionPin converts echo context to params.
+func (w *ServerInterfaceWrapper) GetEnvironmentModuleVersionPin(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pinId" -------------
+	var pinId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pinId", ctx.Param("pinId"), &pinId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pinId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetEnvironmentModuleVersionPin(ctx, orgId, pinId)
+	return err
+}
+
+// TransitionEnvironmentModuleVersionPin converts echo context to params.
+func (w *ServerInterfaceWrapper) TransitionEnvironmentModuleVersionPin(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pinId" -------------
+	var pinId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pinId", ctx.Param("pinId"), &pinId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pinId: %s", err))
+	}
+
+	// ------------- Path parameter "pinAction" -------------
+	var pinAction TransitionEnvironmentModuleVersionPinParamsPinAction
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pinAction", ctx.Param("pinAction"), &pinAction, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pinAction: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params TransitionEnvironmentModuleVersionPinParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.TransitionEnvironmentModuleVersionPin(ctx, orgId, pinId, pinAction, params)
+	return err
+}
+
+// ListEnvironmentModuleVersionPinEvents converts echo context to params.
+func (w *ServerInterfaceWrapper) ListEnvironmentModuleVersionPinEvents(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pinId" -------------
+	var pinId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pinId", ctx.Param("pinId"), &pinId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pinId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ListEnvironmentModuleVersionPinEvents(ctx, orgId, pinId)
+	return err
+}
+
+// AppendEnvironmentModuleVersionPinNote converts echo context to params.
+func (w *ServerInterfaceWrapper) AppendEnvironmentModuleVersionPinNote(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pinId" -------------
+	var pinId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pinId", ctx.Param("pinId"), &pinId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pinId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AppendEnvironmentModuleVersionPinNoteParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.AppendEnvironmentModuleVersionPinNote(ctx, orgId, pinId, params)
+	return err
+}
+
 // ListModules converts echo context to params.
 func (w *ServerInterfaceWrapper) ListModules(ctx echo.Context) error {
 	var err error
@@ -3678,6 +5874,114 @@ func (w *ServerInterfaceWrapper) UpdateModule(ctx echo.Context) error {
 	return err
 }
 
+// GetModuleCatalogueEntry converts echo context to params.
+func (w *ServerInterfaceWrapper) GetModuleCatalogueEntry(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "moduleId" -------------
+	var moduleId ModuleIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "moduleId", ctx.Param("moduleId"), &moduleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter moduleId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetModuleCatalogueEntry(ctx, orgId, moduleId)
+	return err
+}
+
+// UpdateModuleCatalogueEntry converts echo context to params.
+func (w *ServerInterfaceWrapper) UpdateModuleCatalogueEntry(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "moduleId" -------------
+	var moduleId ModuleIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "moduleId", ctx.Param("moduleId"), &moduleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter moduleId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.UpdateModuleCatalogueEntry(ctx, orgId, moduleId)
+	return err
+}
+
+// ChangeModuleCatalogueStatus converts echo context to params.
+func (w *ServerInterfaceWrapper) ChangeModuleCatalogueStatus(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "moduleId" -------------
+	var moduleId ModuleIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "moduleId", ctx.Param("moduleId"), &moduleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter moduleId: %s", err))
+	}
+
+	// ------------- Path parameter "catalogueAction" -------------
+	var catalogueAction ChangeModuleCatalogueStatusParamsCatalogueAction
+
+	err = runtime.BindStyledParameterWithOptions("simple", "catalogueAction", ctx.Param("catalogueAction"), &catalogueAction, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter catalogueAction: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ChangeModuleCatalogueStatusParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ChangeModuleCatalogueStatus(ctx, orgId, moduleId, catalogueAction, params)
+	return err
+}
+
 // ListModuleVersions converts echo context to params.
 func (w *ServerInterfaceWrapper) ListModuleVersions(ctx echo.Context) error {
 	var err error
@@ -3715,8 +6019,70 @@ func (w *ServerInterfaceWrapper) ListModuleVersions(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter page: %s", err))
 	}
 
+	// ------------- Optional query parameter "include_deprecated" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "include_deprecated", ctx.QueryParams(), &params.IncludeDeprecated, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter include_deprecated: %s", err))
+	}
+
+	// ------------- Optional query parameter "include_defective" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "include_defective", ctx.QueryParams(), &params.IncludeDefective, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter include_defective: %s", err))
+	}
+
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.ListModuleVersions(ctx, orgId, moduleId, params)
+	return err
+}
+
+// PublishModuleVersion converts echo context to params.
+func (w *ServerInterfaceWrapper) PublishModuleVersion(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "moduleId" -------------
+	var moduleId ModuleIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "moduleId", ctx.Param("moduleId"), &moduleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter moduleId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PublishModuleVersionParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.PublishModuleVersion(ctx, orgId, moduleId, params)
 	return err
 }
 
@@ -3742,7 +6108,7 @@ func (w *ServerInterfaceWrapper) GetModuleVersion(ctx echo.Context) error {
 	// ------------- Path parameter "moduleVersionId" -------------
 	var moduleVersionId ModuleVersionIdPathParam
 
-	err = runtime.BindStyledParameterWithOptions("simple", "moduleVersionId", ctx.Param("moduleVersionId"), &moduleVersionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	err = runtime.BindStyledParameterWithOptions("simple", "moduleVersionId", ctx.Param("moduleVersionId"), &moduleVersionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter moduleVersionId: %s", err))
 	}
@@ -3751,6 +6117,262 @@ func (w *ServerInterfaceWrapper) GetModuleVersion(ctx echo.Context) error {
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.GetModuleVersion(ctx, orgId, moduleId, moduleVersionId)
+	return err
+}
+
+// TransitionModuleVersion converts echo context to params.
+func (w *ServerInterfaceWrapper) TransitionModuleVersion(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "moduleId" -------------
+	var moduleId ModuleIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "moduleId", ctx.Param("moduleId"), &moduleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter moduleId: %s", err))
+	}
+
+	// ------------- Path parameter "moduleVersionId" -------------
+	var moduleVersionId ModuleVersionIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "moduleVersionId", ctx.Param("moduleVersionId"), &moduleVersionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter moduleVersionId: %s", err))
+	}
+
+	// ------------- Path parameter "lifecycleAction" -------------
+	var lifecycleAction TransitionModuleVersionParamsLifecycleAction
+
+	err = runtime.BindStyledParameterWithOptions("simple", "lifecycleAction", ctx.Param("lifecycleAction"), &lifecycleAction, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter lifecycleAction: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params TransitionModuleVersionParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.TransitionModuleVersion(ctx, orgId, moduleId, moduleVersionId, lifecycleAction, params)
+	return err
+}
+
+// CompareModuleVersions converts echo context to params.
+func (w *ServerInterfaceWrapper) CompareModuleVersions(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "moduleId" -------------
+	var moduleId ModuleIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "moduleId", ctx.Param("moduleId"), &moduleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter moduleId: %s", err))
+	}
+
+	// ------------- Path parameter "moduleVersionId" -------------
+	var moduleVersionId ModuleVersionIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "moduleVersionId", ctx.Param("moduleVersionId"), &moduleVersionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter moduleVersionId: %s", err))
+	}
+
+	// ------------- Path parameter "otherModuleVersionId" -------------
+	var otherModuleVersionId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "otherModuleVersionId", ctx.Param("otherModuleVersionId"), &otherModuleVersionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter otherModuleVersionId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.CompareModuleVersions(ctx, orgId, moduleId, moduleVersionId, otherModuleVersionId)
+	return err
+}
+
+// ListModuleVersionLifecycleEvents converts echo context to params.
+func (w *ServerInterfaceWrapper) ListModuleVersionLifecycleEvents(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "moduleId" -------------
+	var moduleId ModuleIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "moduleId", ctx.Param("moduleId"), &moduleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter moduleId: %s", err))
+	}
+
+	// ------------- Path parameter "moduleVersionId" -------------
+	var moduleVersionId ModuleVersionIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "moduleVersionId", ctx.Param("moduleVersionId"), &moduleVersionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter moduleVersionId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ListModuleVersionLifecycleEvents(ctx, orgId, moduleId, moduleVersionId)
+	return err
+}
+
+// PublishStableModuleVersionSuccessor converts echo context to params.
+func (w *ServerInterfaceWrapper) PublishStableModuleVersionSuccessor(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "moduleId" -------------
+	var moduleId ModuleIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "moduleId", ctx.Param("moduleId"), &moduleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter moduleId: %s", err))
+	}
+
+	// ------------- Path parameter "moduleVersionId" -------------
+	var moduleVersionId ModuleVersionIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "moduleVersionId", ctx.Param("moduleVersionId"), &moduleVersionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter moduleVersionId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PublishStableModuleVersionSuccessorParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.PublishStableModuleVersionSuccessor(ctx, orgId, moduleId, moduleVersionId, params)
+	return err
+}
+
+// GetModuleVersionUsage converts echo context to params.
+func (w *ServerInterfaceWrapper) GetModuleVersionUsage(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "moduleId" -------------
+	var moduleId ModuleIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "moduleId", ctx.Param("moduleId"), &moduleId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter moduleId: %s", err))
+	}
+
+	// ------------- Path parameter "moduleVersionId" -------------
+	var moduleVersionId ModuleVersionIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "moduleVersionId", ctx.Param("moduleVersionId"), &moduleVersionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter moduleVersionId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetModuleVersionUsage(ctx, orgId, moduleId, moduleVersionId)
+	return err
+}
+
+// GetPluginCapability converts echo context to params.
+func (w *ServerInterfaceWrapper) GetPluginCapability(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pluginId" -------------
+	var pluginId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pluginId", ctx.Param("pluginId"), &pluginId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pluginId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetPluginCapability(ctx, orgId, pluginId)
 	return err
 }
 
@@ -4193,6 +6815,40 @@ func (w *ServerInterfaceWrapper) ListAvailableResourceTypes(ctx echo.Context) er
 	return err
 }
 
+// GetEnvironmentDeletionImpact converts echo context to params.
+func (w *ServerInterfaceWrapper) GetEnvironmentDeletionImpact(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", ctx.Param("projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter projectId: %s", err))
+	}
+
+	// ------------- Path parameter "envId" -------------
+	var envId EnvIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "envId", ctx.Param("envId"), &envId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter envId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetEnvironmentDeletionImpact(ctx, orgId, projectId, envId)
+	return err
+}
+
 // ListResourceTypes converts echo context to params.
 func (w *ServerInterfaceWrapper) ListResourceTypes(ctx echo.Context) error {
 	var err error
@@ -4320,6 +6976,62 @@ func (w *ServerInterfaceWrapper) UpdateResourceType(ctx echo.Context) error {
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.UpdateResourceType(ctx, orgId, typeId)
+	return err
+}
+
+// ChangeResourceTypeCatalogueStatus converts echo context to params.
+func (w *ServerInterfaceWrapper) ChangeResourceTypeCatalogueStatus(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "typeId" -------------
+	var typeId ResourceTypeIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "typeId", ctx.Param("typeId"), &typeId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter typeId: %s", err))
+	}
+
+	// ------------- Path parameter "catalogueAction" -------------
+	var catalogueAction ChangeResourceTypeCatalogueStatusParamsCatalogueAction
+
+	err = runtime.BindStyledParameterWithOptions("simple", "catalogueAction", ctx.Param("catalogueAction"), &catalogueAction, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter catalogueAction: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ChangeResourceTypeCatalogueStatusParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ChangeResourceTypeCatalogueStatus(ctx, orgId, typeId, catalogueAction, params)
 	return err
 }
 
@@ -4617,6 +7329,14 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.POST(baseURL+"/internal/orgs", wrapper.CreateInternalOrganization)
 	router.GET(baseURL+"/internal/orgs/:orgId", wrapper.GetInternalOrganization)
 	router.GET(baseURL+"/internal/orgs/:orgId/envs/:envUuid", wrapper.GetInternalEnvironmentByUuid)
+	router.POST(baseURL+"/internal/orgs/:orgId/module-version-pins/:pinId/actions/override", wrapper.BeginEnvironmentModuleVersionPinOverride)
+	router.POST(baseURL+"/internal/orgs/:orgId/module-version-pins/:pinId/actions/reconcile-override", wrapper.ReconcileEnvironmentModuleVersionPinOverride)
+	router.POST(baseURL+"/internal/orgs/:orgId/module-version-pins/:pinId/actions/restore-after-rollback", wrapper.RestoreEnvironmentModuleVersionPinAfterRollback)
+	router.GET(baseURL+"/internal/orgs/:orgId/modules/:moduleId/extension-contributions", wrapper.ListModuleExtensionContributions)
+	router.POST(baseURL+"/internal/orgs/:orgId/modules/:moduleId/extension-contributions", wrapper.UpsertModuleExtensionContribution)
+	router.GET(baseURL+"/internal/orgs/:orgId/modules/:moduleId/operation-reservations", wrapper.ListModuleOperationReservations)
+	router.POST(baseURL+"/internal/orgs/:orgId/modules/:moduleId/operation-reservations", wrapper.AcquireModuleOperationReservation)
+	router.POST(baseURL+"/internal/orgs/:orgId/modules/:moduleId/operation-reservations/:reservationId/actions/release", wrapper.ReleaseModuleOperationReservation)
 	router.PATCH(baseURL+"/internal/orgs/:orgId/projects/:projectId/envs/:envId", wrapper.InternalUpdateEnvironment)
 	router.POST(baseURL+"/internal/orgs/:orgId/projects/:projectId/envs/:envId/actions/force-delete", wrapper.InternalForceDeleteEnvironment)
 	router.POST(baseURL+"/internal/orgs/:orgId/projects/:projectId/envs/:envId/module-catalogue", wrapper.GenerateInternalModuleCatalogue)
@@ -4635,6 +7355,8 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.GET(baseURL+"/orgs/:orgId/env-types/:envTypeId", wrapper.GetEnvironmentType)
 	router.PATCH(baseURL+"/orgs/:orgId/env-types/:envTypeId", wrapper.UpdateEnvironmentType)
 	router.GET(baseURL+"/orgs/:orgId/envs", wrapper.ListEnvironmentsInOrg)
+	router.GET(baseURL+"/orgs/:orgId/module-catalogue", wrapper.ListModuleCatalogueEntries)
+	router.POST(baseURL+"/orgs/:orgId/module-catalogue", wrapper.CreateModuleCatalogueEntry)
 	router.GET(baseURL+"/orgs/:orgId/module-providers", wrapper.ListModuleProviders)
 	router.POST(baseURL+"/orgs/:orgId/module-providers", wrapper.CreateModuleProvider)
 	router.DELETE(baseURL+"/orgs/:orgId/module-providers/:providerType/:providerId", wrapper.DeleteModuleProvider)
@@ -4644,13 +7366,32 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.POST(baseURL+"/orgs/:orgId/module-rules", wrapper.CreateModuleRuleInOrg)
 	router.DELETE(baseURL+"/orgs/:orgId/module-rules/:ruleId", wrapper.DeleteModuleRuleInOrg)
 	router.GET(baseURL+"/orgs/:orgId/module-rules/:ruleId", wrapper.GetModuleRuleInOrg)
+	router.POST(baseURL+"/orgs/:orgId/module-version-lifecycle-transactions", wrapper.TransactModuleVersionLifecycles)
+	router.GET(baseURL+"/orgs/:orgId/module-version-pins", wrapper.ListEnvironmentModuleVersionPins)
+	router.POST(baseURL+"/orgs/:orgId/module-version-pins", wrapper.CreateEnvironmentModuleVersionPin)
+	router.POST(baseURL+"/orgs/:orgId/module-version-pins/bulk", wrapper.ExecuteEnvironmentModuleVersionPinBulkOperation)
+	router.POST(baseURL+"/orgs/:orgId/module-version-pins/bulk-preview", wrapper.PreviewEnvironmentModuleVersionPinBulkOperation)
+	router.GET(baseURL+"/orgs/:orgId/module-version-pins/:pinId", wrapper.GetEnvironmentModuleVersionPin)
+	router.POST(baseURL+"/orgs/:orgId/module-version-pins/:pinId/actions/:pinAction", wrapper.TransitionEnvironmentModuleVersionPin)
+	router.GET(baseURL+"/orgs/:orgId/module-version-pins/:pinId/events", wrapper.ListEnvironmentModuleVersionPinEvents)
+	router.POST(baseURL+"/orgs/:orgId/module-version-pins/:pinId/notes", wrapper.AppendEnvironmentModuleVersionPinNote)
 	router.GET(baseURL+"/orgs/:orgId/modules", wrapper.ListModules)
 	router.POST(baseURL+"/orgs/:orgId/modules", wrapper.CreateModule)
 	router.DELETE(baseURL+"/orgs/:orgId/modules/:moduleId", wrapper.DeleteModule)
 	router.GET(baseURL+"/orgs/:orgId/modules/:moduleId", wrapper.GetModule)
 	router.PATCH(baseURL+"/orgs/:orgId/modules/:moduleId", wrapper.UpdateModule)
+	router.GET(baseURL+"/orgs/:orgId/modules/:moduleId/catalogue", wrapper.GetModuleCatalogueEntry)
+	router.PATCH(baseURL+"/orgs/:orgId/modules/:moduleId/catalogue", wrapper.UpdateModuleCatalogueEntry)
+	router.POST(baseURL+"/orgs/:orgId/modules/:moduleId/catalogue/actions/:catalogueAction", wrapper.ChangeModuleCatalogueStatus)
 	router.GET(baseURL+"/orgs/:orgId/modules/:moduleId/versions", wrapper.ListModuleVersions)
+	router.POST(baseURL+"/orgs/:orgId/modules/:moduleId/versions", wrapper.PublishModuleVersion)
 	router.GET(baseURL+"/orgs/:orgId/modules/:moduleId/versions/:moduleVersionId", wrapper.GetModuleVersion)
+	router.POST(baseURL+"/orgs/:orgId/modules/:moduleId/versions/:moduleVersionId/actions/:lifecycleAction", wrapper.TransitionModuleVersion)
+	router.GET(baseURL+"/orgs/:orgId/modules/:moduleId/versions/:moduleVersionId/compare/:otherModuleVersionId", wrapper.CompareModuleVersions)
+	router.GET(baseURL+"/orgs/:orgId/modules/:moduleId/versions/:moduleVersionId/events", wrapper.ListModuleVersionLifecycleEvents)
+	router.POST(baseURL+"/orgs/:orgId/modules/:moduleId/versions/:moduleVersionId/stable-successor", wrapper.PublishStableModuleVersionSuccessor)
+	router.GET(baseURL+"/orgs/:orgId/modules/:moduleId/versions/:moduleVersionId/usage", wrapper.GetModuleVersionUsage)
+	router.GET(baseURL+"/orgs/:orgId/plugins/:pluginId", wrapper.GetPluginCapability)
 	router.GET(baseURL+"/orgs/:orgId/projects", wrapper.ListProjects)
 	router.POST(baseURL+"/orgs/:orgId/projects", wrapper.CreateProject)
 	router.DELETE(baseURL+"/orgs/:orgId/projects/:projectId", wrapper.DeleteProject)
@@ -4663,11 +7404,13 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.PATCH(baseURL+"/orgs/:orgId/projects/:projectId/envs/:envId", wrapper.UpdateEnvironment)
 	router.POST(baseURL+"/orgs/:orgId/projects/:projectId/envs/:envId/actions/refresh_runner", wrapper.UpdateRunnerInAnEnvironment)
 	router.GET(baseURL+"/orgs/:orgId/projects/:projectId/envs/:envId/available-resource-types", wrapper.ListAvailableResourceTypes)
+	router.GET(baseURL+"/orgs/:orgId/projects/:projectId/envs/:envId/deletion-impact", wrapper.GetEnvironmentDeletionImpact)
 	router.GET(baseURL+"/orgs/:orgId/resource-types", wrapper.ListResourceTypes)
 	router.POST(baseURL+"/orgs/:orgId/resource-types", wrapper.CreateResourceType)
 	router.DELETE(baseURL+"/orgs/:orgId/resource-types/:typeId", wrapper.DeleteResourceType)
 	router.GET(baseURL+"/orgs/:orgId/resource-types/:typeId", wrapper.GetResourceType)
 	router.PATCH(baseURL+"/orgs/:orgId/resource-types/:typeId", wrapper.UpdateResourceType)
+	router.POST(baseURL+"/orgs/:orgId/resource-types/:typeId/actions/:catalogueAction", wrapper.ChangeResourceTypeCatalogueStatus)
 	router.GET(baseURL+"/orgs/:orgId/runner-rules", wrapper.ListRunnerRulesInOrg)
 	router.POST(baseURL+"/orgs/:orgId/runner-rules", wrapper.CreateRunnerRuleInOrg)
 	router.DELETE(baseURL+"/orgs/:orgId/runner-rules/:ruleId", wrapper.DeleteRunnerRuleInOrg)
@@ -4802,6 +7545,390 @@ func (response GetInternalEnvironmentByUuid404JSONResponse) VisitGetInternalEnvi
 	return json.NewEncoder(w).Encode(response)
 }
 
+type BeginEnvironmentModuleVersionPinOverrideRequestObject struct {
+	OrgId  OrgIdPathParam     `json:"orgId"`
+	PinId  openapi_types.UUID `json:"pinId"`
+	Params BeginEnvironmentModuleVersionPinOverrideParams
+	Body   *BeginEnvironmentModuleVersionPinOverrideJSONRequestBody
+}
+
+type BeginEnvironmentModuleVersionPinOverrideResponseObject interface {
+	VisitBeginEnvironmentModuleVersionPinOverrideResponse(w http.ResponseWriter) error
+}
+
+type BeginEnvironmentModuleVersionPinOverride200JSONResponse EnvironmentModuleVersionPin
+
+func (response BeginEnvironmentModuleVersionPinOverride200JSONResponse) VisitBeginEnvironmentModuleVersionPinOverrideResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type BeginEnvironmentModuleVersionPinOverride400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response BeginEnvironmentModuleVersionPinOverride400JSONResponse) VisitBeginEnvironmentModuleVersionPinOverrideResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type BeginEnvironmentModuleVersionPinOverride404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response BeginEnvironmentModuleVersionPinOverride404JSONResponse) VisitBeginEnvironmentModuleVersionPinOverrideResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type BeginEnvironmentModuleVersionPinOverride409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response BeginEnvironmentModuleVersionPinOverride409JSONResponse) VisitBeginEnvironmentModuleVersionPinOverrideResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReconcileEnvironmentModuleVersionPinOverrideRequestObject struct {
+	OrgId  OrgIdPathParam     `json:"orgId"`
+	PinId  openapi_types.UUID `json:"pinId"`
+	Params ReconcileEnvironmentModuleVersionPinOverrideParams
+	Body   *ReconcileEnvironmentModuleVersionPinOverrideJSONRequestBody
+}
+
+type ReconcileEnvironmentModuleVersionPinOverrideResponseObject interface {
+	VisitReconcileEnvironmentModuleVersionPinOverrideResponse(w http.ResponseWriter) error
+}
+
+type ReconcileEnvironmentModuleVersionPinOverride200JSONResponse EnvironmentModuleVersionPin
+
+func (response ReconcileEnvironmentModuleVersionPinOverride200JSONResponse) VisitReconcileEnvironmentModuleVersionPinOverrideResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReconcileEnvironmentModuleVersionPinOverride400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response ReconcileEnvironmentModuleVersionPinOverride400JSONResponse) VisitReconcileEnvironmentModuleVersionPinOverrideResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReconcileEnvironmentModuleVersionPinOverride404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ReconcileEnvironmentModuleVersionPinOverride404JSONResponse) VisitReconcileEnvironmentModuleVersionPinOverrideResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReconcileEnvironmentModuleVersionPinOverride409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response ReconcileEnvironmentModuleVersionPinOverride409JSONResponse) VisitReconcileEnvironmentModuleVersionPinOverrideResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RestoreEnvironmentModuleVersionPinAfterRollbackRequestObject struct {
+	OrgId  OrgIdPathParam     `json:"orgId"`
+	PinId  openapi_types.UUID `json:"pinId"`
+	Params RestoreEnvironmentModuleVersionPinAfterRollbackParams
+	Body   *RestoreEnvironmentModuleVersionPinAfterRollbackJSONRequestBody
+}
+
+type RestoreEnvironmentModuleVersionPinAfterRollbackResponseObject interface {
+	VisitRestoreEnvironmentModuleVersionPinAfterRollbackResponse(w http.ResponseWriter) error
+}
+
+type RestoreEnvironmentModuleVersionPinAfterRollback200JSONResponse EnvironmentModuleVersionPin
+
+func (response RestoreEnvironmentModuleVersionPinAfterRollback200JSONResponse) VisitRestoreEnvironmentModuleVersionPinAfterRollbackResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RestoreEnvironmentModuleVersionPinAfterRollback400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response RestoreEnvironmentModuleVersionPinAfterRollback400JSONResponse) VisitRestoreEnvironmentModuleVersionPinAfterRollbackResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RestoreEnvironmentModuleVersionPinAfterRollback404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response RestoreEnvironmentModuleVersionPinAfterRollback404JSONResponse) VisitRestoreEnvironmentModuleVersionPinAfterRollbackResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RestoreEnvironmentModuleVersionPinAfterRollback409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response RestoreEnvironmentModuleVersionPinAfterRollback409JSONResponse) VisitRestoreEnvironmentModuleVersionPinAfterRollbackResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListModuleExtensionContributionsRequestObject struct {
+	OrgId    OrgIdPathParam    `json:"orgId"`
+	ModuleId ModuleIdPathParam `json:"moduleId"`
+	Params   ListModuleExtensionContributionsParams
+}
+
+type ListModuleExtensionContributionsResponseObject interface {
+	VisitListModuleExtensionContributionsResponse(w http.ResponseWriter) error
+}
+
+type ListModuleExtensionContributions200JSONResponse []ModuleExtensionContribution
+
+func (response ListModuleExtensionContributions200JSONResponse) VisitListModuleExtensionContributionsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListModuleExtensionContributions403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ListModuleExtensionContributions403JSONResponse) VisitListModuleExtensionContributionsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListModuleExtensionContributions404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ListModuleExtensionContributions404JSONResponse) VisitListModuleExtensionContributionsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpsertModuleExtensionContributionRequestObject struct {
+	OrgId    OrgIdPathParam    `json:"orgId"`
+	ModuleId ModuleIdPathParam `json:"moduleId"`
+	Params   UpsertModuleExtensionContributionParams
+	Body     *UpsertModuleExtensionContributionJSONRequestBody
+}
+
+type UpsertModuleExtensionContributionResponseObject interface {
+	VisitUpsertModuleExtensionContributionResponse(w http.ResponseWriter) error
+}
+
+type UpsertModuleExtensionContribution200JSONResponse ModuleExtensionContribution
+
+func (response UpsertModuleExtensionContribution200JSONResponse) VisitUpsertModuleExtensionContributionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpsertModuleExtensionContribution400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response UpsertModuleExtensionContribution400JSONResponse) VisitUpsertModuleExtensionContributionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpsertModuleExtensionContribution403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response UpsertModuleExtensionContribution403JSONResponse) VisitUpsertModuleExtensionContributionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpsertModuleExtensionContribution404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response UpsertModuleExtensionContribution404JSONResponse) VisitUpsertModuleExtensionContributionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpsertModuleExtensionContribution409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response UpsertModuleExtensionContribution409JSONResponse) VisitUpsertModuleExtensionContributionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListModuleOperationReservationsRequestObject struct {
+	OrgId    OrgIdPathParam    `json:"orgId"`
+	ModuleId ModuleIdPathParam `json:"moduleId"`
+	Params   ListModuleOperationReservationsParams
+}
+
+type ListModuleOperationReservationsResponseObject interface {
+	VisitListModuleOperationReservationsResponse(w http.ResponseWriter) error
+}
+
+type ListModuleOperationReservations200JSONResponse []ModuleOperationReservation
+
+func (response ListModuleOperationReservations200JSONResponse) VisitListModuleOperationReservationsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListModuleOperationReservations403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ListModuleOperationReservations403JSONResponse) VisitListModuleOperationReservationsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListModuleOperationReservations404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ListModuleOperationReservations404JSONResponse) VisitListModuleOperationReservationsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AcquireModuleOperationReservationRequestObject struct {
+	OrgId    OrgIdPathParam    `json:"orgId"`
+	ModuleId ModuleIdPathParam `json:"moduleId"`
+	Params   AcquireModuleOperationReservationParams
+	Body     *AcquireModuleOperationReservationJSONRequestBody
+}
+
+type AcquireModuleOperationReservationResponseObject interface {
+	VisitAcquireModuleOperationReservationResponse(w http.ResponseWriter) error
+}
+
+type AcquireModuleOperationReservation201JSONResponse ModuleOperationReservation
+
+func (response AcquireModuleOperationReservation201JSONResponse) VisitAcquireModuleOperationReservationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AcquireModuleOperationReservation400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response AcquireModuleOperationReservation400JSONResponse) VisitAcquireModuleOperationReservationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AcquireModuleOperationReservation403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response AcquireModuleOperationReservation403JSONResponse) VisitAcquireModuleOperationReservationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AcquireModuleOperationReservation404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response AcquireModuleOperationReservation404JSONResponse) VisitAcquireModuleOperationReservationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AcquireModuleOperationReservation409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response AcquireModuleOperationReservation409JSONResponse) VisitAcquireModuleOperationReservationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReleaseModuleOperationReservationRequestObject struct {
+	OrgId         OrgIdPathParam     `json:"orgId"`
+	ModuleId      ModuleIdPathParam  `json:"moduleId"`
+	ReservationId openapi_types.UUID `json:"reservationId"`
+	Params        ReleaseModuleOperationReservationParams
+	Body          *ReleaseModuleOperationReservationJSONRequestBody
+}
+
+type ReleaseModuleOperationReservationResponseObject interface {
+	VisitReleaseModuleOperationReservationResponse(w http.ResponseWriter) error
+}
+
+type ReleaseModuleOperationReservation200JSONResponse ModuleOperationReservation
+
+func (response ReleaseModuleOperationReservation200JSONResponse) VisitReleaseModuleOperationReservationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReleaseModuleOperationReservation400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response ReleaseModuleOperationReservation400JSONResponse) VisitReleaseModuleOperationReservationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReleaseModuleOperationReservation403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ReleaseModuleOperationReservation403JSONResponse) VisitReleaseModuleOperationReservationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReleaseModuleOperationReservation404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ReleaseModuleOperationReservation404JSONResponse) VisitReleaseModuleOperationReservationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReleaseModuleOperationReservation409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response ReleaseModuleOperationReservation409JSONResponse) VisitReleaseModuleOperationReservationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type InternalUpdateEnvironmentRequestObject struct {
 	OrgId     OrgIdPathParam     `json:"orgId"`
 	ProjectId ProjectIdPathParam `json:"projectId"`
@@ -4890,6 +8017,7 @@ type GenerateInternalModuleCatalogueRequestObject struct {
 	OrgId     OrgIdPathParam     `json:"orgId"`
 	ProjectId ProjectIdPathParam `json:"projectId"`
 	EnvId     EnvIdPathParam     `json:"envId"`
+	Params    GenerateInternalModuleCatalogueParams
 	Body      *GenerateInternalModuleCatalogueJSONRequestBody
 }
 
@@ -5124,6 +8252,15 @@ type InternalUpdateResourceType404JSONResponse struct{ N404NotFoundJSONResponse 
 func (response InternalUpdateResourceType404JSONResponse) VisitInternalUpdateResourceTypeResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type InternalUpdateResourceType409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response InternalUpdateResourceType409JSONResponse) VisitInternalUpdateResourceTypeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -5374,6 +8511,88 @@ type ListEnvironmentsInOrg404JSONResponse struct{ N404NotFoundJSONResponse }
 func (response ListEnvironmentsInOrg404JSONResponse) VisitListEnvironmentsInOrgResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListModuleCatalogueEntriesRequestObject struct {
+	OrgId  OrgIdPathParam `json:"orgId"`
+	Params ListModuleCatalogueEntriesParams
+}
+
+type ListModuleCatalogueEntriesResponseObject interface {
+	VisitListModuleCatalogueEntriesResponse(w http.ResponseWriter) error
+}
+
+type ListModuleCatalogueEntries200JSONResponse []ModuleCatalogueEntry
+
+func (response ListModuleCatalogueEntries200JSONResponse) VisitListModuleCatalogueEntriesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListModuleCatalogueEntries403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ListModuleCatalogueEntries403JSONResponse) VisitListModuleCatalogueEntriesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateModuleCatalogueEntryRequestObject struct {
+	OrgId  OrgIdPathParam `json:"orgId"`
+	Params CreateModuleCatalogueEntryParams
+	Body   *CreateModuleCatalogueEntryJSONRequestBody
+}
+
+type CreateModuleCatalogueEntryResponseObject interface {
+	VisitCreateModuleCatalogueEntryResponse(w http.ResponseWriter) error
+}
+
+type CreateModuleCatalogueEntry201JSONResponse ModuleCatalogueEntry
+
+func (response CreateModuleCatalogueEntry201JSONResponse) VisitCreateModuleCatalogueEntryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateModuleCatalogueEntry400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response CreateModuleCatalogueEntry400JSONResponse) VisitCreateModuleCatalogueEntryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateModuleCatalogueEntry403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response CreateModuleCatalogueEntry403JSONResponse) VisitCreateModuleCatalogueEntryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateModuleCatalogueEntry404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response CreateModuleCatalogueEntry404JSONResponse) VisitCreateModuleCatalogueEntryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateModuleCatalogueEntry409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response CreateModuleCatalogueEntry409JSONResponse) VisitCreateModuleCatalogueEntryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -5686,6 +8905,437 @@ func (response GetModuleRuleInOrg404JSONResponse) VisitGetModuleRuleInOrgRespons
 	return json.NewEncoder(w).Encode(response)
 }
 
+type TransactModuleVersionLifecyclesRequestObject struct {
+	OrgId  OrgIdPathParam `json:"orgId"`
+	Params TransactModuleVersionLifecyclesParams
+	Body   *TransactModuleVersionLifecyclesJSONRequestBody
+}
+
+type TransactModuleVersionLifecyclesResponseObject interface {
+	VisitTransactModuleVersionLifecyclesResponse(w http.ResponseWriter) error
+}
+
+type TransactModuleVersionLifecycles200JSONResponse ModuleVersionLifecycleTransactionResult
+
+func (response TransactModuleVersionLifecycles200JSONResponse) VisitTransactModuleVersionLifecyclesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TransactModuleVersionLifecycles400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response TransactModuleVersionLifecycles400JSONResponse) VisitTransactModuleVersionLifecyclesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TransactModuleVersionLifecycles403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response TransactModuleVersionLifecycles403JSONResponse) VisitTransactModuleVersionLifecyclesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TransactModuleVersionLifecycles404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response TransactModuleVersionLifecycles404JSONResponse) VisitTransactModuleVersionLifecyclesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TransactModuleVersionLifecycles409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response TransactModuleVersionLifecycles409JSONResponse) VisitTransactModuleVersionLifecyclesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListEnvironmentModuleVersionPinsRequestObject struct {
+	OrgId  OrgIdPathParam `json:"orgId"`
+	Params ListEnvironmentModuleVersionPinsParams
+}
+
+type ListEnvironmentModuleVersionPinsResponseObject interface {
+	VisitListEnvironmentModuleVersionPinsResponse(w http.ResponseWriter) error
+}
+
+type ListEnvironmentModuleVersionPins200JSONResponse []EnvironmentModuleVersionPin
+
+func (response ListEnvironmentModuleVersionPins200JSONResponse) VisitListEnvironmentModuleVersionPinsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListEnvironmentModuleVersionPins403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ListEnvironmentModuleVersionPins403JSONResponse) VisitListEnvironmentModuleVersionPinsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateEnvironmentModuleVersionPinRequestObject struct {
+	OrgId  OrgIdPathParam `json:"orgId"`
+	Params CreateEnvironmentModuleVersionPinParams
+	Body   *CreateEnvironmentModuleVersionPinJSONRequestBody
+}
+
+type CreateEnvironmentModuleVersionPinResponseObject interface {
+	VisitCreateEnvironmentModuleVersionPinResponse(w http.ResponseWriter) error
+}
+
+type CreateEnvironmentModuleVersionPin201JSONResponse EnvironmentModuleVersionPin
+
+func (response CreateEnvironmentModuleVersionPin201JSONResponse) VisitCreateEnvironmentModuleVersionPinResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateEnvironmentModuleVersionPin400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response CreateEnvironmentModuleVersionPin400JSONResponse) VisitCreateEnvironmentModuleVersionPinResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateEnvironmentModuleVersionPin403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response CreateEnvironmentModuleVersionPin403JSONResponse) VisitCreateEnvironmentModuleVersionPinResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateEnvironmentModuleVersionPin404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response CreateEnvironmentModuleVersionPin404JSONResponse) VisitCreateEnvironmentModuleVersionPinResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateEnvironmentModuleVersionPin409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response CreateEnvironmentModuleVersionPin409JSONResponse) VisitCreateEnvironmentModuleVersionPinResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ExecuteEnvironmentModuleVersionPinBulkOperationRequestObject struct {
+	OrgId  OrgIdPathParam `json:"orgId"`
+	Params ExecuteEnvironmentModuleVersionPinBulkOperationParams
+	Body   *ExecuteEnvironmentModuleVersionPinBulkOperationJSONRequestBody
+}
+
+type ExecuteEnvironmentModuleVersionPinBulkOperationResponseObject interface {
+	VisitExecuteEnvironmentModuleVersionPinBulkOperationResponse(w http.ResponseWriter) error
+}
+
+type ExecuteEnvironmentModuleVersionPinBulkOperation200JSONResponse ModuleVersionPinBulkResult
+
+func (response ExecuteEnvironmentModuleVersionPinBulkOperation200JSONResponse) VisitExecuteEnvironmentModuleVersionPinBulkOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ExecuteEnvironmentModuleVersionPinBulkOperation400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response ExecuteEnvironmentModuleVersionPinBulkOperation400JSONResponse) VisitExecuteEnvironmentModuleVersionPinBulkOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ExecuteEnvironmentModuleVersionPinBulkOperation403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ExecuteEnvironmentModuleVersionPinBulkOperation403JSONResponse) VisitExecuteEnvironmentModuleVersionPinBulkOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ExecuteEnvironmentModuleVersionPinBulkOperation404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ExecuteEnvironmentModuleVersionPinBulkOperation404JSONResponse) VisitExecuteEnvironmentModuleVersionPinBulkOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ExecuteEnvironmentModuleVersionPinBulkOperation409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response ExecuteEnvironmentModuleVersionPinBulkOperation409JSONResponse) VisitExecuteEnvironmentModuleVersionPinBulkOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PreviewEnvironmentModuleVersionPinBulkOperationRequestObject struct {
+	OrgId OrgIdPathParam `json:"orgId"`
+	Body  *PreviewEnvironmentModuleVersionPinBulkOperationJSONRequestBody
+}
+
+type PreviewEnvironmentModuleVersionPinBulkOperationResponseObject interface {
+	VisitPreviewEnvironmentModuleVersionPinBulkOperationResponse(w http.ResponseWriter) error
+}
+
+type PreviewEnvironmentModuleVersionPinBulkOperation200JSONResponse ModuleVersionPinBulkPreview
+
+func (response PreviewEnvironmentModuleVersionPinBulkOperation200JSONResponse) VisitPreviewEnvironmentModuleVersionPinBulkOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PreviewEnvironmentModuleVersionPinBulkOperation400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response PreviewEnvironmentModuleVersionPinBulkOperation400JSONResponse) VisitPreviewEnvironmentModuleVersionPinBulkOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PreviewEnvironmentModuleVersionPinBulkOperation403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response PreviewEnvironmentModuleVersionPinBulkOperation403JSONResponse) VisitPreviewEnvironmentModuleVersionPinBulkOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PreviewEnvironmentModuleVersionPinBulkOperation404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response PreviewEnvironmentModuleVersionPinBulkOperation404JSONResponse) VisitPreviewEnvironmentModuleVersionPinBulkOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PreviewEnvironmentModuleVersionPinBulkOperation409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response PreviewEnvironmentModuleVersionPinBulkOperation409JSONResponse) VisitPreviewEnvironmentModuleVersionPinBulkOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEnvironmentModuleVersionPinRequestObject struct {
+	OrgId OrgIdPathParam     `json:"orgId"`
+	PinId openapi_types.UUID `json:"pinId"`
+}
+
+type GetEnvironmentModuleVersionPinResponseObject interface {
+	VisitGetEnvironmentModuleVersionPinResponse(w http.ResponseWriter) error
+}
+
+type GetEnvironmentModuleVersionPin200JSONResponse EnvironmentModuleVersionPin
+
+func (response GetEnvironmentModuleVersionPin200JSONResponse) VisitGetEnvironmentModuleVersionPinResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEnvironmentModuleVersionPin403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response GetEnvironmentModuleVersionPin403JSONResponse) VisitGetEnvironmentModuleVersionPinResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEnvironmentModuleVersionPin404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response GetEnvironmentModuleVersionPin404JSONResponse) VisitGetEnvironmentModuleVersionPinResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TransitionEnvironmentModuleVersionPinRequestObject struct {
+	OrgId     OrgIdPathParam                                       `json:"orgId"`
+	PinId     openapi_types.UUID                                   `json:"pinId"`
+	PinAction TransitionEnvironmentModuleVersionPinParamsPinAction `json:"pinAction"`
+	Params    TransitionEnvironmentModuleVersionPinParams
+	Body      *TransitionEnvironmentModuleVersionPinJSONRequestBody
+}
+
+type TransitionEnvironmentModuleVersionPinResponseObject interface {
+	VisitTransitionEnvironmentModuleVersionPinResponse(w http.ResponseWriter) error
+}
+
+type TransitionEnvironmentModuleVersionPin200JSONResponse EnvironmentModuleVersionPin
+
+func (response TransitionEnvironmentModuleVersionPin200JSONResponse) VisitTransitionEnvironmentModuleVersionPinResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TransitionEnvironmentModuleVersionPin400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response TransitionEnvironmentModuleVersionPin400JSONResponse) VisitTransitionEnvironmentModuleVersionPinResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TransitionEnvironmentModuleVersionPin403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response TransitionEnvironmentModuleVersionPin403JSONResponse) VisitTransitionEnvironmentModuleVersionPinResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TransitionEnvironmentModuleVersionPin404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response TransitionEnvironmentModuleVersionPin404JSONResponse) VisitTransitionEnvironmentModuleVersionPinResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TransitionEnvironmentModuleVersionPin409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response TransitionEnvironmentModuleVersionPin409JSONResponse) VisitTransitionEnvironmentModuleVersionPinResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListEnvironmentModuleVersionPinEventsRequestObject struct {
+	OrgId OrgIdPathParam     `json:"orgId"`
+	PinId openapi_types.UUID `json:"pinId"`
+}
+
+type ListEnvironmentModuleVersionPinEventsResponseObject interface {
+	VisitListEnvironmentModuleVersionPinEventsResponse(w http.ResponseWriter) error
+}
+
+type ListEnvironmentModuleVersionPinEvents200JSONResponse []ModuleVersionPinEvent
+
+func (response ListEnvironmentModuleVersionPinEvents200JSONResponse) VisitListEnvironmentModuleVersionPinEventsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListEnvironmentModuleVersionPinEvents403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ListEnvironmentModuleVersionPinEvents403JSONResponse) VisitListEnvironmentModuleVersionPinEventsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListEnvironmentModuleVersionPinEvents404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ListEnvironmentModuleVersionPinEvents404JSONResponse) VisitListEnvironmentModuleVersionPinEventsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AppendEnvironmentModuleVersionPinNoteRequestObject struct {
+	OrgId  OrgIdPathParam     `json:"orgId"`
+	PinId  openapi_types.UUID `json:"pinId"`
+	Params AppendEnvironmentModuleVersionPinNoteParams
+	Body   *AppendEnvironmentModuleVersionPinNoteJSONRequestBody
+}
+
+type AppendEnvironmentModuleVersionPinNoteResponseObject interface {
+	VisitAppendEnvironmentModuleVersionPinNoteResponse(w http.ResponseWriter) error
+}
+
+type AppendEnvironmentModuleVersionPinNote201JSONResponse ModuleVersionPinEvent
+
+func (response AppendEnvironmentModuleVersionPinNote201JSONResponse) VisitAppendEnvironmentModuleVersionPinNoteResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AppendEnvironmentModuleVersionPinNote400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response AppendEnvironmentModuleVersionPinNote400JSONResponse) VisitAppendEnvironmentModuleVersionPinNoteResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AppendEnvironmentModuleVersionPinNote403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response AppendEnvironmentModuleVersionPinNote403JSONResponse) VisitAppendEnvironmentModuleVersionPinNoteResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AppendEnvironmentModuleVersionPinNote404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response AppendEnvironmentModuleVersionPinNote404JSONResponse) VisitAppendEnvironmentModuleVersionPinNoteResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AppendEnvironmentModuleVersionPinNote409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response AppendEnvironmentModuleVersionPinNote409JSONResponse) VisitAppendEnvironmentModuleVersionPinNoteResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type ListModulesRequestObject struct {
 	OrgId  OrgIdPathParam `json:"orgId"`
 	Params ListModulesParams
@@ -5857,6 +9507,154 @@ func (response UpdateModule409JSONResponse) VisitUpdateModuleResponse(w http.Res
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetModuleCatalogueEntryRequestObject struct {
+	OrgId    OrgIdPathParam    `json:"orgId"`
+	ModuleId ModuleIdPathParam `json:"moduleId"`
+}
+
+type GetModuleCatalogueEntryResponseObject interface {
+	VisitGetModuleCatalogueEntryResponse(w http.ResponseWriter) error
+}
+
+type GetModuleCatalogueEntry200JSONResponse ModuleCatalogueEntry
+
+func (response GetModuleCatalogueEntry200JSONResponse) VisitGetModuleCatalogueEntryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetModuleCatalogueEntry403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response GetModuleCatalogueEntry403JSONResponse) VisitGetModuleCatalogueEntryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetModuleCatalogueEntry404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response GetModuleCatalogueEntry404JSONResponse) VisitGetModuleCatalogueEntryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateModuleCatalogueEntryRequestObject struct {
+	OrgId    OrgIdPathParam    `json:"orgId"`
+	ModuleId ModuleIdPathParam `json:"moduleId"`
+	Body     *UpdateModuleCatalogueEntryJSONRequestBody
+}
+
+type UpdateModuleCatalogueEntryResponseObject interface {
+	VisitUpdateModuleCatalogueEntryResponse(w http.ResponseWriter) error
+}
+
+type UpdateModuleCatalogueEntry200JSONResponse ModuleCatalogueEntry
+
+func (response UpdateModuleCatalogueEntry200JSONResponse) VisitUpdateModuleCatalogueEntryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateModuleCatalogueEntry400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response UpdateModuleCatalogueEntry400JSONResponse) VisitUpdateModuleCatalogueEntryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateModuleCatalogueEntry403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response UpdateModuleCatalogueEntry403JSONResponse) VisitUpdateModuleCatalogueEntryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateModuleCatalogueEntry404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response UpdateModuleCatalogueEntry404JSONResponse) VisitUpdateModuleCatalogueEntryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateModuleCatalogueEntry409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response UpdateModuleCatalogueEntry409JSONResponse) VisitUpdateModuleCatalogueEntryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ChangeModuleCatalogueStatusRequestObject struct {
+	OrgId           OrgIdPathParam                                   `json:"orgId"`
+	ModuleId        ModuleIdPathParam                                `json:"moduleId"`
+	CatalogueAction ChangeModuleCatalogueStatusParamsCatalogueAction `json:"catalogueAction"`
+	Params          ChangeModuleCatalogueStatusParams
+	Body            *ChangeModuleCatalogueStatusJSONRequestBody
+}
+
+type ChangeModuleCatalogueStatusResponseObject interface {
+	VisitChangeModuleCatalogueStatusResponse(w http.ResponseWriter) error
+}
+
+type ChangeModuleCatalogueStatus200JSONResponse ModuleCatalogueEntry
+
+func (response ChangeModuleCatalogueStatus200JSONResponse) VisitChangeModuleCatalogueStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ChangeModuleCatalogueStatus400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response ChangeModuleCatalogueStatus400JSONResponse) VisitChangeModuleCatalogueStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ChangeModuleCatalogueStatus403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ChangeModuleCatalogueStatus403JSONResponse) VisitChangeModuleCatalogueStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ChangeModuleCatalogueStatus404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ChangeModuleCatalogueStatus404JSONResponse) VisitChangeModuleCatalogueStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ChangeModuleCatalogueStatus409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response ChangeModuleCatalogueStatus409JSONResponse) VisitChangeModuleCatalogueStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type ListModuleVersionsRequestObject struct {
 	OrgId    OrgIdPathParam    `json:"orgId"`
 	ModuleId ModuleIdPathParam `json:"moduleId"`
@@ -5867,7 +9665,7 @@ type ListModuleVersionsResponseObject interface {
 	VisitListModuleVersionsResponse(w http.ResponseWriter) error
 }
 
-type ListModuleVersions200JSONResponse ModuleVersionPage
+type ListModuleVersions200JSONResponse CoreModuleVersionPage
 
 func (response ListModuleVersions200JSONResponse) VisitListModuleVersionsResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
@@ -5885,6 +9683,62 @@ func (response ListModuleVersions404JSONResponse) VisitListModuleVersionsRespons
 	return json.NewEncoder(w).Encode(response)
 }
 
+type PublishModuleVersionRequestObject struct {
+	OrgId    OrgIdPathParam    `json:"orgId"`
+	ModuleId ModuleIdPathParam `json:"moduleId"`
+	Params   PublishModuleVersionParams
+	Body     *PublishModuleVersionJSONRequestBody
+}
+
+type PublishModuleVersionResponseObject interface {
+	VisitPublishModuleVersionResponse(w http.ResponseWriter) error
+}
+
+type PublishModuleVersion201JSONResponse CoreModuleVersion
+
+func (response PublishModuleVersion201JSONResponse) VisitPublishModuleVersionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PublishModuleVersion400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response PublishModuleVersion400JSONResponse) VisitPublishModuleVersionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PublishModuleVersion403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response PublishModuleVersion403JSONResponse) VisitPublishModuleVersionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PublishModuleVersion404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response PublishModuleVersion404JSONResponse) VisitPublishModuleVersionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PublishModuleVersion409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response PublishModuleVersion409JSONResponse) VisitPublishModuleVersionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type GetModuleVersionRequestObject struct {
 	OrgId           OrgIdPathParam           `json:"orgId"`
 	ModuleId        ModuleIdPathParam        `json:"moduleId"`
@@ -5895,7 +9749,7 @@ type GetModuleVersionResponseObject interface {
 	VisitGetModuleVersionResponse(w http.ResponseWriter) error
 }
 
-type GetModuleVersion200JSONResponse ModuleVersion
+type GetModuleVersion200JSONResponse CoreModuleVersionDetail
 
 func (response GetModuleVersion200JSONResponse) VisitGetModuleVersionResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
@@ -5907,6 +9761,269 @@ func (response GetModuleVersion200JSONResponse) VisitGetModuleVersionResponse(w 
 type GetModuleVersion404JSONResponse struct{ N404NotFoundJSONResponse }
 
 func (response GetModuleVersion404JSONResponse) VisitGetModuleVersionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TransitionModuleVersionRequestObject struct {
+	OrgId           OrgIdPathParam                               `json:"orgId"`
+	ModuleId        ModuleIdPathParam                            `json:"moduleId"`
+	ModuleVersionId ModuleVersionIdPathParam                     `json:"moduleVersionId"`
+	LifecycleAction TransitionModuleVersionParamsLifecycleAction `json:"lifecycleAction"`
+	Params          TransitionModuleVersionParams
+	Body            *TransitionModuleVersionJSONRequestBody
+}
+
+type TransitionModuleVersionResponseObject interface {
+	VisitTransitionModuleVersionResponse(w http.ResponseWriter) error
+}
+
+type TransitionModuleVersion200JSONResponse CoreModuleVersion
+
+func (response TransitionModuleVersion200JSONResponse) VisitTransitionModuleVersionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TransitionModuleVersion400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response TransitionModuleVersion400JSONResponse) VisitTransitionModuleVersionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TransitionModuleVersion403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response TransitionModuleVersion403JSONResponse) VisitTransitionModuleVersionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TransitionModuleVersion404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response TransitionModuleVersion404JSONResponse) VisitTransitionModuleVersionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TransitionModuleVersion409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response TransitionModuleVersion409JSONResponse) VisitTransitionModuleVersionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CompareModuleVersionsRequestObject struct {
+	OrgId                OrgIdPathParam           `json:"orgId"`
+	ModuleId             ModuleIdPathParam        `json:"moduleId"`
+	ModuleVersionId      ModuleVersionIdPathParam `json:"moduleVersionId"`
+	OtherModuleVersionId string                   `json:"otherModuleVersionId"`
+}
+
+type CompareModuleVersionsResponseObject interface {
+	VisitCompareModuleVersionsResponse(w http.ResponseWriter) error
+}
+
+type CompareModuleVersions200JSONResponse ModuleVersionComparison
+
+func (response CompareModuleVersions200JSONResponse) VisitCompareModuleVersionsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CompareModuleVersions403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response CompareModuleVersions403JSONResponse) VisitCompareModuleVersionsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CompareModuleVersions404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response CompareModuleVersions404JSONResponse) VisitCompareModuleVersionsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListModuleVersionLifecycleEventsRequestObject struct {
+	OrgId           OrgIdPathParam           `json:"orgId"`
+	ModuleId        ModuleIdPathParam        `json:"moduleId"`
+	ModuleVersionId ModuleVersionIdPathParam `json:"moduleVersionId"`
+}
+
+type ListModuleVersionLifecycleEventsResponseObject interface {
+	VisitListModuleVersionLifecycleEventsResponse(w http.ResponseWriter) error
+}
+
+type ListModuleVersionLifecycleEvents200JSONResponse []ModuleVersionLifecycleEvent
+
+func (response ListModuleVersionLifecycleEvents200JSONResponse) VisitListModuleVersionLifecycleEventsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListModuleVersionLifecycleEvents403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ListModuleVersionLifecycleEvents403JSONResponse) VisitListModuleVersionLifecycleEventsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListModuleVersionLifecycleEvents404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ListModuleVersionLifecycleEvents404JSONResponse) VisitListModuleVersionLifecycleEventsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PublishStableModuleVersionSuccessorRequestObject struct {
+	OrgId           OrgIdPathParam           `json:"orgId"`
+	ModuleId        ModuleIdPathParam        `json:"moduleId"`
+	ModuleVersionId ModuleVersionIdPathParam `json:"moduleVersionId"`
+	Params          PublishStableModuleVersionSuccessorParams
+	Body            *PublishStableModuleVersionSuccessorJSONRequestBody
+}
+
+type PublishStableModuleVersionSuccessorResponseObject interface {
+	VisitPublishStableModuleVersionSuccessorResponse(w http.ResponseWriter) error
+}
+
+type PublishStableModuleVersionSuccessor201JSONResponse StableModuleVersionSuccessorResult
+
+func (response PublishStableModuleVersionSuccessor201JSONResponse) VisitPublishStableModuleVersionSuccessorResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PublishStableModuleVersionSuccessor400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response PublishStableModuleVersionSuccessor400JSONResponse) VisitPublishStableModuleVersionSuccessorResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PublishStableModuleVersionSuccessor403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response PublishStableModuleVersionSuccessor403JSONResponse) VisitPublishStableModuleVersionSuccessorResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PublishStableModuleVersionSuccessor404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response PublishStableModuleVersionSuccessor404JSONResponse) VisitPublishStableModuleVersionSuccessorResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PublishStableModuleVersionSuccessor409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response PublishStableModuleVersionSuccessor409JSONResponse) VisitPublishStableModuleVersionSuccessorResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetModuleVersionUsageRequestObject struct {
+	OrgId           OrgIdPathParam           `json:"orgId"`
+	ModuleId        ModuleIdPathParam        `json:"moduleId"`
+	ModuleVersionId ModuleVersionIdPathParam `json:"moduleVersionId"`
+}
+
+type GetModuleVersionUsageResponseObject interface {
+	VisitGetModuleVersionUsageResponse(w http.ResponseWriter) error
+}
+
+type GetModuleVersionUsage200JSONResponse ModuleVersionUsage
+
+func (response GetModuleVersionUsage200JSONResponse) VisitGetModuleVersionUsageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetModuleVersionUsage403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response GetModuleVersionUsage403JSONResponse) VisitGetModuleVersionUsageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetModuleVersionUsage404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response GetModuleVersionUsage404JSONResponse) VisitGetModuleVersionUsageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginCapabilityRequestObject struct {
+	OrgId    OrgIdPathParam `json:"orgId"`
+	PluginId string         `json:"pluginId"`
+}
+
+type GetPluginCapabilityResponseObject interface {
+	VisitGetPluginCapabilityResponse(w http.ResponseWriter) error
+}
+
+type GetPluginCapability200JSONResponse PluginCapability
+
+func (response GetPluginCapability200JSONResponse) VisitGetPluginCapabilityResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginCapability403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response GetPluginCapability403JSONResponse) VisitGetPluginCapabilityResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginCapability404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response GetPluginCapability404JSONResponse) VisitGetPluginCapabilityResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
 
@@ -6302,6 +10419,43 @@ func (response ListAvailableResourceTypes404JSONResponse) VisitListAvailableReso
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetEnvironmentDeletionImpactRequestObject struct {
+	OrgId     OrgIdPathParam     `json:"orgId"`
+	ProjectId ProjectIdPathParam `json:"projectId"`
+	EnvId     EnvIdPathParam     `json:"envId"`
+}
+
+type GetEnvironmentDeletionImpactResponseObject interface {
+	VisitGetEnvironmentDeletionImpactResponse(w http.ResponseWriter) error
+}
+
+type GetEnvironmentDeletionImpact200JSONResponse EnvironmentDeletionImpact
+
+func (response GetEnvironmentDeletionImpact200JSONResponse) VisitGetEnvironmentDeletionImpactResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEnvironmentDeletionImpact403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response GetEnvironmentDeletionImpact403JSONResponse) VisitGetEnvironmentDeletionImpactResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEnvironmentDeletionImpact404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response GetEnvironmentDeletionImpact404JSONResponse) VisitGetEnvironmentDeletionImpactResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type ListResourceTypesRequestObject struct {
 	OrgId  OrgIdPathParam `json:"orgId"`
 	Params ListResourceTypesParams
@@ -6460,6 +10614,72 @@ type UpdateResourceType404JSONResponse struct{ N404NotFoundJSONResponse }
 func (response UpdateResourceType404JSONResponse) VisitUpdateResourceTypeResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateResourceType409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response UpdateResourceType409JSONResponse) VisitUpdateResourceTypeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ChangeResourceTypeCatalogueStatusRequestObject struct {
+	OrgId           OrgIdPathParam                                         `json:"orgId"`
+	TypeId          ResourceTypeIdPathParam                                `json:"typeId"`
+	CatalogueAction ChangeResourceTypeCatalogueStatusParamsCatalogueAction `json:"catalogueAction"`
+	Params          ChangeResourceTypeCatalogueStatusParams
+	Body            *ChangeResourceTypeCatalogueStatusJSONRequestBody
+}
+
+type ChangeResourceTypeCatalogueStatusResponseObject interface {
+	VisitChangeResourceTypeCatalogueStatusResponse(w http.ResponseWriter) error
+}
+
+type ChangeResourceTypeCatalogueStatus200JSONResponse ResourceType
+
+func (response ChangeResourceTypeCatalogueStatus200JSONResponse) VisitChangeResourceTypeCatalogueStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ChangeResourceTypeCatalogueStatus400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response ChangeResourceTypeCatalogueStatus400JSONResponse) VisitChangeResourceTypeCatalogueStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ChangeResourceTypeCatalogueStatus403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ChangeResourceTypeCatalogueStatus403JSONResponse) VisitChangeResourceTypeCatalogueStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ChangeResourceTypeCatalogueStatus404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ChangeResourceTypeCatalogueStatus404JSONResponse) VisitChangeResourceTypeCatalogueStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ChangeResourceTypeCatalogueStatus409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response ChangeResourceTypeCatalogueStatus409JSONResponse) VisitChangeResourceTypeCatalogueStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -6774,6 +10994,30 @@ type StrictServerInterface interface {
 	// Get an Environment by UUID
 	// (GET /internal/orgs/{orgId}/envs/{envUuid})
 	GetInternalEnvironmentByUuid(ctx context.Context, request GetInternalEnvironmentByUuidRequestObject) (GetInternalEnvironmentByUuidResponseObject, error)
+
+	// (POST /internal/orgs/{orgId}/module-version-pins/{pinId}/actions/override)
+	BeginEnvironmentModuleVersionPinOverride(ctx context.Context, request BeginEnvironmentModuleVersionPinOverrideRequestObject) (BeginEnvironmentModuleVersionPinOverrideResponseObject, error)
+
+	// (POST /internal/orgs/{orgId}/module-version-pins/{pinId}/actions/reconcile-override)
+	ReconcileEnvironmentModuleVersionPinOverride(ctx context.Context, request ReconcileEnvironmentModuleVersionPinOverrideRequestObject) (ReconcileEnvironmentModuleVersionPinOverrideResponseObject, error)
+
+	// (POST /internal/orgs/{orgId}/module-version-pins/{pinId}/actions/restore-after-rollback)
+	RestoreEnvironmentModuleVersionPinAfterRollback(ctx context.Context, request RestoreEnvironmentModuleVersionPinAfterRollbackRequestObject) (RestoreEnvironmentModuleVersionPinAfterRollbackResponseObject, error)
+	// List namespaced related resources and contextual actions registered by add-ons
+	// (GET /internal/orgs/{orgId}/modules/{moduleId}/extension-contributions)
+	ListModuleExtensionContributions(ctx context.Context, request ListModuleExtensionContributionsRequestObject) (ListModuleExtensionContributionsResponseObject, error)
+	// Register or update a namespaced related resource or contextual action
+	// (POST /internal/orgs/{orgId}/modules/{moduleId}/extension-contributions)
+	UpsertModuleExtensionContribution(ctx context.Context, request UpsertModuleExtensionContributionRequestObject) (UpsertModuleExtensionContributionResponseObject, error)
+	// List add-on reservations that exclusively protect a Module operation
+	// (GET /internal/orgs/{orgId}/modules/{moduleId}/operation-reservations)
+	ListModuleOperationReservations(ctx context.Context, request ListModuleOperationReservationsRequestObject) (ListModuleOperationReservationsResponseObject, error)
+	// Acquire the Module's exclusive add-on operation reservation
+	// (POST /internal/orgs/{orgId}/modules/{moduleId}/operation-reservations)
+	AcquireModuleOperationReservation(ctx context.Context, request AcquireModuleOperationReservationRequestObject) (AcquireModuleOperationReservationResponseObject, error)
+	// Release an exact add-on operation reservation
+	// (POST /internal/orgs/{orgId}/modules/{moduleId}/operation-reservations/{reservationId}/actions/release)
+	ReleaseModuleOperationReservation(ctx context.Context, request ReleaseModuleOperationReservationRequestObject) (ReleaseModuleOperationReservationResponseObject, error)
 	// An internal API for updating fields on an environment
 	// (PATCH /internal/orgs/{orgId}/projects/{projectId}/envs/{envId})
 	InternalUpdateEnvironment(ctx context.Context, request InternalUpdateEnvironmentRequestObject) (InternalUpdateEnvironmentResponseObject, error)
@@ -6801,7 +11045,7 @@ type StrictServerInterface interface {
 	// Delete a built-in resource type
 	// (DELETE /internal/resource-types/{typeId})
 	InternalDeleteResourceType(ctx context.Context, request InternalDeleteResourceTypeRequestObject) (InternalDeleteResourceTypeResponseObject, error)
-	// Update a built-in resource type
+	// Reject mutation of an immutable built-in resource type contract
 	// (PATCH /internal/resource-types/{typeId})
 	InternalUpdateResourceType(ctx context.Context, request InternalUpdateResourceTypeRequestObject) (InternalUpdateResourceTypeResponseObject, error)
 	// Create a new organization with a random name and suffix.
@@ -6828,6 +11072,12 @@ type StrictServerInterface interface {
 	// List environments in an organization
 	// (GET /orgs/{orgId}/envs)
 	ListEnvironmentsInOrg(ctx context.Context, request ListEnvironmentsInOrgRequestObject) (ListEnvironmentsInOrgResponseObject, error)
+	// List stable Module identities, including empty shells
+	// (GET /orgs/{orgId}/module-catalogue)
+	ListModuleCatalogueEntries(ctx context.Context, request ListModuleCatalogueEntriesRequestObject) (ListModuleCatalogueEntriesResponseObject, error)
+	// Create an empty stable Module identity without publishing a version
+	// (POST /orgs/{orgId}/module-catalogue)
+	CreateModuleCatalogueEntry(ctx context.Context, request CreateModuleCatalogueEntryRequestObject) (CreateModuleCatalogueEntryResponseObject, error)
 	// List module providers in the org
 	// (GET /orgs/{orgId}/module-providers)
 	ListModuleProviders(ctx context.Context, request ListModuleProvidersRequestObject) (ListModuleProvidersResponseObject, error)
@@ -6855,27 +11105,84 @@ type StrictServerInterface interface {
 	// Get an existing module rule in the org
 	// (GET /orgs/{orgId}/module-rules/{ruleId})
 	GetModuleRuleInOrg(ctx context.Context, request GetModuleRuleInOrgRequestObject) (GetModuleRuleInOrgResponseObject, error)
+	// Apply lifecycle changes across Modules in one atomic Core transaction
+	// (POST /orgs/{orgId}/module-version-lifecycle-transactions)
+	TransactModuleVersionLifecycles(ctx context.Context, request TransactModuleVersionLifecyclesRequestObject) (TransactModuleVersionLifecyclesResponseObject, error)
+
+	// (GET /orgs/{orgId}/module-version-pins)
+	ListEnvironmentModuleVersionPins(ctx context.Context, request ListEnvironmentModuleVersionPinsRequestObject) (ListEnvironmentModuleVersionPinsResponseObject, error)
+
+	// (POST /orgs/{orgId}/module-version-pins)
+	CreateEnvironmentModuleVersionPin(ctx context.Context, request CreateEnvironmentModuleVersionPinRequestObject) (CreateEnvironmentModuleVersionPinResponseObject, error)
+
+	// (POST /orgs/{orgId}/module-version-pins/bulk)
+	ExecuteEnvironmentModuleVersionPinBulkOperation(ctx context.Context, request ExecuteEnvironmentModuleVersionPinBulkOperationRequestObject) (ExecuteEnvironmentModuleVersionPinBulkOperationResponseObject, error)
+
+	// (POST /orgs/{orgId}/module-version-pins/bulk-preview)
+	PreviewEnvironmentModuleVersionPinBulkOperation(ctx context.Context, request PreviewEnvironmentModuleVersionPinBulkOperationRequestObject) (PreviewEnvironmentModuleVersionPinBulkOperationResponseObject, error)
+
+	// (GET /orgs/{orgId}/module-version-pins/{pinId})
+	GetEnvironmentModuleVersionPin(ctx context.Context, request GetEnvironmentModuleVersionPinRequestObject) (GetEnvironmentModuleVersionPinResponseObject, error)
+
+	// (POST /orgs/{orgId}/module-version-pins/{pinId}/actions/{pinAction})
+	TransitionEnvironmentModuleVersionPin(ctx context.Context, request TransitionEnvironmentModuleVersionPinRequestObject) (TransitionEnvironmentModuleVersionPinResponseObject, error)
+
+	// (GET /orgs/{orgId}/module-version-pins/{pinId}/events)
+	ListEnvironmentModuleVersionPinEvents(ctx context.Context, request ListEnvironmentModuleVersionPinEventsRequestObject) (ListEnvironmentModuleVersionPinEventsResponseObject, error)
+
+	// (POST /orgs/{orgId}/module-version-pins/{pinId}/notes)
+	AppendEnvironmentModuleVersionPinNote(ctx context.Context, request AppendEnvironmentModuleVersionPinNoteRequestObject) (AppendEnvironmentModuleVersionPinNoteResponseObject, error)
 	// List modules in the org
 	// (GET /orgs/{orgId}/modules)
 	ListModules(ctx context.Context, request ListModulesRequestObject) (ListModulesResponseObject, error)
-	// Create a new modules in the org
+	// Create a Module with an initial immutable Proposed version
 	// (POST /orgs/{orgId}/modules)
 	CreateModule(ctx context.Context, request CreateModuleRequestObject) (CreateModuleResponseObject, error)
-	// Delete an existing module in the org if it is unused
+	// Delete an unused empty Module catalogue entry
 	// (DELETE /orgs/{orgId}/modules/{moduleId})
 	DeleteModule(ctx context.Context, request DeleteModuleRequestObject) (DeleteModuleResponseObject, error)
 	// Get an existing module in the org
 	// (GET /orgs/{orgId}/modules/{moduleId})
 	GetModule(ctx context.Context, request GetModuleRequestObject) (GetModuleResponseObject, error)
-	// Update an existing module
+	// Publish a new immutable Proposed version for an existing Module
 	// (PATCH /orgs/{orgId}/modules/{moduleId})
 	UpdateModule(ctx context.Context, request UpdateModuleRequestObject) (UpdateModuleResponseObject, error)
+
+	// (GET /orgs/{orgId}/modules/{moduleId}/catalogue)
+	GetModuleCatalogueEntry(ctx context.Context, request GetModuleCatalogueEntryRequestObject) (GetModuleCatalogueEntryResponseObject, error)
+
+	// (PATCH /orgs/{orgId}/modules/{moduleId}/catalogue)
+	UpdateModuleCatalogueEntry(ctx context.Context, request UpdateModuleCatalogueEntryRequestObject) (UpdateModuleCatalogueEntryResponseObject, error)
+
+	// (POST /orgs/{orgId}/modules/{moduleId}/catalogue/actions/{catalogueAction})
+	ChangeModuleCatalogueStatus(ctx context.Context, request ChangeModuleCatalogueStatusRequestObject) (ChangeModuleCatalogueStatusResponseObject, error)
 	// List the versions of a module
 	// (GET /orgs/{orgId}/modules/{moduleId}/versions)
 	ListModuleVersions(ctx context.Context, request ListModuleVersionsRequestObject) (ListModuleVersionsResponseObject, error)
+	// Publish a complete immutable Proposed Module Version
+	// (POST /orgs/{orgId}/modules/{moduleId}/versions)
+	PublishModuleVersion(ctx context.Context, request PublishModuleVersionRequestObject) (PublishModuleVersionResponseObject, error)
 	// Get a previous module version in the org
 	// (GET /orgs/{orgId}/modules/{moduleId}/versions/{moduleVersionId})
 	GetModuleVersion(ctx context.Context, request GetModuleVersionRequestObject) (GetModuleVersionResponseObject, error)
+
+	// (POST /orgs/{orgId}/modules/{moduleId}/versions/{moduleVersionId}/actions/{lifecycleAction})
+	TransitionModuleVersion(ctx context.Context, request TransitionModuleVersionRequestObject) (TransitionModuleVersionResponseObject, error)
+	// Structurally compare two immutable versions of one Module
+	// (GET /orgs/{orgId}/modules/{moduleId}/versions/{moduleVersionId}/compare/{otherModuleVersionId})
+	CompareModuleVersions(ctx context.Context, request CompareModuleVersionsRequestObject) (CompareModuleVersionsResponseObject, error)
+
+	// (GET /orgs/{orgId}/modules/{moduleId}/versions/{moduleVersionId}/events)
+	ListModuleVersionLifecycleEvents(ctx context.Context, request ListModuleVersionLifecycleEventsRequestObject) (ListModuleVersionLifecycleEventsResponseObject, error)
+	// Atomically publish a stable successor and deprecate the exact Proposed prerelease
+	// (POST /orgs/{orgId}/modules/{moduleId}/versions/{moduleVersionId}/stable-successor)
+	PublishStableModuleVersionSuccessor(ctx context.Context, request PublishStableModuleVersionSuccessorRequestObject) (PublishStableModuleVersionSuccessorResponseObject, error)
+	// Inspect observed Environment adoption and Pin usage for one immutable Module Version
+	// (GET /orgs/{orgId}/modules/{moduleId}/versions/{moduleVersionId}/usage)
+	GetModuleVersionUsage(ctx context.Context, request GetModuleVersionUsageRequestObject) (GetModuleVersionUsageResponseObject, error)
+	// Discover an installed plugin and its availability for this organization.
+	// (GET /orgs/{orgId}/plugins/{pluginId})
+	GetPluginCapability(ctx context.Context, request GetPluginCapabilityRequestObject) (GetPluginCapabilityResponseObject, error)
 	// List projects
 	// (GET /orgs/{orgId}/projects)
 	ListProjects(ctx context.Context, request ListProjectsRequestObject) (ListProjectsResponseObject, error)
@@ -6912,6 +11219,9 @@ type StrictServerInterface interface {
 	// List available resource types for an environment in project
 	// (GET /orgs/{orgId}/projects/{projectId}/envs/{envId}/available-resource-types)
 	ListAvailableResourceTypes(ctx context.Context, request ListAvailableResourceTypesRequestObject) (ListAvailableResourceTypesResponseObject, error)
+	// Preview retained Module Pins and add-on resources affected by Environment deletion.
+	// (GET /orgs/{orgId}/projects/{projectId}/envs/{envId}/deletion-impact)
+	GetEnvironmentDeletionImpact(ctx context.Context, request GetEnvironmentDeletionImpactRequestObject) (GetEnvironmentDeletionImpactResponseObject, error)
 	// List available resource types
 	// (GET /orgs/{orgId}/resource-types)
 	ListResourceTypes(ctx context.Context, request ListResourceTypesRequestObject) (ListResourceTypesResponseObject, error)
@@ -6924,9 +11234,12 @@ type StrictServerInterface interface {
 	// Get a resource type
 	// (GET /orgs/{orgId}/resource-types/{typeId})
 	GetResourceType(ctx context.Context, request GetResourceTypeRequestObject) (GetResourceTypeResponseObject, error)
-	// Update a resource type
+	// Reject mutation of an immutable resource type contract
 	// (PATCH /orgs/{orgId}/resource-types/{typeId})
 	UpdateResourceType(ctx context.Context, request UpdateResourceTypeRequestObject) (UpdateResourceTypeResponseObject, error)
+	// Archive or unarchive an immutable resource type identity
+	// (POST /orgs/{orgId}/resource-types/{typeId}/actions/{catalogueAction})
+	ChangeResourceTypeCatalogueStatus(ctx context.Context, request ChangeResourceTypeCatalogueStatusRequestObject) (ChangeResourceTypeCatalogueStatusResponseObject, error)
 	// List runner rules in the org
 	// (GET /orgs/{orgId}/runner-rules)
 	ListRunnerRulesInOrg(ctx context.Context, request ListRunnerRulesInOrgRequestObject) (ListRunnerRulesInOrgResponseObject, error)
@@ -7073,6 +11386,259 @@ func (sh *strictHandler) GetInternalEnvironmentByUuid(ctx echo.Context, orgId Or
 	return nil
 }
 
+// BeginEnvironmentModuleVersionPinOverride operation middleware
+func (sh *strictHandler) BeginEnvironmentModuleVersionPinOverride(ctx echo.Context, orgId OrgIdPathParam, pinId openapi_types.UUID, params BeginEnvironmentModuleVersionPinOverrideParams) error {
+	var request BeginEnvironmentModuleVersionPinOverrideRequestObject
+
+	request.OrgId = orgId
+	request.PinId = pinId
+	request.Params = params
+
+	var body BeginEnvironmentModuleVersionPinOverrideJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.BeginEnvironmentModuleVersionPinOverride(ctx.Request().Context(), request.(BeginEnvironmentModuleVersionPinOverrideRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "BeginEnvironmentModuleVersionPinOverride")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(BeginEnvironmentModuleVersionPinOverrideResponseObject); ok {
+		return validResponse.VisitBeginEnvironmentModuleVersionPinOverrideResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ReconcileEnvironmentModuleVersionPinOverride operation middleware
+func (sh *strictHandler) ReconcileEnvironmentModuleVersionPinOverride(ctx echo.Context, orgId OrgIdPathParam, pinId openapi_types.UUID, params ReconcileEnvironmentModuleVersionPinOverrideParams) error {
+	var request ReconcileEnvironmentModuleVersionPinOverrideRequestObject
+
+	request.OrgId = orgId
+	request.PinId = pinId
+	request.Params = params
+
+	var body ReconcileEnvironmentModuleVersionPinOverrideJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ReconcileEnvironmentModuleVersionPinOverride(ctx.Request().Context(), request.(ReconcileEnvironmentModuleVersionPinOverrideRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReconcileEnvironmentModuleVersionPinOverride")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ReconcileEnvironmentModuleVersionPinOverrideResponseObject); ok {
+		return validResponse.VisitReconcileEnvironmentModuleVersionPinOverrideResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// RestoreEnvironmentModuleVersionPinAfterRollback operation middleware
+func (sh *strictHandler) RestoreEnvironmentModuleVersionPinAfterRollback(ctx echo.Context, orgId OrgIdPathParam, pinId openapi_types.UUID, params RestoreEnvironmentModuleVersionPinAfterRollbackParams) error {
+	var request RestoreEnvironmentModuleVersionPinAfterRollbackRequestObject
+
+	request.OrgId = orgId
+	request.PinId = pinId
+	request.Params = params
+
+	var body RestoreEnvironmentModuleVersionPinAfterRollbackJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.RestoreEnvironmentModuleVersionPinAfterRollback(ctx.Request().Context(), request.(RestoreEnvironmentModuleVersionPinAfterRollbackRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RestoreEnvironmentModuleVersionPinAfterRollback")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(RestoreEnvironmentModuleVersionPinAfterRollbackResponseObject); ok {
+		return validResponse.VisitRestoreEnvironmentModuleVersionPinAfterRollbackResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ListModuleExtensionContributions operation middleware
+func (sh *strictHandler) ListModuleExtensionContributions(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, params ListModuleExtensionContributionsParams) error {
+	var request ListModuleExtensionContributionsRequestObject
+
+	request.OrgId = orgId
+	request.ModuleId = moduleId
+	request.Params = params
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListModuleExtensionContributions(ctx.Request().Context(), request.(ListModuleExtensionContributionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListModuleExtensionContributions")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ListModuleExtensionContributionsResponseObject); ok {
+		return validResponse.VisitListModuleExtensionContributionsResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// UpsertModuleExtensionContribution operation middleware
+func (sh *strictHandler) UpsertModuleExtensionContribution(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, params UpsertModuleExtensionContributionParams) error {
+	var request UpsertModuleExtensionContributionRequestObject
+
+	request.OrgId = orgId
+	request.ModuleId = moduleId
+	request.Params = params
+
+	var body UpsertModuleExtensionContributionJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.UpsertModuleExtensionContribution(ctx.Request().Context(), request.(UpsertModuleExtensionContributionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpsertModuleExtensionContribution")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(UpsertModuleExtensionContributionResponseObject); ok {
+		return validResponse.VisitUpsertModuleExtensionContributionResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ListModuleOperationReservations operation middleware
+func (sh *strictHandler) ListModuleOperationReservations(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, params ListModuleOperationReservationsParams) error {
+	var request ListModuleOperationReservationsRequestObject
+
+	request.OrgId = orgId
+	request.ModuleId = moduleId
+	request.Params = params
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListModuleOperationReservations(ctx.Request().Context(), request.(ListModuleOperationReservationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListModuleOperationReservations")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ListModuleOperationReservationsResponseObject); ok {
+		return validResponse.VisitListModuleOperationReservationsResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// AcquireModuleOperationReservation operation middleware
+func (sh *strictHandler) AcquireModuleOperationReservation(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, params AcquireModuleOperationReservationParams) error {
+	var request AcquireModuleOperationReservationRequestObject
+
+	request.OrgId = orgId
+	request.ModuleId = moduleId
+	request.Params = params
+
+	var body AcquireModuleOperationReservationJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AcquireModuleOperationReservation(ctx.Request().Context(), request.(AcquireModuleOperationReservationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AcquireModuleOperationReservation")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(AcquireModuleOperationReservationResponseObject); ok {
+		return validResponse.VisitAcquireModuleOperationReservationResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ReleaseModuleOperationReservation operation middleware
+func (sh *strictHandler) ReleaseModuleOperationReservation(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, reservationId openapi_types.UUID, params ReleaseModuleOperationReservationParams) error {
+	var request ReleaseModuleOperationReservationRequestObject
+
+	request.OrgId = orgId
+	request.ModuleId = moduleId
+	request.ReservationId = reservationId
+	request.Params = params
+
+	var body ReleaseModuleOperationReservationJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ReleaseModuleOperationReservation(ctx.Request().Context(), request.(ReleaseModuleOperationReservationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReleaseModuleOperationReservation")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ReleaseModuleOperationReservationResponseObject); ok {
+		return validResponse.VisitReleaseModuleOperationReservationResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
 // InternalUpdateEnvironment operation middleware
 func (sh *strictHandler) InternalUpdateEnvironment(ctx echo.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam) error {
 	var request InternalUpdateEnvironmentRequestObject
@@ -7135,12 +11701,13 @@ func (sh *strictHandler) InternalForceDeleteEnvironment(ctx echo.Context, orgId 
 }
 
 // GenerateInternalModuleCatalogue operation middleware
-func (sh *strictHandler) GenerateInternalModuleCatalogue(ctx echo.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam) error {
+func (sh *strictHandler) GenerateInternalModuleCatalogue(ctx echo.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam, params GenerateInternalModuleCatalogueParams) error {
 	var request GenerateInternalModuleCatalogueRequestObject
 
 	request.OrgId = orgId
 	request.ProjectId = projectId
 	request.EnvId = envId
+	request.Params = params
 
 	var body GenerateInternalModuleCatalogueJSONRequestBody
 	if err := ctx.Bind(&body); err != nil {
@@ -7571,6 +12138,64 @@ func (sh *strictHandler) ListEnvironmentsInOrg(ctx echo.Context, orgId OrgIdPath
 	return nil
 }
 
+// ListModuleCatalogueEntries operation middleware
+func (sh *strictHandler) ListModuleCatalogueEntries(ctx echo.Context, orgId OrgIdPathParam, params ListModuleCatalogueEntriesParams) error {
+	var request ListModuleCatalogueEntriesRequestObject
+
+	request.OrgId = orgId
+	request.Params = params
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListModuleCatalogueEntries(ctx.Request().Context(), request.(ListModuleCatalogueEntriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListModuleCatalogueEntries")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ListModuleCatalogueEntriesResponseObject); ok {
+		return validResponse.VisitListModuleCatalogueEntriesResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// CreateModuleCatalogueEntry operation middleware
+func (sh *strictHandler) CreateModuleCatalogueEntry(ctx echo.Context, orgId OrgIdPathParam, params CreateModuleCatalogueEntryParams) error {
+	var request CreateModuleCatalogueEntryRequestObject
+
+	request.OrgId = orgId
+	request.Params = params
+
+	var body CreateModuleCatalogueEntryJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateModuleCatalogueEntry(ctx.Request().Context(), request.(CreateModuleCatalogueEntryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateModuleCatalogueEntry")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(CreateModuleCatalogueEntryResponseObject); ok {
+		return validResponse.VisitCreateModuleCatalogueEntryResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
 // ListModuleProviders operation middleware
 func (sh *strictHandler) ListModuleProviders(ctx echo.Context, orgId OrgIdPathParam, params ListModuleProvidersParams) error {
 	var request ListModuleProvidersRequestObject
@@ -7824,6 +12449,278 @@ func (sh *strictHandler) GetModuleRuleInOrg(ctx echo.Context, orgId OrgIdPathPar
 	return nil
 }
 
+// TransactModuleVersionLifecycles operation middleware
+func (sh *strictHandler) TransactModuleVersionLifecycles(ctx echo.Context, orgId OrgIdPathParam, params TransactModuleVersionLifecyclesParams) error {
+	var request TransactModuleVersionLifecyclesRequestObject
+
+	request.OrgId = orgId
+	request.Params = params
+
+	var body TransactModuleVersionLifecyclesJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.TransactModuleVersionLifecycles(ctx.Request().Context(), request.(TransactModuleVersionLifecyclesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TransactModuleVersionLifecycles")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(TransactModuleVersionLifecyclesResponseObject); ok {
+		return validResponse.VisitTransactModuleVersionLifecyclesResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ListEnvironmentModuleVersionPins operation middleware
+func (sh *strictHandler) ListEnvironmentModuleVersionPins(ctx echo.Context, orgId OrgIdPathParam, params ListEnvironmentModuleVersionPinsParams) error {
+	var request ListEnvironmentModuleVersionPinsRequestObject
+
+	request.OrgId = orgId
+	request.Params = params
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListEnvironmentModuleVersionPins(ctx.Request().Context(), request.(ListEnvironmentModuleVersionPinsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListEnvironmentModuleVersionPins")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ListEnvironmentModuleVersionPinsResponseObject); ok {
+		return validResponse.VisitListEnvironmentModuleVersionPinsResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// CreateEnvironmentModuleVersionPin operation middleware
+func (sh *strictHandler) CreateEnvironmentModuleVersionPin(ctx echo.Context, orgId OrgIdPathParam, params CreateEnvironmentModuleVersionPinParams) error {
+	var request CreateEnvironmentModuleVersionPinRequestObject
+
+	request.OrgId = orgId
+	request.Params = params
+
+	var body CreateEnvironmentModuleVersionPinJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateEnvironmentModuleVersionPin(ctx.Request().Context(), request.(CreateEnvironmentModuleVersionPinRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateEnvironmentModuleVersionPin")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(CreateEnvironmentModuleVersionPinResponseObject); ok {
+		return validResponse.VisitCreateEnvironmentModuleVersionPinResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ExecuteEnvironmentModuleVersionPinBulkOperation operation middleware
+func (sh *strictHandler) ExecuteEnvironmentModuleVersionPinBulkOperation(ctx echo.Context, orgId OrgIdPathParam, params ExecuteEnvironmentModuleVersionPinBulkOperationParams) error {
+	var request ExecuteEnvironmentModuleVersionPinBulkOperationRequestObject
+
+	request.OrgId = orgId
+	request.Params = params
+
+	var body ExecuteEnvironmentModuleVersionPinBulkOperationJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ExecuteEnvironmentModuleVersionPinBulkOperation(ctx.Request().Context(), request.(ExecuteEnvironmentModuleVersionPinBulkOperationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ExecuteEnvironmentModuleVersionPinBulkOperation")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ExecuteEnvironmentModuleVersionPinBulkOperationResponseObject); ok {
+		return validResponse.VisitExecuteEnvironmentModuleVersionPinBulkOperationResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// PreviewEnvironmentModuleVersionPinBulkOperation operation middleware
+func (sh *strictHandler) PreviewEnvironmentModuleVersionPinBulkOperation(ctx echo.Context, orgId OrgIdPathParam) error {
+	var request PreviewEnvironmentModuleVersionPinBulkOperationRequestObject
+
+	request.OrgId = orgId
+
+	var body PreviewEnvironmentModuleVersionPinBulkOperationJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.PreviewEnvironmentModuleVersionPinBulkOperation(ctx.Request().Context(), request.(PreviewEnvironmentModuleVersionPinBulkOperationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PreviewEnvironmentModuleVersionPinBulkOperation")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(PreviewEnvironmentModuleVersionPinBulkOperationResponseObject); ok {
+		return validResponse.VisitPreviewEnvironmentModuleVersionPinBulkOperationResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// GetEnvironmentModuleVersionPin operation middleware
+func (sh *strictHandler) GetEnvironmentModuleVersionPin(ctx echo.Context, orgId OrgIdPathParam, pinId openapi_types.UUID) error {
+	var request GetEnvironmentModuleVersionPinRequestObject
+
+	request.OrgId = orgId
+	request.PinId = pinId
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetEnvironmentModuleVersionPin(ctx.Request().Context(), request.(GetEnvironmentModuleVersionPinRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetEnvironmentModuleVersionPin")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GetEnvironmentModuleVersionPinResponseObject); ok {
+		return validResponse.VisitGetEnvironmentModuleVersionPinResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// TransitionEnvironmentModuleVersionPin operation middleware
+func (sh *strictHandler) TransitionEnvironmentModuleVersionPin(ctx echo.Context, orgId OrgIdPathParam, pinId openapi_types.UUID, pinAction TransitionEnvironmentModuleVersionPinParamsPinAction, params TransitionEnvironmentModuleVersionPinParams) error {
+	var request TransitionEnvironmentModuleVersionPinRequestObject
+
+	request.OrgId = orgId
+	request.PinId = pinId
+	request.PinAction = pinAction
+	request.Params = params
+
+	var body TransitionEnvironmentModuleVersionPinJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.TransitionEnvironmentModuleVersionPin(ctx.Request().Context(), request.(TransitionEnvironmentModuleVersionPinRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TransitionEnvironmentModuleVersionPin")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(TransitionEnvironmentModuleVersionPinResponseObject); ok {
+		return validResponse.VisitTransitionEnvironmentModuleVersionPinResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ListEnvironmentModuleVersionPinEvents operation middleware
+func (sh *strictHandler) ListEnvironmentModuleVersionPinEvents(ctx echo.Context, orgId OrgIdPathParam, pinId openapi_types.UUID) error {
+	var request ListEnvironmentModuleVersionPinEventsRequestObject
+
+	request.OrgId = orgId
+	request.PinId = pinId
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListEnvironmentModuleVersionPinEvents(ctx.Request().Context(), request.(ListEnvironmentModuleVersionPinEventsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListEnvironmentModuleVersionPinEvents")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ListEnvironmentModuleVersionPinEventsResponseObject); ok {
+		return validResponse.VisitListEnvironmentModuleVersionPinEventsResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// AppendEnvironmentModuleVersionPinNote operation middleware
+func (sh *strictHandler) AppendEnvironmentModuleVersionPinNote(ctx echo.Context, orgId OrgIdPathParam, pinId openapi_types.UUID, params AppendEnvironmentModuleVersionPinNoteParams) error {
+	var request AppendEnvironmentModuleVersionPinNoteRequestObject
+
+	request.OrgId = orgId
+	request.PinId = pinId
+	request.Params = params
+
+	var body AppendEnvironmentModuleVersionPinNoteJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AppendEnvironmentModuleVersionPinNote(ctx.Request().Context(), request.(AppendEnvironmentModuleVersionPinNoteRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AppendEnvironmentModuleVersionPinNote")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(AppendEnvironmentModuleVersionPinNoteResponseObject); ok {
+		return validResponse.VisitAppendEnvironmentModuleVersionPinNoteResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
 // ListModules operation middleware
 func (sh *strictHandler) ListModules(ctx echo.Context, orgId OrgIdPathParam, params ListModulesParams) error {
 	var request ListModulesRequestObject
@@ -7965,6 +12862,98 @@ func (sh *strictHandler) UpdateModule(ctx echo.Context, orgId OrgIdPathParam, mo
 	return nil
 }
 
+// GetModuleCatalogueEntry operation middleware
+func (sh *strictHandler) GetModuleCatalogueEntry(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam) error {
+	var request GetModuleCatalogueEntryRequestObject
+
+	request.OrgId = orgId
+	request.ModuleId = moduleId
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetModuleCatalogueEntry(ctx.Request().Context(), request.(GetModuleCatalogueEntryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetModuleCatalogueEntry")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GetModuleCatalogueEntryResponseObject); ok {
+		return validResponse.VisitGetModuleCatalogueEntryResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// UpdateModuleCatalogueEntry operation middleware
+func (sh *strictHandler) UpdateModuleCatalogueEntry(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam) error {
+	var request UpdateModuleCatalogueEntryRequestObject
+
+	request.OrgId = orgId
+	request.ModuleId = moduleId
+
+	var body UpdateModuleCatalogueEntryJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateModuleCatalogueEntry(ctx.Request().Context(), request.(UpdateModuleCatalogueEntryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateModuleCatalogueEntry")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(UpdateModuleCatalogueEntryResponseObject); ok {
+		return validResponse.VisitUpdateModuleCatalogueEntryResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ChangeModuleCatalogueStatus operation middleware
+func (sh *strictHandler) ChangeModuleCatalogueStatus(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, catalogueAction ChangeModuleCatalogueStatusParamsCatalogueAction, params ChangeModuleCatalogueStatusParams) error {
+	var request ChangeModuleCatalogueStatusRequestObject
+
+	request.OrgId = orgId
+	request.ModuleId = moduleId
+	request.CatalogueAction = catalogueAction
+	request.Params = params
+
+	var body ChangeModuleCatalogueStatusJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ChangeModuleCatalogueStatus(ctx.Request().Context(), request.(ChangeModuleCatalogueStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangeModuleCatalogueStatus")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ChangeModuleCatalogueStatusResponseObject); ok {
+		return validResponse.VisitChangeModuleCatalogueStatusResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
 // ListModuleVersions operation middleware
 func (sh *strictHandler) ListModuleVersions(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, params ListModuleVersionsParams) error {
 	var request ListModuleVersionsRequestObject
@@ -7992,6 +12981,39 @@ func (sh *strictHandler) ListModuleVersions(ctx echo.Context, orgId OrgIdPathPar
 	return nil
 }
 
+// PublishModuleVersion operation middleware
+func (sh *strictHandler) PublishModuleVersion(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, params PublishModuleVersionParams) error {
+	var request PublishModuleVersionRequestObject
+
+	request.OrgId = orgId
+	request.ModuleId = moduleId
+	request.Params = params
+
+	var body PublishModuleVersionJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.PublishModuleVersion(ctx.Request().Context(), request.(PublishModuleVersionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PublishModuleVersion")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(PublishModuleVersionResponseObject); ok {
+		return validResponse.VisitPublishModuleVersionResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
 // GetModuleVersion operation middleware
 func (sh *strictHandler) GetModuleVersion(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, moduleVersionId ModuleVersionIdPathParam) error {
 	var request GetModuleVersionRequestObject
@@ -8013,6 +13035,183 @@ func (sh *strictHandler) GetModuleVersion(ctx echo.Context, orgId OrgIdPathParam
 		return err
 	} else if validResponse, ok := response.(GetModuleVersionResponseObject); ok {
 		return validResponse.VisitGetModuleVersionResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// TransitionModuleVersion operation middleware
+func (sh *strictHandler) TransitionModuleVersion(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, moduleVersionId ModuleVersionIdPathParam, lifecycleAction TransitionModuleVersionParamsLifecycleAction, params TransitionModuleVersionParams) error {
+	var request TransitionModuleVersionRequestObject
+
+	request.OrgId = orgId
+	request.ModuleId = moduleId
+	request.ModuleVersionId = moduleVersionId
+	request.LifecycleAction = lifecycleAction
+	request.Params = params
+
+	var body TransitionModuleVersionJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.TransitionModuleVersion(ctx.Request().Context(), request.(TransitionModuleVersionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TransitionModuleVersion")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(TransitionModuleVersionResponseObject); ok {
+		return validResponse.VisitTransitionModuleVersionResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// CompareModuleVersions operation middleware
+func (sh *strictHandler) CompareModuleVersions(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, moduleVersionId ModuleVersionIdPathParam, otherModuleVersionId string) error {
+	var request CompareModuleVersionsRequestObject
+
+	request.OrgId = orgId
+	request.ModuleId = moduleId
+	request.ModuleVersionId = moduleVersionId
+	request.OtherModuleVersionId = otherModuleVersionId
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.CompareModuleVersions(ctx.Request().Context(), request.(CompareModuleVersionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CompareModuleVersions")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(CompareModuleVersionsResponseObject); ok {
+		return validResponse.VisitCompareModuleVersionsResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ListModuleVersionLifecycleEvents operation middleware
+func (sh *strictHandler) ListModuleVersionLifecycleEvents(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, moduleVersionId ModuleVersionIdPathParam) error {
+	var request ListModuleVersionLifecycleEventsRequestObject
+
+	request.OrgId = orgId
+	request.ModuleId = moduleId
+	request.ModuleVersionId = moduleVersionId
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListModuleVersionLifecycleEvents(ctx.Request().Context(), request.(ListModuleVersionLifecycleEventsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListModuleVersionLifecycleEvents")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ListModuleVersionLifecycleEventsResponseObject); ok {
+		return validResponse.VisitListModuleVersionLifecycleEventsResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// PublishStableModuleVersionSuccessor operation middleware
+func (sh *strictHandler) PublishStableModuleVersionSuccessor(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, moduleVersionId ModuleVersionIdPathParam, params PublishStableModuleVersionSuccessorParams) error {
+	var request PublishStableModuleVersionSuccessorRequestObject
+
+	request.OrgId = orgId
+	request.ModuleId = moduleId
+	request.ModuleVersionId = moduleVersionId
+	request.Params = params
+
+	var body PublishStableModuleVersionSuccessorJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.PublishStableModuleVersionSuccessor(ctx.Request().Context(), request.(PublishStableModuleVersionSuccessorRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PublishStableModuleVersionSuccessor")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(PublishStableModuleVersionSuccessorResponseObject); ok {
+		return validResponse.VisitPublishStableModuleVersionSuccessorResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// GetModuleVersionUsage operation middleware
+func (sh *strictHandler) GetModuleVersionUsage(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, moduleVersionId ModuleVersionIdPathParam) error {
+	var request GetModuleVersionUsageRequestObject
+
+	request.OrgId = orgId
+	request.ModuleId = moduleId
+	request.ModuleVersionId = moduleVersionId
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetModuleVersionUsage(ctx.Request().Context(), request.(GetModuleVersionUsageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetModuleVersionUsage")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GetModuleVersionUsageResponseObject); ok {
+		return validResponse.VisitGetModuleVersionUsageResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// GetPluginCapability operation middleware
+func (sh *strictHandler) GetPluginCapability(ctx echo.Context, orgId OrgIdPathParam, pluginId string) error {
+	var request GetPluginCapabilityRequestObject
+
+	request.OrgId = orgId
+	request.PluginId = pluginId
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPluginCapability(ctx.Request().Context(), request.(GetPluginCapabilityRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPluginCapability")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GetPluginCapabilityResponseObject); ok {
+		return validResponse.VisitGetPluginCapabilityResponse(ctx.Response())
 	} else if response != nil {
 		return fmt.Errorf("unexpected response type: %T", response)
 	}
@@ -8364,6 +13563,33 @@ func (sh *strictHandler) ListAvailableResourceTypes(ctx echo.Context, orgId OrgI
 	return nil
 }
 
+// GetEnvironmentDeletionImpact operation middleware
+func (sh *strictHandler) GetEnvironmentDeletionImpact(ctx echo.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam) error {
+	var request GetEnvironmentDeletionImpactRequestObject
+
+	request.OrgId = orgId
+	request.ProjectId = projectId
+	request.EnvId = envId
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetEnvironmentDeletionImpact(ctx.Request().Context(), request.(GetEnvironmentDeletionImpactRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetEnvironmentDeletionImpact")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GetEnvironmentDeletionImpactResponseObject); ok {
+		return validResponse.VisitGetEnvironmentDeletionImpactResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
 // ListResourceTypes operation middleware
 func (sh *strictHandler) ListResourceTypes(ctx echo.Context, orgId OrgIdPathParam, params ListResourceTypesParams) error {
 	var request ListResourceTypesRequestObject
@@ -8499,6 +13725,40 @@ func (sh *strictHandler) UpdateResourceType(ctx echo.Context, orgId OrgIdPathPar
 		return err
 	} else if validResponse, ok := response.(UpdateResourceTypeResponseObject); ok {
 		return validResponse.VisitUpdateResourceTypeResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ChangeResourceTypeCatalogueStatus operation middleware
+func (sh *strictHandler) ChangeResourceTypeCatalogueStatus(ctx echo.Context, orgId OrgIdPathParam, typeId ResourceTypeIdPathParam, catalogueAction ChangeResourceTypeCatalogueStatusParamsCatalogueAction, params ChangeResourceTypeCatalogueStatusParams) error {
+	var request ChangeResourceTypeCatalogueStatusRequestObject
+
+	request.OrgId = orgId
+	request.TypeId = typeId
+	request.CatalogueAction = catalogueAction
+	request.Params = params
+
+	var body ChangeResourceTypeCatalogueStatusJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ChangeResourceTypeCatalogueStatus(ctx.Request().Context(), request.(ChangeResourceTypeCatalogueStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangeResourceTypeCatalogueStatus")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ChangeResourceTypeCatalogueStatusResponseObject); ok {
+		return validResponse.VisitChangeResourceTypeCatalogueStatusResponse(ctx.Response())
 	} else if response != nil {
 		return fmt.Errorf("unexpected response type: %T", response)
 	}
@@ -8758,227 +14018,346 @@ func (sh *strictHandler) UpdateRunner(ctx echo.Context, orgId OrgIdPathParam, ru
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"32HIsA3BfBH1ONqphevr/xcAAP//gA6SJC+cAQA=",
+	"H4sIAAAAAAAC/+y9C3Mbt7kw/Ffw6nQmdkxS8iU5ic5kUkV2XNWNrSPZJ+/bSOUBd0ES0RLYAljJrKvv",
+	"t3+D62J3sTeKEilFmU4tkru4PHjueC5fdiK6SClBRPCd/S87KWRwgQRi6lPMlicZ+e8MseWx/EF9h3jE",
+	"cCowJTv7O0dTIFiGBkDMEWDonxniAlzhJAGECrCAFwhAsgTRHJIZ4kBQ9SBfcoEWAzDJzMMMiYwRcDWH",
+	"AlzRLInBHF4iMEGIgJgSNNoZ7GA53z/lWnYGOwQu0M6+XOCYZWRnsMOjOVpAvcApzBKxsz+FCUeDHbFM",
+	"5aMTShMEyc719WAHkcuj+BiKec2uPs4ReEMuMaNkgYgAR693BjvoM1ykiRyKqz+GiFzaZaVQzPNVqeF3",
+	"BjsSHpiheGdfwchbo1kTFwyTmV3Sx2WKei1LvlBeW4wuUUJT+Xvt4vRE/Rf4KcN9lvfpU2lte89fvHz1",
+	"zbf/OfzuezgZRjGaDuVXQ/md/Ep+U7toOXnjkqeULaDY2d/J9JPVLUwpi1AnbFZImSImxwTqNRCjBMnH",
+	"5I9iTjMBYsQFo0tMZiAjMWKJ+hOTKYNcsCwSGatFXDVmX7TFMVqkVCASLd+h5V8QjBGrbuJUwEmCQAST",
+	"BLHhDBHEoEAxuEBLkHEUSyKMUZylCY6gQCCiiwUksaRBhhF3K57r8d2Sj/LZh+/QsvEsFvDz3xCZifnO",
+	"/ou9vcHOAhP7+bvQyWASJVmM3lPyWuMvYgdRhDjHkwR15j8JtszHjAcY4jRjkeQ8krVAhhRfgm5sDQwz",
+	"Ja87LTPcmFAydk+P81H6HuSCxlnSTOsH4Bf1UJm+F8shfznUA4RpxQ7ek771a/+DGMeUdFuaebi8xBej",
+	"V6O9prW5SXoukbJZK3/8wGaQ4H9BEViY4duUzcKrU+P3XFMKZ+gjvUCNUlIuTD4IhHxS4pwVlVNGF4U1",
+	"Hrj/fvihBhvlSDstq0LsGM5Q25oW8DNeZAtAssUEMUCnAAu04HqBSiJjAqBeOp1KasoSwf31frNXs0bE",
+	"xnXrxESgGWJ6oYz+jiLReqzH+rmaEzWjhE/VTdH3ZPV7HYSeXdwaBZ43+Q2FXsroJY4RawWxIepj83yA",
+	"8cArPrTD1S7bTNYf2OpFqZr0XKd8pbBSeMWbV2fe6LM+K0g66Wgn5uHq0vjL8MrEKhpZcU1NtP4zTgRi",
+	"YLJ0AhHI4QCORzXLK5GzfHqsEKxxQZ2F2klAsq1OLKxd3rXTCcsIaaGSA3CiHgqQxsV3fKhHqFuiHr3X",
+	"EeszTinhSJljr/b2foLxiRYd8ouIEiEV/f0vOzDV+hymZPd3Lpf7xRv5TwxNd/Z3/mM3t/Z29a989w1j",
+	"lOnZqqjsTDrIASaXMMHxCPxCmdSHBcQJiCABEwSmNCOxlBZSD0NyRDCh8XK0cz3YebX3/BOBmZhThv8l",
+	"930XC48SLG2QGMfkKwEM5QO1ASDXgogws4KIoVh+hIlSALXeqwD+66+/Dg/yh1FxbZXjUnt9+TNlExzH",
+	"iNz+Rk8Ru0RMWx9cQBLzgh0uzWuGphnXlrc7AoCFOZhX76n4WR7d3WOTOgrtApBrFpDNkMj5E2WAoUQf",
+	"UEwRV3o7+oy5Xfr3h5RMExzdMSFEZlauzEC9Imn2cSFtKUMA2r8xUnzFjC4nP7iEOJHG2YnHuUNsxipc",
+	"0L5Q5NvcaGcoVvpjbvvAFEsMTpm0TwTWXKMweHmuk4I88H/zGdwvS3Dw6yk4fQkmWXSBpKJVtvBKxCCN",
+	"1bBwzAj+ZyZFjySqKUZM2tcGbb21VOVSZQaqhuUhACpoFABoHm6f7LfzwY7SgtvQJXiaH/Qart1yIWNw",
+	"qVabiTQT4xwVYRxj+TBMjr3z0jKhCjb9nlq+Hgnkrjq508Y9fcnXQydKU9ayxQqi33aUUCwuMQfweeXt",
+	"wU7T7ve/lFBQm33j/iihX9TGu5hjbo4RTFBCyUxytSbjuIIxZh0Kcrz+DJrPXaswSkU4EmixE2QX3uHw",
+	"LE0pEyiW+pfaFBTRHMVmcyMgn6csmiMuGBSUAUSUe8g6LcgS2KPyx4UMnREj2GIASWzBhJbgAi05iKli",
+	"mvQSsQSmml/J+b+yx0HSTPCvRmdkJ3DAFpnGUQI5Dx+c+qmMfQNwNcfR3GoG1uUk5efMip+Sy1I7TAIH",
+	"5haxTm6isCQ422pIyvqgaEctN6Tt59RaOpt85QOP1Mro3pmKj6XdfttSybHYKqS1D0KJUsyB8SKszpJD",
+	"zJigz0L5J8bKI9PFY5Nx5Dtu5O7kKA4qeoFtJ6efCh7FFf+IFillkC2lzlldk1R48CxjWikSFNCJgBJM",
+	"9jUlpDmKMobF0ldrJeeBnGcLqalAAo4OfgGMJqh6LPLbMWQ1EDk4ee+onWrnqRpWDwSFQPLNnX9ARvbh",
+	"Fd/HcLG//9ve8PvzL89fXO/Ld87Odn+Dw38dDP8+3ht+/+yHwejPZ2fD8e75sz9VgDfY+Tw0ow6VTSEN",
+	"KbNAgLVKCI1OL7d0Itd0cPJegpMjzjElY21/lTfzREsqmDwFp/pBIB+UG7Is62qOSA40u+UROJqqeS3j",
+	"HQAIDAMD3B9K+aEnCJztfKFsNsbx9fCLtgLl32c7o6IS9e2rgpf8ZQGeBmIrAcwHBFhkWoVVeENJsjTQ",
+	"i+aQwUiJlScJkgPwAYjxDAs+UKJFzTsc7z5VsBV8zNAsqFB6kFUY8+sp0I+GOOepxVXlQQXSnMERAk9O",
+	"P54+BYjEKcVEBEAulOzJuEDMjm7BLc+uhI0SeudfXlwP1R/PhmdncUfQuX2WsU1pwx/t1qr82VJRkND/",
+	"lTF08supoAzOUIGoO9C8ZEOQADMIMKOAgyiiGREAcmOJcPPDBEYXiMSabDEHGgVH4KBoA8szpmKOGOBI",
+	"SIOGnxEjwDkS4BJDgLyrvUvIsOSzXL1o8J+PwClC4Czb23sZzYVI+f7urrsuGc0hn+OIsnQU0cWuQIzB",
+	"KWWL3QSSWQZnaNcsdRfKvbHFf6iNDM1G1KjoTGpGYJH7H3iVhRn0RqyG9t9LQjBcTIHRAfHQvln0iomp",
+	"WgkPqQwpFPNxytAUfw6KTPULkE85pNfnM8VW9fPhmmU4LqCyPFBodY8LtFRanBGNxVXKOXYF3VXD78aY",
+	"oUhQ5cMLMpLReHj+7MmP+zk/tl8+/frsbPfHrhTi45oHjArBGHyVj4wKmt2M0SztfFTOXn0rXytCgM2G",
+	"DquGamWhEzOLHUNNMb2RxFBayXEqDJKkjO7tPQ/NK4yt36S/nMohzERadSkxFqPLBvcwKGN+iPkU+Mkp",
+	"ihgSgRtk9b3GWknfl+aeT+p+Ur+QP8olIOfxw0SiBUz011WaVM7QyjzHcoKrOWJIE4YeGXMzeAHCu5TN",
+	"+K5AXAwpm+1qNsZ3G2wHs+qwJuNtKZ/an/DFIHRd5Z+FcfDaaSrQlvQyo0P55ZBf4HRIjWQcKrGGmDb2",
+	"1aEw9It/M1q1oCETeAojMY7xzDh/KxuOGIICxWMoCh7vWHJRgRdBakjwFEXLKEFjib5ZR+PXLPMULaAU",
+	"Iaf6VWlg45lGrbGJOzCbQSRbSJhd7kmIPVeqD4EzFHtgq5jpPMlmwY2a35Urv923P9ihKfxnhsbmpIyF",
+	"V31KaWnBn9JskmA+R/F4suw0I0MJghyNCRX6/OotWw9N3bCYiG9f7SiFEC8k5J5XsVGquBr8/hBVdqdn",
+	"YegS1z7TGZCXiOGpURn6Iox70WJLiZwM+IunW8SFgV1Y9UBrUC+85ADaDyoUVgVd4NAKRBfmtyXSfq3U",
+	"FkXSSfJhurP/Ww+C27kefKl4d6eYYEtnfUbyGWTTe1XuVD66HBreaqrQOA/BwzobarwDncz+OiB3M/xX",
+	"Ndi9ULeA6kd8vS6gpBZ4dVU+SaatfXpY2pLSFq04tdQ1ihmoGICz9+LlcO/5cO/5x729ffW/v+8MOkqE",
+	"GPM0gcsavciP75tnC0gAQzBWziCjhBRuDU7V335UYGhKRC7H9oY5CA1fRVY7t7p0CcZ1YZCdLif8reW2",
+	"an3gZ1WWwglKGt3KVWAXVvA3NYDW+ydL6/xOaYKjpUIGGMdDSgBHiVLulQWwqtJhIkyCMLcBLc1gyKNu",
+	"qgLTDG4lS3H4T9qckbaOPUjzgrRwzaTL3O5x3LroSTX/DQP/Z//zsb5WVlunTI03MnYuL3357/mIVPBg",
+	"mtCltq19bLROC47EQP9qzbopThKtOWcpJWCKGRdmmCoel0MLAuZMFyns4XaurOlXxwvEedjjS4DFHmAe",
+	"ApBzGmEVT+ruE/Q4ZfpLkLRyIZZ7jTPtK1SfpTGFibdj8NXn5b++Cm0uS+NVuKTPLiSPNMOM1sckO+N1",
+	"gXPdNW6H7vjMkwUuX9BiClAvsIkio3ao1yIbD9XQP9F4GXKQOHc6NZIMQEDQVbPwvJGI0k4XHEs7UxEx",
+	"Np4x47HgKYokyyuhS50w8124xUDnF0XPyz/OztIvh9G1+oerf/5+fXZGzp+Af9f/+PTr+t+6uWh8YFnX",
+	"r4vl8Ry/NxPE5TMDH0sMUT+u/M8qZsJ6DiibNUnushv3yY/7wx/lX3vD78+fPe3oA/f2pZcwQc4zVVmj",
+	"J/TWpCmsZxMtay8uezO6yAJ+9if5Zm9V9STEuXzkbOE5r02uxtEihTpAqMhAJgmNLpBv67vo/IH5kRXN",
+	"jxp3Xm5YeEfR3TGRYtLdyvH2V7SgcDDeREVPoXjsUiA6T6RHf/NZICLHP6REMDzJwoEtpZOqgGHggO1B",
+	"1uw8tMiWkz0yjsZPSkZZqVI83bWqRFWR2rS8ysFUHXmRwJfaG4EuJZQ6osokSy7GciD9bse3VnEJ2nc6",
+	"urr8E69xn61EGx0f6+0LrPfy0UvEGI7RGEqG1m00+0quzXY9Gvdq70N1bzIEeY1Lzz2j4yqdq6w7ayqY",
+	"h60GXgeP6IJe9sTEdfhI+3u1jzHJGULRAum27J6wDkbiWWdoAc5VbbzMa0vEWHamFlbmgBP0a4b4VIE3",
+	"1BsN5/14ZNFAqNzlTjFbjGM0RXJBqD8ir8R8+nKVFcjBkm4xkLZoQjxfO3aV8CmAQo0YY5bdcsJtAWTe",
+	"rFsQNObbc/cjVKyqugQXpcnbeq8K1tkb/wR0VixbwCRZAkX3CGQkQZzrYFIvFV95deIRODB/jo2Dx0yF",
+	"SazyJLgLRbVJ0tYTpCwH87KNEGVoiDnPjMVtbgr1OtSVgtTllU1UmFNCxsv5so9X6MXbqg2373bzUnrx",
+	"NFssIFvqa4zSbzf2cRjLs2AS9/F5/KXq5wi7oJYpMra5dUfmCeK4GGZVNMtfF8zyktejt3+9bGjfvelc",
+	"svL5OGU0zqI8CquYxF3cyq9zpGKlCmRkI6zU3iRNHbsRTXaL76/308FL4r+F5LuE6JbPfLvYbIGc7hvH",
+	"9RdfjZzRP6hIGdKPwFe8EazMsYFLwT7cp4Gp9E8hCsg2D9CYt3kXqzNW+UCBwHQGnYBKRnr0reLwXZzB",
+	"CByq7EOuuY5kqphMEdNrUgR49JoPFKDkGoH21oW4w6pXDRII23TfULAVSpcPRaB3IL+i86dB3GqjpDcp",
+	"3jNZ24yza5ZVTWdzs3N5vOe5s3ueG98OHFIJIiF19zSBEVKHoEZV4eJrvjUoM5YCXgT5hYZJFQdVkjRk",
+	"sUlRt9n1gZxZFVzeL03Tvy9P4TKhUAmoBRIwhgIG787VOkah/DtUu4c5ZQJEVJU3ShniksWbFBWXkKfH",
+	"1dxHPepn4yluxWB0odOBYkAnHLFLOMEJFkspkAQ9I1MszyuVgGFy1UAwmk0SxOeUqgljGmXy4LXMOyum",
+	"DB8cHw210Kg6V2oDDjQdDx0do89pAonOULCi3gIsn+qULpCYyxXNYZoiguL/0yqbNHTztYSw6O3h6U2S",
+	"NMBbSmcJAocJzWIXPv7k7eHpU5NG/SCyNWYRXzVTwySTNwbfvz08BT+p54qHbv4auoT0kqUo7UPz79nZ",
+	"8Pxr+90qeQ3mtEopDfnKtLx5TAfpng4iYecBY7TuBAmDFSGqtjeI2g19CAVM6CwLcqOIJoljPjBJ1HmZ",
+	"+hKSPWnxZjLkbHEhXWKgpNqAAysLMfdHUDoJYvprARIEuQCUmJxiORAW2pemk8YL9T1Q3Kw+meV1vvet",
+	"gYz+GDLU3ZZ7Xi3b0k2tt8l2B/5UPc70rVG3wxppqaqHUIqxoE5JB9CeWeSQZFBJy0BjeVR8jGdE5ayE",
+	"9G+i+LgSts4fml8YDnQiZooJcUUBbH6Kds667H9VplH+jC5hkmnUxBzwC5ymJUU2XHywR3ioWs7Y3AbY",
+	"5YShqJ3HTptSlX/0pkzhRI22CRQS1m5rWkCoEx6Bv9ArdIlYThFy4wYmLjpgAK4QIEhHXvrOHvNgDjUO",
+	"rlCSmEoEC7gEhIKEkhli2p2tDi2kkS1GvkMrUDLPkHFcyIziKIXasJtIW/urP39VCePUL/55tfz/Ep30",
+	"PsYCpW7bAeackyGVv+YqZaQMXWKacTBjMJ23nIwdxhi1JJaHVD6YUelg4BUfNeSQrQT16+4cyvDWntkg",
+	"gTSQLvlhdclZTT6uVJ61EjXubQVoRCCJ0Ai8+WwS//S80gDBC821nC00VcXAhKRDlfOlzkYP59Hsf4HL",
+	"vdxfBiPF8qT9ioia3lhR/h1Rr2yy7lez6xOaJzWC02VurSXpLpQHVjJQIKEERzABp2jxPyYB355GfgBo",
+	"kQpD9+oBd0R77qHRraeF3fSGmxmNIZDPVYJ6W3REGay9cszOr88r/gErPIzSDguKRT+WcWLYRsXJVhjf",
+	"VUIqMgtELmsjfB3VFmNLvfo2agqjjlakXE1qTGtgsT+tvR3sNGeMLtvDlxrmS12qS9ctwjRtDFZy9ZKa",
+	"8N/msR+qh6uVjrq8exSXihb1J5SxieooLL1Jw/bLK3cXW4W3qsJLz164dt2xGeU7wWJopkbg1PrwtRVt",
+	"/F3W4evff4j6twaAZ9FcW9YzLABDKeVYGsu+rPHWo7KBo2L8gfdzM9TNXs9VGEEIqqvFElC/7HWhFqE0",
+	"bRhNQJpAEsjM717uKofbCBwJ55aAmaDDjhcbi+WQstnzFy+LDvVvGh3qa7n2T+gVYhHkCMAknUOSLRDD",
+	"kVFvletwmc4R4frasd6FQySjMJ4L68HREJnmELEPmG4XZQiVgHJF2QWf03RYBMrzb8qhYOsCivXJ9IfN",
+	"dUfO0BaeEMDWjccnBDnc/YhOsEvX1Ym7s2XzfJUhm5TIyPdrj7mrFtKci10tMHJ9HVKGeB4rUZgIQOv2",
+	"DmlF777jBzNEhF57i2PelGsuDq/cc+BdNkGMIIE4UONVsex3Omnb7LvvuJ7ir3SilyKXeIGWHV70dvEO",
+	"Lbs6QPULTa5PuWy9hvN+4Gu6vf0wsdm53tWtLX3L/nBQbofsOxQU31p1ACh+8c03z79XHnxMwPGbX4DW",
+	"3fQVgG7dovnznCZxXjVUgjtl+FIewQVaFgXJUP7305u3R+/B8aef/nZ0CN69+X/qyzPyyyG9+um//9/r",
+	"dy/+5+pg+eYg+iaeHX5+BQl9+f1fP+7939lH/hci+Mvf0e/Pvvmc/OffD65Oj9i7FE33fjgjapA3719X",
+	"xw1UAq4VWg3rOyO//ePsjJw/O6uf7MnZGXna8SLiAi3387LRCaUXIMEXGm0N7M1RVI7AnOWbC35DFkPA",
+	"m3entkxdIN5L/9AZ+d9c8EPzyvVgdbJZJ5OxW6ghhzAIb4HNPFxI10D27QW6qfx7++7N+iD29gLdM9wM",
+	"Q/A2ROBDBXQNYNeol60Nau++u2+s8+7Vs4cI7Ebgely+PaBHt3prlTTQ1G1urFFdrvN8bZvENIXBlKYN",
+	"eB/D5Xi9+rt5oUVvMIA5SGhky6M0W6AmXtfMNdDbbQTy2yi9cVFrA3tnTduzaOassygdwyzGiEQobKN/",
+	"Ovmbhe4VZRcqXE+7u8QSpJQm+Y2iC70hwI6pKOjD0etDvbDgocg1cF3T2JbqDC/FRIqZZ4F5VjkwFyli",
+	"nBIoUPv5FPYcnv4GVSpDQqg75TSfVhfCqUcq1UBSu0DGOG1P3/nEzYW2NaVsqWkA45ihvKWBI5Jp+HFV",
+	"4gROkgLxeLH7irKCdPn28NiN/jfzVBCH2llDE1soZXFjoQxFOXneUK/uxc/LccaSwBGbZR/LRyQVdWYc",
+	"hexlB5sufCQXDaFaZQaRLEA8qWYUjb/SSRXnVPZFCqMa8KqfPKb5VzqRojR8A5rSeCw5VmKaRPXr7XJM",
+	"Y/DRvA1OUxSBBSR4qjolqQAWVVbRBn/pLf1OJyClrgCvaZ9kccF30C8Qm/khx7ZavdxQZeaaZiCtXMyW",
+	"brd1yH2Iqam7IYk+j+p8jcjhaRydxUtFqOiwLxyBd985ZUjDTGHnjRhWvkDLrswE4xgKuMIw5p/X8u0y",
+	"GAtDd6Gt0ur6gxBAcPFdowaJERHjSH6jrsmR23dxJkm4Wk0FP2OUxPtS8LKRfn/ovT80m6vWLtFTXaDl",
+	"SlNcoGXt0CWUrPP+n1ZkeFg7uF6DIA4jRC3DVkkIuUjupPx7Z2bax4nuoLXD+ifnRqkFdIPoqZ9CvTSU",
+	"L9UcXYg51A9n3mhjWQ3gcbPeTOO6QQJCSRT+ZFILIK/NMlAXaGRoud+CxshepvcSn7+WSrrzYq1IBPhc",
+	"9fifIJupOrq1ivm+VKk1ClcLw8tTmLs8fUgZUljGd6q3YYchp+aHFJGPdJp5kY1zKIr5AJiAPEi6Zl8u",
+	"dKip0kqpS2ClKklrSnDzNUB9uIw95Yb3X4Ro2hSHbwe8DpMRcNaY8Nbaz7B3lpopWV7c6Hn7Kb0hgi1D",
+	"HQCiOb5sLPpkHulXrci91LHe10olxTLGpFw2qmf/Ij4l7GxFxsDpqWBHt4JiBGx9Uam9UFGppk4BJmJ5",
+	"9a1WCONWymLVtVboE73pMDYP3WyjsroA65wYVgv6dPWybOympr1SonmxvWkR0GbtzUWxGrCotRNAGGZe",
+	"bwxXwsZSZDWaWaoO8vHhJWRKsMn3ggMf2MHCv7oZqgtrqqx410ICfU5R5NeHvAHK370AaMQ+g231O2zA",
+	"IaoSqORTvxg/QThU0PYKoFqDUJkqcCpVO8qk5pBCBpMEJbl6lrdfNr4lzbhtq9KAabdKrGtE0+U4Riki",
+	"sXxwPGV0MTZTVXdyNAXKcaIy8FwmidaF9CCAksJq3S6UqgQTTr0Hn0xQDg4Ua4A81YpwRP1f7DCl1Oab",
+	"Zlb1DfDFPIfVmJIOgGrYiwaJSoGCwA4bLWshyGleysv8eEbcrzaCkGfKpJxmSbIsAHeCptSYAsX1UCJN",
+	"izVDtq2vb53/zWuqK2kFcp3a5NaLyczUKTjSkYQv9lY36kSw5/fHSnMPn2qLmb2UixlTCr9flOJlUwzt",
+	"wfDvNifa/Tk8/7I3+Pb5tfdjt+CavJK3V0+r2G6383VcxTYKlID08CZYDwGpVt8eZ1gnv+uR1hriy4EA",
+	"Ukd1VrFfuQf1a0e//nyVpBOYppjMdA4zhlyHopp9+4sxicbmYH1qNfDCHJR7a+cnWWgq3Z8Gp/izMmfl",
+	"2zpw2s2mHBMcqTRO27sUfU6ZbmzKAUNTxOQWTBEMYxDrpN7PYtSw2o12Ai9ucAtbgNveWyY5hMY1jMvg",
+	"kqozYgjJ+S5MytPEVBvxdm1v1QqzAMzBV5gkmKCvgk6hShv99gP6oF451W+EU8wtIpTRuEStgxI3auBo",
+	"K2Vx1ORrBZI7S/EfNpsJLxaZMKVTTGKmfbmQoTlQaOHnrQEkkUjldH5YYCFMmRh9FOaES311+Ry++Obb",
+	"/d/gcKpaPH/76vpPQev/vnPwoODvm4n9MNj+enSgkh1ZX0ZJ8m/g/WxybvwVeaW7NFsx3lN4xQF/CVx9",
+	"mFb7rl0v9/2JWy3u1nNKjzKyTUb2hqWf6dic1NhBgI6ag+9fNHRWvR2JPgIn5gAGUrjfsWDPi8SMDe+7",
+	"QYG7Av+0ZexcnQpzw6aKsPpWIsh44Iwch/qyA694qejE9bqoteI3bjUwXbqzvz+X5e8VZH65034d078G",
+	"gYu1MwiW6y7SHASGm5uqB6Nu1UbLPt0i2dWrawGRGtBTPH9JQUPxvRxlBwrmvkhdkwOtrwtpjY4Rk9Pq",
+	"geLRVXKXrpJwW6aq1+RuG/9078ZhzJJxqd7Bqu1/LjCJ/UuUckMp0xUffRYZTMawXGK41Lw1uJJir2jk",
+	"zxYzOBW2WYqCKWILTGCylkI0hQiLcvK3yfseDc+/DhpdpgBpG81XsMz0CzLhNy0dOe+sH06xUIsf0xFE",
+	"KIMX1bOz55zD5wY9bRoI8lPKERPhS7S10k3LBdr6yaNlwrURyzYi/80QeZ1YW4+OR53reegUoIAdvVgO",
+	"+cuhb/K7E5cmxnrKUOR19Oo7c2jfRV6SQtev9Sp1GDPANlA7QaqMcVgimopiPYNj7EsdZeIttZe6ETH0",
+	"7i/XEGFU5h910puhBEHeGKxkHunbEc681PE8bhw30E8YFUAdhpYDb03XtRzfBgWUraf4EPof6DfDAmhT",
+	"2NQaERjErca3Glhsn7NoAK7vYuhlPx05c1ZHBg9jFCWQoRhoTwdQts4URp7bBFCi7wF0nNEZ0UUKtIPe",
+	"tXyxth34KK2Lgt9E11kmqpCfLkssuesZQf/MYKItflUPCkZCF7z66+mH95LvZmgE3uv6nWSKGLOFeNw1",
+	"gguF+AvmgjJlyMMJV6lwysZVyGc8bK7yAl6kyTK/gvAvHGrunKy/sLmAkKsPZJ2ftnTpHRULKgcA34cq",
+	"QWVPbLjLEJpigl3N69wDYJBHF5l37lSFk0GnV2PgWL3D3/f1qxnnKElVzXOOmMmDMuEkjCGJUgp3C/qL",
+	"DmOXJKZhpJ+pafdjZ65vnGKQw8IBc7faEXhtaunLg1PRK2utwVzv/1B+BYkTepvOZ+6uR9x6Sx1ojM/c",
+	"VdgtONSh0IV29aUkpuSM5M2mFBB1ZdcLQq8IgHOkG1zIZ0bgE0fgK0iWX6m0VdMIEBCq1xpRImfBRJiY",
+	"H2MUOA2RZIuJyriQYFI6MNe3NqkUhGRZLLfnXmsmhhZfiqtD3jPw377nJwAE+pb6+Rp9uoh49xjVpH19",
+	"ujYhwNBfqc7elxskF1kbJz+wQI6Tap2zBNA20YlcIWxqM2UNZP1D+/90ZwjwfLTXPaDX+fSNR1eH91rj",
+	"NbDakg1fPInzO069sJhyk3AAt4ZA+OXG0WzL7oPDiHec5/GrvjUmAdZk0oY7pciBD3497X5x3NXkDq0W",
+	"ZETjGAIzfGkvlWwt80oB2is+9PbZZp8bjX48PF+9W6ajh2LbzCJxBoFQpSQTDl2owX4b2ygsruuOmi5o",
+	"q1sxerjSpBmaYS7YEkSUshgT7bjJd+ka6uy27vdJboQ9233645Py/p/uVr/q2KDFi9tVBeXAkznlQh7J",
+	"7lNnPe3qi4k7FAZNwHjyw7//zw//1o+bf8zHyPzzw7/NaE/Bk98k3M6fPRmOnj398enTJwNwo/e/7gbX",
+	"KqAqCOeQxkLHe9YWIP4BPB+9GL0cALNM9fGF+RiBF6O90d4A5KB7MXoR6vDdT2C260dt1ljlfnzjxVzr",
+	"9LR7ZKeV1h4Km6sroLqqErOWhrS50pA3oh2tsRPtNqsK26YaVL13LnMxIN78osxHrwOFu2uy9demAlSj",
+	"Su5MGq/FGumUAWgxrHez1ADe3idr4N6r+Y/K0P1Qhmro7kS5+lF8SBcLqG/FS/fya0w29S49yjmyfe4z",
+	"3FXRKmminubQx7ll2wzpt/2qFYMv69EQbBecW9EP+kVxr18eFgNkVoGJGcFFhV/mEZBrgVGdbKv2affj",
+	"X1oq+Ht7MO0qU17QQe2PVAlnLwBOB3ZPsySxjWLtLQNDgmF0KUExZzSb6bDst8gZEjWIv0obclsstXsG",
+	"zmMizMNMbLwrHWadqSs3TEbx01DQ3WShPKaXrJCCuca8kTxsg+GtSyN5TA/pmh5yw8wL28EqT72QUKA8",
+	"7wrZpXKhE7yBdo5e/GdGdPhHz8I21UE/eQP5c/NePelC2u7Wl3Izyz2kixQyzINxjnGsKhQVZbGT/c0t",
+	"bq8H5v2KRFlxgJy79x2gTK19B5l2KFpfA9RTAlM+p0KXRytofuNoDskM+VGPXr1nnQi0hlnNLDc4RjvC",
+	"DQ6yNMQqR2mHuOFheoozJrPmM1DFhHpXXStJtKYJqsKv+fmC5Gp+lKEFvbzRsdsRbnDspSFWOXY7xA2P",
+	"vZDN1ww58yBDGkuaHxZ0fLNQ/iqOVQd13MDyojoka8SoegZUv+c6wIV5ex3O1LGQMIOvQ5s6LlLP5Zuw",
+	"p4mhDEKSr4akahhsLaOpI+Lz7oLacff9VVq3VzwH968s0c0KBt2Z9dhugXW0hkiWJFKlLu1geyyayk7b",
+	"K4+WOE7gmXB1HXdDFgBVsFN7aZ7axG7Hk8rcpQKZlSv5GEr+m83JenNpiu+V04sEZd0K6FKmkhF65FCs",
+	"ks2rZFTPZvzKFDL2ZF7U9ZaSmlZN0mvIKeLon5lt+FO5sQmUBKXrAZCV+50ujqrLuJku4vY8CGUnVZUU",
+	"V9+2dtUDg8yhJNnGq+0yqXxkkHCdVBrORBLyAXXyvKdQa5jKcvLcb/LcuLTsx7LwK0eNe6taabM2vaLC",
+	"IQxOWI9IyuiCCl0bNmUo0kEKC8guhjGaIpsnyxAXUpE8v+UKuZanrlIHySJTp6zkNd2O5usNLWNgAd4E",
+	"pA4ZYA3nfIK4ajJVjf7vzeHNgrqTwSFlqOj5um5B69KqvDlbN987HcsOvZm8rIpT7/6E/VmAY/JTllwc",
+	"VFkGlkibEf1vjHkEWRzkDKHxTOxDmBnn/KkzhIvLvDbZFmwxduyrYBMXz72VJkqF9nTMnOHhJnGgXEuh",
+	"5wy5iPimWUSEZ++t8UiFFl2Np5jMEEuZCSHyS9O8KrBA+fG2uKfjjkWFoQrR8Lq7c06DJMd6kNvBO5Tg",
+	"GZ4kqMYlWIR3NWbEIkx/HlPcXMmIdOymL6L0TLIuR3QUM5+Lp1Z37BaAg54syuz8kaVsgqWsStI9Dzes",
+	"zzbTnD9pTZEI/5Fal8NK1XJwjBYpFfIdleUSXmKKO6tn8tEVrbuU0Umi4RcKno6zqNTVxl9hsX1nXXfP",
+	"znC5maVZOYrSCiqHXur46fEYb+NdcbFO2V4Hj+ld1CLFPVT1NzlUystoVdpLvNxRuFpAF9DVu6uwLhUy",
+	"Rpc5jbZuvLubSz1ZT9eTLLkY94b7Ko6wGKUJXS56bFJDpHbpq3rWjjHp7VQjVAQsr7y2iPxdhZoNdAkO",
+	"IgAlyVLHnuT70HVBBBqrO5LRWgq79GCfjWWAcl9y3yZWd+Ht8w6txfFm4OFtqYBJRedbiP5yv5tHO/1c",
+	"b8eYvKd13ZssLt3IbFCDdFnHh0vEGI5r1rJOv9VNShL1AoUrEHdDOdrgjirx+9B8vSwvewonKKIkwklt",
+	"Y6/ePHKTB0gzEdFFobqgakGEYnVZO4U4UX9EkEQoSfpHnDVB74Oe/NSbsM97P9vF9XnpMN/I+jwAPfDQ",
+	"ArwsTXvh4glNkgmMpCYnKHsYmLg6KzFe/fjumEn16EIr6HWkDV0MqUHncYpIrCnOfBUjkgdmdPBdZpME",
+	"83mNh2HtrVF0/5NA8xNwYMqdEV0nbZEmWLu685pma2qQct8zNUqtErskUrT3kuwVL9JlBZsLIVlLuP3W",
+	"BZR0gbktDCrVyHLbzed74YMPRbj7ObF7//7t+fD7898kjX399Oxs1PrNkx/3h/JPXc59NDx/9vTHJz/u",
+	"n509K3/7p/q09EIYjLeNbwKbqJgOpR0N6iJlavtSrT3ApRTWULymVjkBagqdluDdWJuvzW31CnpWceLj",
+	"fLKGp167dTQ+5C2xeTC7+gpQbiGHtiGLstrzYp0JtzbX+jYSb8t3zZ7Nel0H1aauj5tIs2vmu7eXfFVf",
+	"U2N7EpU65Cm1xxOutyNNrXcbB3NrG0qulEo0BBAHPp+8iF7Gr4acLtAw59rNVFCIRmluTRM49FaO/Ymb",
+	"sIyAaxeNfV98RDNz1dzY1968aZ3bzQ9PluPQBU5te+3GwSobnSzH5u5gjYN6613xuleB3PPnhy57565A",
+	"ckdI9r4dnuhSy7284GVzrOPaQrpXteYBURVhx7Xw7Xcve+OLqsYQyIDuVUsxBTwMo3wJq2qAUTy0IqXV",
+	"nU0Vk7pxBB891+Fe2eRF7kqo3nhrWq2W511Qlq8vAzeeAQQo+1X8RYeOzC8sUhMAR2zVdSE1OjqV6gr1",
+	"65HoEsymiLMq6U4TkCaQoLVpjZTNzPy3U6ml2G4qUCONq1RlU3hcP+wWZjOXp5hxoStQF1a2Z/4bBv7P",
+	"/lfQxBobenQp4GaUB10Wplwp5vmLoMYiD6wm9jCBxBuyuLko44IugpapM96qQ9qCIPqZ8uBl912MEiSs",
+	"XZkggcbOq64/x8WK3HlXnzVVxJGnLBEvgVzYmjhrxD7Lgorr+aSPNcOxwzC5DkHtSS8BtGfvuvTcAuKF",
+	"2o6YJ4vVrf3eVQqbHA6EOM9xks0wObiEOIETnGCxPC13aYL6R7UrQsUYEy5gog9efkZE/ph/Eljoj5hI",
+	"5QkKE+GRkXykbk6BmsUdeAuqeeQ9FUfeMuufeuMW3/SM21LNQ0fFndY89ckHgIP9IUzNQ6HM/QUm4zye",
+	"pVRaLqIpGnI4lVbTAsVYC4JZhmNIotyolYNgU8MkeNEf2SX0Ti6OMU8TuByr8o31TfvqYhUYkioXGr5+",
+	"fwpSBQ1XiWJUx8xak+nrUDpXIpuW5LDbLshvVcJd1xX3WMc2pAVA2Y2UIB+kz9zkqYTa659GayzTKsfz",
+	"Zfsai7SWEKW4KrNLMM8WkACGYKxDWcpFQU/VH+DY6d+d8M2O7tX1LrgO1B/DtH7QJhlalJ32TOwSdXcM",
+	"IkGUJEugRSLISII41xWB5vASgQlCBBghOgIHwIpadyaYgyuI1VfqGkp8xf3ylcpvM0FuiEbx3UVIh9mx",
+	"Xox2kR7YFwvfvnaTrC7mfTy0le/iDOkmIkYLpiy/s9Op13wDioBd6TYpAyVGU1e9r1kp0PtarUVFLVta",
+	"mQXoSlw4llSg6+JMtZdOh7DZwqplZbDCLPysir2mhr//ODtLvxxG1+ofrv75+/XZGTl/Av5d/+PTr+t/",
+	"61Ym1YeQLbHGASa6Qmo0hwxGAjG+Lka3nr6NjQ0bQ7jagHJtaWWpZasbrydv0ep+pJKZ1favMP1IzXdA",
+	"zaVjLIA2dJonaMoQn5+oMtYHpcTT4JWKyrgEExrrCm9MDyDVCWirYUtVl/hKRfXM9ZO15XGPXls1yAyp",
+	"MFrNNCp7QC6+40P9VIODQE+jr5Ns67SS3j4FKroDYAEWCBLuai3aNZTq52oZZdobfhBzxK4wl3xAPSjx",
+	"zz4sFZP/dTv+X9fATOlteXlY122unKtRLtzsYJdvL3y2fmf/IJXaGoryCUu0ef8297tq3DYCXxkIfiUJ",
+	"TDfq11XQA33y1JA4amyO//wWm+OX9naDPsAWjEfhqrq2FLubUDXhb4RkUZQKSGLI4lFEFwtKhinlYsYQ",
+	"7wM5K2el1H2WS92vVdjJqPbnrjXX/a2VAen/psqPUoKkTr2gDIGYiiFHKWSKDFLIhDJvEnqFWAQ56gb4",
+	"j8Eb3oPQ/a4p7lwqeTgKlFyO5viysYWweaRnS2f7UscWwpMMJ2KMQ24ExyM8oQaBemGISXHzPkIVCpt4",
+	"6V4RFDChswx5iQoVy86uv6NXzT+hQzt+yahresbNVsm+6WziFZHgdhwOTeEiJ4X5/d8KsSFLcPDrKTjt",
+	"U3c5JBuLs9Up5y9r2pHG6BIlkgzGMIoQ5zbBsg3zijDGurGFG8xFemATEGRiNUegsFru1cOeJnCm6pHb",
+	"zqa6WKmUmZK1WNcmgNy8WqhbLtWLfJadQX0ZRduOuE0D93HURr6aN0Ohj90LYOvgRwUv05g5r+7c3FTz",
+	"tvqLFzdTsuodO6pHlwAjCay0SR1RjGAlf0CxtH+/PsDbSqe3ZjizuiW08QKjJAfbjm+ANQxuwBvA0RTQ",
+	"BRYCxQPXZ0hizNKqrrowPQvr3Q+Cj7QzgTZiLe1ktUb1A0CnU5Xx8CFF5OD4CLwc7QGzrw9qXsCziWpS",
+	"cYkYKIQkD85IIWR5AMoBbYNCT4YBKMQnK7WhsOfRGTmhVIBC9069e4mbuvsA0hppRvK6/hdoeUVZrH3x",
+	"DP2usmNGZ+QX+FlyYfDtK/AO/zQAz78Fpmd+ImlBD/TtK/sloTHipnm2olZFU7qV/xnRvfzVDRwfKMSv",
+	"JJVwoExvTpNLFEv7VClFuot2TbF//0TbfGOsSJ0b95AVLIH74Sbzl9zfV7alkm6bVcjBunXIjbHrKi5l",
+	"JjK6U5bAideeq9pBoNIPiU6V4y7vrSSiOfIOzKAnB3AGMZFkn8cwB1fapNt91FddBnh5z5OKpldZT10j",
+	"UUQug15EL1DRd/YIaloTa6w0zVlw4QpUCwTllrMICdPUdMicLEEe1ifFiN4C9741N6gciQFYZCJT97Xo",
+	"c5RkHF8ijcNy2ap+thokdLeCyOXa1EMNpMa7FRV8aJcUPjgfRNrl0gWYuYgtQJSymZSbDeCpQsbwCxV8",
+	"uk7QmF23wGelCpbFcNG2O7Z6iEoEDAPxLu7lPNxuhpEzBCPrc+4i1rWD2n+9HcieV7a+dOd5DYtq1X9U",
+	"nclbU3s690srsPK7U3tGN9F7is0hG/LRVpY6/UKUlGbsyKnJQ/iN8hC++Lj3cn/v1f7eN909hHVCSLX9",
+	"sslkqCCRvHwktS4DgcrtlhYDwRkbmbU/rXUBdJozRpfraDaN9BR5g2k/wrwUTv38xctX33z7n8PvvoeT",
+	"YRSj6VB+NZTfya/kN13CqVdi0D2adI66d62u5fmFo3EhWZ2xAaZpuFBEme02ZMPpCzEraWou7eqnqNuV",
+	"fxEUHNzelA3rcyJ7J/VpOOX99lg5ty7kC2/sUerXfS74RsspdiWYh3mhupXuobnL5/12YcFL80or7vYx",
+	"C33DXPjrmAvKpPjoNaIKgT3Vb5bGbYRscPXNKxmUcn0bu8QWO4vbYITRTu3BHJZ3Hbx0kgYJio2NYt5A",
+	"XljAyJRKZniBCTQF7Lzc2otsghhBqiJBGKDvvuOhBQ28V4dwpjKuagc4kL+3joIumhbx5qJ9HbML1DDC",
+	"2wsUHkHlLLEEcT5EUe0aTt1TbyJeg7jWgfteBQvpo5VsnKAOBFYD6bbGfPU76/BmDVQ7vFl7pm3vtsPx",
+	"PEwE3RQ3LySmQHNVrdiy8XYGpT175V4J8svzbvSrfWydqNh42Zq2cRsE7XkB10LadeOtQuR1Y61C7oWx",
+	"1kP43pC3wwIKE6zIDPqN0XoON2AQPUbpA3mPaax2fevk5drLceRD56rfiYscRJ9RlAkEPiLGoDQjpDVO",
+	"MwbySsEgSjIuwiGEq5g+auouxk85gLHssDG+mvHwfD0x1IN7p0WuqjzWC4529498ajscQEWL4J64gOSi",
+	"+15a2Hc2d3VhV3A7FxgGqYIXGHftdm/wqvfyZvTxYFtnR6c1tSfStQSQh3mzNQrLHHh2gWpDyGuDr5tR",
+	"//64mCuEd9+4zB/S3fzo/C0Vc3kQftwNMbWgo67qAi3Xs3FIWE+f3Wiz3nW3lnR0L39n/ZVmHq2XpvSr",
+	"WyDLNdkvnri7DTPGG37F5PVq1tltFdQskn9dnnc9kX+sva2xWGyi2Gy+iedCq7ibAr6xinur4lcK1fnW",
+	"c68Qe+dM8XvlpVgTWRg/6m0a9xUsOn0ZfLYC5cLPVsmEpBjICCA3lcXM0lWhVERi7brOjwEcZGIumV9k",
+	"xI58RMwRAxwJgcmMnxGTT8aRAJcYFgysS8gwnCQmSNiGk4/AKULgLNvbexnNhUj5/u6uC3MczSGf44iy",
+	"dBTRxa6wB72bQDLL4AztmqXu8pf/ofYwNHtQA6IzMnWZddoEropIc7lagd17uHCVZE9fgp/UY0VUNH/l",
+	"97OBFEPz79nZ8Pzr33olZJbORJ+VSdS2jiq3MJ3erRt5i/k4ZWiKP4cr18hfgHzKyS890xQnJkHcPzWp",
+	"PupAUZsmCHleaOMCLVX8mbGkiuCRc+wKuquG340xQ5GgbFmF08Hw73vD70fjocq4PDvbLX359Ouzs90f",
+	"V4GaB4wA6DxYjHIrrjul1t/BDCxahWRA621TNUI5cOuiTk+zQFVQWFP1m8NT8DNkMygCUdAwE/O2/R1c",
+	"8Y9okVIG2VLSu1zw73TSCpbqnv5KJ12B2nalNdBL1ytZBaRNQu2PDtyO8PyrXmcRdn+lE+dctNzEQuok",
+	"rBZYiVwNQM6ha8V2tQrVYjnMRboff//NN609XlCxFGtdGeOqUqbSRKwssGJsVFzA870Xrwat9b/dlDWS",
+	"UVCQmmAjOZcEye90Ug3JkJxvRofyyyG/wOnQKlPDlKpCTXkDVY3ElIwZTdAYshpn1MHJe3dVTRPD6uVy",
+	"siQBeAFniA8AQ4JhdCnle8SQ0JI8j9QfqM9WLRNOnS2KBcjIPrzi+xgu9veNM+O77/eev9iXE+++OTx9",
+	"Y9d8QrVDKRcXhZfPzuIvz19cq/dyqTHeG37/7IfB6M9nZ8PxbtdboN/pBFRhVRYaRwe/ALkoCS5lKy6C",
+	"XstDXXFE9aXRTj6leRXtRZVsV6i6MgDQVYiwlUHU+778LQJzNo/YCEsZi5LkCrGLYQInfDdNoJCK0pCy",
+	"aI5M/UFjde5fPh/tjfYC9FMjlvd3tWD+swuDVk10DoY/65jojpJZb6V81RYVQWWyZtJskuBojFNX4bIC",
+	"41/nSOmeggLIOZ4RAIF+DeDUJyAB+YVxqWPvAgJrZNc93QDPJkQitDymI1XpDAnwFgp0BZf8jGDCBYJK",
+	"I35/8NH9oB22MJrbmQkSV5Rd8BF47aVLqnSbksc+WHWgO1kzNAvbVb+eghP1m1pbRnw+AnDJG5Hx4RXi",
+	"YviihAyvWmpnnH95cT1Ufzwbnp3F3SlML7tMVfmiR7rKuWIu/Xi08UtLugwxGzPmAhI4Q2w/40MEuRg+",
+	"LzIg/dS+tB93YyjgBHK0GzGkXD4w4cODyWH8ZhpmSU+elCb57R/7klTU/5uR1YdhTlznX769fvrvJ5wv",
+	"Ck87lnp2tjt69vRpdwBbxqxFVgDOp+oBQBk4tpNYZlbxN8rnpt5bHPyit+Y+F4aRWjHKP+uQWVO5fVXx",
+	"xVGUMSyW4xmjWcqbHQnqKohOwdHrojZiBwF6kEqdIj6nWRIrrsQ5jbAqviLNmsKlUI5U+rWhHXaohu2v",
+	"j3jNySvdyDvDR/OtuqJQrjimAoPhceXtW5YcUUJUfi4QdAQOBEgkjaj6NB7jrIGJHnyoyKmNmzRA4vm3",
+	"TV3aVc9PftGgyvjoIFUaJ3Kl0M5zHDHhOL6JivIR8os71k4KO29WTMpXsFpYDHZy1dniTVBBPJcWgEpC",
+	"LzUKUhmslLU0kU0Zso3F1tAEcvWejt6c3RsMe+0Na5s7Nm3QLTifP2hgNYC3rrd6RBlDSb+u0G6lbVA4",
+	"pKy4HOPRNOnKPV+t9HVwy3CDDsr7qQFTjV+0xddp6T73Df9knJrKsLFVxjoFpMN/ZQyxRa1RL38++SW4",
+	"ysHOrD6I8+3hac1LnSJma97lL2vdCGGv8RoCRGvGbfFqvFzptTqotb3XdEzX5024Vnsle1oM8S66HtcQ",
+	"6d3N11hee83l0jJ1LoyuRBG8fVIJQhKrB44wzkP3ZVY7Uqn9es8ZR+wo/guCsfb/YLmwuf442NHVTHd+",
+	"Zn4zDZjid0iyYmkXkilVoMNCSWmPxe7vmH7BBKZ4Z3/npbFwUyjmaupdW756l7KZ+mamnf6uK+9RvLO/",
+	"8zfMxZF50r9tVVFoeUWCOpLIH9lNddTkf2eILZVKXIug/kvy+OgFIv5r5yp1SlURVQt/sbenpQER1pOV",
+	"pom5lNn93QjLbn1HQ3tVgVgK4GVsV/JpmhlF2y6qcNoKNMVz/k3lIXFLRArG5Z46kl2X4S3gTNXMK39v",
+	"X1WIn1IeOEYdkBja3I4mIMSFVWJuDY5eVOR1kXCdDV841ee3upqWEzWxmHZJyg5/pREtNJNb+u6rvb2f",
+	"YHyiYarf+r7LW99LFptgU8GjB/posCpOFUAiSEDpuDug0fWgxB92v1A2O4qva/nEWyRqsKsfl1DTHEMx",
+	"3xCtt2DFDIkySrzqcriv3lPxM81I3Pdw36JW1nDDI91F5JLvfkHk8lOGu52wVxnlp+UnrWnf7JjbJYFZ",
+	"3x2hRqGH4vZhBCTAr04zWYJPn45ee4jgr78jGuhoVds8dJhiwne/pJjI33TTH75rOwEqUywoaH5CM0y8",
+	"2csd+T/YEdaAMUpbkgpNriup9e6URcvAO/XWZhatK8ExWqRUIBIt36GlOSaNjeuXo3Xw6y5Fb4UoyssK",
+	"EckxVk4Zhx/DhEYXuqpyuaPkjaRrX3K7LYlsac9Rm+1+yW9MdwxFlEQ4QcN2Cjyxzz5S4a1ToYP1PSDH",
+	"A1UbEguouj69dk1BAc1ERBdS1TWbiR/JsY0cuaAMDeFUIDZkNEkmMLpoIkn1fMOBHciRTuxAj1S5ElVa",
+	"+Blw3wOafPMZRgKkDF1imvFkCVJMCIqBeQsYRHOeKHql2t877HokVL77ZWFqMV3vos8CEUW2qtwynmTa",
+	"EGpybump3tg3Dwsv3r5ZYxcfoN5/ZkjFhhryxSRKshiNYwanqmWaQ8hyV5pq85fmEQViC6wB32PQm5pf",
+	"PbrbB0+nmmVYpa8TNMNcIElBDjdAATcMBb3sgtcvf6ZsguMYkbuw85RXUPXJSGGEYqBuhlDsVaCFREcL",
+	"oc8igwkw0kmFlJhNT5YAxvGw6D4M0lmd4/BTyhFrIpKN0cj2SaIgfDQANyGLGmmnSiv+7z4OUZYnD91A",
+	"2twJhd2+s9VylBwsADZRqXyuQqM76xR6uX3NEEfsEnaVeR/s9yf+e9so8sxVeby1AioEyi7ySb+d63PA",
+	"P8ItF01asBRWrAOpXCHmRBW6FigSAILyVlcVSAeR4p8NcH8USE1oaeC3iVu4JloJ2Ua2nreHYgBGJlpZ",
+	"da9IE7h8lEvLnCyUlajh/BX3SqIbYg0ymjuQRrtfvE9FT4qLxapznagHtpDcAx6WwiYfnqflRMXxofiQ",
+	"LhZQSY0N6LNd2Yf3M7D6wyPTKCuzCi6q1a7yRN0Om7B9sne/mL8Kt84mqiBV1Z4r9G+vnHW+YvFa87bp",
+	"3q2270V1NYJh/STpgaIIow27PUO0qIqFaGPpCnIAowil4oFcM3gimOSRGgfHRypOQ+0akxmYYpTEHNBy",
+	"X+ub3dm3UpYTtFPKIjSMUYJEQdqWD8p0iSUA8QimCMxNJTZV8mrpUt5VDxt8iRM0QypYUie3xIgLRpel",
+	"PbrGuqaz0jRLkqV9VnNlzMEURhJQKsCfl1+5ouwCxQAyeZijM6IWKheUIHiJACZTBrlgWSQypmxuHSoz",
+	"QXNMTEkll9QhzUO56BQsING9Y2gmVPqDCQf94OUI6iy1MFP6WQL1tYLpfeRMg4YMQo0pACaJqTNXSgTS",
+	"fcdLGFu14PUwJ6bvUs5MOhjrr9prGUpmomeIR9vKFRSOWHCK8gawmNNMmsc8jyiyRBS7K9pRWPb6OHcz",
+	"LmEuPV1f1np9/C0i8qMLJTWdHd2L9xb37YYAzGIs1IWBlFLK5kwSeiV5E0MqMzcGr1HKUKSIgTLwGk2R",
+	"6lXtNVeMM6beMFeSI0sf5eDu/zs8dYnK3v1vv8ud0KViRZVTu3BNCHi2QAALDuhVHo4zNOE44BgTkwfc",
+	"aeEaCYZONR8eFV11HaydmsOI2XLIMgLkoeIkz2SBxG6w7FcagSMBYop0NtgiU3KAMrdHcKhyMjHhq23t",
+	"OIGE6Ky0mx9SjjlmG/bi99Ono9dcZ0ywhbnIIaa9J5YCOGcOIIJJYvP10oTGyC2jHeMkq8GRQPHQzDw8",
+	"1HM6b3DAH9qaZFVOUeRiqVMisUonrIOGgUFEKYsxUc0f6USV6YptoVeP5X3FQQK5ADMG07ktX3uJY0Qi",
+	"BFLEFliVYwC2Ib0dXuI/ZGwp8egKshhQkujbdRPzAWDCEIyXQPe0lz8xtBJ4dQd7i0MGwjVA7Q3E89sN",
+	"3C8xdsv3N2Fd1Mma7oG598VkEFQtW2pdRhU1LraB1sJ0PRHbuZh7pWjLKjfk4AoliapNRaQuESWQodgG",
+	"mBhU50HNopcu0Tlo3FR6vrOAcW99dxQ0bna4lQHjwBbarsaKH7sS2TfAAKVPdsoi81g4/2l5nI+xMZwY",
+	"PJDcNQ+yHVLWNoKHrj45nfqynEu0tBh681QGUyh/94v+o2PeUl6e65ax0K7qjtOczP7uBCsKh24rN7la",
+	"/dqDoCuzlCs3c/u9uVqxaOBOpw4DbMSFKhJSz4osNCRL8jusP9SE1krT/h6JrKOVAgMmGU7EEJNio0U/",
+	"Aq3QjL9T/qo9NZ3rWHr/NtRgf4rN5a0WNvrA8lV1l5MwsnTClQbq3/0i/zF8P3d6h3FKO3BL8/RjBcx7",
+	"uYWvvwpVTfB8f8pPeEMOfPtn+Nq4h29yfoNud363eDC3yzY2dx3Xg22Ya7m1sI1tvOA2DYOE1i7oVNrJ",
+	"eCG/mCSoBnt1hDiMRGc2ZEtoNBVfqBRduCWZceMaB8+7HMnzT8R4I/+F4hsERdyhqPF7UGgNFAIGSUwX",
+	"KoBXuVZ4Np3iz6OalHrvtLsURLg3hRB6oExZP7w7s9Fr2aZKXdiuI3GluUjHo9tF5LLFWJD6rGd/rmYn",
+	"rOCmuG/uhhWNizuKVC43teOeKRqqolHaWGtZnfLzayH1W40Y2qxVU4bXgzRsKp0U++JcPbtS1/Yf2w2c",
+	"SmTKWrCz0137H84QIpUDb2EodUrDth7X3obIf1P1dRrot01UhK3aSgTrpo/31iXMVsSjrmwD3y6WfTK5",
+	"g6sjWkg+dNZk+RH5oMa/P6psJWjkZ5wI015QKZaTZVXTa2hTHApXnCzfWGpZKUpji673Nq9rKzUbkg4a",
+	"TwibQyGJLQmtLjLkDREMr8dSa0pLtZFFW5uWWgDIskdCqoO6MbNVp3JIYmAdZwskYAwFXDVHdQXM0lWy",
+	"bRRXvq4B0OehgscXqVgCPkdJ4t83tWeVatU9CLXb55EbSOVye9ycFRhG0UAeqDpTc+zqaPMWvI8pXNbm",
+	"JBb3Q1SydIHmqa7mL2kFgrxCf5VQ6vixiz3rwI+P3bMPTc+Qf8/wJSIuFs+afGGtwkLCqPyVPAgXCX1+",
+	"6/mTdin9i1rfkQahEc0LcgzqwzludWPq9vltdc4VV7lpruyg9SBdcyUMa0ewVmaoYiEdhV/nHzt56NaM",
+	"oZ3CIN1iV3rxj+ba+4y5yuKsxxyApwCrbsQZyXSpmjCrqvP7PTgk2NsMT9qYv7AdR+rFV5PH8CEgxm3L",
+	"y815Gnvh5sMOtvFcmjW00FO8qpSXDnaGSi9+mA7N3NAox9eFDY1SmFK9odFv8oU1J2sn/sXUyFnjpCZZ",
+	"o2nWY5sLvMZpq/74WOWU2voBpg/0TKfKqzgibyGjJs9yyzpvNQxccqmVTL67YU+rG4q6PEFQyp708PrJ",
+	"Z9fDQ24rtDRLNhmJniXoQVuDTDG4JixqFFO7X5iugNbV3FsfvnVJOErQH9xkaz/eNtNsyw5s7y5Je1uM",
+	"qtWJ1PZzSPAURcsoQUPBIOGmPFJ97PZH81Shmv/f7CD8Yd4Olbf5MQfV5myshkWZ/sChy6NLxJZAHbVq",
+	"mw8iulhgIVAMoKALHMEkWT7eI+3vHKRpsgSOOkA0h2SGOIARo5yb+ySlZlGCDOx0KRWPjnrdJPkdVrqG",
+	"rZR7atzaFb9nBIxNlZNe5WxCY+p9r224vDj2gm5nEEJjM5T2WARdFMbvc1cqkqOL+NxeAELf8IGm/T4w",
+	"OdGw1a2IK+/efMcU+bG1f3R9lD+uRFiNf+9OsqSh/9WbzyjKGunjpyy5+OCVhn+4SpXZrKmhvHF1yiyn",
+	"TYNaQIEYhomqPeaz5GNMjK7wqFHdkH6Gqg8Yuqqno2P9wJ3R0R3Sg9nattCDWU6IIH5m9F/IFsz2SSFG",
+	"EVZFtf4LEKoI4wpySxyPFNGTIkzPxab82lvWt26lheL5tjUflHiqiyVDEnup8Uov0rnSE4kgkC23rSHN",
+	"zTDLlcaWnw/U39ctfiDlQriPWFc77kHkyhHUjY1ItpBQzkiqdhhjHkEW75w/dq24pabZIXfVo/xYkcrR",
+	"pVzAqg6mN/rthypNeuSSlGDSxYFzkKaIxENVX1fide5dnGMu6IMTKIQK1HCVoMHRgGzvqXjsyL6i0i5h",
+	"t7l46QpxNBODRBTVbp3Fpp0CzYS2FGz1dW7rltfrYY+yoJ5Au4SN8cdosa7RYncQ3bvd6Sg1AUahm4Fy",
+	"V91FCgWe4ASLpS3gT2YAkTilmIgRONG8igOOFpAIHI1dHXoSA6haH6iohhhNMVFq4X+pbtaqarjtBb2A",
+	"rsi3yrlV88PEdaQYx3iGuDB18l1/hJTRBTWNScy0I/AeXYEowSqFl89plsQ2tgd6maGICLYc2IyyPJ3M",
+	"1ShXA6PPEi+wSJajShsdP/xqu31Vm87HeXiRV+YqT5dhI0AhNkw8/8Mxoynlean6PnfLfkfKYjxWuUeg",
+	"IT399MgkdI/AsUZqr1A+kIRF0CViruMQOACv9r53UNd7Ue2rzHhjo+aOXd+YGDMUCe6oS1DAjHnqUZZe",
+	"BkxG4IOKMfVn4YChlCGOiAAZhzOlI6gVKQ0hodEFYjZXmwtg+mcJnTGryitrvKmSox+dtpmumg8/LE0n",
+	"B5lc3UqyPTIJ5yHx0hycti3ntXe3jG9b4tLalQOb4dNPOxgo+lX8cZgmMEJeKVPVdwpmiTBpJZ4moQNb",
+	"y/rECBwzNEXMiuyC6aI4hhXWfhyQ9poF2IWfnbRB9Lstkb/plKI/dCrRsVMqJSLXKwW2F5ijR4eOK+kK",
+	"u+3VZhzHvfMqIRvhv+3lOU4LBScqhWOWWhW5YbmYu3P4dUrG3Jqzv/XyMJvmgu34555wSGZ4Y9xY9OTR",
+	"h7YiZ8yvTd1XrZenhyoGonSipwKKjG9T+/7ShjrdihqTcWewkxH79+PN6C1RuHaKP4ab3ZSYrVOjg5Pc",
+	"a1q5GTq9Swd7U5h97Fr+9u782jys6QB7t/H7TXR5SBkqXmttq2/e81qrvgDQ2OO9Sv8dB6zhbcX2DV6x",
+	"aihtwgVewccQLh7V24ipdeY+5nn5lrW7VwqY18VEm52byhn7nRmvJazzXlBiaUN3ZJRXSOG1aoqynR1n",
+	"VTg7zeztiqPHFmfpzRArN0+cD7NHbOc9R72wWVMCRCezxlzf7kisMnrPzmBnAdnF0NdYGOKCskeLZ52S",
+	"zCU4h9OW7Y0p9OKJVIzjoxG0Nh4ilwUZ2v1CxRyxX7rKrkP92v0wnPpykRAoGlnJ3ccQmXXpY8A8TF6v",
+	"5fYXmGAucAS4YFkkMgYTELnXts1LnQvWU7fcZGkWjIC4op4O59tDlKCb3og0UEmHyOpw5Yb1BVXfL82u",
+	"f7R1EWR9Y64fTrx1V5TU1c+HJsSFsoZUSm0H6durAsxP3cv3kXNvk87VBNxNOBKa1lOfAH1aso0dcqmb",
+	"zdwtKO0dhhIEOXqsMlNXZcZBw4sbNS0LauCqbEWdbOuOIIf0bcg1FVbX2UHxST396KWoE2EaPgG6+jDh",
+	"iOnMBpiYWMYYMXyJYjBldKEj26FAXADBMi6uKBPzJXiN0oQuVcY1JzDlcyr49mpsR4SnKBKAqt2WiifA",
+	"WMdpK4w/xsRAYUqZUt1ypW4Vf1yaZDOdnaT+aHG6HauHDmEKdTDaOjC6xkM7AAxJ8kPD1+9PgV6dCxdx",
+	"9VNL+UtmD40WRwqFQEy+/I/f4PBfe8Pvz589+XH/t9Hw3H1++uxPd5yVXYFsgBY+zpEFROQe1NedI3BA",
+	"QEYuCL0iDlheFLAO6iVUjDHhAiaJ83NvITW8xjyil4jpkEazXLsrlX8uOICXECcWBpIWxBzz2ibPGrxB",
+	"AtA1eZstlGP70GNXZ4OuGiDb22EuzU/MKyYuv2ot0GWf29JcE7O8zSWbWPg8yDq/qTv8KtrU8g7VyUVX",
+	"9u5Q2Xdd+NWp1YJeVZPE/XWua5QLajMlYJKYetmQcxphFyanlK0cQqGIBT3EiUmcrPj5mmITAlkcH/P5",
+	"pDibZtImsJk125/H0YRM9bkam8WPO5AaW5qu0XxajQG/W3BktyZoNhfc2w1dNtmX+ebiol8/5s3JjMcG",
+	"zo8NnJsbOFdJodi7uXNV3IfFRb2NbUXN2wettvt42b2JeC1f3v2CyGVLdniu7ZkawYGlSJ6FOc90bkmM",
+	"uGBU6rHWRTkCR1PF4OxPU4gTPtBObW+YK5wkgM/plXL6ZBx8ZV4YyxdQ/JUpBiEh4rKe1YGACBIwQWAB",
+	"YyQ1fcGWAM4gJnUJ3punx/a31OH0emNKWYQapU1fa6iIcGu2iF7cFQP4WEI0zMEVxCpXUuVOBnBWQkhd",
+	"xhhLrNZ+88eNVJmQCbI2nEu+aptt6429ENmPGmRhh2ql94bu7kgb2tb41e6Sp8WKvLdnf6ta0+bsz+64",
+	"tw026C3pPi5UmqEpQ3w+ZhkhqCFmRq/rRD11RA7Iw9QkYrY8ye7suuVEw14D9aClm5EUujgGVKuU+riA",
+	"mEMBrqz4pUxVHedoewWr2bK/B60chASt1p8xl09yrZzpA/pB3f4CbHRnQm0dFG/cAZhkUnSIjOmcgxbg",
+	"Kaitk8D0TWaChrYe31A7NZq8Qgf2Jb86H39ABLZWj1JbIz0Phkdxv3dNiuZ7Sl5rv5MkUCkX8CRBd8Uf",
+	"gtiwvd4jh/HFCpTcFWrxTZGQZ6lQknIlorPF0IZ4kcJIdGwg8Nq8daRfelTQC0pSCTq1zQSijDHdCsMU",
+	"pNNnsL0BKabPB3AV+kyk1TEmuogejOMhzeupcgCnUxRJA3eyLHX/0FvuIUB6CIU7lwX3IlblfvPEeq7X",
+	"7FAvVe3dzmbV3ho32LTah9SD9I6X6zx3FaNF1rP7RSj9qEOIy1qRr6/+9gcqFdr1ZOv9jdt7UnubIPAN",
+	"ORE7H2Oj/3CrzvJ2pcXmnII9kOlhV988QcoNk5eanap4bZeNUMBpIGHPYC8jrkb6rF5arqBu3HmBuVpy",
+	"eSwztwVFF9rI+qSIzYVic9lj/0Y/e08jHqAMOCxs4gw2p6cPZ1Bu2SFrbeGiHebq7v2IfFClZB5qL5fm",
+	"sOzJ8th6khpbuPSbsxyHB1RPqD4Rdzeb37jnG2Y111DxxvrW5Bi4tfXxDBRZfQMbvYl2l4Pb63qI7bb0",
+	"SLfMDfoc3BoeqMchx6kWlGpk7rtfWKg/S9DlsGbk66DQ/fEak7gK+t3Pt8H1sI0ntnf3JL7x9iQ3JtYu",
+	"StiD7qNnwgQau+ipZzbaQ08vYcv1kHWoINuteWxa63h4Goe1A1biXVLH0EZCZy3jTkSVXtMfR73odIht",
+	"2sS2nMze3dLsRlSIjgfWfGWx6VO7LSa/wQuKLgjzsK8mTGh0N7Fwff3/BwAA//97/LXYP3YCAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
