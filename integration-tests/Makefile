@@ -34,6 +34,7 @@ test: compose.yaml test-iam-startup
 .PHONY: test-iam-startup
 test-iam-startup: compose.yaml
 	docker compose up --no-build -d platform-orchestrator-iam-platform-orchestrator-iam --wait --wait-timeout 60
+	timeout 60s sh -c 'until curl --fail --silent --output /dev/null http://127.0.0.1:8083/health; do sleep 1; done'
 
 .PHONY: clean
 clean:
