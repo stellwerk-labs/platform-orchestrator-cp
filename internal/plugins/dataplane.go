@@ -35,6 +35,7 @@ type DataPlaneRequest struct {
 	ProjectUUID     uuid.UUID
 	EnvironmentUUID uuid.UUID
 	DeploymentID    uuid.UUID
+	DispatchID      string
 	Body            json.RawMessage
 }
 
@@ -62,10 +63,20 @@ func dataPlaneRequestPath(request DataPlaneRequest) (string, string, error) {
 	case "external-deployment.admit":
 		return http.MethodPost, base + "/external-deployments", nil
 	case "external-deployment.read":
-		if request.ProjectUUID == uuid.Nil || request.EnvironmentUUID == uuid.Nil || request.DeploymentID == uuid.Nil || len(request.Body) != 0 {
+		if request.ProjectUUID == uuid.Nil || request.EnvironmentUUID == uuid.Nil || len(request.Body) != 0 {
 			return "", "", invalid
 		}
-		return http.MethodGet, base + "/projects/" + request.ProjectUUID.String() + "/envs/" + request.EnvironmentUUID.String() + "/external-deployments/" + request.DeploymentID.String(), nil
+		scope := base + "/projects/" + request.ProjectUUID.String() + "/envs/" + request.EnvironmentUUID.String()
+		if request.DispatchID != "" {
+			if request.DeploymentID != uuid.Nil || len(request.DispatchID) > 128 || request.DispatchID == "." || request.DispatchID == ".." || strings.ContainsAny(request.DispatchID, "/\\%?#\r\n") {
+				return "", "", invalid
+			}
+			return http.MethodGet, scope + "/external-deployment-dispatches/" + url.PathEscape(request.DispatchID), nil
+		}
+		if request.DeploymentID == uuid.Nil {
+			return "", "", invalid
+		}
+		return http.MethodGet, scope + "/external-deployments/" + request.DeploymentID.String(), nil
 	default:
 		return "", "", invalid
 	}

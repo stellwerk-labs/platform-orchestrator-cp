@@ -131,6 +131,12 @@ func (d *databaser) CreateEnvironmentModuleVersionPin(ctx context.Context, tx Tx
 	if tx == nil {
 		return nil, errors.New("transaction required")
 	}
+	if err := lockExternalDispatchEnvironment(ctx, tx, environmentUUID); err != nil {
+		return nil, err
+	}
+	if err := checkExternalDispatchBarrier(ctx, tx, orgID, environmentUUID); err != nil {
+		return nil, err
+	}
 	if err := moduleversions.RequireTransitionReason(reason); err != nil {
 		return nil, NewErrBadRequest(err.Error())
 	}
@@ -179,9 +185,21 @@ func (d *databaser) TransitionEnvironmentModuleVersionPin(ctx context.Context, t
 	if err := moduleversions.RequireTransitionReason(reason); err != nil {
 		return nil, NewErrBadRequest(err.Error())
 	}
-	pin, err := d.GetEnvironmentModuleVersionPin(ctx, tx, orgID, pinID, GetModeForUpdate)
+	pin, err := d.GetEnvironmentModuleVersionPin(ctx, tx, orgID, pinID, GetModeDefault)
 	if err != nil {
 		return nil, err
+	}
+	if err := lockExternalDispatchEnvironment(ctx, tx, pin.EnvironmentUUID); err != nil {
+		return nil, err
+	}
+	pin, err = d.GetEnvironmentModuleVersionPin(ctx, tx, orgID, pinID, GetModeForUpdate)
+	if err != nil {
+		return nil, err
+	}
+	if target == moduleversions.PinActive && pin.Status == moduleversions.PinOverridden {
+		if err := checkExternalDispatchBarrier(ctx, tx, orgID, pin.EnvironmentUUID); err != nil {
+			return nil, err
+		}
 	}
 	if pin.ResourceVersion != expectedVersion {
 		return nil, NewErrConflict("module version pin changed since it was read")

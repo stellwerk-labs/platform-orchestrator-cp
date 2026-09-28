@@ -58,10 +58,13 @@ func TestExternalGrantPersistenceFencingAndDispatch(t *testing.T) {
 	grant, err = ApplyExternalGrantCommand(ctx, db, control)
 	require.NoError(t, err)
 	dispatch := ExternalDispatch{OrgID: command.OrgID, PluginID: command.PluginID, OperationID: command.OperationID, ActorID: command.ActorID, Fence: grant.Revision, Action: "external-deployment.admit", DispatchID: "environment-1", ProjectUUID: command.Intent.Environments[0].ProjectID, EnvironmentUUID: command.Intent.Environments[0].EnvironmentID, RequestDigest: strings.Repeat("b", 64)}
+	dispatch.TargetVersions = grant.Intent.TargetVersions
 	require.ErrorContains(t, CheckExternalDispatch(ctx, db, dispatch), "was not authorized")
 	require.NoError(t, RecordExternalDispatch(ctx, db, dispatch))
 	require.NoError(t, RecordExternalDispatch(ctx, db, dispatch), "lost acknowledgement is idempotent")
-	require.NoError(t, CheckExternalDispatch(ctx, db, dispatch))
+	check := dispatch
+	check.TargetVersions = nil
+	require.NoError(t, CheckExternalDispatch(ctx, db, check))
 	changed := dispatch
 	changed.RequestDigest = strings.Repeat("c", 64)
 	require.ErrorContains(t, RecordExternalDispatch(ctx, db, changed), "different exact request")
@@ -82,6 +85,8 @@ func TestExternalGrantPersistenceFencingAndDispatch(t *testing.T) {
 	dispatch.Fence = grant.Revision
 	require.ErrorContains(t, RecordExternalDispatch(ctx, db, dispatch), "different exact request", "dispatch IDs remain reserved across resumes")
 	dispatch.DispatchID = "environment-1-reconciled"
+	require.ErrorContains(t, RecordExternalDispatch(ctx, db, dispatch), "unresolved", "resume cannot free an uncertain dispatch")
+	require.NoError(t, CompleteExternalDispatch(ctx, db, command.OrgID, command.PluginID, command.OperationID, "environment-1", ExternalDispatchCompletion{DeploymentID: uuid.New(), Status: "succeeded", EnvironmentUUID: dispatch.EnvironmentUUID, ProjectUUID: dispatch.ProjectUUID, RequestDigest: strings.Repeat("b", 64)}))
 	require.NoError(t, RecordExternalDispatch(ctx, db, dispatch))
 	// Reconnect through the actual application database constructor. Recovery
 	// cannot depend on the original connection pool or an in-memory session.
@@ -96,7 +101,9 @@ func TestExternalGrantPersistenceFencingAndDispatch(t *testing.T) {
 	loaded, err := GetExternalOperationGrant(ctx, reconnected, command.OrgID, command.PluginID, command.OperationID)
 	require.NoError(t, err)
 	require.Equal(t, grant, loaded)
-	require.NoError(t, CheckExternalDispatch(ctx, reconnected, dispatch))
+	check = dispatch
+	check.TargetVersions = nil
+	require.NoError(t, CheckExternalDispatch(ctx, reconnected, check))
 	_, err = GetExternalOperationGrant(ctx, db, command.OrgID, "dev.example.other", command.OperationID)
 	require.Error(t, err)
 	control.Action, control.RequestID, control.ExpectedRevision = "release", "finish-1", grant.Revision

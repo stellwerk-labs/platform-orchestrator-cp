@@ -533,6 +533,7 @@ func (e PluginContributionUiSdkVersion) Valid() bool {
 // Defines values for PluginDeploymentReadRequestKind.
 const (
 	PluginDeploymentReadRequestKindDeployment PluginDeploymentReadRequestKind = "deployment"
+	PluginDeploymentReadRequestKindDispatch   PluginDeploymentReadRequestKind = "dispatch"
 	PluginDeploymentReadRequestKindPlan       PluginDeploymentReadRequestKind = "plan"
 	PluginDeploymentReadRequestKindReadiness  PluginDeploymentReadRequestKind = "readiness"
 )
@@ -541,6 +542,8 @@ const (
 func (e PluginDeploymentReadRequestKind) Valid() bool {
 	switch e {
 	case PluginDeploymentReadRequestKindDeployment:
+		return true
+	case PluginDeploymentReadRequestKindDispatch:
 		return true
 	case PluginDeploymentReadRequestKindPlan:
 		return true
@@ -2507,15 +2510,25 @@ type PluginDelegationProof struct {
 type PluginDeploymentReadRequest struct {
 	// DeploymentId Required for deployment inspection of exactly one Environment.
 	DeploymentId *openapi_types.UUID `json:"deployment_id,omitempty"`
+
+	// DispatchId Required for receipt inspection after a lost dispatch response. This is a read
+	DispatchId   *string `json:"dispatch_id,omitempty"`
 	Environments []struct {
 		EnvId     string `json:"env_id"`
 		ProjectId string `json:"project_id"`
 	} `json:"environments"`
-	Kind PluginDeploymentReadRequestKind `json:"kind"`
+	GrantFence *int64                          `json:"grant_fence,omitempty"`
+	Kind       PluginDeploymentReadRequestKind `json:"kind"`
 
 	// ModuleVersions For plan only. Module slug or UUID to exact immutable Version UUID. Core supplies the corresponding version coordinate and artifact digest.
 	ModuleVersions *map[string]openapi_types.UUID `json:"module_versions,omitempty"`
-	Proof          PluginDelegationProof          `json:"proof"`
+
+	// OperationId Background inspection uses this immutable grant and grant_fence instead of a user proof. Current actor authorization is always rechecked.
+	OperationId *openapi_types.UUID    `json:"operation_id,omitempty"`
+	Proof       *PluginDelegationProof `json:"proof,omitempty"`
+
+	// RequestId Required for background inspection. Preserve across retries of the same logical inspection.
+	RequestId *string `json:"request_id,omitempty"`
 }
 
 // PluginDeploymentReadRequestKind defines model for PluginDeploymentReadRequest.Kind.

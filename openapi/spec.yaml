@@ -2742,13 +2742,16 @@ components:
     PluginDeploymentReadRequest:
       type: object
       additionalProperties: false
-      required: [proof, kind, environments]
+      required: [kind, environments]
       properties:
         proof: {$ref: '#/components/schemas/PluginDelegationProof'}
+        operation_id: {type: string, format: uuid, description: Background inspection uses this immutable grant and grant_fence instead of a user proof. Current actor authorization is always rechecked.}
+        grant_fence: {type: integer, format: int64, minimum: 1}
+        request_id: {type: string, minLength: 1, maxLength: 128, description: Required for background inspection. Preserve across retries of the same logical inspection.}
         kind:
           type: string
-          enum: [readiness, plan, deployment]
-          x-enum-varnames: [PluginDeploymentReadRequestKindReadiness, PluginDeploymentReadRequestKindPlan, PluginDeploymentReadRequestKindDeployment]
+          enum: [readiness, plan, deployment, dispatch]
+          x-enum-varnames: [PluginDeploymentReadRequestKindReadiness, PluginDeploymentReadRequestKindPlan, PluginDeploymentReadRequestKindDeployment, PluginDeploymentReadRequestKindDispatch]
         environments:
           type: array
           minItems: 1
@@ -2766,6 +2769,7 @@ components:
           maxProperties: 1000
           additionalProperties: {type: string, format: uuid}
         deployment_id: {type: string, format: uuid, description: Required for deployment inspection of exactly one Environment.}
+        dispatch_id: {type: string, minLength: 1, maxLength: 128, description: Required for receipt inspection after a lost dispatch response. This is a read, never a retry of execution.}
     ModuleVersionLifecycle:
       type: object
       required: [module_id, module_uuid, version, version_uuid, artifact_digest, status, created_at]

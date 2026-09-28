@@ -4888,7 +4888,6 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "proof",
           "kind",
           "environments"
         ],
@@ -4896,17 +4895,35 @@
           "proof": {
             "$ref": "#/components/schemas/PluginDelegationProof"
           },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Background inspection uses this immutable grant and grant_fence instead of a user proof. Current actor authorization is always rechecked."
+          },
+          "grant_fence": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Required for background inspection. Preserve across retries of the same logical inspection."
+          },
           "kind": {
             "type": "string",
             "enum": [
               "readiness",
               "plan",
-              "deployment"
+              "deployment",
+              "dispatch"
             ],
             "x-enum-varnames": [
               "PluginDeploymentReadRequestKindReadiness",
               "PluginDeploymentReadRequestKindPlan",
-              "PluginDeploymentReadRequestKindDeployment"
+              "PluginDeploymentReadRequestKindDeployment",
+              "PluginDeploymentReadRequestKindDispatch"
             ]
           },
           "environments": {
@@ -4947,6 +4964,13 @@
             "type": "string",
             "format": "uuid",
             "description": "Required for deployment inspection of exactly one Environment."
+          },
+          "dispatch_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Required for receipt inspection after a lost dispatch response. This is a read",
+            "never a retry of execution.": ""
           }
         }
       },
