@@ -407,6 +407,27 @@ func (e OrganizationStatus) Valid() bool {
 	}
 }
 
+// Defines values for PluginAuthorizationCheckRequestResourcesType.
+const (
+	PluginAuthorizationCheckRequestResourcesTypeEnvironment  PluginAuthorizationCheckRequestResourcesType = "environment"
+	PluginAuthorizationCheckRequestResourcesTypeOrganization PluginAuthorizationCheckRequestResourcesType = "organization"
+	PluginAuthorizationCheckRequestResourcesTypeProject      PluginAuthorizationCheckRequestResourcesType = "project"
+)
+
+// Valid indicates whether the value is a known member of the PluginAuthorizationCheckRequestResourcesType enum.
+func (e PluginAuthorizationCheckRequestResourcesType) Valid() bool {
+	switch e {
+	case PluginAuthorizationCheckRequestResourcesTypeEnvironment:
+		return true
+	case PluginAuthorizationCheckRequestResourcesTypeOrganization:
+		return true
+	case PluginAuthorizationCheckRequestResourcesTypeProject:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PluginAvailabilityState.
 const (
 	PluginAvailabilityStateAvailable    PluginAvailabilityState = "available"
@@ -2412,6 +2433,29 @@ type Organization struct {
 // OrganizationStatus The current status of the org.
 type OrganizationStatus string
 
+// PluginAuthorizationCheckRequest defines model for PluginAuthorizationCheckRequest.
+type PluginAuthorizationCheckRequest struct {
+	GrantFence  *int64                 `json:"grant_fence,omitempty"`
+	OperationId *openapi_types.UUID    `json:"operation_id,omitempty"`
+	Permission  string                 `json:"permission"`
+	Proof       *PluginDelegationProof `json:"proof,omitempty"`
+	Resources   []struct {
+		Id   string                                       `json:"id"`
+		Type PluginAuthorizationCheckRequestResourcesType `json:"type"`
+	} `json:"resources"`
+
+	// SubjectId Optional subject to revalidate inside a persisted grant. Forbidden with fresh proof authority.
+	SubjectId *openapi_types.UUID `json:"subject_id,omitempty"`
+}
+
+// PluginAuthorizationCheckRequestResourcesType defines model for PluginAuthorizationCheckRequest.Resources.Type.
+type PluginAuthorizationCheckRequestResourcesType string
+
+// PluginAuthorizationCheckResult defines model for PluginAuthorizationCheckResult.
+type PluginAuthorizationCheckResult struct {
+	Allowed bool `json:"allowed"`
+}
+
 // PluginAvailabilityState defines model for PluginAvailabilityState.
 type PluginAvailabilityState string
 
@@ -3675,6 +3719,9 @@ type TransitionModuleVersionJSONRequestBody = ModuleReasonedCommand
 // PublishStableModuleVersionSuccessorJSONRequestBody defines body for PublishStableModuleVersionSuccessor for application/json ContentType.
 type PublishStableModuleVersionSuccessorJSONRequestBody = StableModuleVersionSuccessorBody
 
+// CheckPluginAuthorizationJSONRequestBody defines body for CheckPluginAuthorization for application/json ContentType.
+type CheckPluginAuthorizationJSONRequestBody = PluginAuthorizationCheckRequest
+
 // ReadPluginDeploymentDataJSONRequestBody defines body for ReadPluginDeploymentData for application/json ContentType.
 type ReadPluginDeploymentDataJSONRequestBody = PluginDeploymentReadRequest
 
@@ -4569,6 +4616,11 @@ type ClientInterface interface {
 
 	// GetPluginCapability request
 	GetPluginCapability(ctx context.Context, orgId OrgIdPathParam, pluginId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CheckPluginAuthorizationWithBody request with any body
+	CheckPluginAuthorizationWithBody(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CheckPluginAuthorization(ctx context.Context, orgId OrgIdPathParam, pluginId string, body CheckPluginAuthorizationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ReadPluginDeploymentDataWithBody request with any body
 	ReadPluginDeploymentDataWithBody(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -5886,6 +5938,30 @@ func (c *Client) ListPluginContributions(ctx context.Context, orgId OrgIdPathPar
 
 func (c *Client) GetPluginCapability(ctx context.Context, orgId OrgIdPathParam, pluginId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPluginCapabilityRequest(c.Server, orgId, pluginId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CheckPluginAuthorizationWithBody(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCheckPluginAuthorizationRequestWithBody(c.Server, orgId, pluginId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CheckPluginAuthorization(ctx context.Context, orgId OrgIdPathParam, pluginId string, body CheckPluginAuthorizationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCheckPluginAuthorizationRequest(c.Server, orgId, pluginId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -10533,6 +10609,60 @@ func NewGetPluginCapabilityRequest(server string, orgId OrgIdPathParam, pluginId
 	return req, nil
 }
 
+// NewCheckPluginAuthorizationRequest calls the generic CheckPluginAuthorization builder with application/json body
+func NewCheckPluginAuthorizationRequest(server string, orgId OrgIdPathParam, pluginId string, body CheckPluginAuthorizationJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCheckPluginAuthorizationRequestWithBody(server, orgId, pluginId, "application/json", bodyReader)
+}
+
+// NewCheckPluginAuthorizationRequestWithBody generates requests for CheckPluginAuthorization with any type of body
+func NewCheckPluginAuthorizationRequestWithBody(server string, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "orgId", orgId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "pluginId", pluginId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/orgs/%s/plugins/%s/authorization-checks", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewReadPluginDeploymentDataRequest calls the generic ReadPluginDeploymentData builder with application/json body
 func NewReadPluginDeploymentDataRequest(server string, orgId OrgIdPathParam, pluginId string, body ReadPluginDeploymentDataJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -12942,6 +13072,11 @@ type ClientWithResponsesInterface interface {
 	// GetPluginCapabilityWithResponse request
 	GetPluginCapabilityWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, reqEditors ...RequestEditorFn) (*GetPluginCapabilityResponse, error)
 
+	// CheckPluginAuthorizationWithBodyWithResponse request with any body
+	CheckPluginAuthorizationWithBodyWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CheckPluginAuthorizationResponse, error)
+
+	CheckPluginAuthorizationWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, body CheckPluginAuthorizationJSONRequestBody, reqEditors ...RequestEditorFn) (*CheckPluginAuthorizationResponse, error)
+
 	// ReadPluginDeploymentDataWithBodyWithResponse request with any body
 	ReadPluginDeploymentDataWithBodyWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReadPluginDeploymentDataResponse, error)
 
@@ -14744,6 +14879,33 @@ func (r GetPluginCapabilityResponse) StatusCode() int {
 	return 0
 }
 
+type CheckPluginAuthorizationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *PluginAuthorizationCheckResult
+	JSON400      *N400BadRequest
+	JSON403      *N403Forbidden
+	JSON404      *N404NotFound
+	JSON409      *N409Conflict
+	JSON503      *N503ServiceUnavailable
+}
+
+// Status returns HTTPResponse.Status
+func (r CheckPluginAuthorizationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CheckPluginAuthorizationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ReadPluginDeploymentDataResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -16446,6 +16608,23 @@ func (c *ClientWithResponses) GetPluginCapabilityWithResponse(ctx context.Contex
 		return nil, err
 	}
 	return ParseGetPluginCapabilityResponse(rsp)
+}
+
+// CheckPluginAuthorizationWithBodyWithResponse request with arbitrary body returning *CheckPluginAuthorizationResponse
+func (c *ClientWithResponses) CheckPluginAuthorizationWithBodyWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CheckPluginAuthorizationResponse, error) {
+	rsp, err := c.CheckPluginAuthorizationWithBody(ctx, orgId, pluginId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCheckPluginAuthorizationResponse(rsp)
+}
+
+func (c *ClientWithResponses) CheckPluginAuthorizationWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, body CheckPluginAuthorizationJSONRequestBody, reqEditors ...RequestEditorFn) (*CheckPluginAuthorizationResponse, error) {
+	rsp, err := c.CheckPluginAuthorization(ctx, orgId, pluginId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCheckPluginAuthorizationResponse(rsp)
 }
 
 // ReadPluginDeploymentDataWithBodyWithResponse request with arbitrary body returning *ReadPluginDeploymentDataResponse
@@ -19701,6 +19880,67 @@ func ParseGetPluginCapabilityResponse(rsp *http.Response) (*GetPluginCapabilityR
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCheckPluginAuthorizationResponse parses an HTTP response from a CheckPluginAuthorizationWithResponse call
+func ParseCheckPluginAuthorizationResponse(rsp *http.Response) (*CheckPluginAuthorizationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CheckPluginAuthorizationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PluginAuthorizationCheckResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest N400BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest N403Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest N404NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest N409Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest N503ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 

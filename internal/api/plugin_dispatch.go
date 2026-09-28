@@ -65,20 +65,31 @@ func (s *Server) pluginInstallationCaller(ctx context.Context, org, plugin strin
 // for a delegated external operation. IAM remains authoritative for enabled
 // identity and exact scope, including on an idempotent replay.
 func (s *Server) pluginAuthorize(ctx context.Context, actor uuid.UUID, checks []orchestratoriam.ResourcePermissionCheck) error {
+	allowed, err := s.pluginAuthorizationDecision(ctx, actor, checks)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return pluginBoundaryError(403, "plugin_actor_forbidden", "The actor no longer has the required capability and scope.")
+	}
+	return nil
+}
+
+func (s *Server) pluginAuthorizationDecision(ctx context.Context, actor uuid.UUID, checks []orchestratoriam.ResourcePermissionCheck) (bool, error) {
 	if actor == uuid.Nil || actor.String() == "ffffffff-ffff-ffff-ffff-ffffffffffff" || s.IamClient == nil || len(checks) == 0 {
-		return pluginBoundaryError(403, "plugin_actor_forbidden", "A scoped actor authorization is required.")
+		return false, pluginBoundaryError(403, "plugin_actor_forbidden", "A scoped actor authorization is required.")
 	}
 	response, err := s.IamClient.InternalAuthorizeWithResponse(ctx, orchestratoriam.InternalAuthorizeBody{UserId: actor, Checks: checks})
 	if err != nil || response == nil {
-		return pluginBoundaryError(503, "authorization_unavailable", "Current authorization could not be verified. Retry after IAM recovers.")
+		return false, pluginBoundaryError(503, "authorization_unavailable", "Current authorization could not be verified. Retry after IAM recovers.")
 	}
 	if response.StatusCode() == http.StatusForbidden || response.StatusCode() == http.StatusUnauthorized {
-		return pluginBoundaryError(403, "plugin_actor_forbidden", "The actor no longer has the required capability and scope.")
+		return false, nil
 	}
 	if response.StatusCode() != http.StatusNoContent {
-		return pluginBoundaryError(503, "authorization_unavailable", "Current authorization could not be verified.")
+		return false, pluginBoundaryError(503, "authorization_unavailable", "Current authorization could not be verified.")
 	}
-	return nil
+	return true, nil
 }
 
 func (s *Server) CheckPluginOperationDispatch(ctx context.Context, request CheckPluginOperationDispatchRequestObject) (CheckPluginOperationDispatchResponseObject, error) {

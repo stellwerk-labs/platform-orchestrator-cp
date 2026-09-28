@@ -77,17 +77,18 @@ type Operation struct {
 // Installation is operator-controlled experimental configuration, not a signed
 // commercial entitlement. Entitlement verification belongs to a separate gate.
 type Installation struct {
-	ID                 string                       `json:"id"`
-	DisplayName        string                       `json:"display_name"`
-	Version            string                       `json:"version"`
-	Backend            string                       `json:"backend"`
-	Organizations      map[string]AvailabilityState `json:"organizations"`
-	Capabilities       []string                     `json:"capabilities"`
-	UI                 *UIContribution              `json:"ui,omitempty"`
-	Operations         []Operation                  `json:"operations"`
-	ServiceUserID      string                       `json:"service_user_id,omitempty"`
-	AdmissionCheckerID string                       `json:"admission_checker_id,omitempty"`
-	ServiceGrants      []ServiceGrant               `json:"service_grants,omitempty"`
+	ID                    string                       `json:"id"`
+	DisplayName           string                       `json:"display_name"`
+	Version               string                       `json:"version"`
+	Backend               string                       `json:"backend"`
+	Organizations         map[string]AvailabilityState `json:"organizations"`
+	Capabilities          []string                     `json:"capabilities"`
+	UI                    *UIContribution              `json:"ui,omitempty"`
+	Operations            []Operation                  `json:"operations"`
+	ServiceUserID         string                       `json:"service_user_id,omitempty"`
+	AdmissionCheckerID    string                       `json:"admission_checker_id,omitempty"`
+	ServiceGrants         []ServiceGrant               `json:"service_grants,omitempty"`
+	AuthorizationPolicies []AuthorizationPolicy        `json:"authorization_policies,omitempty"`
 }
 
 type InstallationRegistry struct{ installations map[string]Installation }
@@ -237,11 +238,19 @@ type ServiceGrant struct {
 	Scope      string `json:"scope"`
 }
 
+// AuthorizationPolicy is the operator-owned catalogue of plugin-local
+// capabilities that the plugin service may ask IAM to evaluate. It grants no
+// capability by itself and can never name Core or another plugin's permission.
+type AuthorizationPolicy struct {
+	Permission string   `json:"permission"`
+	Scopes     []string `json:"scopes"`
+}
+
 var localCapability = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 
 func validateServiceGrants(item Installation) error {
 	if len(item.ServiceGrants) == 0 {
-		if item.ServiceUserID != "" || item.AdmissionCheckerID != "" {
+		if item.ServiceUserID != "" || item.AdmissionCheckerID != "" || len(item.AuthorizationPolicies) != 0 {
 			return fmt.Errorf("service identities require explicit service grants")
 		}
 		return nil
@@ -263,6 +272,30 @@ func validateServiceGrants(item Installation) error {
 		}
 		seen[grant.Action] = true
 	}
+	policySeen := map[string]bool{}
+	for _, policy := range item.AuthorizationPolicies {
+		prefix := "plugin." + item.ID + "."
+		if policySeen[policy.Permission] || !strings.HasPrefix(policy.Permission, prefix) || !localCapability.MatchString(strings.TrimPrefix(policy.Permission, prefix)) || len(policy.Scopes) == 0 {
+			return fmt.Errorf("authorization policies require unique owned capabilities and exact scopes")
+		}
+		policySeen[policy.Permission] = true
+		scopeSeen := map[string]bool{}
+		for _, scope := range policy.Scopes {
+			if scopeSeen[scope] || !slices.Contains([]string{"organization", "project", "environment"}, scope) {
+				return fmt.Errorf("authorization policies require unique owned capabilities and exact scopes")
+			}
+			scopeSeen[scope] = true
+		}
+	}
+	if len(item.AuthorizationPolicies) != 0 {
+		grant, ok := item.ServiceGrant("authorization.check")
+		policy, policyOK := item.AuthorizationPolicy(grant.Permission)
+		if !ok || !policyOK || !slices.Contains(policy.Scopes, grant.Scope) {
+			return fmt.Errorf("authorization policies require an authorization.check grant covered by policy")
+		}
+	} else if _, ok := item.ServiceGrant("authorization.check"); ok {
+		return fmt.Errorf("authorization.check requires explicit authorization policies")
+	}
 	return nil
 }
 
@@ -273,6 +306,15 @@ func (item Installation) ServiceGrant(action string) (ServiceGrant, bool) {
 		}
 	}
 	return ServiceGrant{}, false
+}
+
+func (item Installation) AuthorizationPolicy(permission string) (AuthorizationPolicy, bool) {
+	for _, policy := range item.AuthorizationPolicies {
+		if policy.Permission == permission {
+			return policy, true
+		}
+	}
+	return AuthorizationPolicy{}, false
 }
 
 func validateOrigin(raw string, development bool) error {

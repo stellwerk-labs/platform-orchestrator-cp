@@ -46,3 +46,48 @@ func TestInstallationServiceGrantsAreExplicitAndNamespaced(t *testing.T) {
 	changed.UI.CoreOperations[0].ID = "listWorkflows"
 	require.Error(t, load(t, changed), "plugin actions must not acquire host provenance")
 }
+
+func TestInstallationAuthorizationPoliciesAreClosedAndNamespaced(t *testing.T) {
+	const pluginID = "dev.example.workflow"
+	permission := "plugin." + pluginID + ".rollout-read"
+	item := Installation{
+		ID: pluginID, DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.example.test",
+		Organizations: map[string]AvailabilityState{"acme": StateAvailable}, ServiceUserID: uuid.NewString(), AdmissionCheckerID: uuid.NewString(),
+		ServiceGrants:         []ServiceGrant{{Action: "authorization.check", Permission: permission, Scope: "organization"}},
+		AuthorizationPolicies: []AuthorizationPolicy{{Permission: permission, Scopes: []string{"organization", "project", "environment"}}},
+		Operations:            []Operation{{ID: "read", Method: "GET", Path: "/orgs/{orgId}/workflows", ServiceActions: []string{"authorization.check"}}},
+	}
+	load := func(t *testing.T, value Installation) error {
+		t.Helper()
+		encoded, err := json.Marshal([]Installation{value})
+		require.NoError(t, err)
+		_, err = LoadInstallations(strings.NewReader(string(encoded)), false)
+		return err
+	}
+	require.NoError(t, load(t, item))
+
+	for name, change := range map[string]func(*Installation){
+		"core permission": func(changed *Installation) { changed.AuthorizationPolicies[0].Permission = "module.version.unpin" },
+		"other plugin": func(changed *Installation) {
+			changed.AuthorizationPolicies[0].Permission = "plugin.dev.other.workflow.rollout-read"
+		},
+		"nested local capability": func(changed *Installation) {
+			changed.AuthorizationPolicies[0].Permission = "plugin." + pluginID + ".rollout.read"
+		},
+		"unknown scope": func(changed *Installation) { changed.AuthorizationPolicies[0].Scopes = []string{"rollout"} },
+		"duplicate scope": func(changed *Installation) {
+			changed.AuthorizationPolicies[0].Scopes = []string{"organization", "organization"}
+		},
+		"missing policy":              func(changed *Installation) { changed.AuthorizationPolicies = nil },
+		"missing check grant":         func(changed *Installation) { changed.ServiceGrants[0].Action = "inventory.read" },
+		"uncovered check grant scope": func(changed *Installation) { changed.AuthorizationPolicies[0].Scopes = []string{"environment"} },
+	} {
+		t.Run(name, func(t *testing.T) {
+			changed := item
+			changed.ServiceGrants = append([]ServiceGrant(nil), item.ServiceGrants...)
+			changed.AuthorizationPolicies = []AuthorizationPolicy{{Permission: item.AuthorizationPolicies[0].Permission, Scopes: append([]string(nil), item.AuthorizationPolicies[0].Scopes...)}}
+			change(&changed)
+			require.Error(t, load(t, changed))
+		})
+	}
+}
