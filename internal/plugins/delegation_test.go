@@ -80,3 +80,27 @@ func TestServiceDelegationCannotExchangeCancelForActivation(t *testing.T) {
 	_, err = gateway.VerifyServiceDelegation(t.Context(), "acme", item.ID, item.ServiceUserID, "operation.activate", proof)
 	require.Error(t, err, "a signed cancel is not activation authority")
 }
+
+func TestReadDelegationCannotAuthorizeMutation(t *testing.T) {
+	_, key, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+	item := Installation{ID: "dev.example.workflow", DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.example.test", ServiceUserID: uuid.NewString(), AdmissionCheckerID: uuid.NewString(), Organizations: map[string]AvailabilityState{"acme": StateNotEntitled}, ServiceGrants: []ServiceGrant{{Action: "inventory.read", Permission: "plugin.dev.example.workflow.read", Scope: "organization"}}, Operations: []Operation{{ID: "read", Method: "GET", Path: "/orgs/{orgId}/workflows", ServiceActions: []string{"inventory.read"}}}}
+	encoded, err := json.Marshal([]Installation{item})
+	require.NoError(t, err)
+	registry, err := LoadInstallations(strings.NewReader(string(encoded)), false)
+	require.NoError(t, err)
+	now := time.Now().UTC()
+	gateway := &Gateway{Registry: registry, SigningKey: key, Issuer: "core", Now: func() time.Time { return now }}
+	proof := DelegationProof{OperationID: "read", IdempotencyKey: "read-1"}
+	proof.Assertion, err = plugincontext.Sign(key, plugincontext.Claims{Version: 1, Issuer: "core", Audience: "plugin:" + item.ID, PluginID: item.ID, OrgID: "acme", ActorID: uuid.NewString(), OperationID: "read", Method: "GET", Path: "/orgs/acme/workflows", BodySHA256: plugincontext.Digest(nil), RequestID: proof.IdempotencyKey, IssuedAt: now.Unix(), ExpiresAt: now.Add(time.Minute).Unix()}, now)
+	require.NoError(t, err)
+	_, err = gateway.VerifyServiceReadDelegation(t.Context(), "acme", item.ID, item.ServiceUserID, "inventory.read", proof)
+	require.NoError(t, err, "historical inspection remains available after entitlement expiry")
+	_, err = gateway.VerifyServiceDelegation(t.Context(), "acme", item.ID, item.ServiceUserID, "inventory.read", proof)
+	require.Error(t, err, "the mutation verifier does not accept a read proof")
+	_, err = gateway.VerifyServiceReadDelegation(t.Context(), "acme", item.ID, item.ServiceUserID, "operation.activate", proof)
+	require.Error(t, err)
+	gateway.Now = func() time.Time { return now.Add(time.Minute) }
+	_, err = gateway.VerifyServiceReadDelegation(t.Context(), "acme", item.ID, item.ServiceUserID, "inventory.read", proof)
+	require.Error(t, err, "read delegation still expires")
+}

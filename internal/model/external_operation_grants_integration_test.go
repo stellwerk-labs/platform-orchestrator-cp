@@ -153,7 +153,8 @@ func TestExternalModuleOperationsAreBoundToCurrentGrantAndCapturedDefaults(t *te
 		version, err := db.GetCoreModuleVersion(ctx, nil, grant.OrgID, target.ModuleUUID.String(), base.String(), GetModeDefault)
 		require.NoError(t, err)
 		restore.Targets[i].VersionUUID = *base
-		restore.Targets[i].ExpectedResourceVersion = version.ResourceVersion
+		restore.Targets[i].ExpectedResourceVersion = 0
+		require.Positive(t, version.ResourceVersion, "Core derives the locked post-promotion baseline revision")
 		promoted := target.VersionUUID
 		restore.Targets[i].ExpectedDefaultUUID = &promoted
 	}

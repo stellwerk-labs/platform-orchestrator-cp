@@ -34,6 +34,9 @@ func (s *Server) ListPluginContributions(ctx context.Context, request ListPlugin
 		}
 		value := map[string]any{"id": descriptor.ID, "display_name": descriptor.DisplayName, "version": descriptor.Version, "state": descriptor.State, "mode": descriptor.Mode, "operations": operations}
 		if descriptor.Mode != plugins.ModeHidden && installation.UI != nil {
+			if descriptor.Mode != plugins.ModeFull {
+				installation.UI.ContextualActions = nil
+			}
 			value["ui"] = installation.UI
 		}
 		encoded, err := json.Marshal(value)

@@ -22,6 +22,16 @@ type DelegationProof struct {
 }
 
 func (g *Gateway) VerifyServiceDelegation(ctx context.Context, org, plugin, serviceUser, action string, proof DelegationProof) (plugincontext.Claims, error) {
+	return g.verifyServiceDelegation(ctx, org, plugin, serviceUser, action, proof, true)
+}
+
+// VerifyServiceReadDelegation can authorize a declared read port from either a
+// read or write source operation. It must never be used for a mutating port.
+func (g *Gateway) VerifyServiceReadDelegation(ctx context.Context, org, plugin, serviceUser, action string, proof DelegationProof) (plugincontext.Claims, error) {
+	return g.verifyServiceDelegation(ctx, org, plugin, serviceUser, action, proof, false)
+}
+
+func (g *Gateway) verifyServiceDelegation(ctx context.Context, org, plugin, serviceUser, action string, proof DelegationProof, requireMutation bool) (plugincontext.Claims, error) {
 	deny := func() (plugincontext.Claims, error) {
 		return plugincontext.Claims{}, &GatewayError{"plugin_delegation_forbidden", "A valid declared service delegation is required.", 403}
 	}
@@ -37,7 +47,7 @@ func (g *Gateway) VerifyServiceDelegation(ctx context.Context, org, plugin, serv
 		return deny()
 	}
 	operation := item.Operations[index]
-	if !operation.Mutating || !slices.Contains(operation.ServiceActions, action) {
+	if requireMutation && !operation.Mutating || !slices.Contains(operation.ServiceActions, action) {
 		return deny()
 	}
 	for parameter, values := range operation.ServiceActionPathValues[action] {
@@ -45,7 +55,7 @@ func (g *Gateway) VerifyServiceDelegation(ctx context.Context, org, plugin, serv
 			return deny()
 		}
 	}
-	allowed := descriptor.State == StateAvailable || (descriptor.State == StateNotEnabled || descriptor.State == StateNotEntitled) && operation.IsSafety(proof.PathParameters)
+	allowed := descriptor.State == StateAvailable || (descriptor.State == StateNotEnabled || descriptor.State == StateNotEntitled) && (!requireMutation || operation.IsSafety(proof.PathParameters))
 	if !allowed {
 		return deny()
 	}

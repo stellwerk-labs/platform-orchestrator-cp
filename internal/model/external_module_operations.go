@@ -225,7 +225,14 @@ func ApplyExternalModuleOperation(ctx context.Context, db Databaser, command Ext
 		if version.LifecycleStatus != eligible {
 			return nil, NewErrConflict("Module Version is not eligible for this operation")
 		}
-		if _, err := db.TransitionCoreModuleVersion(ctx, tx, command.OrgID, target.ModuleUUID.String(), target.VersionUUID.String(), moduleversions.LifecycleDefault, target.ExpectedResourceVersion, command.ActorID, command.Reason, &command.OperationID); err != nil {
+		expectedVersion := target.ExpectedResourceVersion
+		if command.GrantFence > 0 && command.Action == externalActionRestore {
+			// The operation's promotion deprecated this exact captured baseline and
+			// advanced its revision. Core holds the Module and Version locks, checks
+			// the grant/default lineage above, and owns the current revision.
+			expectedVersion = version.ResourceVersion
+		}
+		if _, err := db.TransitionCoreModuleVersion(ctx, tx, command.OrgID, target.ModuleUUID.String(), target.VersionUUID.String(), moduleversions.LifecycleDefault, expectedVersion, command.ActorID, command.Reason, &command.OperationID); err != nil {
 			return nil, err
 		}
 	}

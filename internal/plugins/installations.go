@@ -24,12 +24,33 @@ const (
 )
 
 type UIContribution struct {
-	SDKVersion      string          `json:"sdk_version"`
-	Origin          string          `json:"origin"`
-	Entrypoint      string          `json:"entrypoint"`
-	RoutePrefix     string          `json:"route_prefix"`
-	NavigationLabel string          `json:"navigation_label"`
-	CoreOperations  []HostOperation `json:"core_operations,omitempty"`
+	SDKVersion        string             `json:"sdk_version"`
+	Origin            string             `json:"origin"`
+	Entrypoint        string             `json:"entrypoint"`
+	RoutePrefix       string             `json:"route_prefix"`
+	NavigationLabel   string             `json:"navigation_label"`
+	CoreOperations    []HostOperation    `json:"core_operations,omitempty"`
+	ContextualActions []ContextualAction `json:"contextual_actions,omitempty"`
+}
+
+type ContextualAction struct {
+	ID                  string               `json:"id"`
+	ResourceType        string               `json:"resource_type"`
+	Label               string               `json:"label"`
+	RequiredOperationID string               `json:"required_operation_id"`
+	Route               ContextualRoute      `json:"route"`
+	When                ContextualConditions `json:"when"`
+	Primary             bool                 `json:"primary,omitempty"`
+}
+
+type ContextualRoute struct {
+	Path  string            `json:"path"`
+	Query map[string]string `json:"query,omitempty"`
+}
+
+type ContextualConditions struct {
+	LifecycleStatus         []string `json:"lifecycle_status"`
+	SemanticVersionRequired bool     `json:"semantic_version_required"`
 }
 
 // HostOperation names a closed Console SDK operation. It is never sent to the
@@ -163,9 +184,43 @@ func LoadInstallations(reader io.Reader, allowDevelopmentHTTP bool) (*Installati
 				return nil, fmt.Errorf("invalid path template")
 			}
 		}
+		if item.UI != nil {
+			if err := validateContextualActions(item.UI.ContextualActions, seen); err != nil {
+				return nil, err
+			}
+		}
 		registry.installations[item.ID] = item
 	}
 	return registry, nil
+}
+
+var contextualRoute = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9/-]*[a-z0-9])?$`)
+var contextualQueryKey = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)
+
+func validateContextualActions(actions []ContextualAction, operations map[string]bool) error {
+	if len(actions) > 100 {
+		return fmt.Errorf("too many contextual actions")
+	}
+	seen := map[string]bool{}
+	for _, action := range actions {
+		if !operationIdentifier.MatchString(action.ID) || seen[action.ID] || action.ResourceType != "module_version" || strings.TrimSpace(action.Label) == "" || len(action.Label) > 100 || !operations[action.RequiredOperationID] || !contextualRoute.MatchString(action.Route.Path) || strings.Contains(action.Route.Path, "//") || len(action.When.LifecycleStatus) == 0 {
+			return fmt.Errorf("invalid contextual action identity, route, condition or required plugin operation")
+		}
+		seen[action.ID] = true
+		statuses := map[string]bool{}
+		for _, status := range action.When.LifecycleStatus {
+			if !slices.Contains([]string{"proposed", "default", "deprecated", "defective"}, status) || statuses[status] {
+				return fmt.Errorf("invalid contextual lifecycle condition")
+			}
+			statuses[status] = true
+		}
+		for key, value := range action.Route.Query {
+			if !contextualQueryKey.MatchString(key) || !slices.Contains([]string{"$module_id", "$semantic_version", "$version_uuid"}, value) {
+				return fmt.Errorf("invalid contextual query substitution")
+			}
+		}
+	}
+	return nil
 }
 
 func reservedHostOperation(id string) bool {

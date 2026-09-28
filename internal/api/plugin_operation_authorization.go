@@ -14,6 +14,10 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 )
 
+func pluginProofFromAPI(proof PluginDelegationProof) plugins.DelegationProof {
+	return plugins.DelegationProof{OperationID: proof.OperationId, PathParameters: ref.DerefOr(proof.PathParameters, map[string]string{}), Query: ref.DerefOr(proof.Query, map[string][]string{}), Body: ref.DerefOr(proof.Body, []byte{}), IdempotencyKey: proof.IdempotencyKey, Assertion: proof.Assertion}
+}
+
 func (s *Server) GetPluginOperationGrant(ctx context.Context, request GetPluginOperationGrantRequestObject) (GetPluginOperationGrantResponseObject, error) {
 	if _, _, err := s.pluginInstallationCaller(ctx, request.OrgId, request.PluginId, false); err != nil {
 		return nil, err
@@ -42,7 +46,7 @@ func (s *Server) AuthorizePluginOperation(ctx context.Context, request Authorize
 		return nil, pluginBoundaryError(400, "plugin_request_invalid", "An operation authorization is required.")
 	}
 	body := request.Body
-	proof := plugins.DelegationProof{OperationID: body.Proof.OperationId, PathParameters: ref.DerefOr(body.Proof.PathParameters, map[string]string{}), Query: ref.DerefOr(body.Proof.Query, map[string][]string{}), Body: ref.DerefOr(body.Proof.Body, []byte{}), IdempotencyKey: body.Proof.IdempotencyKey, Assertion: body.Proof.Assertion}
+	proof := pluginProofFromAPI(body.Proof)
 	action := "operation." + string(body.Action)
 	claims, err := s.PluginGateway.VerifyServiceDelegation(ctx, request.OrgId, request.PluginId, item.ServiceUserID, action, proof)
 	if err != nil {

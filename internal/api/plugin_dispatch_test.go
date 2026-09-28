@@ -44,4 +44,21 @@ func TestPluginDispatchRejectsUnconfiguredServicesBeforeDataAccess(t *testing.T)
 	response := httptest.NewRecorder()
 	e.ServeHTTP(response, request)
 	require.Equal(t, http.StatusConflict, response.Code, response.Body.String())
+	operationPath := "/orgs/acme/plugins/" + pluginID + "/operations/" + uuid.NewString()
+	for _, route := range []struct{ method, path, body string }{
+		{http.MethodGet, operationPath, ""},
+		{http.MethodPost, "/orgs/acme/plugins/" + pluginID + "/inventory", `{"proof":{"operation_id":"read","idempotency_key":"read-1","assertion":"not-an-assertion"},"selector":{},"module_ids":[]}`},
+		{http.MethodPost, operationPath + "/authorize", `{"action":"activate","expected_revision":1,"reason":"Start","proof":{"operation_id":"command","idempotency_key":"start-1","assertion":"not-an-assertion"}}`},
+		{http.MethodPost, operationPath + "/modules", `{"action":"reserve","grant_fence":1,"expected_fence":0,"request_id":"reserve-1","reason":"Reserve","targets":[{"module_uuid":"` + uuid.NewString() + `","version_uuid":"` + uuid.NewString() + `","expected_resource_version":1}]}`},
+	} {
+		t.Run(route.path, func(t *testing.T) {
+			request := httptest.NewRequest(route.method, route.path, strings.NewReader(route.body))
+			request.Header.Set("Content-Type", "application/json")
+			request.Header.Set("From", checker)
+			request.Header.Set("Po-Org-Id", "acme")
+			response := httptest.NewRecorder()
+			e.ServeHTTP(response, request)
+			require.Equal(t, http.StatusForbidden, response.Code, response.Body.String())
+		})
+	}
 }

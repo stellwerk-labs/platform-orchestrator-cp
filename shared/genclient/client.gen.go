@@ -461,6 +461,42 @@ func (e PluginContributionMode) Valid() bool {
 	}
 }
 
+// Defines values for PluginContributionUiContextualActionsResourceType.
+const (
+	PluginContributionUiContextualActionsResourceTypeModuleVersion PluginContributionUiContextualActionsResourceType = "module_version"
+)
+
+// Valid indicates whether the value is a known member of the PluginContributionUiContextualActionsResourceType enum.
+func (e PluginContributionUiContextualActionsResourceType) Valid() bool {
+	switch e {
+	case PluginContributionUiContextualActionsResourceTypeModuleVersion:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginContributionUiContextualActionsRouteQuery.
+const (
+	PluginContributionUiContextualActionsRouteQueryModuleId        PluginContributionUiContextualActionsRouteQuery = "$module_id"
+	PluginContributionUiContextualActionsRouteQuerySemanticVersion PluginContributionUiContextualActionsRouteQuery = "$semantic_version"
+	PluginContributionUiContextualActionsRouteQueryVersionUuid     PluginContributionUiContextualActionsRouteQuery = "$version_uuid"
+)
+
+// Valid indicates whether the value is a known member of the PluginContributionUiContextualActionsRouteQuery enum.
+func (e PluginContributionUiContextualActionsRouteQuery) Valid() bool {
+	switch e {
+	case PluginContributionUiContextualActionsRouteQueryModuleId:
+		return true
+	case PluginContributionUiContextualActionsRouteQuerySemanticVersion:
+		return true
+	case PluginContributionUiContextualActionsRouteQueryVersionUuid:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PluginContributionUiCoreOperationsMethod.
 const (
 	GET  PluginContributionUiCoreOperationsMethod = "GET"
@@ -2068,6 +2104,18 @@ type ModuleVersionComparisonSnapshot struct {
 	SourceRevision  string              `json:"source_revision"`
 }
 
+// ModuleVersionLifecycle defines model for ModuleVersionLifecycle.
+type ModuleVersionLifecycle struct {
+	// ArtifactDigest Optional external artifact claim. Empty for inline source or when omitted at publication.
+	ArtifactDigest string                      `json:"artifact_digest"`
+	CreatedAt      time.Time                   `json:"created_at"`
+	ModuleId       string                      `json:"module_id"`
+	ModuleUuid     openapi_types.UUID          `json:"module_uuid"`
+	Status         ModuleVersionSemanticStatus `json:"status"`
+	Version        string                      `json:"version"`
+	VersionUuid    openapi_types.UUID          `json:"version_uuid"`
+}
+
 // ModuleVersionLifecycleEvent defines model for ModuleVersionLifecycleEvent.
 type ModuleVersionLifecycleEvent struct {
 	Actor                  openapi_types.UUID           `json:"actor"`
@@ -2370,6 +2418,23 @@ type PluginContribution struct {
 	} `json:"operations"`
 	State PluginAvailabilityState `json:"state"`
 	Ui    *struct {
+		// ContextualActions Declarative navigation into the plugin, not Core authorization or executable UI code. Present only in full mode with the required operation advertised.
+		ContextualActions *[]struct {
+			Id                  string                                            `json:"id"`
+			Label               string                                            `json:"label"`
+			Primary             *bool                                             `json:"primary,omitempty"`
+			RequiredOperationId string                                            `json:"required_operation_id"`
+			ResourceType        PluginContributionUiContextualActionsResourceType `json:"resource_type"`
+			Route               struct {
+				Path  string                                                      `json:"path"`
+				Query *map[string]PluginContributionUiContextualActionsRouteQuery `json:"query,omitempty"`
+			} `json:"route"`
+			When struct {
+				LifecycleStatus         []ModuleVersionSemanticStatus `json:"lifecycle_status"`
+				SemanticVersionRequired bool                          `json:"semantic_version_required"`
+			} `json:"when"`
+		} `json:"contextual_actions,omitempty"`
+
 		// CoreOperations Named Console SDK operations executed with the user's independent Core permissions, never forwarded to the plugin.
 		CoreOperations *[]struct {
 			Id       string                                   `json:"id"`
@@ -2387,6 +2452,12 @@ type PluginContribution struct {
 
 // PluginContributionMode defines model for PluginContribution.Mode.
 type PluginContributionMode string
+
+// PluginContributionUiContextualActionsResourceType defines model for PluginContribution.Ui.ContextualActions.ResourceType.
+type PluginContributionUiContextualActionsResourceType string
+
+// PluginContributionUiContextualActionsRouteQuery defines model for PluginContribution.Ui.ContextualActions.Route.Query.
+type PluginContributionUiContextualActionsRouteQuery string
 
 // PluginContributionUiCoreOperationsMethod defines model for PluginContribution.Ui.CoreOperations.Method.
 type PluginContributionUiCoreOperationsMethod string
@@ -2438,6 +2509,31 @@ type PluginDispatchCheck struct {
 // PluginDispatchCheckAction defines model for PluginDispatchCheck.Action.
 type PluginDispatchCheckAction string
 
+// PluginInventory defines model for PluginInventory.
+type PluginInventory struct {
+	EnvironmentTypes []EnvironmentType             `json:"environment_types"`
+	Environments     []Environment                 `json:"environments"`
+	Modules          []ModuleCatalogueEntry        `json:"modules"`
+	PinEvents        []ModuleVersionPinEvent       `json:"pin_events"`
+	Pins             []EnvironmentModuleVersionPin `json:"pins"`
+	Versions         []CoreModuleVersion           `json:"versions"`
+}
+
+// PluginInventoryRequest defines model for PluginInventoryRequest.
+type PluginInventoryRequest struct {
+	ModuleIds []string                `json:"module_ids"`
+	Proof     PluginDelegationProof   `json:"proof"`
+	Selector  PluginInventorySelector `json:"selector"`
+}
+
+// PluginInventorySelector defines model for PluginInventorySelector.
+type PluginInventorySelector struct {
+	EnvironmentIds   *[]openapi_types.UUID `json:"environment_ids,omitempty"`
+	EnvironmentTypes *[]string             `json:"environment_types,omitempty"`
+	Labels           *map[string]string    `json:"labels,omitempty"`
+	ProjectIds       *[]string             `json:"project_ids,omitempty"`
+}
+
 // PluginInvocation defines model for PluginInvocation.
 type PluginInvocation struct {
 	Body           *json.RawMessage     `json:"body,omitempty"`
@@ -2476,10 +2572,12 @@ type PluginModuleOperationRequest struct {
 	Reason        string                             `json:"reason"`
 	RequestId     string                             `json:"request_id"`
 	Targets       []struct {
-		ExpectedDefaultUuid     *openapi_types.UUID `json:"expected_default_uuid,omitempty"`
-		ExpectedResourceVersion int64               `json:"expected_resource_version"`
-		ModuleUuid              openapi_types.UUID  `json:"module_uuid"`
-		VersionUuid             openapi_types.UUID  `json:"version_uuid"`
+		ExpectedDefaultUuid *openapi_types.UUID `json:"expected_default_uuid,omitempty"`
+
+		// ExpectedResourceVersion Required CAS revision for promotion. For a grant-bound restore, Core derives the locked captured-baseline revision and the client may send zero; exact Default lineage and grant fences still apply.
+		ExpectedResourceVersion int64              `json:"expected_resource_version"`
+		ModuleUuid              openapi_types.UUID `json:"module_uuid"`
+		VersionUuid             openapi_types.UUID `json:"version_uuid"`
 	} `json:"targets"`
 }
 
@@ -3525,6 +3623,9 @@ type TransitionModuleVersionJSONRequestBody = ModuleReasonedCommand
 // PublishStableModuleVersionSuccessorJSONRequestBody defines body for PublishStableModuleVersionSuccessor for application/json ContentType.
 type PublishStableModuleVersionSuccessorJSONRequestBody = StableModuleVersionSuccessorBody
 
+// ReadPluginInventoryJSONRequestBody defines body for ReadPluginInventory for application/json ContentType.
+type ReadPluginInventoryJSONRequestBody = PluginInventoryRequest
+
 // InvokePluginOperationJSONRequestBody defines body for InvokePluginOperation for application/json ContentType.
 type InvokePluginOperationJSONRequestBody = PluginInvocation
 
@@ -4343,6 +4444,9 @@ type ClientInterface interface {
 
 	AppendEnvironmentModuleVersionPinNote(ctx context.Context, orgId OrgIdPathParam, pinId openapi_types.UUID, params *AppendEnvironmentModuleVersionPinNoteParams, body AppendEnvironmentModuleVersionPinNoteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListProposedModuleVersions request
+	ListProposedModuleVersions(ctx context.Context, orgId OrgIdPathParam, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListModules request
 	ListModules(ctx context.Context, orgId OrgIdPathParam, params *ListModulesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -4410,6 +4514,11 @@ type ClientInterface interface {
 
 	// GetPluginCapability request
 	GetPluginCapability(ctx context.Context, orgId OrgIdPathParam, pluginId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReadPluginInventoryWithBody request with any body
+	ReadPluginInventoryWithBody(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	ReadPluginInventory(ctx context.Context, orgId OrgIdPathParam, pluginId string, body ReadPluginInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// InvokePluginOperationWithBody request with any body
 	InvokePluginOperationWithBody(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -5415,6 +5524,18 @@ func (c *Client) AppendEnvironmentModuleVersionPinNote(ctx context.Context, orgI
 	return c.Client.Do(req)
 }
 
+func (c *Client) ListProposedModuleVersions(ctx context.Context, orgId OrgIdPathParam, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListProposedModuleVersionsRequest(c.Server, orgId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) ListModules(ctx context.Context, orgId OrgIdPathParam, params *ListModulesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListModulesRequest(c.Server, orgId, params)
 	if err != nil {
@@ -5705,6 +5826,30 @@ func (c *Client) ListPluginContributions(ctx context.Context, orgId OrgIdPathPar
 
 func (c *Client) GetPluginCapability(ctx context.Context, orgId OrgIdPathParam, pluginId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPluginCapabilityRequest(c.Server, orgId, pluginId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ReadPluginInventoryWithBody(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReadPluginInventoryRequestWithBody(c.Server, orgId, pluginId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ReadPluginInventory(ctx context.Context, orgId OrgIdPathParam, pluginId string, body ReadPluginInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReadPluginInventoryRequest(c.Server, orgId, pluginId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -9223,6 +9368,40 @@ func NewAppendEnvironmentModuleVersionPinNoteRequestWithBody(server string, orgI
 	return req, nil
 }
 
+// NewListProposedModuleVersionsRequest generates requests for ListProposedModuleVersions
+func NewListProposedModuleVersionsRequest(server string, orgId OrgIdPathParam) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "orgId", orgId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/orgs/%s/module-versions/proposed", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListModulesRequest generates requests for ListModules
 func NewListModulesRequest(server string, orgId OrgIdPathParam, params *ListModulesParams) (*http.Request, error) {
 	var err error
@@ -10266,6 +10445,60 @@ func NewGetPluginCapabilityRequest(server string, orgId OrgIdPathParam, pluginId
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewReadPluginInventoryRequest calls the generic ReadPluginInventory builder with application/json body
+func NewReadPluginInventoryRequest(server string, orgId OrgIdPathParam, pluginId string, body ReadPluginInventoryJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewReadPluginInventoryRequestWithBody(server, orgId, pluginId, "application/json", bodyReader)
+}
+
+// NewReadPluginInventoryRequestWithBody generates requests for ReadPluginInventory with any type of body
+func NewReadPluginInventoryRequestWithBody(server string, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "orgId", orgId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "pluginId", pluginId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/orgs/%s/plugins/%s/inventory", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -12500,6 +12733,9 @@ type ClientWithResponsesInterface interface {
 
 	AppendEnvironmentModuleVersionPinNoteWithResponse(ctx context.Context, orgId OrgIdPathParam, pinId openapi_types.UUID, params *AppendEnvironmentModuleVersionPinNoteParams, body AppendEnvironmentModuleVersionPinNoteJSONRequestBody, reqEditors ...RequestEditorFn) (*AppendEnvironmentModuleVersionPinNoteResponse, error)
 
+	// ListProposedModuleVersionsWithResponse request
+	ListProposedModuleVersionsWithResponse(ctx context.Context, orgId OrgIdPathParam, reqEditors ...RequestEditorFn) (*ListProposedModuleVersionsResponse, error)
+
 	// ListModulesWithResponse request
 	ListModulesWithResponse(ctx context.Context, orgId OrgIdPathParam, params *ListModulesParams, reqEditors ...RequestEditorFn) (*ListModulesResponse, error)
 
@@ -12567,6 +12803,11 @@ type ClientWithResponsesInterface interface {
 
 	// GetPluginCapabilityWithResponse request
 	GetPluginCapabilityWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, reqEditors ...RequestEditorFn) (*GetPluginCapabilityResponse, error)
+
+	// ReadPluginInventoryWithBodyWithResponse request with any body
+	ReadPluginInventoryWithBodyWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReadPluginInventoryResponse, error)
+
+	ReadPluginInventoryWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, body ReadPluginInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*ReadPluginInventoryResponse, error)
 
 	// InvokePluginOperationWithBodyWithResponse request with any body
 	InvokePluginOperationWithBodyWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*InvokePluginOperationResponse, error)
@@ -13899,6 +14140,30 @@ func (r AppendEnvironmentModuleVersionPinNoteResponse) StatusCode() int {
 	return 0
 }
 
+type ListProposedModuleVersionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *[]ModuleVersionLifecycle
+	JSON403      *N403Forbidden
+	JSON404      *N404NotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r ListProposedModuleVersionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListProposedModuleVersionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListModulesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -14330,6 +14595,32 @@ func (r GetPluginCapabilityResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetPluginCapabilityResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ReadPluginInventoryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *PluginInventory
+	JSON400      *N400BadRequest
+	JSON403      *N403Forbidden
+	JSON404      *N404NotFound
+	JSON503      *N503ServiceUnavailable
+}
+
+// Status returns HTTPResponse.Status
+func (r ReadPluginInventoryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReadPluginInventoryResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -15761,6 +16052,15 @@ func (c *ClientWithResponses) AppendEnvironmentModuleVersionPinNoteWithResponse(
 	return ParseAppendEnvironmentModuleVersionPinNoteResponse(rsp)
 }
 
+// ListProposedModuleVersionsWithResponse request returning *ListProposedModuleVersionsResponse
+func (c *ClientWithResponses) ListProposedModuleVersionsWithResponse(ctx context.Context, orgId OrgIdPathParam, reqEditors ...RequestEditorFn) (*ListProposedModuleVersionsResponse, error) {
+	rsp, err := c.ListProposedModuleVersions(ctx, orgId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListProposedModuleVersionsResponse(rsp)
+}
+
 // ListModulesWithResponse request returning *ListModulesResponse
 func (c *ClientWithResponses) ListModulesWithResponse(ctx context.Context, orgId OrgIdPathParam, params *ListModulesParams, reqEditors ...RequestEditorFn) (*ListModulesResponse, error) {
 	rsp, err := c.ListModules(ctx, orgId, params, reqEditors...)
@@ -15977,6 +16277,23 @@ func (c *ClientWithResponses) GetPluginCapabilityWithResponse(ctx context.Contex
 		return nil, err
 	}
 	return ParseGetPluginCapabilityResponse(rsp)
+}
+
+// ReadPluginInventoryWithBodyWithResponse request with arbitrary body returning *ReadPluginInventoryResponse
+func (c *ClientWithResponses) ReadPluginInventoryWithBodyWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReadPluginInventoryResponse, error) {
+	rsp, err := c.ReadPluginInventoryWithBody(ctx, orgId, pluginId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReadPluginInventoryResponse(rsp)
+}
+
+func (c *ClientWithResponses) ReadPluginInventoryWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, body ReadPluginInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*ReadPluginInventoryResponse, error) {
+	rsp, err := c.ReadPluginInventory(ctx, orgId, pluginId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReadPluginInventoryResponse(rsp)
 }
 
 // InvokePluginOperationWithBodyWithResponse request with arbitrary body returning *InvokePluginOperationResponse
@@ -18409,6 +18726,46 @@ func ParseAppendEnvironmentModuleVersionPinNoteResponse(rsp *http.Response) (*Ap
 	return response, nil
 }
 
+// ParseListProposedModuleVersionsResponse parses an HTTP response from a ListProposedModuleVersionsWithResponse call
+func ParseListProposedModuleVersionsResponse(rsp *http.Response) (*ListProposedModuleVersionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListProposedModuleVersionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []ModuleVersionLifecycle
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest N403Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest N404NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListModulesResponse parses an HTTP response from a ListModulesWithResponse call
 func ParseListModulesResponse(rsp *http.Response) (*ListModulesResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -19158,6 +19515,60 @@ func ParseGetPluginCapabilityResponse(rsp *http.Response) (*GetPluginCapabilityR
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseReadPluginInventoryResponse parses an HTTP response from a ReadPluginInventoryWithResponse call
+func ParseReadPluginInventoryResponse(rsp *http.Response) (*ReadPluginInventoryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReadPluginInventoryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PluginInventory
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest N400BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest N403Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest N404NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest N503ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 
