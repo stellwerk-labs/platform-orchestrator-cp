@@ -70,6 +70,34 @@ func TestGatewayReadOnlyPostPreservesExactSignedRequest(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestGatewayGETForwardsGeneratedSignedRequestIdentity(t *testing.T) {
+	public, key, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+	now := time.Now().UTC()
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestID := r.Header.Get("Idempotency-Key")
+		if !assert.NotEmpty(t, requestID) {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		claims, err := plugincontext.Verify(public, r.Header.Get(plugincontext.Header), plugincontext.Request{
+			Issuer: "cp", Audience: "plugin:" + testPluginID, PluginID: testPluginID, OrgID: "acme",
+			OperationID: "list", Method: http.MethodGet, Path: "/orgs/acme/changes?state=active", IdempotencyKey: requestID,
+		}, now)
+		if !assert.NoError(t, err) {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		assert.Equal(t, claims.RequestID, requestID)
+		_, _ = w.Write([]byte(`{"items":[]}`))
+	}))
+	defer backend.Close()
+	gateway := Gateway{Registry: testRegistry(t, backend.URL, StateAvailable), SigningKey: key, Issuer: "cp", Now: func() time.Time { return now }}
+	result, err := gateway.Invoke(t.Context(), "acme", testPluginID, testActor, Invocation{OperationID: "list", Query: map[string][]string{"state": {"active"}}})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, result.Status)
+}
+
 func TestGatewayRequestBindingAndCredentialIsolation(t *testing.T) {
 	public, key, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {

@@ -115,9 +115,10 @@ func (g *Gateway) Invoke(ctx context.Context, org, pluginID, actor string, invoc
 	if len(body) > 0 {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	if operation.Method != http.MethodGet {
-		req.Header.Set("Idempotency-Key", requestID)
-	}
+	// Every receiver needs the generated request identity to exchange this exact
+	// short-lived proof for a scoped Core authorization check. For mutations it
+	// also remains the caller-supplied durable idempotency key.
+	req.Header.Set("Idempotency-Key", requestID)
 	client := g.Client
 	if client == nil {
 		client = &http.Client{Timeout: 30 * time.Second}
