@@ -26,14 +26,14 @@ func externalOperationDatabase(t *testing.T) Databaser {
 	schema := "plugin_cp_" + strings.ReplaceAll(uuid.NewString(), "-", "")
 	_, err = admin.Exec(`CREATE SCHEMA ` + schema)
 	require.NoError(t, err)
-	db, err := NewDatabaser(t.Context(), zap.NewNop(), dsn+" search_path="+schema)
-	require.NoError(t, err)
 	t.Cleanup(func() {
-		require.NoError(t, db.Close())
 		_, err := admin.Exec(`DROP SCHEMA ` + schema + ` CASCADE`)
 		require.NoError(t, err)
 		require.NoError(t, admin.Close())
 	})
+	db, err := NewDatabaser(t.Context(), zap.NewNop(), dsn+" search_path="+schema)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	return db
 }
 
