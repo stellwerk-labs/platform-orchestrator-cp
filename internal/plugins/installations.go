@@ -173,7 +173,9 @@ func LoadInstallations(reader io.Reader, allowDevelopmentHTTP bool) (*Installati
 				if op.Mutating {
 					return nil, fmt.Errorf("GET cannot mutate")
 				}
-			case "POST", "PUT", "PATCH", "DELETE":
+			case "POST":
+				// A bounded preview can use a JSON body without changing state.
+			case "PUT", "PATCH", "DELETE":
 				if !op.Mutating {
 					return nil, fmt.Errorf("write operation must be marked mutating")
 				}

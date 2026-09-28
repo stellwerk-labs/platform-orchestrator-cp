@@ -17,6 +17,8 @@ import (
 
 const maxPluginBody = 16 << 20
 const pluginUnavailable = "plugin_unavailable"
+const pluginRequestInvalid = "plugin_request_invalid"
+const pluginResponseInvalid = "plugin_response_invalid"
 
 type Invocation struct {
 	OperationID    string              `json:"operation_id"`
@@ -75,16 +77,16 @@ func (g *Gateway) Invoke(ctx context.Context, org, pluginID, actor string, invoc
 	if _, err := uuid.Parse(actor); err != nil {
 		return nil, &GatewayError{"plugin_actor_invalid", "An authenticated actor is required.", 401}
 	}
-	if operation.Mutating && (invocation.IdempotencyKey == "" || len(invocation.IdempotencyKey) > 128 || strings.ContainsAny(invocation.IdempotencyKey, "\r\n")) {
+	if operation.Mutating && invocation.IdempotencyKey == "" || len(invocation.IdempotencyKey) > 128 || strings.ContainsAny(invocation.IdempotencyKey, "\r\n") {
 		return nil, &GatewayError{"plugin_idempotency_required", "A non-empty idempotency key (up to 128 characters) is required.", 400}
 	}
 	requestPath, err := operation.RequestPath(org, invocation.PathParameters, invocation.Query)
 	if err != nil {
-		return nil, &GatewayError{"plugin_request_invalid", err.Error(), 400}
+		return nil, &GatewayError{pluginRequestInvalid, err.Error(), 400}
 	}
 	body := invocation.Body
 	if len(body) > maxPluginBody || (len(body) > 0 && !json.Valid(body)) || (operation.Method == http.MethodGet && len(body) > 0 && string(body) != "null") {
-		return nil, &GatewayError{"plugin_request_invalid", "Invalid plugin request body.", 400}
+		return nil, &GatewayError{pluginRequestInvalid, "Invalid plugin request body.", 400}
 	}
 	if operation.Method == http.MethodGet {
 		body = nil
@@ -113,7 +115,7 @@ func (g *Gateway) Invoke(ctx context.Context, org, pluginID, actor string, invoc
 	if len(body) > 0 {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	if operation.Mutating {
+	if operation.Method != http.MethodGet {
 		req.Header.Set("Idempotency-Key", requestID)
 	}
 	client := g.Client
@@ -136,13 +138,13 @@ func (g *Gateway) Invoke(ctx context.Context, org, pluginID, actor string, invoc
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, maxPluginBody+1))
 	if err != nil || len(data) > maxPluginBody {
-		return nil, &GatewayError{"plugin_response_invalid", "The plugin response exceeded the permitted limit or was interrupted.", 502}
+		return nil, &GatewayError{pluginResponseInvalid, "The plugin response exceeded the permitted limit or was interrupted.", 502}
 	}
 	if len(data) == 0 {
 		data = []byte("null")
 	}
 	if !json.Valid(data) {
-		return nil, &GatewayError{"plugin_response_invalid", "The plugin returned a non-JSON response.", 502}
+		return nil, &GatewayError{pluginResponseInvalid, "The plugin returned a non-JSON response.", 502}
 	}
 	return &InvocationResult{Status: response.StatusCode, Body: data}, nil
 }

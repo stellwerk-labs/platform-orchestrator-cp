@@ -196,6 +196,10 @@ func main() {
 		}
 		server.PluginGateway = gateway
 		server.Plugins = gateway.Registry
+		server.PluginDataPlane, err = plugins.NewDataPlanePort(cfg.DataPlaneUrl, gateway, cfg.PluginDevelopmentHTTP)
+		if err != nil {
+			zap.L().Fatal("Failed to initialize the fixed Data Plane plugin port", zap.Error(err))
+		}
 	}
 
 	echoServer, err := hecho.DefaultEchoServerWithValidation(&hecho.ValidatedServerConfig{

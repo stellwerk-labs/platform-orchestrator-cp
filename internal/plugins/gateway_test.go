@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/plugincontext"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const testPluginID = "dev.example.change-manager"
@@ -34,6 +36,38 @@ func testRegistry(t *testing.T, backend string, state AvailabilityState) *Instal
 		t.Fatal(err)
 	}
 	return registry
+}
+
+func TestGatewayReadOnlyPostPreservesExactSignedRequest(t *testing.T) {
+	public, key, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+	now := time.Now().UTC()
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if !assert.NoError(t, err) {
+			w.WriteHeader(400)
+			return
+		}
+		claims, err := plugincontext.Verify(public, r.Header.Get(plugincontext.Header), plugincontext.Request{Issuer: "cp", Audience: "plugin:" + testPluginID, PluginID: testPluginID, OrgID: "acme", Method: r.Method, Path: r.URL.RequestURI(), Body: body, OperationID: "preview", IdempotencyKey: r.Header.Get("Idempotency-Key")}, now)
+		if !assert.NoError(t, err) {
+			w.WriteHeader(401)
+			return
+		}
+		assert.NotEmpty(t, claims.RequestID)
+		assert.Equal(t, claims.RequestID, r.Header.Get("Idempotency-Key"))
+		_, _ = w.Write([]byte(`{"preview":true}`))
+	}))
+	defer backend.Close()
+	encoded, err := json.Marshal([]Installation{{ID: testPluginID, DisplayName: "Change Manager", Version: "1.0.0", Backend: backend.URL, Organizations: map[string]AvailabilityState{"acme": StateNotEntitled}, Operations: []Operation{{ID: "preview", Method: "POST", Path: "/orgs/{orgId}/preview", Mutating: false}}}})
+	require.NoError(t, err)
+	registry, err := LoadInstallations(strings.NewReader(string(encoded)), true)
+	require.NoError(t, err)
+	gateway := &Gateway{Registry: registry, SigningKey: key, Issuer: "cp", Now: func() time.Time { return now }}
+	result, err := gateway.Invoke(t.Context(), "acme", testPluginID, testActor, Invocation{OperationID: "preview", Body: json.RawMessage(`{"items":[]}`)})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, result.Status)
+	_, err = gateway.Invoke(t.Context(), "acme", testPluginID, testActor, Invocation{OperationID: "preview", Body: json.RawMessage(`{}`), IdempotencyKey: "invalid\nheader"})
+	require.Error(t, err)
 }
 
 func TestGatewayRequestBindingAndCredentialIsolation(t *testing.T) {

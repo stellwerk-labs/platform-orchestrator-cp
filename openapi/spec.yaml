@@ -3,6 +3,31 @@ info:
   title: ''
   version: ''
 paths:
+  /orgs/{orgId}/plugins/{pluginId}/deployment-reads:
+    post:
+      operationId: readPluginDeploymentData
+      summary: Authorize and forward a closed Deployment inspection or planning request.
+      description: Core resolves immutable ownership, checks the delegated actor and declared service port, and signs an exact request to its fixed Data Plane. Only metadata and safe plan projections are returned. This endpoint cannot admit or execute a Deployment, or retrieve logs, outputs or secret values.
+      tags: [Plugin]
+      security: [{userIdHeader: []}]
+      parameters:
+        - $ref: '#/components/parameters/orgIdPathParam'
+        - {name: pluginId, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PluginDeploymentReadRequest'}
+      responses:
+        '200':
+          description: Exact Data Plane response and status for external-deployment.readiness, external-deployment.plan or external-deployment.read. The Data Plane OpenAPI schemas define each body; non-success upstream status remains a failure, not a successful empty result.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PluginInvocationResult'}
+        '400': {$ref: '#/components/responses/400BadRequest'}
+        '403': {$ref: '#/components/responses/403Forbidden'}
+        '404': {$ref: '#/components/responses/404NotFound'}
+        '503': {$ref: '#/components/responses/503ServiceUnavailable'}
   /orgs/{orgId}/module-versions/proposed:
     get:
       operationId: listProposedModuleVersions
@@ -2714,6 +2739,33 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
   schemas:
+    PluginDeploymentReadRequest:
+      type: object
+      additionalProperties: false
+      required: [proof, kind, environments]
+      properties:
+        proof: {$ref: '#/components/schemas/PluginDelegationProof'}
+        kind:
+          type: string
+          enum: [readiness, plan, deployment]
+          x-enum-varnames: [PluginDeploymentReadRequestKindReadiness, PluginDeploymentReadRequestKindPlan, PluginDeploymentReadRequestKindDeployment]
+        environments:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            type: object
+            additionalProperties: false
+            required: [project_id, env_id]
+            properties:
+              project_id: {type: string, minLength: 1, maxLength: 200}
+              env_id: {type: string, minLength: 1, maxLength: 200}
+        module_versions:
+          description: For plan only. Module slug or UUID to exact immutable Version UUID. Core supplies the corresponding version coordinate and artifact digest.
+          type: object
+          maxProperties: 1000
+          additionalProperties: {type: string, format: uuid}
+        deployment_id: {type: string, format: uuid, description: Required for deployment inspection of exactly one Environment.}
     ModuleVersionLifecycle:
       type: object
       required: [module_id, module_uuid, version, version_uuid, artifact_digest, status, created_at]

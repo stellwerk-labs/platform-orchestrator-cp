@@ -530,6 +530,27 @@ func (e PluginContributionUiSdkVersion) Valid() bool {
 	}
 }
 
+// Defines values for PluginDeploymentReadRequestKind.
+const (
+	PluginDeploymentReadRequestKindDeployment PluginDeploymentReadRequestKind = "deployment"
+	PluginDeploymentReadRequestKindPlan       PluginDeploymentReadRequestKind = "plan"
+	PluginDeploymentReadRequestKindReadiness  PluginDeploymentReadRequestKind = "readiness"
+)
+
+// Valid indicates whether the value is a known member of the PluginDeploymentReadRequestKind enum.
+func (e PluginDeploymentReadRequestKind) Valid() bool {
+	switch e {
+	case PluginDeploymentReadRequestKindDeployment:
+		return true
+	case PluginDeploymentReadRequestKindPlan:
+		return true
+	case PluginDeploymentReadRequestKindReadiness:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PluginDispatchCheckAction.
 const (
 	ExternalDeploymentAdmit    PluginDispatchCheckAction = "external-deployment.admit"
@@ -2482,6 +2503,24 @@ type PluginDelegationProof struct {
 	Query          *map[string][]string `json:"query,omitempty"`
 }
 
+// PluginDeploymentReadRequest defines model for PluginDeploymentReadRequest.
+type PluginDeploymentReadRequest struct {
+	// DeploymentId Required for deployment inspection of exactly one Environment.
+	DeploymentId *openapi_types.UUID `json:"deployment_id,omitempty"`
+	Environments []struct {
+		EnvId     string `json:"env_id"`
+		ProjectId string `json:"project_id"`
+	} `json:"environments"`
+	Kind PluginDeploymentReadRequestKind `json:"kind"`
+
+	// ModuleVersions For plan only. Module slug or UUID to exact immutable Version UUID. Core supplies the corresponding version coordinate and artifact digest.
+	ModuleVersions *map[string]openapi_types.UUID `json:"module_versions,omitempty"`
+	Proof          PluginDelegationProof          `json:"proof"`
+}
+
+// PluginDeploymentReadRequestKind defines model for PluginDeploymentReadRequest.Kind.
+type PluginDeploymentReadRequestKind string
+
 // PluginDispatchAuthorization defines model for PluginDispatchAuthorization.
 type PluginDispatchAuthorization struct {
 	Action          string             `json:"action"`
@@ -3623,6 +3662,9 @@ type TransitionModuleVersionJSONRequestBody = ModuleReasonedCommand
 // PublishStableModuleVersionSuccessorJSONRequestBody defines body for PublishStableModuleVersionSuccessor for application/json ContentType.
 type PublishStableModuleVersionSuccessorJSONRequestBody = StableModuleVersionSuccessorBody
 
+// ReadPluginDeploymentDataJSONRequestBody defines body for ReadPluginDeploymentData for application/json ContentType.
+type ReadPluginDeploymentDataJSONRequestBody = PluginDeploymentReadRequest
+
 // ReadPluginInventoryJSONRequestBody defines body for ReadPluginInventory for application/json ContentType.
 type ReadPluginInventoryJSONRequestBody = PluginInventoryRequest
 
@@ -4514,6 +4556,11 @@ type ClientInterface interface {
 
 	// GetPluginCapability request
 	GetPluginCapability(ctx context.Context, orgId OrgIdPathParam, pluginId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReadPluginDeploymentDataWithBody request with any body
+	ReadPluginDeploymentDataWithBody(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	ReadPluginDeploymentData(ctx context.Context, orgId OrgIdPathParam, pluginId string, body ReadPluginDeploymentDataJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ReadPluginInventoryWithBody request with any body
 	ReadPluginInventoryWithBody(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -5826,6 +5873,30 @@ func (c *Client) ListPluginContributions(ctx context.Context, orgId OrgIdPathPar
 
 func (c *Client) GetPluginCapability(ctx context.Context, orgId OrgIdPathParam, pluginId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPluginCapabilityRequest(c.Server, orgId, pluginId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ReadPluginDeploymentDataWithBody(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReadPluginDeploymentDataRequestWithBody(c.Server, orgId, pluginId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ReadPluginDeploymentData(ctx context.Context, orgId OrgIdPathParam, pluginId string, body ReadPluginDeploymentDataJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReadPluginDeploymentDataRequest(c.Server, orgId, pluginId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -10449,6 +10520,60 @@ func NewGetPluginCapabilityRequest(server string, orgId OrgIdPathParam, pluginId
 	return req, nil
 }
 
+// NewReadPluginDeploymentDataRequest calls the generic ReadPluginDeploymentData builder with application/json body
+func NewReadPluginDeploymentDataRequest(server string, orgId OrgIdPathParam, pluginId string, body ReadPluginDeploymentDataJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewReadPluginDeploymentDataRequestWithBody(server, orgId, pluginId, "application/json", bodyReader)
+}
+
+// NewReadPluginDeploymentDataRequestWithBody generates requests for ReadPluginDeploymentData with any type of body
+func NewReadPluginDeploymentDataRequestWithBody(server string, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "orgId", orgId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "pluginId", pluginId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/orgs/%s/plugins/%s/deployment-reads", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewReadPluginInventoryRequest calls the generic ReadPluginInventory builder with application/json body
 func NewReadPluginInventoryRequest(server string, orgId OrgIdPathParam, pluginId string, body ReadPluginInventoryJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -12804,6 +12929,11 @@ type ClientWithResponsesInterface interface {
 	// GetPluginCapabilityWithResponse request
 	GetPluginCapabilityWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, reqEditors ...RequestEditorFn) (*GetPluginCapabilityResponse, error)
 
+	// ReadPluginDeploymentDataWithBodyWithResponse request with any body
+	ReadPluginDeploymentDataWithBodyWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReadPluginDeploymentDataResponse, error)
+
+	ReadPluginDeploymentDataWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, body ReadPluginDeploymentDataJSONRequestBody, reqEditors ...RequestEditorFn) (*ReadPluginDeploymentDataResponse, error)
+
 	// ReadPluginInventoryWithBodyWithResponse request with any body
 	ReadPluginInventoryWithBodyWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReadPluginInventoryResponse, error)
 
@@ -14601,6 +14731,32 @@ func (r GetPluginCapabilityResponse) StatusCode() int {
 	return 0
 }
 
+type ReadPluginDeploymentDataResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *PluginInvocationResult
+	JSON400      *N400BadRequest
+	JSON403      *N403Forbidden
+	JSON404      *N404NotFound
+	JSON503      *N503ServiceUnavailable
+}
+
+// Status returns HTTPResponse.Status
+func (r ReadPluginDeploymentDataResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReadPluginDeploymentDataResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ReadPluginInventoryResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -16277,6 +16433,23 @@ func (c *ClientWithResponses) GetPluginCapabilityWithResponse(ctx context.Contex
 		return nil, err
 	}
 	return ParseGetPluginCapabilityResponse(rsp)
+}
+
+// ReadPluginDeploymentDataWithBodyWithResponse request with arbitrary body returning *ReadPluginDeploymentDataResponse
+func (c *ClientWithResponses) ReadPluginDeploymentDataWithBodyWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReadPluginDeploymentDataResponse, error) {
+	rsp, err := c.ReadPluginDeploymentDataWithBody(ctx, orgId, pluginId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReadPluginDeploymentDataResponse(rsp)
+}
+
+func (c *ClientWithResponses) ReadPluginDeploymentDataWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, body ReadPluginDeploymentDataJSONRequestBody, reqEditors ...RequestEditorFn) (*ReadPluginDeploymentDataResponse, error) {
+	rsp, err := c.ReadPluginDeploymentData(ctx, orgId, pluginId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReadPluginDeploymentDataResponse(rsp)
 }
 
 // ReadPluginInventoryWithBodyWithResponse request with arbitrary body returning *ReadPluginInventoryResponse
@@ -19515,6 +19688,60 @@ func ParseGetPluginCapabilityResponse(rsp *http.Response) (*GetPluginCapabilityR
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseReadPluginDeploymentDataResponse parses an HTTP response from a ReadPluginDeploymentDataWithResponse call
+func ParseReadPluginDeploymentDataResponse(rsp *http.Response) (*ReadPluginDeploymentDataResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReadPluginDeploymentDataResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PluginInvocationResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest N400BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest N403Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest N404NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest N503ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 
