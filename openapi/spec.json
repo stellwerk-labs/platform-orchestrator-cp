@@ -5,6 +5,94 @@
     "version": ""
   },
   "paths": {
+    "/orgs/{orgId}/plugins": {
+      "get": {
+        "operationId": "listPluginContributions",
+        "summary": "Discover registered plugin UI contributions for this organization.",
+        "tags": [
+          "Plugin"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contributions permitted for this organization. An empty list is normal.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginContributionPage"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/plugins/{pluginId}/invoke": {
+      "post": {
+        "operationId": "invokePluginOperation",
+        "summary": "Invoke an explicitly registered add-on operation with delegated actor identity.",
+        "tags": [
+          "Plugin"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "name": "pluginId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginInvocation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The plugin's JSON response and original status. Authorization is checked by the gateway and plugin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginInvocationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          },
+          "503": {
+            "$ref": "#/components/responses/503ServiceUnavailable"
+          }
+        }
+      }
+    },
     "/orgs/{orgId}/plugins/{pluginId}": {
       "get": {
         "operationId": "getPluginCapability",
@@ -4318,6 +4406,16 @@
       }
     },
     "responses": {
+      "503ServiceUnavailable": {
+        "description": "The installed plugin cannot currently serve this request.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
       "400BadRequest": {
         "description": "The request was invalid. More detail can be found in the error body.",
         "content": {
@@ -4377,6 +4475,155 @@
       }
     },
     "schemas": {
+      "PluginContributionPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PluginContribution"
+            }
+          }
+        }
+      },
+      "PluginContribution": {
+        "type": "object",
+        "required": [
+          "id",
+          "display_name",
+          "state",
+          "mode",
+          "operations"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/PluginAvailabilityState"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "full",
+              "read_only",
+              "safety_only",
+              "hidden"
+            ]
+          },
+          "ui": {
+            "type": "object",
+            "required": [
+              "sdk_version",
+              "origin",
+              "entrypoint",
+              "route_prefix",
+              "navigation_label"
+            ],
+            "properties": {
+              "sdk_version": {
+                "type": "string",
+                "enum": [
+                  "1"
+                ]
+              },
+              "origin": {
+                "type": "string",
+                "format": "uri"
+              },
+              "entrypoint": {
+                "type": "string"
+              },
+              "route_prefix": {
+                "type": "string"
+              },
+              "navigation_label": {
+                "type": "string"
+              }
+            }
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "method",
+                "mutating"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "method": {
+                  "type": "string"
+                },
+                "mutating": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      },
+      "PluginInvocation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operation_id"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string"
+          },
+          "path_parameters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "query": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "body": {
+            "x-go-type": "json.RawMessage"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128
+          }
+        }
+      },
+      "PluginInvocationResult": {
+        "type": "object",
+        "required": [
+          "status",
+          "body"
+        ],
+        "properties": {
+          "status": {
+            "type": "integer"
+          },
+          "body": {
+            "x-go-type": "json.RawMessage"
+          }
+        }
+      },
       "PluginAvailabilityState": {
         "type": "string",
         "enum": [

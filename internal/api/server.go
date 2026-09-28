@@ -23,13 +23,14 @@ import (
 //go:generate go tool oapi-codegen --config=oapi-codegen.cfg.yaml --exclude-tags not-implemented ../../openapi/spec.yaml
 
 type Server struct {
-	Database  model.Databaser
-	Logger    *zap.Logger
-	Vault     vault.VaultClientInterface
-	Publisher hmessaging.Publisher
-	DpClient  orchestratordp.ClientWithResponsesInterface
-	IamClient orchestratoriam.ClientWithResponsesInterface
-	Plugins   plugins.Registry
+	Database      model.Databaser
+	Logger        *zap.Logger
+	Vault         vault.VaultClientInterface
+	Publisher     hmessaging.Publisher
+	DpClient      orchestratordp.ClientWithResponsesInterface
+	IamClient     orchestratoriam.ClientWithResponsesInterface
+	Plugins       plugins.Registry
+	PluginGateway *plugins.Gateway
 }
 
 func (s *Server) MapRoutes(e *echo.Echo) {

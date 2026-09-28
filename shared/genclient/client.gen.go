@@ -437,6 +437,45 @@ func (e PluginAvailabilityState) Valid() bool {
 	}
 }
 
+// Defines values for PluginContributionMode.
+const (
+	Full       PluginContributionMode = "full"
+	Hidden     PluginContributionMode = "hidden"
+	ReadOnly   PluginContributionMode = "read_only"
+	SafetyOnly PluginContributionMode = "safety_only"
+)
+
+// Valid indicates whether the value is a known member of the PluginContributionMode enum.
+func (e PluginContributionMode) Valid() bool {
+	switch e {
+	case Full:
+		return true
+	case Hidden:
+		return true
+	case ReadOnly:
+		return true
+	case SafetyOnly:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginContributionUiSdkVersion.
+const (
+	N1 PluginContributionUiSdkVersion = "1"
+)
+
+// Valid indicates whether the value is a known member of the PluginContributionUiSdkVersion enum.
+func (e PluginContributionUiSdkVersion) Valid() bool {
+	switch e {
+	case N1:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ProjectStatus.
 const (
 	ProjectStatusActive   ProjectStatus = "active"
@@ -2193,6 +2232,53 @@ type PluginCapability struct {
 	Version *string `json:"version,omitempty"`
 }
 
+// PluginContribution defines model for PluginContribution.
+type PluginContribution struct {
+	DisplayName string                 `json:"display_name"`
+	Id          string                 `json:"id"`
+	Mode        PluginContributionMode `json:"mode"`
+	Operations  []struct {
+		Id       string `json:"id"`
+		Method   string `json:"method"`
+		Mutating bool   `json:"mutating"`
+	} `json:"operations"`
+	State PluginAvailabilityState `json:"state"`
+	Ui    *struct {
+		Entrypoint      string                         `json:"entrypoint"`
+		NavigationLabel string                         `json:"navigation_label"`
+		Origin          string                         `json:"origin"`
+		RoutePrefix     string                         `json:"route_prefix"`
+		SdkVersion      PluginContributionUiSdkVersion `json:"sdk_version"`
+	} `json:"ui,omitempty"`
+	Version *string `json:"version,omitempty"`
+}
+
+// PluginContributionMode defines model for PluginContribution.Mode.
+type PluginContributionMode string
+
+// PluginContributionUiSdkVersion defines model for PluginContribution.Ui.SdkVersion.
+type PluginContributionUiSdkVersion string
+
+// PluginContributionPage defines model for PluginContributionPage.
+type PluginContributionPage struct {
+	Items []PluginContribution `json:"items"`
+}
+
+// PluginInvocation defines model for PluginInvocation.
+type PluginInvocation struct {
+	Body           *json.RawMessage     `json:"body,omitempty"`
+	IdempotencyKey *string              `json:"idempotency_key,omitempty"`
+	OperationId    string               `json:"operation_id"`
+	PathParameters *map[string]string   `json:"path_parameters,omitempty"`
+	Query          *map[string][]string `json:"query,omitempty"`
+}
+
+// PluginInvocationResult defines model for PluginInvocationResult.
+type PluginInvocationResult struct {
+	Body   json.RawMessage `json:"body"`
+	Status int             `json:"status"`
+}
+
 // Project A project.
 type Project struct {
 	// CreatedAt The date and time when the project was created
@@ -2734,6 +2820,9 @@ type N404NotFound = Error
 // N409Conflict A standard error response
 type N409Conflict = Error
 
+// N503ServiceUnavailable A standard error response
+type N503ServiceUnavailable = Error
+
 // ListInternalOrganizationsParams defines parameters for ListInternalOrganizations.
 type ListInternalOrganizationsParams struct {
 	// PerPage The maximum number of items to return in a page of results
@@ -3184,6 +3273,9 @@ type TransitionModuleVersionJSONRequestBody = ModuleReasonedCommand
 
 // PublishStableModuleVersionSuccessorJSONRequestBody defines body for PublishStableModuleVersionSuccessor for application/json ContentType.
 type PublishStableModuleVersionSuccessorJSONRequestBody = StableModuleVersionSuccessorBody
+
+// InvokePluginOperationJSONRequestBody defines body for InvokePluginOperation for application/json ContentType.
+type InvokePluginOperationJSONRequestBody = PluginInvocation
 
 // CreateProjectJSONRequestBody defines body for CreateProject for application/json ContentType.
 type CreateProjectJSONRequestBody = ProjectCreateBody
@@ -4053,8 +4145,16 @@ type ClientInterface interface {
 	// GetModuleVersionUsage request
 	GetModuleVersionUsage(ctx context.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, moduleVersionId ModuleVersionIdPathParam, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListPluginContributions request
+	ListPluginContributions(ctx context.Context, orgId OrgIdPathParam, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetPluginCapability request
 	GetPluginCapability(ctx context.Context, orgId OrgIdPathParam, pluginId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// InvokePluginOperationWithBody request with any body
+	InvokePluginOperationWithBody(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	InvokePluginOperation(ctx context.Context, orgId OrgIdPathParam, pluginId string, body InvokePluginOperationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListProjects request
 	ListProjects(ctx context.Context, orgId OrgIdPathParam, params *ListProjectsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -5313,8 +5413,44 @@ func (c *Client) GetModuleVersionUsage(ctx context.Context, orgId OrgIdPathParam
 	return c.Client.Do(req)
 }
 
+func (c *Client) ListPluginContributions(ctx context.Context, orgId OrgIdPathParam, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListPluginContributionsRequest(c.Server, orgId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) GetPluginCapability(ctx context.Context, orgId OrgIdPathParam, pluginId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPluginCapabilityRequest(c.Server, orgId, pluginId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) InvokePluginOperationWithBody(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewInvokePluginOperationRequestWithBody(c.Server, orgId, pluginId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) InvokePluginOperation(ctx context.Context, orgId OrgIdPathParam, pluginId string, body InvokePluginOperationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewInvokePluginOperationRequest(c.Server, orgId, pluginId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -9697,6 +9833,40 @@ func NewGetModuleVersionUsageRequest(server string, orgId OrgIdPathParam, module
 	return req, nil
 }
 
+// NewListPluginContributionsRequest generates requests for ListPluginContributions
+func NewListPluginContributionsRequest(server string, orgId OrgIdPathParam) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "orgId", orgId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/orgs/%s/plugins", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetPluginCapabilityRequest generates requests for GetPluginCapability
 func NewGetPluginCapabilityRequest(server string, orgId OrgIdPathParam, pluginId string) (*http.Request, error) {
 	var err error
@@ -9734,6 +9904,60 @@ func NewGetPluginCapabilityRequest(server string, orgId OrgIdPathParam, pluginId
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewInvokePluginOperationRequest calls the generic InvokePluginOperation builder with application/json body
+func NewInvokePluginOperationRequest(server string, orgId OrgIdPathParam, pluginId string, body InvokePluginOperationJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewInvokePluginOperationRequestWithBody(server, orgId, pluginId, "application/json", bodyReader)
+}
+
+// NewInvokePluginOperationRequestWithBody generates requests for InvokePluginOperation with any type of body
+func NewInvokePluginOperationRequestWithBody(server string, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "orgId", orgId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "pluginId", pluginId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/orgs/%s/plugins/%s/invoke", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -11745,8 +11969,16 @@ type ClientWithResponsesInterface interface {
 	// GetModuleVersionUsageWithResponse request
 	GetModuleVersionUsageWithResponse(ctx context.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, moduleVersionId ModuleVersionIdPathParam, reqEditors ...RequestEditorFn) (*GetModuleVersionUsageResponse, error)
 
+	// ListPluginContributionsWithResponse request
+	ListPluginContributionsWithResponse(ctx context.Context, orgId OrgIdPathParam, reqEditors ...RequestEditorFn) (*ListPluginContributionsResponse, error)
+
 	// GetPluginCapabilityWithResponse request
 	GetPluginCapabilityWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, reqEditors ...RequestEditorFn) (*GetPluginCapabilityResponse, error)
+
+	// InvokePluginOperationWithBodyWithResponse request with any body
+	InvokePluginOperationWithBodyWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*InvokePluginOperationResponse, error)
+
+	InvokePluginOperationWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, body InvokePluginOperationJSONRequestBody, reqEditors ...RequestEditorFn) (*InvokePluginOperationResponse, error)
 
 	// ListProjectsWithResponse request
 	ListProjectsWithResponse(ctx context.Context, orgId OrgIdPathParam, params *ListProjectsParams, reqEditors ...RequestEditorFn) (*ListProjectsResponse, error)
@@ -13446,6 +13678,29 @@ func (r GetModuleVersionUsageResponse) StatusCode() int {
 	return 0
 }
 
+type ListPluginContributionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *PluginContributionPage
+	JSON403      *N403Forbidden
+}
+
+// Status returns HTTPResponse.Status
+func (r ListPluginContributionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListPluginContributionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type GetPluginCapabilityResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -13464,6 +13719,33 @@ func (r GetPluginCapabilityResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetPluginCapabilityResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type InvokePluginOperationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *PluginInvocationResult
+	JSON400      *N400BadRequest
+	JSON403      *N403Forbidden
+	JSON404      *N404NotFound
+	JSON409      *N409Conflict
+	JSON503      *N503ServiceUnavailable
+}
+
+// Status returns HTTPResponse.Status
+func (r InvokePluginOperationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r InvokePluginOperationResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -14963,6 +15245,15 @@ func (c *ClientWithResponses) GetModuleVersionUsageWithResponse(ctx context.Cont
 	return ParseGetModuleVersionUsageResponse(rsp)
 }
 
+// ListPluginContributionsWithResponse request returning *ListPluginContributionsResponse
+func (c *ClientWithResponses) ListPluginContributionsWithResponse(ctx context.Context, orgId OrgIdPathParam, reqEditors ...RequestEditorFn) (*ListPluginContributionsResponse, error) {
+	rsp, err := c.ListPluginContributions(ctx, orgId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListPluginContributionsResponse(rsp)
+}
+
 // GetPluginCapabilityWithResponse request returning *GetPluginCapabilityResponse
 func (c *ClientWithResponses) GetPluginCapabilityWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, reqEditors ...RequestEditorFn) (*GetPluginCapabilityResponse, error) {
 	rsp, err := c.GetPluginCapability(ctx, orgId, pluginId, reqEditors...)
@@ -14970,6 +15261,23 @@ func (c *ClientWithResponses) GetPluginCapabilityWithResponse(ctx context.Contex
 		return nil, err
 	}
 	return ParseGetPluginCapabilityResponse(rsp)
+}
+
+// InvokePluginOperationWithBodyWithResponse request with arbitrary body returning *InvokePluginOperationResponse
+func (c *ClientWithResponses) InvokePluginOperationWithBodyWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*InvokePluginOperationResponse, error) {
+	rsp, err := c.InvokePluginOperationWithBody(ctx, orgId, pluginId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseInvokePluginOperationResponse(rsp)
+}
+
+func (c *ClientWithResponses) InvokePluginOperationWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, body InvokePluginOperationJSONRequestBody, reqEditors ...RequestEditorFn) (*InvokePluginOperationResponse, error) {
+	rsp, err := c.InvokePluginOperation(ctx, orgId, pluginId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseInvokePluginOperationResponse(rsp)
 }
 
 // ListProjectsWithResponse request returning *ListProjectsResponse
@@ -18007,6 +18315,39 @@ func ParseGetModuleVersionUsageResponse(rsp *http.Response) (*GetModuleVersionUs
 	return response, nil
 }
 
+// ParseListPluginContributionsResponse parses an HTTP response from a ListPluginContributionsWithResponse call
+func ParseListPluginContributionsResponse(rsp *http.Response) (*ListPluginContributionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListPluginContributionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PluginContributionPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest N403Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetPluginCapabilityResponse parses an HTTP response from a GetPluginCapabilityWithResponse call
 func ParseGetPluginCapabilityResponse(rsp *http.Response) (*GetPluginCapabilityResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -18041,6 +18382,67 @@ func ParseGetPluginCapabilityResponse(rsp *http.Response) (*GetPluginCapabilityR
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseInvokePluginOperationResponse parses an HTTP response from a InvokePluginOperationWithResponse call
+func ParseInvokePluginOperationResponse(rsp *http.Response) (*InvokePluginOperationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &InvokePluginOperationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PluginInvocationResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest N400BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest N403Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest N404NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest N409Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest N503ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 

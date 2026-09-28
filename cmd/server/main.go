@@ -33,6 +33,7 @@ import (
 	apimiddleware "github.com/stellwerk-labs/platform-orchestrator-cp/internal/api/middleware"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/config"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/vault"
 
@@ -187,6 +188,14 @@ func main() {
 		Publisher: publisher,
 		DpClient:  dpClient,
 		IamClient: iamClient,
+	}
+	if cfg.PluginExperimentEnabled {
+		gateway, err := plugins.LoadGateway(cfg.PluginInstallationsFile, cfg.PluginSigningKeyFile, cfg.PluginIssuer, cfg.PluginDevelopmentHTTP)
+		if err != nil {
+			zap.L().Fatal("Failed to initialize experimental plugin gateway", zap.Error(err))
+		}
+		server.PluginGateway = gateway
+		server.Plugins = gateway.Registry
 	}
 
 	echoServer, err := hecho.DefaultEchoServerWithValidation(&hecho.ValidatedServerConfig{
