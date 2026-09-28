@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 type AccessMode string
@@ -21,35 +24,49 @@ const (
 )
 
 type UIContribution struct {
-	SDKVersion      string `json:"sdk_version"`
-	Origin          string `json:"origin"`
-	Entrypoint      string `json:"entrypoint"`
-	RoutePrefix     string `json:"route_prefix"`
-	NavigationLabel string `json:"navigation_label"`
+	SDKVersion      string          `json:"sdk_version"`
+	Origin          string          `json:"origin"`
+	Entrypoint      string          `json:"entrypoint"`
+	RoutePrefix     string          `json:"route_prefix"`
+	NavigationLabel string          `json:"navigation_label"`
+	CoreOperations  []HostOperation `json:"core_operations,omitempty"`
+}
+
+// HostOperation names a closed Console SDK operation. It is never sent to the
+// plugin backend, and metadata is not a grant of the user's Core permissions.
+type HostOperation struct {
+	ID       string `json:"id"`
+	Method   string `json:"method"`
+	Mutating bool   `json:"mutating"`
 }
 
 type Operation struct {
-	ID               string              `json:"id"`
-	Method           string              `json:"method"`
-	Path             string              `json:"path"`
-	QueryKeys        []string            `json:"query_keys,omitempty"`
-	Mutating         bool                `json:"mutating"`
-	Safety           bool                `json:"safety,omitempty"`
-	PathValues       map[string][]string `json:"path_values,omitempty"`
-	SafetyPathValues map[string][]string `json:"safety_path_values,omitempty"`
+	ID                      string                         `json:"id"`
+	Method                  string                         `json:"method"`
+	Path                    string                         `json:"path"`
+	QueryKeys               []string                       `json:"query_keys,omitempty"`
+	Mutating                bool                           `json:"mutating"`
+	Safety                  bool                           `json:"safety,omitempty"`
+	PathValues              map[string][]string            `json:"path_values,omitempty"`
+	SafetyPathValues        map[string][]string            `json:"safety_path_values,omitempty"`
+	ServiceActions          []string                       `json:"service_actions,omitempty"`
+	ServiceActionPathValues map[string]map[string][]string `json:"service_action_path_values,omitempty"`
 }
 
 // Installation is operator-controlled experimental configuration, not a signed
 // commercial entitlement. Entitlement verification belongs to a separate gate.
 type Installation struct {
-	ID            string                       `json:"id"`
-	DisplayName   string                       `json:"display_name"`
-	Version       string                       `json:"version"`
-	Backend       string                       `json:"backend"`
-	Organizations map[string]AvailabilityState `json:"organizations"`
-	Capabilities  []string                     `json:"capabilities"`
-	UI            *UIContribution              `json:"ui,omitempty"`
-	Operations    []Operation                  `json:"operations"`
+	ID                 string                       `json:"id"`
+	DisplayName        string                       `json:"display_name"`
+	Version            string                       `json:"version"`
+	Backend            string                       `json:"backend"`
+	Organizations      map[string]AvailabilityState `json:"organizations"`
+	Capabilities       []string                     `json:"capabilities"`
+	UI                 *UIContribution              `json:"ui,omitempty"`
+	Operations         []Operation                  `json:"operations"`
+	ServiceUserID      string                       `json:"service_user_id,omitempty"`
+	AdmissionCheckerID string                       `json:"admission_checker_id,omitempty"`
+	ServiceGrants      []ServiceGrant               `json:"service_grants,omitempty"`
 }
 
 type InstallationRegistry struct{ installations map[string]Installation }
@@ -57,6 +74,8 @@ type InstallationRegistry struct{ installations map[string]Installation }
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$`)
 var operationIdentifier = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$`)
 var pathParameter = regexp.MustCompile(`\{([a-zA-Z][a-zA-Z0-9_]*)\}`)
+
+const orgPathParameter = "orgId"
 
 func LoadInstallations(reader io.Reader, allowDevelopmentHTTP bool) (*InstallationRegistry, error) {
 	var items []Installation
@@ -86,6 +105,13 @@ func LoadInstallations(reader io.Reader, allowDevelopmentHTTP bool) (*Installati
 			if item.UI.SDKVersion != "1" || !safePath(item.UI.Entrypoint) || !safePath(item.UI.RoutePrefix) || item.UI.NavigationLabel == "" {
 				return nil, fmt.Errorf("invalid plugin UI contribution")
 			}
+			hostSeen := map[string]bool{}
+			for _, op := range item.UI.CoreOperations {
+				if !operationIdentifier.MatchString(op.ID) || !reservedHostOperation(op.ID) || hostSeen[op.ID] || (op.Method != http.MethodGet && op.Method != http.MethodPost) || op.Method == http.MethodGet && op.Mutating {
+					return nil, fmt.Errorf("invalid or duplicate Core host operation")
+				}
+				hostSeen[op.ID] = true
+			}
 		}
 		for org, state := range item.Organizations {
 			if org == "" || strings.ContainsAny(org, "/\\") {
@@ -98,11 +124,29 @@ func LoadInstallations(reader io.Reader, allowDevelopmentHTTP bool) (*Installati
 			}
 		}
 		seen := map[string]bool{}
+		if err := validateServiceGrants(item); err != nil {
+			return nil, err
+		}
 		for _, op := range item.Operations {
-			if !operationIdentifier.MatchString(op.ID) || seen[op.ID] || !safePath(op.Path) {
+			if !operationIdentifier.MatchString(op.ID) || reservedHostOperation(op.ID) || seen[op.ID] || !safePath(op.Path) {
 				return nil, fmt.Errorf("invalid or duplicate plugin operation")
 			}
 			seen[op.ID] = true
+			for _, action := range op.ServiceActions {
+				if _, found := item.ServiceGrant(action); !found {
+					return nil, fmt.Errorf("operation refers to undeclared service action")
+				}
+			}
+			for action, constraints := range op.ServiceActionPathValues {
+				if !slices.Contains(op.ServiceActions, action) || len(constraints) == 0 {
+					return nil, fmt.Errorf("service action constraints need a declared action")
+				}
+				for parameter, values := range constraints {
+					if !strings.Contains(op.Path, "{"+parameter+"}") || parameter == orgPathParameter || len(values) == 0 {
+						return nil, fmt.Errorf("service action constraint must bind a real operation path parameter")
+					}
+				}
+			}
 			switch op.Method {
 			case "GET":
 				if op.Mutating {
@@ -122,6 +166,56 @@ func LoadInstallations(reader io.Reader, allowDevelopmentHTTP bool) (*Installati
 		registry.installations[item.ID] = item
 	}
 	return registry, nil
+}
+
+func reservedHostOperation(id string) bool {
+	return strings.HasPrefix(id, "core.") || strings.HasPrefix(id, "iam.")
+}
+
+// ServiceGrant is operator-owned policy. A plugin cannot choose the permission
+// checked on its behalf, substitute a Core permission, or enlarge its scope.
+type ServiceGrant struct {
+	Action     string `json:"action"`
+	Permission string `json:"permission"`
+	Scope      string `json:"scope"`
+}
+
+var localCapability = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+
+func validateServiceGrants(item Installation) error {
+	if len(item.ServiceGrants) == 0 {
+		if item.ServiceUserID != "" || item.AdmissionCheckerID != "" {
+			return fmt.Errorf("service identities require explicit service grants")
+		}
+		return nil
+	}
+	for _, identity := range []string{item.ServiceUserID, item.AdmissionCheckerID} {
+		id, err := uuid.Parse(identity)
+		if err != nil || id == uuid.Nil || identity == "ffffffff-ffff-ffff-ffff-ffffffffffff" {
+			return fmt.Errorf("plugin service identities must be explicit non-system UUIDs")
+		}
+	}
+	if item.ServiceUserID == item.AdmissionCheckerID {
+		return fmt.Errorf("plugin and admission checker must have distinct identities")
+	}
+	seen := map[string]bool{}
+	for _, grant := range item.ServiceGrants {
+		prefix := "plugin." + item.ID + "."
+		if !operationIdentifier.MatchString(grant.Action) || seen[grant.Action] || !strings.HasPrefix(grant.Permission, prefix) || !localCapability.MatchString(strings.TrimPrefix(grant.Permission, prefix)) || (grant.Scope != "organization" && grant.Scope != "environment") {
+			return fmt.Errorf("service grants require unique actions, owned capabilities and exact scope")
+		}
+		seen[grant.Action] = true
+	}
+	return nil
+}
+
+func (item Installation) ServiceGrant(action string) (ServiceGrant, bool) {
+	for _, grant := range item.ServiceGrants {
+		if grant.Action == action {
+			return grant, true
+		}
+	}
+	return ServiceGrant{}, false
 }
 
 func validateOrigin(raw string, development bool) error {
@@ -199,7 +293,7 @@ func (op Operation) RequestPath(org string, parameters map[string]string, query 
 	path := pathParameter.ReplaceAllStringFunc(op.Path, func(match string) string {
 		key := strings.Trim(match, "{}")
 		value, exists := parameters[key]
-		if key == "orgId" {
+		if key == orgPathParameter {
 			value, exists = org, true
 		}
 		if !exists || value == "" || value == "." || value == ".." || strings.ContainsAny(value, "/\\%?#\r\n") {
@@ -212,7 +306,7 @@ func (op Operation) RequestPath(org string, parameters map[string]string, query 
 		return url.PathEscape(value)
 	})
 	for key := range parameters {
-		if key == "orgId" || !used[key] {
+		if key == orgPathParameter || !used[key] {
 			invalid = true
 		}
 	}

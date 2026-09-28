@@ -32,6 +32,7 @@ type ExternalModuleCommand struct {
 	RequestID     string                 `json:"request_id"`
 	Action        string                 `json:"action"`
 	ExpectedFence int64                  `json:"expected_fence"`
+	GrantFence    int64                  `json:"grant_fence,omitempty"`
 	Reason        string                 `json:"reason"`
 	Targets       []ExternalModuleTarget `json:"targets"`
 }
@@ -94,6 +95,37 @@ func ApplyExternalModuleOperation(ctx context.Context, db Databaser, command Ext
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
+	if command.GrantFence > 0 {
+		if err := lockExternalGrant(ctx, tx, command.OrgID, command.PluginID, command.OperationID); err != nil {
+			return nil, err
+		}
+		grant, err := readExternalGrant(ctx, tx, command.OrgID, command.PluginID, command.OperationID)
+		if err != nil {
+			return nil, err
+		}
+		if grant.Revision != command.GrantFence || grant.ActorID != command.ActorID || !slices.Contains(grant.Intent.Actions, "module."+command.Action) {
+			return nil, NewErrConflict("module action is outside the current operation grant")
+		}
+		allowed := grant.State == grantStateActive || command.Action == externalActionReserve && grant.State == grantStatePrepared || command.Action == externalActionRelease && grant.State == grantStateSuspended
+		if !allowed {
+			return nil, NewErrConflict("operation grant cannot mutate module reservations or defaults in this state")
+		}
+		if len(grant.Intent.Modules) != len(ids) {
+			return nil, NewErrConflict("module targets differ from the frozen operation grant")
+		}
+		for _, target := range command.Targets {
+			if !slices.Contains(grant.Intent.Modules, target.ModuleUUID) || command.Action == externalActionPromote && grant.Intent.TargetVersions[target.ModuleUUID.String()] != target.VersionUUID {
+				return nil, NewErrConflict("module or target version differs from the frozen operation grant")
+			}
+			base := grant.BaselineDefaults[target.ModuleUUID.String()]
+			if command.Action == externalActionPromote && !sameOptionalUUID(base, target.ExpectedDefaultUUID) {
+				return nil, NewErrConflict("promotion must compare the captured Default")
+			}
+			if command.Action == externalActionRestore && (base == nil || *base != target.VersionUUID || target.ExpectedDefaultUUID == nil || *target.ExpectedDefaultUUID != grant.Intent.TargetVersions[target.ModuleUUID.String()]) {
+				return nil, NewErrConflict("restoration must undo only this operation's exact Default promotion")
+			}
+		}
+	}
 	// Serialize an absent operation too. JSON tuple encoding avoids ambiguous
 	// concatenation; a hash collision can only serialize unrelated operations.
 	lockIdentity, _ := json.Marshal([]string{command.OrgID, command.PluginID, command.OperationID.String()})
