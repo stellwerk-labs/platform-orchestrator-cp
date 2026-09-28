@@ -84,3 +84,30 @@ func TestExternalDispatchPinNotesAndNoApprovalPolicy(t *testing.T) {
 	check.TargetVersions = nil
 	require.NoError(t, CheckExternalDispatch(t.Context(), db, check))
 }
+
+func TestExternalPinCancellationRequiresConclusiveNoEffect(t *testing.T) {
+	db := externalOperationDatabase(t)
+	_, grant, begin := externalPinFixture(t, db)
+	pins, err := ApplyExternalPinCommand(t.Context(), db, begin, nil)
+	require.NoError(t, err)
+	env := grant.Intent.Environments[0]
+	dispatch := ExternalDispatch{OrgID: grant.OrgID, PluginID: grant.PluginID, OperationID: grant.OperationID, ActorID: grant.ActorID, Fence: grant.Revision, Action: "external-deployment.admit", DispatchID: "uncertain-override", ProjectUUID: env.ProjectID, EnvironmentUUID: env.EnvironmentID, RequestDigest: grant.Intent.Fingerprint, TargetVersions: grant.Intent.TargetVersions}
+	require.NoError(t, RecordExternalDispatch(t.Context(), db, dispatch))
+	cancel := begin
+	cancel.Action, cancel.RequestID, cancel.Targets = "cancel", "cancel-override", nil
+	for _, pin := range pins {
+		cancel.Targets = append(cancel.Targets, ExternalPinTarget{PinID: pin.ID, ExpectedResourceVersion: pin.ResourceVersion})
+	}
+	_, err = ApplyExternalPinCommand(t.Context(), db, cancel, nil)
+	require.ErrorContains(t, err, "authoritative outcome")
+	require.NoError(t, WithdrawExternalDispatch(t.Context(), db, grant.OrgID, grant.PluginID, grant.OperationID, dispatch.DispatchID))
+	_, err = ApplyExternalPinCommand(t.Context(), db, cancel, nil)
+	require.ErrorContains(t, err, "authoritative outcome", "withdrawal cannot prove an earlier in-flight admission had no effect")
+	require.NoError(t, CompleteExternalDispatch(t.Context(), db, grant.OrgID, grant.PluginID, grant.OperationID, dispatch.DispatchID, ExternalDispatchCompletion{EnvironmentUUID: env.EnvironmentID, ProjectUUID: env.ProjectID, RequestDigest: dispatch.RequestDigest, NoEffect: true}))
+	restored, err := ApplyExternalPinCommand(t.Context(), db, cancel, nil)
+	require.NoError(t, err)
+	for i, pin := range restored {
+		require.Equal(t, moduleversions.PinActive, pin.Status)
+		require.Equal(t, pins[i].ActivationEventID, pin.ActivationEventID, "failed/unstarted override does not invent an activation boundary")
+	}
+}

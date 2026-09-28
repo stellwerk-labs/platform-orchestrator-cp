@@ -191,7 +191,7 @@ func externalPinDecision(ctx context.Context, db Databaser, tx Tx, grant *Extern
 			return deny("only an unstarted pending override may be cancelled")
 		}
 		var dispatched bool
-		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM external_operation_dispatches WHERE org_id=$1 AND plugin_id=$2 AND operation_id=$3 AND intent->>'environment_uuid'=$4)`, command.OrgID, command.PluginID, command.OperationID, pin.EnvironmentUUID.String()).Scan(&dispatched); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM external_operation_dispatches WHERE org_id=$1 AND plugin_id=$2 AND operation_id=$3 AND intent->>'environment_uuid'=$4 AND NOT (state='settled' AND COALESCE(completion->>'NoEffect','false')='true'))`, command.OrgID, command.PluginID, command.OperationID, pin.EnvironmentUUID.String()).Scan(&dispatched); err != nil {
 			return "", "", nil, nil, err
 		}
 		if dispatched {

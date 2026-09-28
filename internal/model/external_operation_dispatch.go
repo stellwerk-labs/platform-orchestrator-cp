@@ -16,18 +16,44 @@ import (
 // grant generation. The digest covers the complete downstream request bytes.
 // Its receipt is not permission to bypass current IAM, enablement or fencing.
 type ExternalDispatch struct {
-	OrgID           string               `json:"org_id"`
-	PluginID        string               `json:"plugin_id"`
-	OperationID     uuid.UUID            `json:"operation_id"`
-	Fence           int64                `json:"fence"`
-	Action          string               `json:"action"`
-	DispatchID      string               `json:"dispatch_id"`
-	ProjectUUID     uuid.UUID            `json:"project_uuid"`
-	EnvironmentUUID uuid.UUID            `json:"environment_uuid"`
-	RequestDigest   string               `json:"request_digest"`
-	ActorID         uuid.UUID            `json:"actor_id"`
-	TargetVersions  map[string]uuid.UUID `json:"target_versions,omitempty"`
-	ApprovedPins    map[string]uuid.UUID `json:"approved_pins,omitempty"`
+	OrgID           string                    `json:"org_id"`
+	PluginID        string                    `json:"plugin_id"`
+	OperationID     uuid.UUID                 `json:"operation_id"`
+	Fence           int64                     `json:"fence"`
+	Action          string                    `json:"action"`
+	DispatchID      string                    `json:"dispatch_id"`
+	ProjectUUID     uuid.UUID                 `json:"project_uuid"`
+	EnvironmentUUID uuid.UUID                 `json:"environment_uuid"`
+	RequestDigest   string                    `json:"request_digest"`
+	ActorID         uuid.UUID                 `json:"actor_id"`
+	TargetVersions  map[string]uuid.UUID      `json:"target_versions,omitempty"`
+	ApprovedPins    map[string]uuid.UUID      `json:"approved_pins,omitempty"`
+	Approval        *ExternalDispatchApproval `json:"approval,omitempty"`
+}
+
+// ExternalDispatchApproval identifies the original approver, not the controller
+// or service identity. Core checks its operator-declared capability again at
+// the DP admission callback, before any infrastructure execution begins.
+type ExternalDispatchApproval struct {
+	ActorID uuid.UUID `json:"actor_id"`
+	Scope   string    `json:"scope"`
+}
+
+func GetExternalDispatch(ctx context.Context, db Databaser, org, plugin string, operation uuid.UUID, dispatchID string) (*ExternalDispatch, error) {
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var raw []byte
+	if err := tx.QueryRowContext(ctx, `SELECT intent FROM external_operation_dispatches WHERE org_id=$1 AND plugin_id=$2 AND operation_id=$3 AND dispatch_id=$4`, org, plugin, operation, dispatchID).Scan(&raw); err != nil {
+		return nil, err
+	}
+	var dispatch ExternalDispatch
+	if err := json.Unmarshal(raw, &dispatch); err != nil {
+		return nil, err
+	}
+	return &dispatch, nil
 }
 
 func validateExternalDispatch(grant *ExternalOperationGrant, dispatch ExternalDispatch) error {
@@ -96,6 +122,7 @@ func externalDispatchTransaction(ctx context.Context, db Databaser, dispatch Ext
 		comparison := recorded
 		if !create {
 			comparison.TargetVersions, comparison.ApprovedPins = nil, nil
+			comparison.Approval = nil
 		}
 		if !reflect.DeepEqual(comparison, dispatch) {
 			return NewErrConflict("dispatch ID belongs to a different exact request")

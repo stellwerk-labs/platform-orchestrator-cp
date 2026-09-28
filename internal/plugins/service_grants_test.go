@@ -66,6 +66,14 @@ func TestInstallationAuthorizationPoliciesAreClosedAndNamespaced(t *testing.T) {
 	}
 	require.NoError(t, load(t, item))
 
+	item.DeploymentApprovalPolicies = map[string]string{"environment": permission, "project": permission}
+	require.NoError(t, load(t, item))
+	for scope, candidate := range map[string]string{"organization": permission, "project": "deployment_read", "environment": "plugin.dev.other.workflow.approve"} {
+		changed := item
+		changed.DeploymentApprovalPolicies = map[string]string{scope: candidate}
+		require.Error(t, load(t, changed), "approval policy must use a configured owned capability at the exact permitted scope")
+	}
+
 	for name, change := range map[string]func(*Installation){
 		"core permission": func(changed *Installation) { changed.AuthorizationPolicies[0].Permission = "module.version.unpin" },
 		"other plugin": func(changed *Installation) {

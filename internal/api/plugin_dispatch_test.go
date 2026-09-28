@@ -51,6 +51,9 @@ func TestPluginDispatchRejectsUnconfiguredServicesBeforeDataAccess(t *testing.T)
 		{http.MethodPost, "/orgs/acme/plugins/" + pluginID + "/deployment-reads", `{"proof":{"operation_id":"read","idempotency_key":"read-1","assertion":"not-an-assertion"},"kind":"readiness","environments":[{"project_id":"project","env_id":"development"}]}`},
 		{http.MethodPost, operationPath + "/authorize", `{"action":"activate","expected_revision":1,"reason":"Start","proof":{"operation_id":"command","idempotency_key":"start-1","assertion":"not-an-assertion"}}`},
 		{http.MethodPost, operationPath + "/modules", `{"action":"reserve","grant_fence":1,"expected_fence":0,"request_id":"reserve-1","reason":"Reserve","targets":[{"module_uuid":"` + uuid.NewString() + `","version_uuid":"` + uuid.NewString() + `","expected_resource_version":1}]}`},
+		{http.MethodPost, operationPath + "/deployments", `{"grant_fence":1,"request_id":"dispatch-1","environment_uuid":"` + uuid.NewString() + `","mode":"deploy","plan":{"snapshot_id":"` + uuid.NewString() + `","fingerprint":"sha256:` + strings.Repeat("a", 64) + `","module_versions":{"` + uuid.NewString() + `":"` + uuid.NewString() + `"}}}`},
+		{http.MethodPost, operationPath + "/deployments/dispatch-1/reconcile", `{"grant_fence":1,"withdraw":true}`},
+		{http.MethodPost, operationPath + "/pins", `{"action":"cancel","grant_fence":1,"request_id":"cancel-1","reason":"Cancel unstarted override","targets":[{"pin_id":"` + uuid.NewString() + `","expected_resource_version":1}]}`},
 	} {
 		t.Run(route.path, func(t *testing.T) {
 			request := httptest.NewRequest(route.method, route.path, strings.NewReader(route.body))

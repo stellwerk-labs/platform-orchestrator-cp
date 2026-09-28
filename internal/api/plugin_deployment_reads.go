@@ -52,12 +52,12 @@ func (s *Server) ReadPluginDeploymentData(ctx context.Context, request ReadPlugi
 			return nil, pluginBoundaryError(400, "plugin_request_invalid", "Planning requires one Environment and exact Module Versions.")
 		}
 	case PluginDeploymentReadRequestKindDeployment:
-		action = "external-deployment.read"
+		action = pluginDeploymentReadAction
 		if len(body.Environments) != 1 || body.DeploymentId == nil || *body.DeploymentId == uuid.Nil || body.ModuleVersions != nil || body.DispatchId != nil {
 			return nil, pluginBoundaryError(400, "plugin_request_invalid", "Deployment inspection requires one Environment and Deployment identity.")
 		}
 	case PluginDeploymentReadRequestKindDispatch:
-		action = "external-deployment.read"
+		action = pluginDeploymentReadAction
 		if len(body.Environments) != 1 || body.DispatchId == nil || *body.DispatchId == "" || body.DeploymentId != nil || body.ModuleVersions != nil {
 			return nil, pluginBoundaryError(400, "plugin_request_invalid", "Dispatch inspection requires one Environment and dispatch identity.")
 		}

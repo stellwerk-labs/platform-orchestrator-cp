@@ -125,6 +125,13 @@ func (s *Server) CheckPluginOperationDispatch(ctx context.Context, request Check
 		return nil, err
 	}
 	dispatch := model.ExternalDispatch{OrgID: request.OrgId, PluginID: request.PluginId, OperationID: request.OperationId, ActorID: grant.ActorID, Fence: request.Body.Fence, Action: action, DispatchID: request.Body.DispatchId, ProjectUUID: request.Body.ProjectUuid, EnvironmentUUID: request.Body.EnvironmentUuid, RequestDigest: request.Body.RequestDigest}
+	recorded, err := model.GetExternalDispatch(ctx, s.Database, request.OrgId, request.PluginId, request.OperationId, dispatch.DispatchID)
+	if err != nil {
+		return nil, pluginModelError(err)
+	}
+	if err := s.authorizePluginDispatchApproval(ctx, item, *recorded); err != nil {
+		return nil, err
+	}
 	if err := model.CheckExternalDispatch(ctx, s.Database, dispatch); err != nil {
 		if _, ok := model.IsErrConflict(err); ok {
 			return nil, pluginBoundaryError(409, "plugin_dispatch_conflict", "The exact dispatch is no longer authorized at this operation fence.")
