@@ -194,12 +194,24 @@ func main() {
 		if err != nil {
 			zap.L().Fatal("Failed to initialize experimental plugin gateway", zap.Error(err))
 		}
+		var caPEM []byte
+		if cfg.PluginCAFile != "" {
+			caPEM, err = os.ReadFile(cfg.PluginCAFile)
+			if err != nil {
+				zap.L().Fatal("Failed to read the operator plugin CA bundle", zap.Error(err))
+			}
+		}
+		gateway.Client, err = plugins.NewServiceHTTPClient(caPEM)
+		if err != nil {
+			zap.L().Fatal("Failed to initialize verified plugin transport", zap.Error(err))
+		}
 		server.PluginGateway = gateway
 		server.Plugins = gateway.Registry
-		server.PluginDataPlane, err = plugins.NewDataPlanePort(cfg.DataPlaneUrl, gateway, cfg.PluginDevelopmentHTTP)
+		server.PluginDataPlane, err = plugins.NewDataPlanePort(cfg.DataPlaneUrl, gateway, cfg.PluginDevelopmentHTTP || cfg.PluginDataPlaneInternalHTTP)
 		if err != nil {
 			zap.L().Fatal("Failed to initialize the fixed Data Plane plugin port", zap.Error(err))
 		}
+		server.PluginDataPlane.Client = gateway.Client
 	}
 
 	echoServer, err := hecho.DefaultEchoServerWithValidation(&hecho.ValidatedServerConfig{
