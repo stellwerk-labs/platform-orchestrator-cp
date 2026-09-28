@@ -78,3 +78,45 @@ func TestDataPlanePortDoesNotFollowRedirects(t *testing.T) {
 	require.ErrorContains(t, err, "redirect")
 	require.Zero(t, leaked.Load())
 }
+
+func TestDataPlaneMaterialIsBoundedAndOutsideInvocationEnvelope(t *testing.T) {
+	_, private, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+	registry, err := LoadInstallations(strings.NewReader("[]"), false)
+	require.NoError(t, err)
+	for _, test := range []struct {
+		name, contentType, body string
+		status                  int
+		fails                   bool
+	}{
+		{"plain", "text/plain", "bounded log fixture", 200, false},
+		{"wrong-type", "text/html", "<script>bad</script>", 200, true},
+		{"redirect", "text/plain", "", 302, true},
+		{"error", "application/json", `{"error":"material_not_found"}`, 404, false},
+		{"non-json-error", "text/plain", "upstream invalid error", 502, true},
+		{"oversized", "text/plain", strings.Repeat("x", MaxDeploymentMaterialBytes+1), 200, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", test.contentType)
+				w.WriteHeader(test.status)
+				_, _ = w.Write([]byte(test.body))
+			}))
+			t.Cleanup(server.Close)
+			port, err := NewDataPlanePort(server.URL, &Gateway{Registry: registry, SigningKey: private, Issuer: "core"}, true)
+			require.NoError(t, err)
+			request := DataPlaneRequest{OrgID: "acme", PluginID: "dev.example.workflow", ActorID: uuid.New(), Action: "external-deployment.logs.read", RequestID: "read-1", ProjectUUID: uuid.New(), EnvironmentUUID: uuid.New(), DeploymentID: uuid.New()}
+			_, err = port.Call(t.Context(), request)
+			require.Error(t, err, "material cannot be returned to the plugin invocation transport")
+			result, err := port.ReadMaterial(t.Context(), request)
+			if test.fails {
+				require.Error(t, err)
+				require.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, test.status, result.Status)
+				require.Equal(t, test.body, string(result.Body))
+			}
+		})
+	}
+}

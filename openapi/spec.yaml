@@ -3,6 +3,46 @@ info:
   title: ''
   version: ''
 paths:
+  /orgs/{orgId}/plugins/{pluginId}/projects/{projectUuid}/envs/{environmentUuid}/deployments/{deploymentId}/{materialKind}:
+    get:
+      operationId: getPluginDeploymentMaterial
+      summary: Retrieve plugin-owned Deployment material using the caller's independent Orchestrator permission.
+      description: Requires current ordinary deployment_read authorization. Plugin capabilities and operation grants never authorize this endpoint. Core signs an exact immutable-scope Data Plane request; DP decrypts retained material without exposing a private key. Plugin service and admission-checker principals are explicitly denied. Historical retrieval does not depend on a live Environment or the plugin's entitlement. No material is sent through the plugin backend or invocation envelope.
+      tags: [Plugin]
+      security: [{userIdHeader: []}]
+      parameters:
+        - $ref: '#/components/parameters/orgIdPathParam'
+        - {name: pluginId, in: path, required: true, schema: {type: string}}
+        - {name: projectUuid, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: environmentUuid, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: deploymentId, in: path, required: true, schema: {type: string, format: uuid}}
+        - name: materialKind
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [logs, outputs]
+            x-enum-varnames: [PluginDeploymentMaterialLogs, PluginDeploymentMaterialOutputs]
+      responses:
+        '200':
+          description: Original decrypted bytes, bounded to 16 MiB and returned as an attachment. Outputs retain the original JSON bytes without reserialization.
+          headers:
+            Content-Disposition: {schema: {type: string}}
+            Cache-Control: {schema: {type: string}}
+            X-Content-Type-Options: {schema: {type: string}}
+          content:
+            text/plain:
+              schema: {type: string}
+        '400': {$ref: '#/components/responses/400BadRequest'}
+        '403': {$ref: '#/components/responses/403Forbidden'}
+        '404': {$ref: '#/components/responses/404NotFound'}
+        '409': {$ref: '#/components/responses/409Conflict'}
+        '413':
+          description: Material exceeds the bounded download size.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '503': {$ref: '#/components/responses/503ServiceUnavailable'}
   /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/deployments:
     post:
       operationId: submitPluginDeployment

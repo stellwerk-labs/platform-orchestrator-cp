@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"strings"
@@ -15,6 +16,14 @@ import (
 )
 
 const maxDataPlaneBody = 8 << 20
+const MaxDeploymentMaterialBytes = 16 << 20
+const DataPlaneLogsRead = "external-deployment.logs.read"
+const DataPlaneOutputsRead = "external-deployment.outputs.read"
+
+type DeploymentMaterialResult struct {
+	Status int
+	Body   []byte
+}
 
 // DataPlanePort sends only closed, typed-by-action service requests to the
 // operator's fixed DP origin. It does not accept caller URLs or credentials.
@@ -77,12 +86,70 @@ func dataPlaneRequestPath(request DataPlaneRequest) (string, string, error) {
 			return "", "", invalid
 		}
 		return http.MethodGet, scope + "/external-deployments/" + request.DeploymentID.String(), nil
+	case DataPlaneLogsRead, DataPlaneOutputsRead:
+		if request.ProjectUUID == uuid.Nil || request.EnvironmentUUID == uuid.Nil || request.DeploymentID == uuid.Nil || request.DispatchID != "" || len(request.Body) != 0 {
+			return "", "", invalid
+		}
+		kind := "logs"
+		if request.Action == DataPlaneOutputsRead {
+			kind = "outputs"
+		}
+		return http.MethodGet, base + "/projects/" + request.ProjectUUID.String() + "/envs/" + request.EnvironmentUUID.String() + "/external-deployments/" + request.DeploymentID.String() + "/" + kind, nil
 	default:
 		return "", "", invalid
 	}
 }
 
 func (p *DataPlanePort) Call(ctx context.Context, request DataPlaneRequest) (*InvocationResult, error) {
+	if request.Action == DataPlaneLogsRead || request.Action == DataPlaneOutputsRead {
+		return nil, &GatewayError{pluginRequestInvalid, "Protected material requires the user-only material transport.", 400}
+	}
+	response, err := p.do(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = response.Body.Close() }()
+	body, err := io.ReadAll(io.LimitReader(response.Body, maxDataPlaneBody+1))
+	if err != nil || len(body) > maxDataPlaneBody || !json.Valid(body) {
+		return nil, &GatewayError{pluginResponseInvalid, "The Data Plane returned an invalid or oversized response.", 502}
+	}
+	return &InvocationResult{Status: response.StatusCode, Body: body}, nil
+}
+
+// ReadMaterial is only used by the authenticated Core user proxy. The plugin
+// service transport cannot expose this data through an invocation envelope.
+func (p *DataPlanePort) ReadMaterial(ctx context.Context, request DataPlaneRequest) (*DeploymentMaterialResult, error) {
+	if request.Action != DataPlaneLogsRead && request.Action != DataPlaneOutputsRead {
+		return nil, &GatewayError{pluginRequestInvalid, "An exact Deployment material request is required.", 400}
+	}
+	response, err := p.do(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = response.Body.Close() }()
+	limit := MaxDeploymentMaterialBytes
+	if response.StatusCode != http.StatusOK {
+		limit = 8192
+	}
+	body, err := io.ReadAll(io.LimitReader(response.Body, int64(limit+1)))
+	if err != nil {
+		return nil, &GatewayError{pluginResponseInvalid, "The Data Plane material response could not be read.", 502}
+	}
+	if len(body) > limit {
+		return nil, &GatewayError{"deployment_material_too_large", "Deployment material exceeds the bounded download size.", http.StatusRequestEntityTooLarge}
+	}
+	if response.StatusCode == http.StatusOK {
+		contentType, _, err := mime.ParseMediaType(response.Header.Get("Content-Type"))
+		if err != nil || contentType != "text/plain" {
+			return nil, &GatewayError{pluginResponseInvalid, "The Data Plane returned an unsupported material content type.", 502}
+		}
+	} else if !json.Valid(body) {
+		return nil, &GatewayError{pluginResponseInvalid, "The Data Plane returned an invalid material error response.", 502}
+	}
+	return &DeploymentMaterialResult{Status: response.StatusCode, Body: body}, nil
+}
+
+func (p *DataPlanePort) do(ctx context.Context, request DataPlaneRequest) (*http.Response, error) {
 	if p == nil || p.Gateway == nil {
 		return nil, &GatewayError{pluginUnavailable, "The Data Plane service port is not configured.", 503}
 	}
@@ -123,13 +190,9 @@ func (p *DataPlanePort) Call(ctx context.Context, request DataPlaneRequest) (*In
 	if err != nil {
 		return nil, &GatewayError{pluginUnavailable, "The Data Plane could not be reached; reconcile an uncertain mutation before retrying execution.", 503}
 	}
-	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode >= 300 && response.StatusCode < 400 {
+		_ = response.Body.Close()
 		return nil, &GatewayError{pluginResponseInvalid, "The Data Plane returned an unsupported redirect.", 502}
 	}
-	body, err := io.ReadAll(io.LimitReader(response.Body, maxDataPlaneBody+1))
-	if err != nil || len(body) > maxDataPlaneBody || !json.Valid(body) {
-		return nil, &GatewayError{pluginResponseInvalid, "The Data Plane returned an invalid or oversized response.", 502}
-	}
-	return &InvocationResult{Status: response.StatusCode, Body: body}, nil
+	return response, nil
 }

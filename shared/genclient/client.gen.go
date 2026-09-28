@@ -890,6 +890,24 @@ func (e TransitionModuleVersionParamsLifecycleAction) Valid() bool {
 	}
 }
 
+// Defines values for GetPluginDeploymentMaterialParamsMaterialKind.
+const (
+	PluginDeploymentMaterialLogs    GetPluginDeploymentMaterialParamsMaterialKind = "logs"
+	PluginDeploymentMaterialOutputs GetPluginDeploymentMaterialParamsMaterialKind = "outputs"
+)
+
+// Valid indicates whether the value is a known member of the GetPluginDeploymentMaterialParamsMaterialKind enum.
+func (e GetPluginDeploymentMaterialParamsMaterialKind) Valid() bool {
+	switch e {
+	case PluginDeploymentMaterialLogs:
+		return true
+	case PluginDeploymentMaterialOutputs:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ChangeResourceTypeCatalogueStatusParamsCatalogueAction.
 const (
 	ChangeResourceTypeCatalogueStatusParamsCatalogueActionArchive   ChangeResourceTypeCatalogueStatusParamsCatalogueAction = "archive"
@@ -3640,6 +3658,9 @@ type ReconcilePluginDeploymentJSONBody struct {
 	Withdraw   bool  `json:"withdraw"`
 }
 
+// GetPluginDeploymentMaterialParamsMaterialKind defines parameters for GetPluginDeploymentMaterial.
+type GetPluginDeploymentMaterialParamsMaterialKind string
+
 // ListProjectsParams defines parameters for ListProjects.
 type ListProjectsParams struct {
 	// PerPage The maximum number of items to return in a page of results
@@ -4794,6 +4815,9 @@ type ClientInterface interface {
 	ApplyPluginPinOperationWithBody(ctx context.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	ApplyPluginPinOperation(ctx context.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID, body ApplyPluginPinOperationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetPluginDeploymentMaterial request
+	GetPluginDeploymentMaterial(ctx context.Context, orgId OrgIdPathParam, pluginId string, projectUuid openapi_types.UUID, environmentUuid openapi_types.UUID, deploymentId openapi_types.UUID, materialKind GetPluginDeploymentMaterialParamsMaterialKind, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListProjects request
 	ListProjects(ctx context.Context, orgId OrgIdPathParam, params *ListProjectsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -6330,6 +6354,18 @@ func (c *Client) ApplyPluginPinOperationWithBody(ctx context.Context, orgId OrgI
 
 func (c *Client) ApplyPluginPinOperation(ctx context.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID, body ApplyPluginPinOperationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewApplyPluginPinOperationRequest(c.Server, orgId, pluginId, operationId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetPluginDeploymentMaterial(ctx context.Context, orgId OrgIdPathParam, pluginId string, projectUuid openapi_types.UUID, environmentUuid openapi_types.UUID, deploymentId openapi_types.UUID, materialKind GetPluginDeploymentMaterialParamsMaterialKind, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetPluginDeploymentMaterialRequest(c.Server, orgId, pluginId, projectUuid, environmentUuid, deploymentId, materialKind)
 	if err != nil {
 		return nil, err
 	}
@@ -11458,6 +11494,75 @@ func NewApplyPluginPinOperationRequestWithBody(server string, orgId OrgIdPathPar
 	return req, nil
 }
 
+// NewGetPluginDeploymentMaterialRequest generates requests for GetPluginDeploymentMaterial
+func NewGetPluginDeploymentMaterialRequest(server string, orgId OrgIdPathParam, pluginId string, projectUuid openapi_types.UUID, environmentUuid openapi_types.UUID, deploymentId openapi_types.UUID, materialKind GetPluginDeploymentMaterialParamsMaterialKind) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "orgId", orgId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "pluginId", pluginId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "projectUuid", projectUuid, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithOptions("simple", false, "environmentUuid", environmentUuid, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam4 string
+
+	pathParam4, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam5 string
+
+	pathParam5, err = runtime.StyleParamWithOptions("simple", false, "materialKind", materialKind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/orgs/%s/plugins/%s/projects/%s/envs/%s/deployments/%s/%s", pathParam0, pathParam1, pathParam2, pathParam3, pathParam4, pathParam5)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListProjectsRequest generates requests for ListProjects
 func NewListProjectsRequest(server string, orgId OrgIdPathParam, params *ListProjectsParams) (*http.Request, error) {
 	var err error
@@ -13527,6 +13632,9 @@ type ClientWithResponsesInterface interface {
 
 	ApplyPluginPinOperationWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID, body ApplyPluginPinOperationJSONRequestBody, reqEditors ...RequestEditorFn) (*ApplyPluginPinOperationResponse, error)
 
+	// GetPluginDeploymentMaterialWithResponse request
+	GetPluginDeploymentMaterialWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, projectUuid openapi_types.UUID, environmentUuid openapi_types.UUID, deploymentId openapi_types.UUID, materialKind GetPluginDeploymentMaterialParamsMaterialKind, reqEditors ...RequestEditorFn) (*GetPluginDeploymentMaterialResponse, error)
+
 	// ListProjectsWithResponse request
 	ListProjectsWithResponse(ctx context.Context, orgId OrgIdPathParam, params *ListProjectsParams, reqEditors ...RequestEditorFn) (*ListProjectsResponse, error)
 
@@ -15588,6 +15696,33 @@ func (r ApplyPluginPinOperationResponse) StatusCode() int {
 	return 0
 }
 
+type GetPluginDeploymentMaterialResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *N400BadRequest
+	JSON403      *N403Forbidden
+	JSON404      *N404NotFound
+	JSON409      *N409Conflict
+	JSON413      *Error
+	JSON503      *N503ServiceUnavailable
+}
+
+// Status returns HTTPResponse.Status
+func (r GetPluginDeploymentMaterialResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetPluginDeploymentMaterialResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListProjectsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -17285,6 +17420,15 @@ func (c *ClientWithResponses) ApplyPluginPinOperationWithResponse(ctx context.Co
 		return nil, err
 	}
 	return ParseApplyPluginPinOperationResponse(rsp)
+}
+
+// GetPluginDeploymentMaterialWithResponse request returning *GetPluginDeploymentMaterialResponse
+func (c *ClientWithResponses) GetPluginDeploymentMaterialWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, projectUuid openapi_types.UUID, environmentUuid openapi_types.UUID, deploymentId openapi_types.UUID, materialKind GetPluginDeploymentMaterialParamsMaterialKind, reqEditors ...RequestEditorFn) (*GetPluginDeploymentMaterialResponse, error) {
+	rsp, err := c.GetPluginDeploymentMaterial(ctx, orgId, pluginId, projectUuid, environmentUuid, deploymentId, materialKind, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetPluginDeploymentMaterialResponse(rsp)
 }
 
 // ListProjectsWithResponse request returning *ListProjectsResponse
@@ -21058,6 +21202,67 @@ func ParseApplyPluginPinOperationResponse(rsp *http.Response) (*ApplyPluginPinOp
 			return nil, err
 		}
 		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest N503ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetPluginDeploymentMaterialResponse parses an HTTP response from a GetPluginDeploymentMaterialWithResponse call
+func ParseGetPluginDeploymentMaterialResponse(rsp *http.Response) (*GetPluginDeploymentMaterialResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetPluginDeploymentMaterialResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest N400BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest N403Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest N404NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest N409Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON413 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
 		var dest N503ServiceUnavailable
