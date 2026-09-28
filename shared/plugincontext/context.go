@@ -38,6 +38,7 @@ type Claims struct {
 
 type Request struct {
 	Issuer, Audience, PluginID, OrgID, Method, Path string
+	OperationID, IdempotencyKey                     string
 	Body                                            []byte
 }
 
@@ -69,8 +70,11 @@ func Sign(key ed25519.PrivateKey, claims Claims, now time.Time) (string, error) 
 }
 
 // Verify binds an assertion to one exact request and receiver. Mutation handlers
-// must additionally reauthorize and durably deduplicate RequestID with the body
-// digest. Verification alone does not provide exactly-once side effects.
+// must additionally reauthorize and durably deduplicate claims.RequestID with
+// the body digest. The operation must come from the selected server handler,
+// not the assertion. IdempotencyKey is the received HTTP header, required for
+// writes and checked against the signed identity. Verification alone does not
+// provide exactly-once side effects.
 func Verify(key ed25519.PublicKey, token string, request Request, now time.Time) (Claims, error) {
 	var claims Claims
 	if len(key) != ed25519.PublicKeySize || len(token) > 16384 {
@@ -97,10 +101,15 @@ func Verify(key ed25519.PublicKey, token string, request Request, now time.Time)
 	if err != nil || !bytes.Equal(data, canonical) || !claims.valid(now) {
 		return Claims{}, ErrInvalid
 	}
-	if request.Issuer == "" || request.Audience == "" || request.PluginID == "" || request.OrgID == "" ||
+	if request.Issuer == "" || request.Audience == "" || request.PluginID == "" || request.OrgID == "" || request.OperationID == "" ||
 		claims.Issuer != request.Issuer || claims.Audience != request.Audience ||
 		claims.PluginID != request.PluginID || claims.OrgID != request.OrgID ||
+		claims.OperationID != request.OperationID ||
 		claims.Method != request.Method || claims.Path != request.Path || claims.BodySHA256 != Digest(request.Body) {
+		return Claims{}, ErrInvalid
+	}
+	if (request.Method != "GET" && request.Method != "HEAD" && request.IdempotencyKey == "") ||
+		(request.IdempotencyKey != "" && request.IdempotencyKey != claims.RequestID) {
 		return Claims{}, ErrInvalid
 	}
 	return claims, nil

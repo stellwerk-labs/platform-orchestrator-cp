@@ -50,7 +50,7 @@ func TestGatewayRequestBindingAndCredentialIsolation(t *testing.T) {
 			t.Error(err)
 			return
 		}
-		claims, err := plugincontext.Verify(public, r.Header.Get(plugincontext.Header), plugincontext.Request{Issuer: "cp", Audience: "plugin:" + testPluginID, PluginID: testPluginID, OrgID: "acme", Method: r.Method, Path: r.URL.RequestURI(), Body: body}, now)
+		claims, err := plugincontext.Verify(public, r.Header.Get(plugincontext.Header), plugincontext.Request{Issuer: "cp", Audience: "plugin:" + testPluginID, PluginID: testPluginID, OrgID: "acme", Method: r.Method, Path: r.URL.RequestURI(), Body: body, OperationID: "command", IdempotencyKey: r.Header.Get("Idempotency-Key")}, now)
 		if err != nil {
 			t.Errorf("delegation: %v", err)
 		}

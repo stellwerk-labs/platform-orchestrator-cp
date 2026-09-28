@@ -14,7 +14,7 @@ func TestRequestBoundContext(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Unix(2000000000, 0)
-	req := Request{Issuer: "cp", Audience: "plugin:dev.example.demo", PluginID: "dev.example.demo", OrgID: "demo", Method: "POST", Path: "/v1/commands?view=exact", Body: []byte(`{"action":"start"}`)}
+	req := Request{Issuer: "cp", Audience: "plugin:dev.example.demo", PluginID: "dev.example.demo", OrgID: "demo", Method: "POST", OperationID: "start", IdempotencyKey: "request", Path: "/v1/commands?view=exact", Body: []byte(`{"action":"start"}`)}
 	claims := Claims{Version: 1, Issuer: req.Issuer, Audience: req.Audience, PluginID: req.PluginID, OrgID: req.OrgID, ActorID: "actor", OperationID: "start", Method: req.Method, Path: req.Path, BodySHA256: Digest(req.Body), RequestID: "request", IssuedAt: now.Unix(), ExpiresAt: now.Add(MaxLifetime).Unix()}
 	token, err := Sign(key, claims, now)
 	if err != nil {
@@ -25,13 +25,17 @@ func TestRequestBoundContext(t *testing.T) {
 		t.Fatalf("round trip: %v", err)
 	}
 	for name, mutate := range map[string]func(*Request){
-		"issuer":   func(r *Request) { r.Issuer = "other" },
-		"audience": func(r *Request) { r.Audience = "dp" },
-		"plugin":   func(r *Request) { r.PluginID = "dev.other.demo" },
-		"org":      func(r *Request) { r.OrgID = "other" },
-		"method":   func(r *Request) { r.Method = "DELETE" },
-		"path":     func(r *Request) { r.Path = "/v1/other" },
-		"body":     func(r *Request) { r.Body = []byte(`{"action":"delete"}`) },
+		"issuer":                     func(r *Request) { r.Issuer = "other" },
+		"audience":                   func(r *Request) { r.Audience = "dp" },
+		"plugin":                     func(r *Request) { r.PluginID = "dev.other.demo" },
+		"org":                        func(r *Request) { r.OrgID = "other" },
+		"method":                     func(r *Request) { r.Method = "DELETE" },
+		"path":                       func(r *Request) { r.Path = "/v1/other" },
+		"body":                       func(r *Request) { r.Body = []byte(`{"action":"delete"}`) },
+		"other-operation-same-route": func(r *Request) { r.OperationID = "cancel" },
+		"missing-operation":          func(r *Request) { r.OperationID = "" },
+		"changed-idempotency-header": func(r *Request) { r.IdempotencyKey = "second-execution" },
+		"missing-idempotency-header": func(r *Request) { r.IdempotencyKey = "" },
 	} {
 		t.Run(name, func(t *testing.T) {
 			changed := req

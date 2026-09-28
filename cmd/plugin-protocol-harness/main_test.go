@@ -40,7 +40,7 @@ func TestProtocolHarnessUsesRealGatewayAndFailsClosed(t *testing.T) {
 		}
 		claims, err := plugincontext.Verify(public, request.Header.Get(plugincontext.Header), plugincontext.Request{
 			Issuer: "harness", Audience: "plugin:" + testPlugin, PluginID: testPlugin,
-			OrgID: testOrg, Method: request.Method, Path: request.URL.RequestURI(), Body: body,
+			OrgID: testOrg, Method: request.Method, Path: request.URL.RequestURI(), Body: body, OperationID: "list", IdempotencyKey: request.Header.Get("Idempotency-Key"),
 		}, now)
 		if err != nil {
 			t.Error(err)
