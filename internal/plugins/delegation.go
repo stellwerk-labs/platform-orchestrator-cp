@@ -55,7 +55,9 @@ func (g *Gateway) verifyServiceDelegation(ctx context.Context, org, plugin, serv
 			return deny()
 		}
 	}
-	allowed := descriptor.State == StateAvailable || (descriptor.State == StateNotEnabled || descriptor.State == StateNotEntitled) && (!requireMutation || operation.IsSafety(proof.PathParameters))
+	allowed := descriptor.Allows(operation.RequiredFeature, requireMutation, operation.IsSafety(proof.PathParameters))
+	grant, granted := item.ServiceGrant(action)
+	allowed = allowed && granted && descriptor.Allows(grant.RequiredFeature, requireMutation, operation.IsSafety(proof.PathParameters))
 	if !allowed {
 		return deny()
 	}

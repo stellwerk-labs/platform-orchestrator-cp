@@ -31,8 +31,17 @@ func (s *Server) GetPluginDeploymentMaterial(ctx context.Context, request GetPlu
 			return nil, pluginBoundaryError(403, "deployment_material_forbidden", "Plugin service identities cannot retrieve decrypted Deployment material.")
 		}
 	}
-	if err := s.pluginAuthorize(ctx, actor, []iamapi.ResourcePermissionCheck{orgCheck(request.OrgId, ordinaryDeploymentReadPermission)}); err != nil {
+	allowed, err := s.pluginAuthorizationDecision(ctx, actor, []iamapi.ResourcePermissionCheck{environmentCheck(request.EnvironmentUuid, ordinaryDeploymentReadPermission)})
+	if err != nil {
 		return nil, err
+	}
+	if !allowed {
+		// Historical Environment IAM relationships may have been removed. An
+		// independently held organization grant still authorizes retained data;
+		// a plugin grant or a lookup failure never substitutes for that grant.
+		if err := s.pluginAuthorize(ctx, actor, []iamapi.ResourcePermissionCheck{orgCheck(request.OrgId, ordinaryDeploymentReadPermission)}); err != nil {
+			return nil, err
+		}
 	}
 	if _, _, found := s.PluginGateway.Registry.Installation(ctx, request.OrgId, request.PluginId); !found {
 		return nil, pluginBoundaryError(404, "plugin_not_installed", "The plugin's retained installation metadata is not available in this organization.")

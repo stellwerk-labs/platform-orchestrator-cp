@@ -10,8 +10,10 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 )
 
 type AccessMode string
@@ -62,6 +64,7 @@ type HostOperation struct {
 }
 
 type Operation struct {
+	RequiredFeature         string                         `json:"required_feature,omitempty"`
 	ID                      string                         `json:"id"`
 	Method                  string                         `json:"method"`
 	Path                    string                         `json:"path"`
@@ -77,6 +80,10 @@ type Operation struct {
 // Installation is operator-controlled experimental configuration, not a signed
 // commercial entitlement. Entitlement verification belongs to a separate gate.
 type Installation struct {
+	InstallationID             string                       `json:"installation_id,omitempty"`
+	ManifestSHA256             string                       `json:"manifest_sha256,omitempty"`
+	Entitlement                *EntitlementDeclaration      `json:"entitlement,omitempty"`
+	OrganizationTimezones      map[string]string            `json:"organization_timezones,omitempty"`
 	ID                         string                       `json:"id"`
 	DisplayName                string                       `json:"display_name"`
 	Version                    string                       `json:"version"`
@@ -92,9 +99,13 @@ type Installation struct {
 	DeploymentApprovalPolicies map[string]string            `json:"deployment_approval_policies,omitempty"`
 }
 
-type InstallationRegistry struct{ installations map[string]Installation }
+type InstallationRegistry struct {
+	installations map[string]Installation
+	Entitlements  EntitlementResolver
+}
 
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$`)
+var canonicalVersion = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$`)
 var operationIdentifier = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$`)
 var pathParameter = regexp.MustCompile(`\{([a-zA-Z][a-zA-Z0-9_]*)\}`)
 
@@ -113,7 +124,10 @@ func LoadInstallations(reader io.Reader, allowDevelopmentHTTP bool) (*Installati
 	}
 	registry := &InstallationRegistry{installations: map[string]Installation{}}
 	for _, item := range items {
-		if !identifier.MatchString(item.ID) || item.DisplayName == "" || item.Version == "" {
+		if err := validateEntitlement(item); err != nil {
+			return nil, err
+		}
+		if !identifier.MatchString(item.ID) || item.DisplayName == "" || !canonicalVersion.MatchString(item.Version) {
 			return nil, fmt.Errorf("invalid plugin identity")
 		}
 		if _, exists := registry.installations[item.ID]; exists {
@@ -146,6 +160,27 @@ func LoadInstallations(reader io.Reader, allowDevelopmentHTTP bool) (*Installati
 			default:
 				return nil, fmt.Errorf("invalid plugin availability")
 			}
+		}
+		if item.OrganizationTimezones == nil {
+			item.OrganizationTimezones = map[string]string{}
+		}
+		for org := range item.OrganizationTimezones {
+			if _, exists := item.Organizations[org]; !exists {
+				return nil, fmt.Errorf("timezone must name an installed organization")
+			}
+		}
+		for org := range item.Organizations {
+			zone := item.OrganizationTimezones[org]
+			if zone == "" {
+				zone = "UTC"
+			}
+			if zone == "Local" {
+				return nil, fmt.Errorf("organization timezone must be an explicit IANA name")
+			}
+			if _, err := time.LoadLocation(zone); err != nil {
+				return nil, fmt.Errorf("invalid organization timezone: %w", err)
+			}
+			item.OrganizationTimezones[org] = zone
 		}
 		seen := map[string]bool{}
 		if err := validateServiceGrants(item); err != nil {
@@ -235,9 +270,10 @@ func reservedHostOperation(id string) bool {
 // ServiceGrant is operator-owned policy. A plugin cannot choose the permission
 // checked on its behalf, substitute a Core permission, or enlarge its scope.
 type ServiceGrant struct {
-	Action     string `json:"action"`
-	Permission string `json:"permission"`
-	Scope      string `json:"scope"`
+	RequiredFeature string `json:"required_feature,omitempty"`
+	Action          string `json:"action"`
+	Permission      string `json:"permission"`
+	Scope           string `json:"scope"`
 }
 
 // AuthorizationPolicy is the operator-owned catalogue of plugin-local
@@ -259,8 +295,8 @@ func validateServiceGrants(item Installation) error {
 	}
 	for _, identity := range []string{item.ServiceUserID, item.AdmissionCheckerID} {
 		id, err := uuid.Parse(identity)
-		if err != nil || id == uuid.Nil || identity == "ffffffff-ffff-ffff-ffff-ffffffffffff" {
-			return fmt.Errorf("plugin service identities must be explicit non-system UUIDs")
+		if err != nil || identity != id.String() || !userid.IsServiceUser(id) {
+			return fmt.Errorf("plugin service identities must be canonical IAM service-user UUIDs")
 		}
 	}
 	if item.ServiceUserID == item.AdmissionCheckerID {
@@ -353,7 +389,7 @@ func accessMode(state AvailabilityState) AccessMode {
 	}
 }
 
-func (r *InstallationRegistry) Get(_ context.Context, orgID, pluginID string) (Descriptor, bool) {
+func (r *InstallationRegistry) Get(ctx context.Context, orgID, pluginID string) (Descriptor, bool) {
 	if r == nil {
 		return Descriptor{}, false
 	}
@@ -365,7 +401,8 @@ func (r *InstallationRegistry) Get(_ context.Context, orgID, pluginID string) (D
 	if !enabled {
 		return Descriptor{}, false
 	}
-	return Descriptor{ID: item.ID, DisplayName: item.DisplayName, Version: item.Version, Capabilities: slices.Clone(item.Capabilities), State: state, Mode: accessMode(state)}, true
+	descriptor := Descriptor{ID: item.ID, DisplayName: item.DisplayName, Version: item.Version, Capabilities: slices.Clone(item.Capabilities), State: state, Mode: accessMode(state)}
+	return r.applyEntitlement(ctx, orgID, item, descriptor), true
 }
 
 func (r *InstallationRegistry) List(ctx context.Context, orgID string) []Descriptor {
@@ -387,11 +424,43 @@ func (r *InstallationRegistry) Installation(ctx context.Context, orgID, pluginID
 	if !ok {
 		return Installation{}, Descriptor{}, false
 	}
-	// JSON round trip avoids sharing mutable slices/maps with route callers.
-	encoded, _ := json.Marshal(r.installations[pluginID])
-	var i Installation
-	_ = json.Unmarshal(encoded, &i)
+	i, _ := r.ConfiguredInstallation(orgID, pluginID)
 	return i, d, true
+}
+
+// ConfiguredInstallation reads only detached operator metadata. Service
+// identity must be checked before evaluating or activating a licence feature.
+// This method by itself makes no claim about the plugin's usable authority.
+func (r *InstallationRegistry) ConfiguredInstallation(orgID, pluginID string) (Installation, bool) {
+	if r == nil {
+		return Installation{}, false
+	}
+	item, found := r.installations[pluginID]
+	if _, configured := item.Organizations[orgID]; !found || !configured {
+		return Installation{}, false
+	}
+	// The struct contains only JSON data. Round-tripping detaches nested maps.
+	encoded, _ := json.Marshal(item)
+	var clone Installation
+	_ = json.Unmarshal(encoded, &clone)
+	return clone, true
+}
+
+// Installations returns detached operator configuration for startup adapters.
+// It neither evaluates an entitlement nor returns credentials or signed grants.
+func (r *InstallationRegistry) Installations() []Installation {
+	items := []Installation{}
+	if r == nil {
+		return items
+	}
+	for _, item := range r.installations {
+		encoded, _ := json.Marshal(item)
+		var clone Installation
+		_ = json.Unmarshal(encoded, &clone)
+		items = append(items, clone)
+	}
+	slices.SortFunc(items, func(a, b Installation) int { return strings.Compare(a.ID, b.ID) })
+	return items
 }
 
 func (op Operation) RequestPath(org string, parameters map[string]string, query map[string][]string) (string, error) {

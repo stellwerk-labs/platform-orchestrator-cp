@@ -70,9 +70,13 @@ func (g *Gateway) Invoke(ctx context.Context, org, pluginID, actor string, invoc
 	if operation == nil {
 		return nil, &GatewayError{"plugin_operation_unknown", "This operation is not registered by the installed plugin.", 400}
 	}
-	allowed := descriptor.State == StateAvailable || ((descriptor.State == StateNotEnabled || descriptor.State == StateNotEntitled) && (!operation.Mutating || operation.IsSafety(invocation.PathParameters)))
+	allowed := descriptor.Allows(operation.RequiredFeature, operation.Mutating, operation.IsSafety(invocation.PathParameters))
 	if !allowed {
-		return nil, &GatewayError{"plugin_" + string(descriptor.State), "The plugin cannot accept this operation. Ask an administrator to check its availability.", 409}
+		code := "plugin_" + string(descriptor.State)
+		if descriptor.State == StateAvailable {
+			code = "plugin_not_entitled"
+		}
+		return nil, &GatewayError{code, "The plugin cannot accept this operation. Ask an administrator to check its availability and signed licence.", 409}
 	}
 	if _, err := uuid.Parse(actor); err != nil {
 		return nil, &GatewayError{"plugin_actor_invalid", "An authenticated actor is required.", 401}

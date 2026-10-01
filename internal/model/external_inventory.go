@@ -111,6 +111,9 @@ func ReadExternalInventory(ctx context.Context, db Databaser, org string, module
 			return nil, NewErrBadRequest("too many Module Versions for one inventory snapshot")
 		}
 	}
+	if len(selected) == 0 {
+		return result, nil
+	}
 	for _, environment := range result.Environments {
 		pins, err := db.ListEnvironmentModuleVersionPins(ctx, tx, org, &environment.Uuid, nil, true)
 		if err != nil {

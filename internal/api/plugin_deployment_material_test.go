@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -14,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stellwerk-labs/golib/hecho"
 	iamapi "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
+	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -25,7 +27,7 @@ import (
 
 func TestPluginMaterialUsesIndependentCorePermissionAndNeverServiceIdentity(t *testing.T) {
 	const pluginID = "dev.example.workflow"
-	actor, service, checker := uuid.New(), uuid.NewString(), uuid.NewString()
+	actor, service, checker := uuid.New(), userid.NewServiceUserTokenId().String(), userid.NewServiceUserTokenId().String()
 	project, environment, deployment := uuid.New(), uuid.New(), uuid.New()
 	item := plugins.Installation{ID: pluginID, DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.test", ServiceUserID: service, AdmissionCheckerID: checker, Organizations: map[string]plugins.AvailabilityState{"acme": plugins.StateNotEntitled}, ServiceGrants: []plugins.ServiceGrant{{Action: "external-deployment.read", Permission: "plugin." + pluginID + ".view", Scope: "environment"}}}
 	encoded, err := json.Marshal([]plugins.Installation{item})
@@ -34,7 +36,7 @@ func TestPluginMaterialUsesIndependentCorePermissionAndNeverServiceIdentity(t *t
 	require.NoError(t, err)
 	public, private, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
-	var allowed atomic.Bool
+	var authority atomic.Int32
 	var iamCalls, materialCalls atomic.Int32
 	iam := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		iamCalls.Add(1)
@@ -44,8 +46,10 @@ func TestPluginMaterialUsesIndependentCorePermissionAndNeverServiceIdentity(t *t
 			return
 		}
 		assert.Equal(t, actor, body.UserId)
-		assert.Equal(t, []iamapi.ResourcePermissionCheck{orgCheck("acme", "deployment_read")}, body.Checks, "no plugin capability or cached operation grant authorizes material")
-		if allowed.Load() {
+		environmentChecks := []iamapi.ResourcePermissionCheck{environmentCheck(environment, "deployment_read")}
+		organizationChecks := []iamapi.ResourcePermissionCheck{orgCheck("acme", "deployment_read")}
+		assert.Contains(t, [][]iamapi.ResourcePermissionCheck{environmentChecks, organizationChecks}, body.Checks, "no plugin capability or cached operation grant authorizes material")
+		if authority.Load() == 1 && reflect.DeepEqual(body.Checks, environmentChecks) || authority.Load() == 2 && reflect.DeepEqual(body.Checks, organizationChecks) {
 			w.WriteHeader(http.StatusNoContent)
 		} else {
 			w.WriteHeader(http.StatusForbidden)
@@ -93,7 +97,7 @@ func TestPluginMaterialUsesIndependentCorePermissionAndNeverServiceIdentity(t *t
 	require.Zero(t, materialCalls.Load())
 	require.Equal(t, 403, get(actor.String()).Code)
 	require.Zero(t, materialCalls.Load())
-	allowed.Store(true)
+	authority.Store(1)
 	response := get(actor.String())
 	require.Equal(t, 200, response.Code, response.Body.String())
 	require.True(t, bytes.Equal([]byte(original), response.Body.Bytes()), "original output bytes, no JSON reserialization")
@@ -101,4 +105,8 @@ func TestPluginMaterialUsesIndependentCorePermissionAndNeverServiceIdentity(t *t
 	require.Equal(t, "nosniff", response.Header().Get("X-Content-Type-Options"))
 	require.Contains(t, response.Header().Get("Content-Disposition"), deployment.String()+".json")
 	require.Equal(t, int32(1), materialCalls.Load(), "retained history is readable without entitlement or live Environment lookup")
+	authority.Store(2)
+	response = get(actor.String())
+	require.Equal(t, 200, response.Code, "independent organization authority retains access after Environment IAM relationships are removed")
+	require.Equal(t, int32(2), materialCalls.Load())
 }

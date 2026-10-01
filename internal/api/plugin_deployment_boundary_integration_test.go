@@ -20,6 +20,7 @@ import (
 	"github.com/stellwerk-labs/golib/hecho"
 	dpapi "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v2/genclient"
 	iamapi "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
+	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -38,7 +39,7 @@ import (
 func TestPluginDeploymentBoundaryApprovalAndNoEffectRecovery(t *testing.T) {
 	db, grant := pluginDeploymentBoundaryDatabase(t)
 	env := grant.Intent.Environments[0]
-	service, checker, approver := uuid.NewString(), uuid.NewString(), uuid.New()
+	service, checker, approver := userid.NewServiceUserTokenId().String(), userid.NewServiceUserTokenId().String(), uuid.New()
 	permission := "plugin." + grant.PluginID + ".control"
 	approvalPermission := "plugin." + grant.PluginID + ".approve"
 	item := plugins.Installation{ID: grant.PluginID, DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.test", ServiceUserID: service, AdmissionCheckerID: checker, Organizations: map[string]plugins.AvailabilityState{grant.OrgID: plugins.StateAvailable}, AuthorizationPolicies: []plugins.AuthorizationPolicy{{Permission: permission, Scopes: []string{"environment"}}, {Permission: approvalPermission, Scopes: []string{"environment", "project"}}}, DeploymentApprovalPolicies: map[string]string{"environment": approvalPermission, "project": approvalPermission}}
@@ -185,7 +186,7 @@ func TestPluginDeploymentBoundaryApprovalAndNoEffectRecovery(t *testing.T) {
 	require.Equal(t, 403, response.Code, "admission-checker credentials must not become plugin credentials")
 }
 
-func pluginDeploymentBoundaryDatabase(t *testing.T) (model.Databaser, *model.ExternalOperationGrant) {
+func pluginDeploymentBoundaryDatabase(t *testing.T, extraActions ...string) (model.Databaser, *model.ExternalOperationGrant) {
 	t.Helper()
 	dsn := os.Getenv("PLUGIN_TEST_DATABASE_URL")
 	require.NotEmpty(t, dsn)
@@ -230,6 +231,7 @@ func pluginDeploymentBoundaryDatabase(t *testing.T) (model.Databaser, *model.Ext
 	version := publish("1.1.0")
 	require.NoError(t, tx.Commit())
 	command := model.ExternalGrantCommand{OrgID: org.Id, PluginID: "dev.example.workflow", OperationID: uuid.New(), ActorID: actor, SourceOperation: "prepare", SourceDigest: strings.Repeat("a", 64), RequestID: "prepare", Action: "prepare", Reason: "Prepare", Intent: &model.ExternalOperationIntent{Fingerprint: strings.Repeat("b", 64), Modules: []uuid.UUID{module.UUID}, TargetVersions: map[string]uuid.UUID{module.UUID.String(): version.UUID}, Environments: []model.ExternalOperationEnvironment{{ProjectID: project.Uuid, EnvironmentID: env.Uuid}}, Actions: []string{"external-deployment.admit", "external-deployment.rollback", "external-deployment.read", "external-deployment.withdraw"}}}
+	command.Intent.Actions = append(command.Intent.Actions, extraActions...)
 	grant, err := model.ApplyExternalGrantCommand(ctx, db, command)
 	require.NoError(t, err)
 	command.Intent, command.Action, command.RequestID, command.ExpectedRevision = nil, "activate", "start", grant.Revision

@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"embed"
 	"encoding/json"
+	"errors"
+	"sort"
 	"sync"
 
 	"github.com/google/uuid"
@@ -182,6 +184,65 @@ type TxWithCommit interface {
 	Rollback() error
 }
 
+// journalTransaction keeps the extension projection out of the resource-lock
+// phase. Flushing immediately before the underlying commit preserves the
+// outbox transaction while making the per-organization journal head the final
+// lock class acquired by every application transaction.
+type journalTransaction struct {
+	TxWithCommit
+	ctx       context.Context
+	mu        sync.Mutex
+	finalized bool
+	journal   []extensionResourceJournalEntry
+}
+
+func (t *journalTransaction) insertPendingEventMessages(ctx context.Context, messages []*hstandardoutbox.PendingEventMessage, entries []extensionResourceJournalEntry) ([]*hstandardoutbox.PendingEventMessage, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.finalized {
+		return nil, sql.ErrTxDone
+	}
+	result, err := hstandardoutbox.InsertPendingEventMessages(ctx, t.TxWithCommit, messages)
+	if err != nil {
+		return nil, err
+	}
+	t.journal = append(t.journal, entries...)
+	return result, nil
+}
+
+func (t *journalTransaction) Commit() error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.finalized {
+		return sql.ErrTxDone
+	}
+	t.finalized = true
+	// Stable sorting retains event order within an organization while preventing
+	// two cross-organization transactions from acquiring journal heads in an
+	// inconsistent order.
+	sort.SliceStable(t.journal, func(i, j int) bool { return t.journal[i].orgID < t.journal[j].orgID })
+	for _, entry := range t.journal {
+		if err := journalExtensionResourceEvent(t.ctx, t.TxWithCommit, entry); err != nil {
+			t.journal = nil
+			_ = t.TxWithCommit.Rollback()
+			return err
+		}
+	}
+	t.journal = nil
+	return t.TxWithCommit.Commit()
+}
+
+func (t *journalTransaction) Rollback() error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.finalized {
+		return sql.ErrTxDone
+	}
+	t.finalized = true
+	t.journal = nil
+	return t.TxWithCommit.Rollback()
+}
+
 func (d *databaser) txOrDb(optionalTx Tx) Tx {
 	if optionalTx == nil {
 		return d
@@ -190,7 +251,11 @@ func (d *databaser) txOrDb(optionalTx Tx) Tx {
 }
 
 func (d *databaser) BeginTx(ctx context.Context, opts *sql.TxOptions) (TxWithCommit, error) {
-	return d.DB.BeginTx(ctx, opts)
+	tx, err := d.DB.BeginTx(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	return &journalTransaction{TxWithCommit: tx, ctx: ctx}, nil
 }
 
 func (d *databaser) AsReliableOutboxStore() reliableoutbox.Store[*hstandardoutbox.PendingEventMessage] {
@@ -198,7 +263,36 @@ func (d *databaser) AsReliableOutboxStore() reliableoutbox.Store[*hstandardoutbo
 }
 
 func (d *databaser) InsertPendingEventMessages(ctx context.Context, optionalTx Tx, messages []*hstandardoutbox.PendingEventMessage) ([]*hstandardoutbox.PendingEventMessage, error) {
-	return hstandardoutbox.InsertPendingEventMessages(ctx, d.txOrDb(optionalTx), messages)
+	if optionalTx == nil {
+		tx, err := d.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = tx.Rollback() }()
+		result, err := d.InsertPendingEventMessages(ctx, tx, messages)
+		if err != nil {
+			return nil, err
+		}
+		return result, tx.Commit()
+	}
+	entries := make([]extensionResourceJournalEntry, 0, len(messages))
+	for _, message := range messages {
+		entry, err := projectExtensionResourceEvent(message)
+		if err != nil {
+			return nil, err
+		}
+		if entry != nil {
+			entries = append(entries, *entry)
+		}
+	}
+	journalTx, ok := optionalTx.(*journalTransaction)
+	if len(entries) > 0 && !ok {
+		return nil, errors.New("extension resource events require a Databaser transaction")
+	}
+	if len(entries) > 0 {
+		return journalTx.insertPendingEventMessages(ctx, messages, entries)
+	}
+	return hstandardoutbox.InsertPendingEventMessages(ctx, optionalTx, messages)
 }
 
 type GetMode string

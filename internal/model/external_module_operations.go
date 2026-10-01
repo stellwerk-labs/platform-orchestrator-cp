@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -35,6 +36,8 @@ type ExternalModuleCommand struct {
 	GrantFence    int64                  `json:"grant_fence,omitempty"`
 	Reason        string                 `json:"reason"`
 	Targets       []ExternalModuleTarget `json:"targets"`
+	// Core-only classification, revalidated under the current grant lock.
+	SafetyReserve bool `json:"-"`
 }
 
 type ExternalModuleReceipt struct {
@@ -71,6 +74,9 @@ func ApplyExternalModuleOperation(ctx context.Context, db Databaser, command Ext
 	if !slices.Contains([]string{externalActionReserve, externalActionRelease, externalActionPromote, externalActionRestore}, command.Action) {
 		return nil, NewErrBadRequest("unknown external Module operation")
 	}
+	if command.SafetyReserve && (command.Action != externalActionReserve || command.GrantFence <= 0 || command.ExpectedFence <= 0) {
+		return nil, NewErrConflict("safety reservation requires a retained fenced operation")
+	}
 	command.Targets = slices.Clone(command.Targets)
 	slices.SortFunc(command.Targets, func(a, b ExternalModuleTarget) int {
 		return strings.Compare(a.ModuleUUID.String(), b.ModuleUUID.String())
@@ -105,6 +111,9 @@ func ApplyExternalModuleOperation(ctx context.Context, db Databaser, command Ext
 		}
 		if grant.Revision != command.GrantFence || grant.ActorID != command.ActorID || !slices.Contains(grant.Intent.Actions, "module."+command.Action) {
 			return nil, NewErrConflict("module action is outside the current operation grant")
+		}
+		if command.SafetyReserve && (grant.State != grantStateActive || !grant.SafetyActivation) {
+			return nil, NewErrConflict("safety reservation requires the current verified safety activation")
 		}
 		allowed := grant.State == grantStateActive || command.Action == externalActionReserve && grant.State == grantStatePrepared || command.Action == externalActionRelease && grant.State == grantStateSuspended
 		if !allowed {
@@ -152,8 +161,12 @@ func ApplyExternalModuleOperation(ctx context.Context, db Databaser, command Ext
 	var fence int64
 	var state string
 	var storedIDs pq.StringArray
+	retainActive := false
 	err = tx.QueryRowContext(ctx, `SELECT fence,state,module_uuids FROM external_module_operations WHERE org_id=$1 AND plugin_id=$2 AND operation_id=$3 FOR UPDATE`, command.OrgID, command.PluginID, command.OperationID).Scan(&fence, &state, &storedIDs)
 	if errors.Is(err, sql.ErrNoRows) {
+		if command.SafetyReserve {
+			return nil, NewErrConflict("safety reservation cannot acquire new Module scope")
+		}
 		if command.Action != externalActionReserve || command.ExpectedFence != 0 {
 			return nil, NewErrConflict("operation must acquire its initial reservation first")
 		}
@@ -172,14 +185,28 @@ func ApplyExternalModuleOperation(ctx context.Context, db Databaser, command Ext
 			return nil, NewErrConflict("operation target membership is immutable")
 		}
 		if command.Action == externalActionReserve {
-			if state != externalStateReleased {
+			retainActive = command.SafetyReserve && state == externalStateActive
+			if state != externalStateReleased && !retainActive {
 				return nil, NewErrConflict("operation already holds its reservations")
 			}
-			fence++
+			if !retainActive {
+				fence++
+			}
 		}
 	}
 	if command.Action != externalActionReserve && state != externalStateActive {
 		return nil, NewErrConflict("operation does not hold active reservations")
+	}
+	if command.SafetyReserve {
+		var retained bool
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM external_module_operation_receipts
+			WHERE org_id=$1 AND plugin_id=$2 AND operation_id=$3 AND action='reserve'
+			AND response->>'fence'=$4 AND response->>'state'='active')`, command.OrgID, command.PluginID, command.OperationID, strconv.FormatInt(command.ExpectedFence, 10)).Scan(&retained); err != nil {
+			return nil, err
+		}
+		if !retained {
+			return nil, NewErrConflict("safety reservation requires retained reservation evidence")
+		}
 	}
 	// Lock exact UUIDs in canonical order for every action, including promotion.
 	for _, target := range command.Targets {
@@ -188,7 +215,7 @@ func ApplyExternalModuleOperation(ctx context.Context, db Databaser, command Ext
 			return nil, err
 		}
 		reservationOperationID := uuid.NewSHA1(command.OperationID, []byte(fmt.Sprintf("%s/%s/%d", command.PluginID, target.ModuleUUID, fence)))
-		if command.Action == externalActionReserve {
+		if command.Action == externalActionReserve && !retainActive {
 			if _, err := db.AcquireModuleOperationReservation(ctx, tx, command.OrgID, target.ModuleUUID.String(), command.PluginID, reservationOperationID, command.OperationID.String(), command.Reason, command.ActorID); err != nil {
 				return nil, err
 			}
@@ -203,6 +230,19 @@ func ApplyExternalModuleOperation(ctx context.Context, db Databaser, command Ext
 		})
 		if index < 0 {
 			return nil, NewErrConflict("operation reservation ownership changed")
+		}
+		if retainActive {
+			// A fresh safety controller retains the exact lease already held by
+			// this operation. Never reacquire a missing or externally released
+			// reservation under an unchanged fence.
+			reservation, err := db.GetModuleOperationReservation(ctx, tx, command.OrgID, reservations[index].ID, GetModeForUpdate)
+			if err != nil {
+				return nil, err
+			}
+			if reservation.ReleasedAt != nil || reservation.ModuleUUID != target.ModuleUUID || reservation.Namespace != command.PluginID || reservation.OperationID != reservationOperationID || reservation.RelatedResourceID != command.OperationID.String() {
+				return nil, NewErrConflict("operation reservation ownership changed")
+			}
+			continue
 		}
 		if command.Action == externalActionRelease {
 			reservation := reservations[index]

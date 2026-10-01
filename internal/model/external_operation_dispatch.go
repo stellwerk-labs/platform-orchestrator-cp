@@ -127,10 +127,15 @@ func externalDispatchTransaction(ctx context.Context, db Databaser, dispatch Ext
 		if !reflect.DeepEqual(comparison, dispatch) {
 			return NewErrConflict("dispatch ID belongs to a different exact request")
 		}
-		if state != "active" {
+		if state != admissionStateActive {
 			return NewErrConflict("dispatch is withdrawn or settled; inspect its receipt without retrying execution")
 		}
-		return validateExternalDispatchPins(ctx, db, tx, grant, recorded)
+		if err := validateExternalDispatchPins(ctx, db, tx, grant, recorded); err != nil {
+			return err
+		}
+		// A callback or idempotent replay can also advance the entitlement
+		// clock. Commit that decision at the exact-dispatch authorization point.
+		return tx.Commit()
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return err
@@ -142,6 +147,9 @@ func externalDispatchTransaction(ctx context.Context, db Databaser, dispatch Ext
 		return err
 	}
 	if err := validateExternalDispatchPins(ctx, db, tx, grant, dispatch); err != nil {
+		return err
+	}
+	if _, err := advanceEnvironmentAdmissionEpoch(ctx, tx, dispatch.OrgID, dispatch.EnvironmentUUID); err != nil {
 		return err
 	}
 	_, err = tx.ExecContext(ctx, `INSERT INTO external_operation_dispatches(org_id,plugin_id,operation_id,dispatch_id,fence,action,actor_id,request_digest,intent) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, dispatch.OrgID, dispatch.PluginID, dispatch.OperationID, dispatch.DispatchID, dispatch.Fence, dispatch.Action, dispatch.ActorID, dispatch.RequestDigest, encoded)
@@ -163,6 +171,12 @@ func checkExternalDispatchBarrier(ctx context.Context, tx Tx, org string, enviro
 	}
 	if pending {
 		return NewErrConflict("Environment has an unresolved external Deployment dispatch")
+	}
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM deployment_admission_guards WHERE org_id=$1 AND environment_uuid=$2 AND outcome IS NULL)`, org, environment).Scan(&pending); err != nil {
+		return err
+	}
+	if pending {
+		return NewErrConflict("Environment has an unresolved ordinary Deployment admission")
 	}
 	return nil
 }

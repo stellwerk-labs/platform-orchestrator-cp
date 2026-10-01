@@ -59,8 +59,8 @@ func (s *Server) CheckPluginAuthorization(ctx context.Context, request CheckPlug
 			return nil, pluginBoundaryError(403, "plugin_actor_forbidden", "An authenticated delegated actor is required.")
 		}
 	} else {
-		if descriptor.State != plugins.StateAvailable && descriptor.State != plugins.StateNotEnabled && descriptor.State != plugins.StateNotEntitled {
-			return nil, pluginBoundaryError(409, "plugin_"+string(descriptor.State), "The plugin cannot check authorization in its current availability state.")
+		if err := pluginServiceAllowed(item, descriptor, pluginAuthorizationCheckAction, false, false); err != nil {
+			return nil, err
 		}
 		grant, err := model.GetExternalOperationGrant(ctx, s.Database, request.OrgId, request.PluginId, *body.OperationId)
 		if errors.Is(err, sql.ErrNoRows) {

@@ -6,6 +6,7 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/stellwerk-labs/golib/hecho"
 	"github.com/stellwerk-labs/golib/hmessaging"
@@ -23,15 +24,17 @@ import (
 //go:generate go tool oapi-codegen --config=oapi-codegen.cfg.yaml --exclude-tags not-implemented ../../openapi/spec.yaml
 
 type Server struct {
-	Database        model.Databaser
-	Logger          *zap.Logger
-	Vault           vault.VaultClientInterface
-	Publisher       hmessaging.Publisher
-	DpClient        orchestratordp.ClientWithResponsesInterface
-	IamClient       orchestratoriam.ClientWithResponsesInterface
-	Plugins         plugins.Registry
-	PluginGateway   *plugins.Gateway
-	PluginDataPlane *plugins.DataPlanePort
+	Database                      model.Databaser
+	Logger                        *zap.Logger
+	Vault                         vault.VaultClientInterface
+	Publisher                     hmessaging.Publisher
+	DpClient                      orchestratordp.ClientWithResponsesInterface
+	IamClient                     orchestratoriam.ClientWithResponsesInterface
+	Plugins                       plugins.Registry
+	PluginGateway                 *plugins.Gateway
+	PluginDataPlane               *plugins.DataPlanePort
+	PluginEntitlements            PluginEntitlementGuard
+	DeploymentAdmissionIdentities map[string]uuid.UUID
 }
 
 func (s *Server) MapRoutes(e *echo.Echo) {

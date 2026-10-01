@@ -17,6 +17,7 @@ const (
 	eventFieldActorType         = "actor_type"
 	eventFieldBulkOperationID   = "bulk_operation_id"
 	eventFieldEnvironmentUUID   = "environment_uuid"
+	eventFieldEventType         = "event_type"
 	eventFieldPinID             = "pin_id"
 	eventFieldProjectUUID       = "project_uuid"
 	eventFieldRevision          = "revision"
@@ -171,7 +172,8 @@ func (d *databaser) CreateEnvironmentModuleVersionPin(ctx context.Context, tx Tx
 		eventFieldOrgID: orgID, eventFieldPinID: pin.ID, eventFieldEnvironmentUUID: environmentUUID, eventFieldProjectUUID: projectUUID,
 		eventFieldModuleUUID: moduleUUID, eventFieldVersionUUID: versionUUID, eventFieldTransitionID: activationEventID,
 		eventFieldRevision: pin.ResourceVersion, eventFieldToStatus: pin.Status, eventFieldActivationEventID: pin.ActivationEventID,
-		eventFieldActor: actor, eventFieldActorType: actorType, eventFieldReason: reason, eventFieldBulkOperationID: bulkOperationID,
+		eventFieldEventType: "created",
+		eventFieldActor:     actor, eventFieldActorType: actorType, eventFieldReason: reason, eventFieldBulkOperationID: bulkOperationID,
 	}); err != nil {
 		return nil, err
 	}
@@ -257,6 +259,7 @@ func (d *databaser) TransitionEnvironmentModuleVersionPin(ctx context.Context, t
 		eventFieldOrgID: orgID, eventFieldPinID: updated.ID, eventFieldEnvironmentUUID: updated.EnvironmentUUID,
 		eventFieldProjectUUID: updated.ProjectUUID, eventFieldModuleUUID: updated.ModuleUUID, eventFieldVersionUUID: updated.VersionUUID,
 		eventFieldTransitionID: eventID, eventFieldRevision: eventRevision, eventFieldFromStatus: pin.Status, eventFieldToStatus: updated.Status,
+		eventFieldEventType:         eventType,
 		eventFieldActivationEventID: updated.ActivationEventID, eventFieldActor: actor, eventFieldActorType: actorType, eventFieldReason: reason,
 		"operation_id": operationID, "deployment_id": deploymentID, eventFieldBulkOperationID: updated.BulkOperationID,
 	}); err != nil {
@@ -310,7 +313,7 @@ func (d *databaser) AppendModuleVersionPinNote(ctx context.Context, tx Tx, orgID
 	if err := d.appendModuleCoreOutboxEvent(ctx, tx, "io.platform-orchestrator.module.version.pin-lifecycle-changed", map[string]any{
 		eventFieldOrgID: orgID, eventFieldPinID: pin.ID, eventFieldEnvironmentUUID: pin.EnvironmentUUID,
 		eventFieldProjectUUID: pin.ProjectUUID, eventFieldModuleUUID: pin.ModuleUUID, eventFieldVersionUUID: pin.VersionUUID,
-		eventFieldTransitionID: event.ID, eventFieldRevision: event.Revision, "event_type": event.EventType,
+		eventFieldTransitionID: event.ID, eventFieldRevision: event.Revision, eventFieldEventType: event.EventType,
 		eventFieldFromStatus: pin.Status, eventFieldToStatus: pin.Status, eventFieldActivationEventID: pin.ActivationEventID,
 		eventFieldActor: actor, eventFieldActorType: actorType, "note": note, eventFieldBulkOperationID: pin.BulkOperationID,
 	}); err != nil {

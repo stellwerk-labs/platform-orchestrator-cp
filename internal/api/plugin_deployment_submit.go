@@ -86,7 +86,7 @@ func (s *Server) SubmitPluginDeployment(ctx context.Context, request SubmitPlugi
 	if err := s.authorizePluginDispatchApproval(ctx, item, dispatch); err != nil {
 		return nil, err
 	}
-	if err := model.RecordExternalDispatch(ctx, s.Database, dispatch); err != nil {
+	if err := model.RecordExternalDispatch(ctx, s.pluginEffectDatabase(request.OrgId, item, action, body.Mode == PluginDeploymentSubmitModeRollback), dispatch); err != nil {
 		return nil, pluginModelError(err)
 	}
 	result, err := s.PluginDataPlane.Call(ctx, plugins.DataPlaneRequest{OrgID: request.OrgId, PluginID: item.ID, ActorID: grant.ActorID, Action: "external-deployment.admit", RequestID: body.RequestId, Body: encoded})
@@ -118,13 +118,12 @@ func validatePluginDeploymentSubmit(body PluginDeploymentSubmitRequest) error {
 
 func (s *Server) authorizePluginEnvironmentOperation(ctx context.Context, org string, item plugins.Installation, descriptor plugins.Descriptor, operation uuid.UUID, fence int64, environmentID uuid.UUID, action string, safety bool) (*model.ExternalOperationGrant, pluginDeploymentEnvironment, error) {
 	empty := pluginDeploymentEnvironment{}
-	allowed := descriptor.State == plugins.StateAvailable || safety && (descriptor.State == plugins.StateNotEnabled || descriptor.State == plugins.StateNotEntitled)
-	if !allowed {
-		return nil, empty, pluginBoundaryError(409, "plugin_"+string(descriptor.State), "The plugin cannot perform this operation in its current availability state.")
-	}
 	policy, ok := item.ServiceGrant(action)
 	if !ok {
 		return nil, empty, pluginBoundaryError(403, "plugin_service_forbidden", "The installation does not declare this service action.")
+	}
+	if err := pluginFeatureAllowed(descriptor, policy.RequiredFeature, true, safety); err != nil {
+		return nil, empty, err
 	}
 	grant, err := model.GetExternalOperationGrant(ctx, s.Database, org, item.ID, operation)
 	if err != nil {
@@ -201,7 +200,7 @@ func (s *Server) ReconcilePluginDeployment(ctx context.Context, request Reconcil
 	if request.Body.Withdraw {
 		// Commit withdrawal before DP receipt acquisition. Holding a Core lock
 		// across the HTTP request would deadlock DP's admission callback.
-		if err := model.WithdrawExternalDispatch(ctx, s.Database, request.OrgId, item.ID, request.OperationId, request.DispatchId); err != nil {
+		if err := model.WithdrawExternalDispatch(ctx, s.pluginEffectDatabase(request.OrgId, item, action, true), request.OrgId, item.ID, request.OperationId, request.DispatchId); err != nil {
 			return nil, pluginModelError(err)
 		}
 	}
@@ -229,7 +228,7 @@ func (s *Server) ReconcilePluginDeployment(ctx context.Context, request Reconcil
 		settle = slices.Contains([]string{"succeeded", "failed", "cancelled", "terminated"}, string(receipt.Status))
 	}
 	if settle {
-		if err := model.CompleteExternalDispatch(ctx, s.Database, request.OrgId, item.ID, request.OperationId, request.DispatchId, evidence); err != nil {
+		if err := model.CompleteExternalDispatch(ctx, s.pluginEffectDatabase(request.OrgId, item, action, true), request.OrgId, item.ID, request.OperationId, request.DispatchId, evidence); err != nil {
 			return nil, pluginModelError(err)
 		}
 	}

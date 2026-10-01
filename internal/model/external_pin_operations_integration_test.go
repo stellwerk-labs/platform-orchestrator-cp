@@ -4,12 +4,78 @@ package model
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
 	"github.com/stretchr/testify/require"
 )
+
+func TestExternalPinReceiptRecoveryDoesNotRepeatOrRenewCommand(t *testing.T) {
+	db := externalOperationDatabase(t)
+	control, grant, command := externalPinFixture(t, db)
+	absent, current, err := GetExternalPinReceipt(t.Context(), db, grant.OrgID, grant.PluginID, grant.OperationID, command.RequestID, grant.Revision)
+	require.NoError(t, err)
+	require.Nil(t, absent)
+	require.Equal(t, grant, current)
+	pins, err := ApplyExternalPinCommand(t.Context(), db, command, nil)
+	require.NoError(t, err)
+	control.Action, control.RequestID, control.ExpectedRevision = "suspend", "pause-after-core-commit", grant.Revision
+	grant, err = ApplyExternalGrantCommand(t.Context(), db, control)
+	require.NoError(t, err)
+	_, _, err = GetExternalPinReceipt(t.Context(), db, grant.OrgID, grant.PluginID, grant.OperationID, command.RequestID, command.GrantFence)
+	require.ErrorContains(t, err, "current operation fence")
+	receipt, current, err := GetExternalPinReceipt(t.Context(), db, grant.OrgID, grant.PluginID, grant.OperationID, command.RequestID, grant.Revision)
+	require.NoError(t, err)
+	require.Equal(t, "begin", receipt.Action)
+	require.Equal(t, command.OperationID, receipt.OperationID)
+	require.Equal(t, command.RequestID, receipt.RequestID)
+	require.Equal(t, pins, receipt.Pins)
+	require.Equal(t, grant, current, "reading must not reactivate or renew a grant")
+	cancel := command
+	cancel.GrantFence, cancel.Action, cancel.RequestID, cancel.Targets = grant.Revision, "cancel", "cancel-after-recovery", nil
+	for _, pin := range pins {
+		cancel.Targets = append(cancel.Targets, ExternalPinTarget{PinID: pin.ID, ExpectedResourceVersion: pin.ResourceVersion})
+	}
+	_, err = ApplyExternalPinCommand(t.Context(), db, cancel, nil)
+	require.NoError(t, err)
+	recovered, _, err := GetExternalPinReceipt(t.Context(), db, grant.OrgID, grant.PluginID, grant.OperationID, command.RequestID, grant.Revision)
+	require.NoError(t, err)
+	require.Equal(t, receipt, recovered, "a receipt must retain the original result, not return later live Pin state")
+	for _, pin := range pins {
+		live, err := db.GetEnvironmentModuleVersionPin(t.Context(), nil, grant.OrgID, pin.ID, GetModeDefault)
+		require.NoError(t, err)
+		require.Equal(t, moduleversions.PinActive, live.Status)
+		require.Equal(t, pin.ResourceVersion+1, live.ResourceVersion, "recovery must append no event or revision")
+	}
+	for _, identity := range []struct {
+		org, plugin string
+		operation   uuid.UUID
+	}{{"other", grant.PluginID, grant.OperationID}, {grant.OrgID, "dev.other.workflow", grant.OperationID}, {grant.OrgID, grant.PluginID, uuid.New()}} {
+		_, _, err := GetExternalPinReceipt(t.Context(), db, identity.org, identity.plugin, identity.operation, command.RequestID, grant.Revision)
+		require.Error(t, err)
+	}
+}
+
+func TestExternalPinLegacyReceiptOnlyAllowsExactReplay(t *testing.T) {
+	db := externalOperationDatabase(t)
+	_, grant, command := externalPinFixture(t, db)
+	pins, err := ApplyExternalPinCommand(t.Context(), db, command, nil)
+	require.NoError(t, err)
+	legacy, err := json.Marshal(pins)
+	require.NoError(t, err)
+	tx, err := db.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	_, err = tx.ExecContext(t.Context(), `UPDATE module_core_commands SET response=$1 WHERE org_id=$2 AND command_scope=$3 AND idempotency_key=$4`, legacy, grant.OrgID, externalPinCommandScope(grant.PluginID, grant.OperationID), command.RequestID)
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
+	replayed, err := ApplyExternalPinCommand(t.Context(), db, command, nil)
+	require.NoError(t, err)
+	require.Equal(t, pins, replayed)
+	_, _, err = GetExternalPinReceipt(t.Context(), db, grant.OrgID, grant.PluginID, grant.OperationID, command.RequestID, grant.Revision)
+	require.ErrorContains(t, err, "no recoverable action metadata", "recovery must not guess an earlier receipt's action")
+}
 
 func externalPinFixture(t *testing.T, db Databaser) (ExternalGrantCommand, *ExternalOperationGrant, ExternalPinCommand) {
 	t.Helper()

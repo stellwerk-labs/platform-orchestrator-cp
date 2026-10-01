@@ -9,13 +9,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/plugincontext"
+	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/require"
 )
 
 func TestServiceDelegationBindsCallerActionAndExactOriginalRequest(t *testing.T) {
 	_, key, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
-	item := Installation{ID: "dev.example.workflow", DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.example.test", ServiceUserID: uuid.NewString(), AdmissionCheckerID: uuid.NewString(), Organizations: map[string]AvailabilityState{"acme": StateAvailable}, ServiceGrants: []ServiceGrant{{Action: "operation.prepare", Permission: "plugin.dev.example.workflow.design", Scope: "organization"}}, Operations: []Operation{{ID: "prepare", Method: "POST", Path: "/orgs/{orgId}/workflows/{id}/prepare", Mutating: true, ServiceActions: []string{"operation.prepare"}}}}
+	item := Installation{ID: "dev.example.workflow", DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.example.test", ServiceUserID: userid.NewServiceUserTokenId().String(), AdmissionCheckerID: userid.NewServiceUserTokenId().String(), Organizations: map[string]AvailabilityState{"acme": StateAvailable}, ServiceGrants: []ServiceGrant{{Action: "operation.prepare", Permission: "plugin.dev.example.workflow.design", Scope: "organization"}}, Operations: []Operation{{ID: "prepare", Method: "POST", Path: "/orgs/{orgId}/workflows/{id}/prepare", Mutating: true, ServiceActions: []string{"operation.prepare"}}}}
 	encoded, err := json.Marshal([]Installation{item})
 	require.NoError(t, err)
 	registry, err := LoadInstallations(strings.NewReader(string(encoded)), false)
@@ -58,7 +59,7 @@ func TestServiceDelegationBindsCallerActionAndExactOriginalRequest(t *testing.T)
 func TestServiceDelegationCannotExchangeCancelForActivation(t *testing.T) {
 	_, key, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
-	item := Installation{ID: "dev.example.workflow", DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.example.test", ServiceUserID: uuid.NewString(), AdmissionCheckerID: uuid.NewString(), Organizations: map[string]AvailabilityState{"acme": StateNotEntitled}, ServiceGrants: []ServiceGrant{
+	item := Installation{ID: "dev.example.workflow", DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.example.test", ServiceUserID: userid.NewServiceUserTokenId().String(), AdmissionCheckerID: userid.NewServiceUserTokenId().String(), Organizations: map[string]AvailabilityState{"acme": StateNotEntitled}, ServiceGrants: []ServiceGrant{
 		{Action: "operation.activate", Permission: "plugin.dev.example.workflow.control", Scope: "organization"},
 		{Action: "operation.release", Permission: "plugin.dev.example.workflow.control", Scope: "organization"},
 	}, Operations: []Operation{{ID: "command", Method: "POST", Path: "/orgs/{orgId}/workflows/{id}/{command}", Mutating: true, ServiceActions: []string{"operation.activate", "operation.release"}, SafetyPathValues: map[string][]string{"command": {"cancel"}}, ServiceActionPathValues: map[string]map[string][]string{
@@ -84,7 +85,7 @@ func TestServiceDelegationCannotExchangeCancelForActivation(t *testing.T) {
 func TestReadDelegationCannotAuthorizeMutation(t *testing.T) {
 	_, key, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
-	item := Installation{ID: "dev.example.workflow", DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.example.test", ServiceUserID: uuid.NewString(), AdmissionCheckerID: uuid.NewString(), Organizations: map[string]AvailabilityState{"acme": StateNotEntitled}, ServiceGrants: []ServiceGrant{{Action: "inventory.read", Permission: "plugin.dev.example.workflow.read", Scope: "organization"}}, Operations: []Operation{{ID: "read", Method: "GET", Path: "/orgs/{orgId}/workflows", ServiceActions: []string{"inventory.read"}}}}
+	item := Installation{ID: "dev.example.workflow", DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.example.test", ServiceUserID: userid.NewServiceUserTokenId().String(), AdmissionCheckerID: userid.NewServiceUserTokenId().String(), Organizations: map[string]AvailabilityState{"acme": StateNotEntitled}, ServiceGrants: []ServiceGrant{{Action: "inventory.read", Permission: "plugin.dev.example.workflow.read", Scope: "organization"}}, Operations: []Operation{{ID: "read", Method: "GET", Path: "/orgs/{orgId}/workflows", ServiceActions: []string{"inventory.read"}}}}
 	encoded, err := json.Marshal([]Installation{item})
 	require.NoError(t, err)
 	registry, err := LoadInstallations(strings.NewReader(string(encoded)), false)

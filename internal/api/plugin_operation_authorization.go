@@ -19,12 +19,20 @@ func pluginProofFromAPI(proof PluginDelegationProof) plugins.DelegationProof {
 }
 
 func (s *Server) GetPluginOperationGrant(ctx context.Context, request GetPluginOperationGrantRequestObject) (GetPluginOperationGrantResponseObject, error) {
-	if _, _, err := s.pluginInstallationCaller(ctx, request.OrgId, request.PluginId, false); err != nil {
+	item, descriptor, err := s.pluginInstallationCaller(ctx, request.OrgId, request.PluginId, false)
+	if err != nil {
 		return nil, err
 	}
 	grant, err := model.GetExternalOperationGrant(ctx, s.Database, request.OrgId, request.PluginId, request.OperationId)
 	if err != nil {
 		return nil, pluginModelError(err)
+	}
+	if item.Entitlement != nil && item.Entitlement.Mode == "required" {
+		for _, action := range grant.Intent.Actions {
+			if err := pluginServiceAllowed(item, descriptor, action, false, false); err != nil {
+				return nil, err
+			}
+		}
 	}
 	encoded, err := json.Marshal(grant)
 	if err != nil {
@@ -34,6 +42,9 @@ func (s *Server) GetPluginOperationGrant(ctx context.Context, request GetPluginO
 	if err := json.Unmarshal(encoded, &response); err != nil {
 		return nil, err
 	}
+	availability := PluginAvailabilityState(descriptor.State)
+	response.Availability = &availability
+	response.Entitlement = pluginEntitlementToAPI(descriptor.Entitlement)
 	return response, nil
 }
 
@@ -101,7 +112,13 @@ func (s *Server) AuthorizePluginOperation(ctx context.Context, request Authorize
 	if err := s.pluginAuthorize(ctx, actor, checks); err != nil {
 		return nil, err
 	}
-	grant, err := model.ApplyExternalGrantCommand(ctx, s.Database, command)
+	// Verification binds the source operation, exact path and permitted service
+	// action. A safety command can reactivate its frozen grant for rollback, but
+	// preparing a new intent always requires forward entitlement. Every later
+	// Core effect independently checks its own action class.
+	safety := body.Action != "prepare" && source.IsSafety(proof.PathParameters)
+	command.SafetyActivation = body.Action == "activate" && safety
+	grant, err := model.ApplyExternalGrantCommand(ctx, s.pluginEffectDatabase(request.OrgId, item, action, safety), command)
 	if err != nil {
 		return nil, pluginModelError(err)
 	}

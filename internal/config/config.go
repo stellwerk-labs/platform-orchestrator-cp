@@ -39,10 +39,16 @@ type Configuration struct {
 	PluginIssuer            string `env:"PLUGIN_ISSUER, default=stellwerk-control-plane"`
 	PluginDevelopmentHTTP   bool   `env:"PLUGIN_DEVELOPMENT_HTTP, default=false"`
 	PluginCAFile            string `env:"PLUGIN_CA_FILE"`
+	// Entitlement trust is independent of package, transport and identity keys.
+	// Production rejects development issuers even when signatures are valid.
+	PluginEntitlementMode       string `env:"PLUGIN_ENTITLEMENT_MODE, default=production" validate:"oneof=production development"`
+	PluginEntitlementTrustFile  string `env:"PLUGIN_ENTITLEMENT_TRUST_FILE"`
+	PluginEntitlementBundleFile string `env:"PLUGIN_ENTITLEMENT_BUNDLE_FILE"`
 	// PluginDataPlaneInternalHTTP permits only the fixed Core-to-DP origin in
 	// an operator-declared trusted cluster network. It never permits HTTP
 	// plugin backends or service-user bearer credentials over HTTP.
-	PluginDataPlaneInternalHTTP bool `env:"PLUGIN_DATA_PLANE_INTERNAL_HTTP, default=false"`
+	PluginDataPlaneInternalHTTP       bool   `env:"PLUGIN_DATA_PLANE_INTERNAL_HTTP, default=false"`
+	DeploymentAdmissionIdentitiesFile string `env:"DEPLOYMENT_ADMISSION_IDENTITIES_FILE"`
 
 	VaultURL  string `env:"VAULT_URL" validate:"url"`
 	VaultAuth string `env:"VAULT_AUTH" validate:"required"`

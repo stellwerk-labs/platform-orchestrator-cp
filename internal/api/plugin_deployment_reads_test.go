@@ -12,16 +12,17 @@ import (
 	"github.com/stellwerk-labs/golib/hecho"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/api/middleware"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
+	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
 func TestPluginDeploymentReadRejectsUndelegatedInspection(t *testing.T) {
 	const pluginID = "dev.example.workflow"
-	service := uuid.NewString()
+	service := userid.NewServiceUserTokenId().String()
 	_, key, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
-	item := plugins.Installation{ID: pluginID, DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.example.test", ServiceUserID: service, AdmissionCheckerID: uuid.NewString(), Organizations: map[string]plugins.AvailabilityState{"acme": plugins.StateAvailable},
+	item := plugins.Installation{ID: pluginID, DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.example.test", ServiceUserID: service, AdmissionCheckerID: userid.NewServiceUserTokenId().String(), Organizations: map[string]plugins.AvailabilityState{"acme": plugins.StateAvailable},
 		ServiceGrants: []plugins.ServiceGrant{{Action: "external-deployment.readiness", Permission: "plugin." + pluginID + ".view", Scope: "environment"}},
 		Operations:    []plugins.Operation{{ID: "preview", Method: "POST", Path: "/orgs/{orgId}/preview", ServiceActions: []string{"external-deployment.readiness"}}},
 	}

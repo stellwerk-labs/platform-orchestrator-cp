@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 )
 
@@ -22,23 +21,23 @@ func (s *Server) ApplyPluginModuleOperation(ctx context.Context, request ApplyPl
 	if !ok || policy.Scope != pluginOrganizationScope {
 		return nil, pluginBoundaryError(403, "plugin_service_forbidden", "An organization-scoped Module service grant is required.")
 	}
-	safety := action == "release" || action == "restore"
-	allowed := descriptor.State == plugins.StateAvailable || safety && (descriptor.State == plugins.StateNotEnabled || descriptor.State == plugins.StateNotEntitled)
-	if !allowed {
-		return nil, pluginBoundaryError(409, "plugin_"+string(descriptor.State), "The plugin cannot perform this Module action in its current availability state.")
-	}
 	grant, err := model.GetExternalOperationGrant(ctx, s.Database, request.OrgId, request.PluginId, request.OperationId)
 	if err != nil {
 		return nil, pluginModelError(err)
 	}
+	safetyReserve := action == "reserve" && grant.State == string(PluginOperationGrantStateActive) && grant.Revision == request.Body.GrantFence && grant.SafetyActivation
+	safety := action == "release" || action == "restore" || safetyReserve
+	if err := pluginFeatureAllowed(descriptor, policy.RequiredFeature, true, safety); err != nil {
+		return nil, err
+	}
 	if err := s.pluginAuthorize(ctx, grant.ActorID, []orchestratoriam.ResourcePermissionCheck{orgCheck(request.OrgId, policy.Permission)}); err != nil {
 		return nil, err
 	}
-	command := model.ExternalModuleCommand{OrgID: request.OrgId, PluginID: request.PluginId, OperationID: request.OperationId, ActorID: grant.ActorID, RequestID: request.Body.RequestId, Action: action, ExpectedFence: request.Body.ExpectedFence, GrantFence: request.Body.GrantFence, Reason: request.Body.Reason}
+	command := model.ExternalModuleCommand{OrgID: request.OrgId, PluginID: request.PluginId, OperationID: request.OperationId, ActorID: grant.ActorID, RequestID: request.Body.RequestId, Action: action, ExpectedFence: request.Body.ExpectedFence, GrantFence: request.Body.GrantFence, Reason: request.Body.Reason, SafetyReserve: safetyReserve}
 	for _, target := range request.Body.Targets {
 		command.Targets = append(command.Targets, model.ExternalModuleTarget{ModuleUUID: target.ModuleUuid, VersionUUID: target.VersionUuid, ExpectedDefaultUUID: target.ExpectedDefaultUuid, ExpectedResourceVersion: target.ExpectedResourceVersion})
 	}
-	receipt, err := model.ApplyExternalModuleOperation(ctx, s.Database, command)
+	receipt, err := model.ApplyExternalModuleOperation(ctx, s.pluginEffectDatabase(request.OrgId, item, "module."+action, safety), command)
 	if err != nil {
 		return nil, pluginModelError(err)
 	}

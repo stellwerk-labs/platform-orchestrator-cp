@@ -41,6 +41,20 @@ func pluginModelError(err error) error {
 // Gateway authentication. Neither the legacy organization-token shortcut nor
 // the internal-system identity can authorize this boundary.
 func (s *Server) pluginInstallationCaller(ctx context.Context, org, plugin string, checker bool) (plugins.Installation, plugins.Descriptor, error) {
+	item, descriptor, err := s.pluginConfiguredCaller(ctx, org, plugin, checker)
+	if err != nil {
+		return item, descriptor, err
+	}
+	if item.Entitlement != nil && item.Entitlement.Mode == "required" && descriptor.Mode == plugins.ModeHidden {
+		return plugins.Installation{}, plugins.Descriptor{}, pluginFeatureAllowed(descriptor, "", false, false)
+	}
+	return item, descriptor, nil
+}
+
+// Identity-only lookup also serves the licence preflight. That endpoint must
+// explain a missing licence before an operation grant exists, without granting
+// access to any Core resource or effect.
+func (s *Server) pluginConfiguredCaller(ctx context.Context, org, plugin string, checker bool) (plugins.Installation, plugins.Descriptor, error) {
 	actor, err := GetAuthenticatedUserIdOr401(ctx)
 	if err != nil {
 		return plugins.Installation{}, plugins.Descriptor{}, err
@@ -48,7 +62,7 @@ func (s *Server) pluginInstallationCaller(ctx context.Context, org, plugin strin
 	if s.PluginGateway == nil || s.PluginGateway.Registry == nil {
 		return plugins.Installation{}, plugins.Descriptor{}, pluginBoundaryError(404, "plugin_not_installed", "The plugin is not installed.")
 	}
-	item, descriptor, found := s.PluginGateway.Registry.Installation(ctx, org, plugin)
+	item, found := s.PluginGateway.Registry.ConfiguredInstallation(org, plugin)
 	identity := item.ServiceUserID
 	if checker {
 		identity = item.AdmissionCheckerID
@@ -57,6 +71,7 @@ func (s *Server) pluginInstallationCaller(ctx context.Context, org, plugin strin
 		return plugins.Installation{}, plugins.Descriptor{}, pluginBoundaryError(403, "plugin_service_forbidden", "The configured plugin service identity is required.")
 	}
 	middleware.SetAuthCheckedCtx(ctx)
+	descriptor, _ := s.PluginGateway.Registry.Get(ctx, org, plugin)
 	return item, descriptor, nil
 }
 
@@ -106,9 +121,8 @@ func (s *Server) CheckPluginOperationDispatch(ctx context.Context, request Check
 		return nil, pluginBoundaryError(403, "plugin_service_forbidden", "The installation has no grant for this service action.")
 	}
 	safety := action == "external-deployment.rollback"
-	allowed := descriptor.State == plugins.StateAvailable || safety && (descriptor.State == plugins.StateNotEnabled || descriptor.State == plugins.StateNotEntitled)
-	if !allowed {
-		return nil, pluginBoundaryError(409, "plugin_"+string(descriptor.State), "The plugin cannot perform this operation in its current availability state.")
+	if err := pluginFeatureAllowed(descriptor, policy.RequiredFeature, true, safety); err != nil {
+		return nil, err
 	}
 	grant, err := model.GetExternalOperationGrant(ctx, s.Database, request.OrgId, request.PluginId, request.OperationId)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -132,7 +146,7 @@ func (s *Server) CheckPluginOperationDispatch(ctx context.Context, request Check
 	if err := s.authorizePluginDispatchApproval(ctx, item, *recorded); err != nil {
 		return nil, err
 	}
-	if err := model.CheckExternalDispatch(ctx, s.Database, dispatch); err != nil {
+	if err := model.CheckExternalDispatch(ctx, s.pluginEffectDatabase(request.OrgId, item, action, safety), dispatch); err != nil {
 		if _, ok := model.IsErrConflict(err); ok {
 			return nil, pluginBoundaryError(409, "plugin_dispatch_conflict", "The exact dispatch is no longer authorized at this operation fence.")
 		}

@@ -14,6 +14,7 @@ import (
 
 const (
 	externalPinBegin            = "begin"
+	externalPinCancel           = "cancel"
 	externalDeploymentSucceeded = "succeeded"
 )
 
@@ -36,6 +37,61 @@ type ExternalPinCommand struct {
 	Targets     []ExternalPinTarget `json:"targets"`
 }
 
+// ExternalPinReceipt is a historical command result, not the current Pin state.
+// Retaining the action allows recovery to reauthorize its exact service policy
+// without retaining or replaying the original short-lived user proof.
+type ExternalPinReceipt struct {
+	OperationID uuid.UUID                     `json:"operation_id"`
+	RequestID   string                        `json:"request_id"`
+	Action      string                        `json:"action"`
+	Pins        []EnvironmentModuleVersionPin `json:"pins"`
+}
+
+func externalPinCommandScope(plugin string, operation uuid.UUID) string {
+	return "plugin-pin:" + plugin + ":" + operation.String()
+}
+
+// GetExternalPinReceipt serializes with command application but performs no
+// transition. Absence is only a read result, never permission to repeat begin.
+// The caller must authorize the returned grant's current controller and scope.
+func GetExternalPinReceipt(ctx context.Context, db Databaser, org, plugin string, operation uuid.UUID, request string, fence int64) (*ExternalPinReceipt, *ExternalOperationGrant, error) {
+	if org == "" || !externalPluginIdentity.MatchString(plugin) || operation == uuid.Nil || request == "" || len(request) > 128 || strings.ContainsAny(request, "\r\n") || fence <= 0 {
+		return nil, nil, NewErrBadRequest("exact Pin receipt identity and current fence are required")
+	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := lockExternalGrant(ctx, tx, org, plugin, operation); err != nil {
+		return nil, nil, err
+	}
+	grant, err := readExternalGrant(ctx, tx, org, plugin, operation)
+	if err != nil {
+		return nil, nil, err
+	}
+	if grant.Revision != fence {
+		return nil, nil, NewErrConflict("Pin receipt recovery requires the current operation fence")
+	}
+	_, prior, found, err := db.GetModuleCoreCommand(ctx, tx, org, externalPinCommandScope(plugin, operation), request)
+	if err != nil || !found {
+		return nil, grant, err
+	}
+	var receipt ExternalPinReceipt
+	if err := json.Unmarshal(prior, &receipt); err != nil {
+		return nil, nil, NewErrConflict("Pin receipt has no recoverable action metadata; explicit operator investigation is required")
+	}
+	if receipt.OperationID != operation || receipt.RequestID != request || !slices.Contains([]string{externalPinBegin, "reconcile", externalActionRestore, externalPinCancel}, receipt.Action) || !slices.Contains(grant.Intent.Actions, "pin.override."+receipt.Action) || len(receipt.Pins) == 0 || len(receipt.Pins) > 1000 {
+		return nil, nil, NewErrConflict("Pin receipt does not match the frozen operation")
+	}
+	for _, pin := range receipt.Pins {
+		if pin.ID == uuid.Nil || pin.OrgID != org || !slices.Contains(grant.Intent.Environments, ExternalOperationEnvironment{ProjectID: pin.ProjectUUID, EnvironmentID: pin.EnvironmentUUID}) || grant.Intent.TargetVersions[pin.ModuleUUID.String()] == uuid.Nil {
+			return nil, nil, NewErrConflict("Pin receipt is outside the frozen operation scope")
+		}
+	}
+	return &receipt, grant, nil
+}
+
 // ExternalPinEvidence is resolved by the trusted Core adapter, never decoded
 // from a plugin request. Success includes the current effective version, so an
 // intervening Deployment cannot be mistaken for completion of the override.
@@ -48,6 +104,7 @@ type ExternalPinEvidence struct {
 	Mode              string
 	ModuleVersions    map[uuid.UUID]uuid.UUID
 	EffectiveVersions map[uuid.UUID]uuid.UUID
+	AdmissionEpoch    int64
 }
 
 type ExternalPinEvidenceReader func(context.Context, Tx, *ExternalOperationGrant, EnvironmentModuleVersionPin, uuid.UUID) (ExternalPinEvidence, error)
@@ -60,7 +117,7 @@ func ApplyExternalPinCommand(ctx context.Context, db Databaser, command External
 	if command.OrgID == "" || !externalPluginIdentity.MatchString(command.PluginID) || command.OperationID == uuid.Nil || command.ActorID == uuid.Nil || command.ActorID.String() == "ffffffff-ffff-ffff-ffff-ffffffffffff" || command.GrantFence <= 0 || command.RequestID == "" || len(command.RequestID) > 128 || strings.ContainsAny(command.RequestID, "\r\n") || strings.TrimSpace(command.Reason) == "" || len(command.Targets) == 0 || len(command.Targets) > 1000 {
 		return nil, NewErrBadRequest("exact bounded Pin command identity and targets are required")
 	}
-	if command.Action != externalPinBegin && command.Action != "reconcile" && command.Action != externalActionRestore && command.Action != "cancel" {
+	if command.Action != externalPinBegin && command.Action != "reconcile" && command.Action != externalActionRestore && command.Action != externalPinCancel {
 		return nil, NewErrBadRequest("unsupported operation-bound Pin action")
 	}
 	tx, err := db.BeginTx(ctx, nil)
@@ -125,7 +182,7 @@ func ApplyExternalPinCommand(ctx context.Context, db Databaser, command External
 		return nil, err
 	}
 	fingerprint := fmt.Sprintf("%x", sha256.Sum256(encoded))
-	scope := "plugin-pin:" + command.PluginID + ":" + command.OperationID.String()
+	scope := externalPinCommandScope(command.PluginID, command.OperationID)
 	priorFingerprint, prior, found, err := db.GetModuleCoreCommand(ctx, tx, command.OrgID, scope, command.RequestID)
 	if err != nil {
 		return nil, err
@@ -134,11 +191,21 @@ func ApplyExternalPinCommand(ctx context.Context, db Databaser, command External
 		if fingerprint != priorFingerprint {
 			return nil, NewErrConflict("Pin request identity was used by another command or actor")
 		}
+		// Earlier experiment receipts contained only the Pin array. Exact
+		// actor-bound replay remains compatible; read-only recovery requires
+		// the action metadata of the new envelope and never guesses it.
 		var result []EnvironmentModuleVersionPin
-		if err := json.Unmarshal(prior, &result); err != nil {
+		if len(prior) > 0 && prior[0] == '[' {
+			if err := json.Unmarshal(prior, &result); err != nil {
+				return nil, err
+			}
+			return result, nil
+		}
+		var receipt ExternalPinReceipt
+		if err := json.Unmarshal(prior, &receipt); err != nil {
 			return nil, err
 		}
-		return result, nil
+		return receipt.Pins, nil
 	}
 	result := make([]EnvironmentModuleVersionPin, 0, len(pins))
 	for i, pin := range pins {
@@ -153,7 +220,8 @@ func ApplyExternalPinCommand(ctx context.Context, db Databaser, command External
 		}
 		result = append(result, *updated)
 	}
-	if err := db.StoreModuleCoreCommand(ctx, tx, command.OrgID, scope, command.RequestID, fingerprint, command.ActorID, result); err != nil {
+	receipt := ExternalPinReceipt{OperationID: command.OperationID, RequestID: command.RequestID, Action: command.Action, Pins: result}
+	if err := db.StoreModuleCoreCommand(ctx, tx, command.OrgID, scope, command.RequestID, fingerprint, command.ActorID, receipt); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -186,7 +254,7 @@ func externalPinDecision(ctx context.Context, db Databaser, tx Tx, grant *Extern
 	if pin.OverrideOperationID == nil || *pin.OverrideOperationID != command.OperationID || pin.Status == moduleversions.PinRemoved {
 		return deny("Pin is not owned by this operation or was explicitly removed")
 	}
-	if command.Action == "cancel" {
+	if command.Action == externalPinCancel {
 		if pin.Status != moduleversions.PinOverridePending || target.DeploymentID != uuid.Nil || target.TargetVersionUUID != uuid.Nil {
 			return deny("only an unstarted pending override may be cancelled")
 		}
@@ -209,8 +277,13 @@ func externalPinDecision(ctx context.Context, db Databaser, tx Tx, grant *Extern
 	if evidence.OperationID != command.OperationID || evidence.DeploymentID != target.DeploymentID || evidence.EnvironmentUUID != pin.EnvironmentUUID || evidence.ProjectUUID != pin.ProjectUUID {
 		return deny("Deployment evidence belongs to another operation or Environment")
 	}
+	if evidence.Status == externalDeploymentSucceeded {
+		if err := CheckEnvironmentAdmissionEpoch(ctx, db, tx, command.OrgID, pin.EnvironmentUUID, evidence.AdmissionEpoch); err != nil {
+			return "", "", nil, nil, err
+		}
+	}
 	if command.Action == externalActionRestore {
-		if pin.Status != moduleversions.PinOverridden || evidence.Status != externalDeploymentSucceeded || evidence.Mode != "rollback" || evidence.ModuleVersions[pin.ModuleUUID] != pin.VersionUUID || evidence.EffectiveVersions[pin.ModuleUUID] != pin.VersionUUID {
+		if pin.Status != moduleversions.PinOverridden || evidence.Status != externalDeploymentSucceeded || evidence.Mode != deploymentModeRollback || evidence.ModuleVersions[pin.ModuleUUID] != pin.VersionUUID || evidence.EffectiveVersions[pin.ModuleUUID] != pin.VersionUUID {
 			return deny("successful Rollback has not restored the exact pinned version")
 		}
 		return moduleversions.PinActive, "restored_after_rollback", nil, &target.DeploymentID, nil
@@ -224,7 +297,7 @@ func externalPinDecision(ctx context.Context, db Databaser, tx Tx, grant *Extern
 			return deny("successful Deployment has not activated the exact override target")
 		}
 		return moduleversions.PinOverridden, "override_succeeded", pin.OverrideTargetVersionUUID, &target.DeploymentID, nil
-	case "failed", "cancelled", "terminated":
+	case deploymentOutcomeFailed, deploymentOutcomeCancelled, deploymentOutcomeTerminated:
 		return moduleversions.PinActive, "override_failed", nil, &target.DeploymentID, nil
 	default:
 		return deny("Deployment outcome is not terminal")

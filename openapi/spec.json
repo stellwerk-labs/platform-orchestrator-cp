@@ -5,6 +5,265 @@
     "version": ""
   },
   "paths": {
+    "/orgs/{orgId}/plugins/{pluginId}/entitlement": {
+      "get": {
+        "operationId": "getPluginEntitlement",
+        "summary": "Read this installation's current offline licence decision as its configured service.",
+        "description": "Only the exact configured plugin service identity may read this non-secret preflight, including before an operation grant exists. It exposes no issuer keys, signed documents or Core resource data. This decision never grants IAM authority and is not an execution credential; every Core effect reauthorizes independently. Missing licence and disabled states are returned explicitly so recovery can stop forward work safely.",
+        "tags": [
+          "Plugin"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "name": "pluginId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current scoped plugin availability and entitlement projection, never signed evidence.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginCapability"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/503ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/deployment-admissions/{admissionId}": {
+      "post": {
+        "operationId": "authorizeDeploymentAdmission",
+        "summary": "Protect one ordinary Data Plane admission against concurrent Pin changes.",
+        "description": "Restricted to the operator-bound authenticated Data Plane service. Rechecks the original actor's deployment permission and exact immutable scope. Persists a guard before DP commits a Deployment. No plugin capability grants access. A settled identity can never authorize another Deployment.",
+        "tags": [
+          "Deployment admissions"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "name": "admissionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentAdmissionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Exact active guard. Execution still belongs exclusively to the Data Plane.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentAdmissionReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          },
+          "503": {
+            "$ref": "#/components/responses/503ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/deployment-admissions/{admissionId}/seal-absence": {
+      "post": {
+        "operationId": "sealDeploymentAdmissionAbsence",
+        "summary": "Permanently close an uncommitted admission, including a delayed authorize request.",
+        "description": "Restricted to the operator-bound Data Plane service. DP must first persist exact intent and an absent tombstone under its admission-key lock, proving no Deployment committed. Core stores an immutable absent receipt even if authorize has not arrived, or settles the exact existing active guard. A late authorize can never reopen this identity. Recovery does not recheck the original actor's permission or require a live Environment. Changed intent or a different terminal outcome conflicts. Timeout or a not-found read alone is never absence evidence.",
+        "tags": [
+          "Deployment admissions"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "name": "admissionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentAdmissionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Exact permanent absent receipt. This never creates execution authority.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentAdmissionReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/deployment-admissions/{admissionId}/settle": {
+      "post": {
+        "operationId": "settleDeploymentAdmission",
+        "summary": "Settle an exact ordinary admission from the authenticated Data Plane's durable outcome.",
+        "description": "Only the operator-bound DP service can report authoritative terminal receipt evidence. An absent outcome requires a sealed DP tombstone under the admission-key lock after transaction rollback; timeout is never evidence. The original actor need not retain permissions for safety reconciliation. Scope, request digest and completion are immutable.",
+        "tags": [
+          "Deployment admissions"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "name": "admissionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "project_uuid",
+                  "environment_uuid",
+                  "request_digest",
+                  "outcome"
+                ],
+                "properties": {
+                  "project_uuid": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "environment_uuid": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "request_digest": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "outcome": {
+                    "type": "string",
+                    "enum": [
+                      "succeeded",
+                      "failed",
+                      "cancelled",
+                      "terminated",
+                      "absent"
+                    ],
+                    "x-enum-varnames": [
+                      "AdmissionOutcomeSucceeded",
+                      "AdmissionOutcomeFailed",
+                      "AdmissionOutcomeCancelled",
+                      "AdmissionOutcomeTerminated",
+                      "AdmissionOutcomeAbsent"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Exact immutable completion receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentAdmissionReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
     "/orgs/{orgId}/plugins/{pluginId}/projects/{projectUuid}/envs/{environmentUuid}/deployments/{deploymentId}/{materialKind}": {
       "get": {
         "operationId": "getPluginDeploymentMaterial",
@@ -360,6 +619,86 @@
         }
       }
     },
+    "/orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/pins/receipts/{requestId}": {
+      "get": {
+        "operationId": "getPluginPinOperationReceipt",
+        "summary": "Recover a committed Pin command result without replaying a user proof.",
+        "description": "Requires the configured plugin service, the current operation fence and the current controller's scoped permission for the recorded action. Returns the exact historical result, not live Pin state. Works after suspension or entitlement expiry; never renews authority or performs a transition. A missing receipt does not prove that a request cannot still arrive, and does not authorize a new begin command.",
+        "tags": [
+          "Plugin"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "name": "pluginId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._-]+$"
+            }
+          },
+          {
+            "name": "grant_fence",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exact committed command identity, action and Pin result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginPinOperationReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          },
+          "503": {
+            "$ref": "#/components/responses/503ServiceUnavailable"
+          }
+        }
+      }
+    },
     "/orgs/{orgId}/plugins/{pluginId}/deployment-reads": {
       "post": {
         "operationId": "readPluginDeploymentData",
@@ -615,6 +954,294 @@
           },
           "404": {
             "$ref": "#/components/responses/404NotFound"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/resource-events": {
+      "get": {
+        "operationId": "readPluginResourceEvents",
+        "tags": [
+          "Plugin"
+        ],
+        "description": "Read durable Core resource metadata within a frozen operation. Only the configured plugin service may call; current controller authorization is required, including during safety recovery. Cursors are opaque and scoped to this operation.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "name": "pluginId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Commit-ordered metadata and the next durable cursor. No definitions, notes, logs or outputs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "events",
+                    "next_cursor",
+                    "organization_timezone"
+                  ],
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PluginResourceEvent"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": "string"
+                    },
+                    "organization_timezone": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/events": {
+      "post": {
+        "operationId": "publishPluginEvent",
+        "tags": [
+          "Plugin"
+        ],
+        "description": "Idempotently publish an event through the Core transactional outbox. The event type is plugin.<immutable-plugin-id>.<local-name>, with one non-dotted local name such as rollout-completed, preventing impersonation of Core or nested plugin namespaces. Broker delivery uses io.platform-orchestrator.<event-type> in the existing platform stream without changing the CloudEvent type or payload. Delivery is at least once; consumers deduplicate by event_id. Never include secret values or deployment material.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "name": "pluginId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "event_id",
+                  "grant_fence",
+                  "type",
+                  "occurred_at",
+                  "data"
+                ],
+                "properties": {
+                  "event_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "grant_fence": {
+                    "type": "integer",
+                    "format": "int64",
+                    "minimum": 1
+                  },
+                  "type": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "occurred_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Publication durably accepted",
+            "or the exact receipt replayed.": ""
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/control": {
+      "post": {
+        "operationId": "controlPluginOperationGrant",
+        "summary": "Suspend or release existing delegated operation authority without replaying a human request.",
+        "description": "Configured plugin service only. The existing frozen intent and operator policy must both delegate the requested action. Core derives the current controller from its grant and rechecks scoped IAM. Only suspend and release are allowed; this route never prepares, expands or reactivates authority. Exact request ID, fence, action and reason are idempotent. Safety control remains available after disablement or entitlement expiry; incompatible and unavailable installations fail closed. Releasing a grant does not remove Deployment barriers or pending Pin protection.",
+        "tags": [
+          "Plugin"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "name": "pluginId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "grant_fence",
+                  "request_id",
+                  "action",
+                  "reason"
+                ],
+                "properties": {
+                  "grant_fence": {
+                    "type": "integer",
+                    "format": "int64",
+                    "minimum": 1
+                  },
+                  "request_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9._-]+$"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "suspend",
+                      "release"
+                    ],
+                    "x-enum-varnames": [
+                      "PluginGrantControlSuspend",
+                      "PluginGrantControlRelease"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Exact resulting operation grant, with a rotated fencing generation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginOperationGrant"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          },
+          "503": {
+            "$ref": "#/components/responses/503ServiceUnavailable"
           }
         }
       }
@@ -5412,6 +6039,129 @@
           }
         }
       },
+      "DeploymentAdmissionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "actor_id",
+          "project_uuid",
+          "environment_uuid",
+          "request_digest",
+          "mode",
+          "module_versions"
+        ],
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "project_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "environment_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "request_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "deploy",
+              "rollback",
+              "destroy"
+            ],
+            "x-enum-varnames": [
+              "AdmissionModeDeploy",
+              "AdmissionModeRollback",
+              "AdmissionModeDestroy"
+            ]
+          },
+          "module_versions": {
+            "description": "Exact resolved Module UUID to Version UUID graph admitted for execution.",
+            "type": "object",
+            "maxProperties": 1000,
+            "additionalProperties": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "carry_forward_module_versions": {
+            "description": "Exact subset of module_versions retained from the Environment's effective base. This evidence permits an archived Module to carry forward only its already-active Version.",
+            "type": "object",
+            "maxProperties": 1000,
+            "additionalProperties": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "confirmed_restricted_version_uuids": {
+            "description": "Exact Defective target Version UUIDs used by this compiled Deployment and explicitly confirmed by the authorised caller.",
+            "type": "array",
+            "maxItems": 1000,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "DeploymentAdmissionReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "admission_id",
+          "project_uuid",
+          "environment_uuid",
+          "request_digest",
+          "epoch",
+          "state",
+          "mode"
+        ],
+        "properties": {
+          "admission_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "project_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "environment_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "request_digest": {
+            "type": "string"
+          },
+          "epoch": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "mode": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "settled"
+            ],
+            "x-enum-varnames": [
+              "AdmissionStateActive",
+              "AdmissionStateSettled"
+            ]
+          },
+          "outcome": {
+            "type": "string"
+          }
+        }
+      },
       "PluginPinOperationRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -5488,6 +6238,42 @@
                   "description": "Required only for reconcile or restore."
                 }
               }
+            }
+          }
+        }
+      },
+      "PluginPinOperationReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operation_id",
+          "request_id",
+          "action",
+          "pins"
+        ],
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "begin",
+              "reconcile",
+              "restore",
+              "cancel"
+            ]
+          },
+          "pins": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1000,
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentModuleVersionPin"
             }
           }
         }
@@ -5618,6 +6404,71 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "PluginResourceEvent": {
+        "type": "object",
+        "required": [
+          "event_id",
+          "type",
+          "occurred_at"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "environment_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "project_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "module_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pin_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "activation_event_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "from_status": {
+            "type": "string"
+          },
+          "to_status": {
+            "type": "string"
+          },
+          "transition": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
           }
         }
       },
@@ -5782,6 +6633,9 @@
               "hidden"
             ]
           },
+          "entitlement": {
+            "$ref": "#/components/schemas/PluginEntitlementStatus"
+          },
           "ui": {
             "type": "object",
             "required": [
@@ -5943,6 +6797,10 @@
                 },
                 "mutating": {
                   "type": "boolean"
+                },
+                "required_feature": {
+                  "type": "string",
+                  "description": "Declared licence feature required by this operation, if any."
                 }
               }
             }
@@ -6327,6 +7185,22 @@
           "source_operation": {
             "type": "string"
           },
+          "availability": {
+            "description": "Current plugin availability, returned by the service-only grant read. Not part of the frozen grant and never an execution credential.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PluginAvailabilityState"
+              }
+            ]
+          },
+          "entitlement": {
+            "description": "Current non-secret licence preflight for scheduler safety. Every Core effect independently reauthorizes in its own transaction.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PluginEntitlementStatus"
+              }
+            ]
+          },
           "intent": {
             "$ref": "#/components/schemas/PluginOperationIntent"
           },
@@ -6519,6 +7393,58 @@
           "PluginAvailabilityStateUnavailable"
         ]
       },
+      "PluginEntitlementStatus": {
+        "type": "object",
+        "description": "Non-secret server-derived licence projection. Neither this projection nor a capability grants IAM permissions or authorizes execution.",
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PluginFeatureAccess"
+            }
+          }
+        }
+      },
+      "PluginFeatureAccess": {
+        "type": "object",
+        "required": [
+          "state",
+          "trust_class",
+          "forward",
+          "read",
+          "safety"
+        ],
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "Effective persisted licence state for this declared feature."
+          },
+          "trust_class": {
+            "type": "string",
+            "description": "Development or production issuer trust. Empty when there is no verified grant."
+          },
+          "forward": {
+            "type": "boolean"
+          },
+          "read": {
+            "type": "boolean"
+          },
+          "safety": {
+            "type": "boolean"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "grace_until": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "PluginCapability": {
         "type": "object",
         "required": [
@@ -6551,6 +7477,9 @@
           "admin_action": {
             "type": "string",
             "description": "Scope-safe remediation guidance for an administrator."
+          },
+          "entitlement": {
+            "$ref": "#/components/schemas/PluginEntitlementStatus"
           }
         }
       },

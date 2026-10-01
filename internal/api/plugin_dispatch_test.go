@@ -11,13 +11,14 @@ import (
 	"github.com/stellwerk-labs/golib/hecho"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/api/middleware"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
+	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
 func TestPluginDispatchRejectsUnconfiguredServicesBeforeDataAccess(t *testing.T) {
 	pluginID := "dev.example.workflow"
-	service, checker := uuid.NewString(), uuid.NewString()
+	service, checker := userid.NewServiceUserTokenId().String(), userid.NewServiceUserTokenId().String()
 	item := plugins.Installation{ID: pluginID, DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.example.test", ServiceUserID: service, AdmissionCheckerID: checker, Organizations: map[string]plugins.AvailabilityState{"acme": plugins.StateNotEnabled}, ServiceGrants: []plugins.ServiceGrant{{Action: "external-deployment.admit", Permission: "plugin.dev.example.workflow.control", Scope: "environment"}}}
 	encoded, err := json.Marshal([]plugins.Installation{item})
 	require.NoError(t, err)

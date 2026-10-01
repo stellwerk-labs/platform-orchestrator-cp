@@ -177,8 +177,8 @@ func (s *Server) pluginInspectionAuthority(ctx context.Context, org string, item
 	if body.OperationId == nil || *body.OperationId == uuid.Nil || body.GrantFence == nil || *body.GrantFence <= 0 || body.RequestId == nil || *body.RequestId == "" || len(*body.RequestId) > 128 || strings.ContainsAny(*body.RequestId, "\r\n") {
 		return uuid.Nil, "", nil, invalid
 	}
-	if descriptor.State != plugins.StateAvailable && descriptor.State != plugins.StateNotEnabled && descriptor.State != plugins.StateNotEntitled {
-		return uuid.Nil, "", nil, pluginBoundaryError(409, "plugin_"+string(descriptor.State), "Plugin inspection is unavailable in its current state.")
+	if err := pluginServiceAllowed(item, descriptor, action, false, false); err != nil {
+		return uuid.Nil, "", nil, err
 	}
 	grant, err := model.GetExternalOperationGrant(ctx, s.Database, org, item.ID, *body.OperationId)
 	if err != nil {

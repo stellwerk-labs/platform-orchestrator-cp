@@ -32,7 +32,10 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/api"
 	apimiddleware "github.com/stellwerk-labs/platform-orchestrator-cp/internal/api/middleware"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/config"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/entitlements"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/events"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginentitlements"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/vault"
@@ -166,7 +169,7 @@ func main() {
 		}
 	}
 	hstandardoutbox.MessageIDPrefix = "platform-orchestrator-cp-"
-	publisher := hnats.NewPublisher(jetStream, hmessaging.EventsStreamName, zap.L())
+	publisher := events.NewPublisher(hnats.NewPublisher(jetStream, hmessaging.EventsStreamName, zap.L()))
 
 	vaultHttpClient := &http.Client{
 		Transport: otelhttp.NewTransport(http.DefaultTransport),
@@ -189,6 +192,18 @@ func main() {
 		DpClient:  dpClient,
 		IamClient: iamClient,
 	}
+	if cfg.DeploymentAdmissionIdentitiesFile != "" {
+		file, err := os.Open(cfg.DeploymentAdmissionIdentitiesFile)
+		if err != nil {
+			zap.L().Fatal("Failed to read Deployment admission service identities", zap.Error(err))
+		}
+		server.DeploymentAdmissionIdentities, err = config.LoadDeploymentAdmissionIdentities(file)
+		_ = file.Close()
+		if err != nil {
+			zap.L().Fatal("Invalid Deployment admission service identities", zap.Error(err))
+		}
+	}
+	var entitlementAdapter *pluginentitlements.Adapter
 	if cfg.PluginExperimentEnabled {
 		gateway, err := plugins.LoadGateway(cfg.PluginInstallationsFile, cfg.PluginSigningKeyFile, cfg.PluginIssuer, cfg.PluginDevelopmentHTTP)
 		if err != nil {
@@ -207,6 +222,12 @@ func main() {
 		}
 		server.PluginGateway = gateway
 		server.Plugins = gateway.Registry
+		entitlementAdapter, err = pluginentitlements.New(ctx, db, gateway.Registry.Installations(), entitlements.TrustClass(cfg.PluginEntitlementMode), cfg.PluginEntitlementTrustFile, cfg.PluginEntitlementBundleFile, time.Now)
+		if err != nil {
+			zap.L().Fatal("Failed to initialize offline plugin entitlements", zap.Error(err))
+		}
+		gateway.Registry.Entitlements = entitlementAdapter
+		server.PluginEntitlements = entitlementAdapter
 		server.PluginDataPlane, err = plugins.NewDataPlanePort(cfg.DataPlaneUrl, gateway, cfg.PluginDevelopmentHTTP || cfg.PluginDataPlaneInternalHTTP)
 		if err != nil {
 			zap.L().Fatal("Failed to initialize the fixed Data Plane plugin port", zap.Error(err))
@@ -237,6 +258,9 @@ func main() {
 
 	bgCtx, bgCancel := context.WithCancel(ctx)
 	defer bgCancel()
+	if entitlementAdapter != nil {
+		go sweepPluginEntitlements(bgCtx, entitlementAdapter, server.Logger)
+	}
 	go func() {
 		zap.L().Info("Starting scheduled flush of pending messages")
 		reliableoutbox.ScheduledFlushPendingMessages(bgCtx, server.Database.AsReliableOutboxStore(), publisher, reliableoutbox.DefaultScheduledFlushPeriodFunc)

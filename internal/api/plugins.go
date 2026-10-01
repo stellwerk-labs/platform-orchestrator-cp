@@ -28,11 +28,14 @@ func (s *Server) ListPluginContributions(ctx context.Context, request ListPlugin
 		installation, _, _ := s.PluginGateway.Registry.Installation(ctx, request.OrgId, descriptor.ID)
 		operations := []map[string]any{}
 		for _, op := range installation.Operations {
-			if descriptor.Mode == plugins.ModeFull || (!op.Mutating || op.Safety || len(op.SafetyPathValues) > 0) && descriptor.Mode == plugins.ModeSafetyOnly {
-				operations = append(operations, map[string]any{"id": op.ID, "method": op.Method, "mutating": op.Mutating})
+			if descriptor.Allows(op.RequiredFeature, op.Mutating, op.Safety || len(op.SafetyPathValues) > 0) {
+				operations = append(operations, map[string]any{"id": op.ID, "method": op.Method, "mutating": op.Mutating, "required_feature": op.RequiredFeature})
 			}
 		}
 		value := map[string]any{"id": descriptor.ID, "display_name": descriptor.DisplayName, "version": descriptor.Version, "state": descriptor.State, "mode": descriptor.Mode, "operations": operations}
+		if descriptor.Entitlement != nil {
+			value["entitlement"] = descriptor.Entitlement
+		}
 		if descriptor.Mode != plugins.ModeHidden && installation.UI != nil {
 			if descriptor.Mode != plugins.ModeFull {
 				installation.UI.ContextualActions = nil
@@ -111,5 +114,17 @@ func (s *Server) GetPluginCapability(
 		State:        PluginAvailabilityState(descriptor.State),
 		Capabilities: descriptor.Capabilities,
 		AdminAction:  ref.RefStringEmptyNil(descriptor.AdminAction),
+		Entitlement:  pluginEntitlementToAPI(descriptor.Entitlement),
 	}, nil
+}
+
+func pluginEntitlementToAPI(status *plugins.EntitlementStatus) *PluginEntitlementStatus {
+	if status == nil {
+		return nil
+	}
+	result := &PluginEntitlementStatus{Features: map[string]PluginFeatureAccess{}}
+	for feature, access := range status.Features {
+		result.Features[feature] = PluginFeatureAccess{State: access.State, TrustClass: access.TrustClass, Forward: access.Forward, Read: access.Read, Safety: access.Safety, ExpiresAt: access.ExpiresAt, GraceUntil: access.GraceUntil}
+	}
+	return result
 }

@@ -15,6 +15,66 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/plugincontext"
 )
 
+func (s *Server) GetPluginPinOperationReceipt(ctx context.Context, request GetPluginPinOperationReceiptRequestObject) (GetPluginPinOperationReceiptResponseObject, error) {
+	item, descriptor, err := s.pluginInstallationCaller(ctx, request.OrgId, request.PluginId, false)
+	if err != nil {
+		return nil, err
+	}
+	receipt, grant, err := model.GetExternalPinReceipt(ctx, s.Database, request.OrgId, item.ID, request.OperationId, request.RequestId, request.Params.GrantFence)
+	if err != nil {
+		return nil, pluginModelError(err)
+	}
+	if receipt == nil {
+		// Authorize before revealing command absence. No individual action is
+		// known yet, so require the operation's declared Pin policies over its
+		// whole frozen scope, not a caller-selected permissive policy.
+		checks := []orchestratoriam.ResourcePermissionCheck{}
+		for _, action := range grant.Intent.Actions {
+			if !slices.Contains([]string{"pin.override.begin", "pin.override.reconcile", "pin.override.restore", "pin.override.cancel"}, action) {
+				continue
+			}
+			policy, ok := item.ServiceGrant(action)
+			if !ok {
+				return nil, pluginBoundaryError(403, "plugin_service_forbidden", "The installation no longer declares the operation's Pin policy.")
+			}
+			if err := pluginFeatureAllowed(descriptor, policy.RequiredFeature, false, false); err != nil {
+				return nil, err
+			}
+			if policy.Scope == pluginOrganizationScope {
+				checks = append(checks, orgCheck(request.OrgId, policy.Permission))
+			} else {
+				for _, environment := range grant.Intent.Environments {
+					checks = append(checks, environmentCheck(environment.EnvironmentID, policy.Permission))
+				}
+			}
+		}
+		if err := s.pluginAuthorize(ctx, grant.ActorID, checks); err != nil {
+			return nil, err
+		}
+		return nil, pluginBoundaryError(404, "plugin_pin_receipt_not_found", "No committed Pin receipt exists for this request. This does not authorize repeating a Pin override.")
+	}
+	policy, ok := item.ServiceGrant("pin.override." + receipt.Action)
+	if !ok {
+		return nil, pluginBoundaryError(403, "plugin_service_forbidden", "The installation no longer declares this Pin service action.")
+	}
+	if err := pluginFeatureAllowed(descriptor, policy.RequiredFeature, false, false); err != nil {
+		return nil, err
+	}
+	checks := []orchestratoriam.ResourcePermissionCheck{}
+	response := GetPluginPinOperationReceipt200JSONResponse{OperationId: receipt.OperationID, RequestId: receipt.RequestID, Action: PluginPinOperationReceiptAction(receipt.Action), Pins: make([]EnvironmentModuleVersionPin, 0, len(receipt.Pins))}
+	for _, pin := range receipt.Pins {
+		checks = append(checks, environmentCheck(pin.EnvironmentUUID, policy.Permission))
+		response.Pins = append(response.Pins, modulePinToAPI(pin))
+	}
+	if policy.Scope == pluginOrganizationScope {
+		checks = []orchestratoriam.ResourcePermissionCheck{orgCheck(request.OrgId, policy.Permission)}
+	}
+	if err := s.pluginAuthorize(ctx, grant.ActorID, checks); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
 func (s *Server) ApplyPluginPinOperation(ctx context.Context, request ApplyPluginPinOperationRequestObject) (ApplyPluginPinOperationResponseObject, error) {
 	item, descriptor, err := s.pluginInstallationCaller(ctx, request.OrgId, request.PluginId, false)
 	if err != nil {
@@ -33,9 +93,8 @@ func (s *Server) ApplyPluginPinOperation(ctx context.Context, request ApplyPlugi
 	if !exists {
 		return nil, pluginBoundaryError(403, "plugin_service_forbidden", "The installation does not declare this Pin service action.")
 	}
-	allowed := descriptor.State == plugins.StateAvailable || body.Action != PluginPinBegin && (descriptor.State == plugins.StateNotEnabled || descriptor.State == plugins.StateNotEntitled)
-	if !allowed {
-		return nil, pluginBoundaryError(409, "plugin_"+string(descriptor.State), "The plugin cannot perform this Pin operation in its current availability state.")
+	if err := pluginFeatureAllowed(descriptor, policy.RequiredFeature, true, !begin); err != nil {
+		return nil, err
 	}
 	grant, err := model.GetExternalOperationGrant(ctx, s.Database, request.OrgId, item.ID, request.OperationId)
 	if err != nil {
@@ -100,7 +159,7 @@ func (s *Server) ApplyPluginPinOperation(ctx context.Context, request ApplyPlugi
 			evidence[pin.ID] = resolved
 		}
 	}
-	result, err := model.ApplyExternalPinCommand(ctx, s.Database, command, func(_ context.Context, _ model.Tx, _ *model.ExternalOperationGrant, pin model.EnvironmentModuleVersionPin, deployment uuid.UUID) (model.ExternalPinEvidence, error) {
+	result, err := model.ApplyExternalPinCommand(ctx, s.pluginEffectDatabase(request.OrgId, item, action, !begin), command, func(_ context.Context, _ model.Tx, _ *model.ExternalOperationGrant, pin model.EnvironmentModuleVersionPin, deployment uuid.UUID) (model.ExternalPinEvidence, error) {
 		resolved, exists := evidence[pin.ID]
 		if !exists || resolved.DeploymentID != deployment {
 			return model.ExternalPinEvidence{}, invalidPluginDeploymentReceipt()
@@ -119,6 +178,10 @@ func (s *Server) ApplyPluginPinOperation(ctx context.Context, request ApplyPlugi
 
 func (s *Server) resolvePluginPinEvidence(ctx context.Context, grant *model.ExternalOperationGrant, pin model.EnvironmentModuleVersionPin, deployment uuid.UUID, requestID string) (model.ExternalPinEvidence, error) {
 	empty := model.ExternalPinEvidence{}
+	epoch, err := model.ReadEnvironmentAdmissionEpoch(ctx, s.Database, nil, grant.OrgID, pin.EnvironmentUUID)
+	if err != nil {
+		return empty, err
+	}
 	environment, err := s.Database.GetEnvironmentByUuid(ctx, nil, grant.OrgID, pin.EnvironmentUUID, model.GetModeDefault)
 	if err != nil {
 		return empty, pluginModelError(err)
@@ -143,6 +206,7 @@ func (s *Server) resolvePluginPinEvidence(ctx context.Context, grant *model.Exte
 		return empty, invalidPluginDeploymentReceipt()
 	}
 	evidence := model.ExternalPinEvidence{OperationID: receipt.OperationRef, EnvironmentUUID: receipt.EnvironmentUuid, ProjectUUID: receipt.ProjectUuid, DeploymentID: receipt.DeploymentId, Mode: string(receipt.Mode), Status: string(receipt.Status), ModuleVersions: map[uuid.UUID]uuid.UUID{}, EffectiveVersions: map[uuid.UUID]uuid.UUID{}}
+	evidence.AdmissionEpoch = epoch
 	for key, value := range receipt.ModuleVersions {
 		module, err := uuid.Parse(key)
 		if err != nil || module == uuid.Nil || value == uuid.Nil {

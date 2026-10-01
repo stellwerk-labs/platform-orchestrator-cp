@@ -6,11 +6,12 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/require"
 )
 
 func TestInstallationServiceGrantsAreExplicitAndNamespaced(t *testing.T) {
-	item := Installation{ID: "dev.example.workflow", DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.example.test", Organizations: map[string]AvailabilityState{"acme": StateAvailable}, ServiceUserID: uuid.NewString(), AdmissionCheckerID: uuid.NewString(), ServiceGrants: []ServiceGrant{{Action: "external-deployment.admit", Permission: "plugin.dev.example.workflow.control", Scope: "environment"}}, Operations: []Operation{{ID: "prepare", Method: "POST", Path: "/orgs/{orgId}/workflows/{id}/prepare", Mutating: true, ServiceActions: []string{"external-deployment.admit"}}}}
+	item := Installation{ID: "dev.example.workflow", DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.example.test", Organizations: map[string]AvailabilityState{"acme": StateAvailable}, ServiceUserID: userid.NewServiceUserTokenId().String(), AdmissionCheckerID: userid.NewServiceUserTokenId().String(), ServiceGrants: []ServiceGrant{{Action: "external-deployment.admit", Permission: "plugin.dev.example.workflow.control", Scope: "environment"}}, Operations: []Operation{{ID: "prepare", Method: "POST", Path: "/orgs/{orgId}/workflows/{id}/prepare", Mutating: true, ServiceActions: []string{"external-deployment.admit"}}}}
 	load := func(t *testing.T, value Installation) error {
 		t.Helper()
 		encoded, err := json.Marshal([]Installation{value})
@@ -26,11 +27,14 @@ func TestInstallationServiceGrantsAreExplicitAndNamespaced(t *testing.T) {
 			require.Error(t, load(t, changed))
 		})
 	}
-	for _, identity := range []string{"", "not-a-uuid", uuid.Nil.String(), "ffffffff-ffff-ffff-ffff-ffffffffffff", item.AdmissionCheckerID} {
+	for _, identity := range []string{"", "not-a-uuid", uuid.Nil.String(), "ffffffff-ffff-ffff-ffff-ffffffffffff", userid.NewHumanUserId().String(), strings.ToUpper("0197aaaa-aaaa-72aa-aaaa-aaaaaaaaaaaa"), item.AdmissionCheckerID} {
 		changed := item
 		changed.ServiceUserID = identity
 		require.Error(t, load(t, changed))
 	}
+	changedChecker := item
+	changedChecker.AdmissionCheckerID = userid.NewHumanUserId().String()
+	require.Error(t, load(t, changedChecker), "a human account cannot become the deployment checker")
 	changed := item
 	changed.ServiceGrants = nil
 	require.Error(t, load(t, changed))
@@ -52,7 +56,7 @@ func TestInstallationAuthorizationPoliciesAreClosedAndNamespaced(t *testing.T) {
 	permission := "plugin." + pluginID + ".rollout-read"
 	item := Installation{
 		ID: pluginID, DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.example.test",
-		Organizations: map[string]AvailabilityState{"acme": StateAvailable}, ServiceUserID: uuid.NewString(), AdmissionCheckerID: uuid.NewString(),
+		Organizations: map[string]AvailabilityState{"acme": StateAvailable}, ServiceUserID: userid.NewServiceUserTokenId().String(), AdmissionCheckerID: userid.NewServiceUserTokenId().String(),
 		ServiceGrants:         []ServiceGrant{{Action: "authorization.check", Permission: permission, Scope: "organization"}},
 		AuthorizationPolicies: []AuthorizationPolicy{{Permission: permission, Scopes: []string{"organization", "project", "environment"}}},
 		Operations:            []Operation{{ID: "read", Method: "GET", Path: "/orgs/{orgId}/workflows", ServiceActions: []string{"authorization.check"}}},

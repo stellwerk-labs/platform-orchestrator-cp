@@ -20,6 +20,7 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/plugincontext"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
+	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
@@ -29,10 +30,10 @@ func TestPluginAuthorizationFreshProofUsesClaimActorAndClosedPolicy(t *testing.T
 	const pluginID = "dev.example.workflow"
 	const org = "acme"
 	permission := "plugin." + pluginID + ".rollout-read"
-	service, actor := uuid.NewString(), uuid.New()
+	service, actor := userid.NewServiceUserTokenId().String(), uuid.New()
 	item := plugins.Installation{
 		ID: pluginID, DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.example.test",
-		Organizations: map[string]plugins.AvailabilityState{org: plugins.StateAvailable}, ServiceUserID: service, AdmissionCheckerID: uuid.NewString(),
+		Organizations: map[string]plugins.AvailabilityState{org: plugins.StateAvailable}, ServiceUserID: service, AdmissionCheckerID: userid.NewServiceUserTokenId().String(),
 		ServiceGrants:         []plugins.ServiceGrant{{Action: pluginAuthorizationCheckAction, Permission: permission, Scope: pluginOrganizationScope}},
 		AuthorizationPolicies: []plugins.AuthorizationPolicy{{Permission: permission, Scopes: []string{pluginOrganizationScope}}},
 		Operations:            []plugins.Operation{{ID: "read", Method: http.MethodGet, Path: "/orgs/{orgId}/workflows", ServiceActions: []string{pluginAuthorizationCheckAction}}},
@@ -80,10 +81,10 @@ func TestPluginAuthorizationFreshProofUsesClaimActorAndClosedPolicy(t *testing.T
 func TestPluginAuthorizationRejectsResourceFromAnotherOrganizationBeforeIAM(t *testing.T) {
 	const pluginID = "dev.example.workflow"
 	permission := "plugin." + pluginID + ".rollout-design"
-	service := uuid.NewString()
+	service := userid.NewServiceUserTokenId().String()
 	item := plugins.Installation{
 		ID: pluginID, DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.example.test",
-		Organizations: map[string]plugins.AvailabilityState{"acme": plugins.StateAvailable}, ServiceUserID: service, AdmissionCheckerID: uuid.NewString(),
+		Organizations: map[string]plugins.AvailabilityState{"acme": plugins.StateAvailable}, ServiceUserID: service, AdmissionCheckerID: userid.NewServiceUserTokenId().String(),
 		ServiceGrants:         []plugins.ServiceGrant{{Action: pluginAuthorizationCheckAction, Permission: permission, Scope: pluginOrganizationScope}},
 		AuthorizationPolicies: []plugins.AuthorizationPolicy{{Permission: permission, Scopes: []string{"project"}}},
 		Operations:            []plugins.Operation{{ID: "read", Method: http.MethodGet, Path: "/orgs/{orgId}/workflows", ServiceActions: []string{pluginAuthorizationCheckAction}}},

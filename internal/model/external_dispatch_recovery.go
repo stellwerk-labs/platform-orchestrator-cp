@@ -53,12 +53,12 @@ func updateExternalDispatchRecovery(ctx context.Context, db Databaser, org, plug
 		return err
 	}
 	if evidence == nil {
-		if state != "active" {
+		if state != admissionStateActive {
 			return nil
 		}
 		_, err = tx.ExecContext(ctx, `UPDATE external_operation_dispatches SET state='withdrawn',withdrawn_at=COALESCE(withdrawn_at,now()) WHERE org_id=$1 AND plugin_id=$2 AND operation_id=$3 AND dispatch_id=$4`, org, plugin, operation, dispatchID)
 	} else {
-		if state == "settled" {
+		if state == admissionStateSettled {
 			var prior ExternalDispatchCompletion
 			if err := json.Unmarshal(previousCompletion, &prior); err != nil {
 				return err
@@ -72,10 +72,10 @@ func updateExternalDispatchRecovery(ctx context.Context, db Databaser, org, plug
 			return NewErrConflict("dispatch completion evidence belongs to another exact request")
 		}
 		if evidence.NoEffect {
-			if state != "withdrawn" && state != "settled" || evidence.DeploymentID != uuid.Nil || evidence.Status != "" {
+			if state != "withdrawn" && state != admissionStateSettled || evidence.DeploymentID != uuid.Nil || evidence.Status != "" {
 				return NewErrConflict("no-effect completion requires a withdrawn dispatch and authoritative absence")
 			}
-		} else if evidence.DeploymentID == uuid.Nil || !slices.Contains([]string{externalDeploymentSucceeded, "failed", "cancelled", "terminated"}, evidence.Status) {
+		} else if evidence.DeploymentID == uuid.Nil || !slices.Contains([]string{externalDeploymentSucceeded, deploymentOutcomeFailed, deploymentOutcomeCancelled, deploymentOutcomeTerminated}, evidence.Status) {
 			return NewErrConflict("dispatch has no authoritative terminal Deployment outcome")
 		}
 		completion, encodeErr := json.Marshal(evidence)

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -16,6 +17,7 @@ import (
 
 const (
 	grantPrepare        = "prepare"
+	grantActivate       = "activate"
 	grantStatePrepared  = "prepared"
 	grantStateActive    = "active"
 	grantStateSuspended = "suspended"
@@ -47,6 +49,14 @@ type ExternalOperationGrant struct {
 	BaselineDefaults map[string]*uuid.UUID   `json:"baseline_defaults"`
 	Revision         int64                   `json:"revision"`
 	State            string                  `json:"state"`
+	// SafetyActivation is Core-only authority from this exact revision's
+	// immutable command receipt. It is never accepted or exposed by the API.
+	SafetyActivation bool `json:"-"`
+}
+
+type externalGrantCommandReceipt struct {
+	ExternalOperationGrant
+	SafetyActivation bool `json:"safety_activation,omitempty"`
 }
 
 type ExternalGrantCommand struct {
@@ -61,6 +71,8 @@ type ExternalGrantCommand struct {
 	Action           string                   `json:"action"`
 	Reason           string                   `json:"reason"`
 	Intent           *ExternalOperationIntent `json:"intent,omitempty"`
+	// Set only after Core verifies the original signed source command.
+	SafetyActivation bool `json:"-"`
 }
 
 func validateExternalIntent(intent ExternalOperationIntent) error {
@@ -121,6 +133,30 @@ func readExternalGrant(ctx context.Context, tx Tx, org, plugin string, operation
 	if err := json.Unmarshal(defaults, &grant.BaselineDefaults); err != nil {
 		return nil, err
 	}
+	if grant.State != grantStateActive {
+		return grant, nil
+	}
+	// The grant lock fences this receipt lookup against every activation. Old
+	// or absent receipts carry no recovery authority. Historical receipts at a
+	// different revision can never classify the current grant as safety.
+	var response []byte
+	err = tx.QueryRowContext(ctx, `SELECT response FROM external_operation_grant_commands
+		WHERE org_id=$1 AND plugin_id=$2 AND operation_id=$3 AND actor_id=$4
+		AND response->>'revision'=$5 AND response->>'state'=$6`, org, plugin, operation, grant.ActorID, strconv.FormatInt(grant.Revision, 10), grant.State).Scan(&response)
+	if errors.Is(err, sql.ErrNoRows) {
+		return grant, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var receipt externalGrantCommandReceipt
+	if err := json.Unmarshal(response, &receipt); err != nil {
+		return nil, err
+	}
+	if receipt.OrgID != org || receipt.PluginID != plugin || receipt.OperationID != operation || receipt.ActorID != grant.ActorID || receipt.Revision != grant.Revision || receipt.State != grant.State {
+		return nil, NewErrConflict("operation grant command receipt identity changed")
+	}
+	grant.SafetyActivation = grant.State == grantStateActive && receipt.SafetyActivation
 	return grant, nil
 }
 
@@ -135,16 +171,21 @@ func GetExternalOperationGrant(ctx context.Context, db Databaser, org, plugin st
 
 // ApplyExternalGrantCommand requires current service and actor authorization
 // before every call, including replay. It persists only Core's bounded intent.
-// A suspended or released grant cannot dispatch; reactivation rotates its fence.
+// Activation freshly authorizes the same immutable intent, even when already
+// active. Every new activation binds its actor and rotates the grant fence;
+// replay returns its original receipt without renewing current authority.
 func ApplyExternalGrantCommand(ctx context.Context, db Databaser, command ExternalGrantCommand) (*ExternalOperationGrant, error) {
 	if command.OrgID == "" || !externalPluginIdentity.MatchString(command.PluginID) || command.OperationID == uuid.Nil || command.ActorID == uuid.Nil || command.RequestID == "" || len(command.RequestID) > 128 || command.SourceOperation == "" || strings.TrimSpace(command.Reason) == "" {
 		return nil, NewErrBadRequest("operation grant requires exact identity, request, source and reason")
 	}
 	if decoded, err := hex.DecodeString(command.SourceDigest); err != nil || len(decoded) != 32 || strings.ToLower(command.SourceDigest) != command.SourceDigest {
-		return nil, NewErrBadRequest("original delegated request digest is required")
+		return nil, NewErrBadRequest("exact source request digest is required")
 	}
-	if !slices.Contains([]string{grantPrepare, "activate", "suspend", "release"}, command.Action) {
+	if !slices.Contains([]string{grantPrepare, grantActivate, "suspend", "release"}, command.Action) {
 		return nil, NewErrBadRequest("unsupported grant command")
+	}
+	if command.SafetyActivation && command.Action != grantActivate {
+		return nil, NewErrBadRequest("only activation can retain verified safety authority")
 	}
 	if command.Action == grantPrepare {
 		if command.Intent == nil || command.ExpectedRevision != 0 {
@@ -176,11 +217,12 @@ func ApplyExternalGrantCommand(ctx context.Context, db Databaser, command Extern
 		if priorDigest != digest {
 			return nil, NewErrConflict("grant request ID already belongs to another command or actor")
 		}
-		var previous ExternalOperationGrant
+		var previous externalGrantCommandReceipt
 		if err := json.Unmarshal(priorResponse, &previous); err != nil {
 			return nil, err
 		}
-		return &previous, nil
+		previous.ExternalOperationGrant.SafetyActivation = previous.State == grantStateActive && previous.SafetyActivation
+		return &previous.ExternalOperationGrant, nil
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
@@ -227,8 +269,8 @@ func ApplyExternalGrantCommand(ctx context.Context, db Databaser, command Extern
 			return nil, NewErrConflict("operation grant revision changed")
 		}
 		switch command.Action {
-		case "activate":
-			if grant.State != grantStatePrepared && grant.State != grantStateSuspended && grant.State != grantStateReleased {
+		case grantActivate:
+			if !slices.Contains([]string{grantStatePrepared, grantStateSuspended, grantStateReleased, grantStateActive}, grant.State) {
 				return nil, NewErrConflict("operation grant cannot be activated from current state")
 			}
 			grant.State = grantStateActive
@@ -250,7 +292,8 @@ func ApplyExternalGrantCommand(ctx context.Context, db Databaser, command Extern
 	if err != nil {
 		return nil, err
 	}
-	response, err := json.Marshal(grant)
+	grant.SafetyActivation = command.Action == grantActivate && command.SafetyActivation
+	response, err := json.Marshal(externalGrantCommandReceipt{ExternalOperationGrant: *grant, SafetyActivation: grant.SafetyActivation})
 	if err != nil {
 		return nil, err
 	}
