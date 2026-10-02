@@ -71,7 +71,7 @@ func pluginDeploymentSubmitAction(body PluginDeploymentSubmitRequest) string {
 // uses the current grant fence separately and never rewrites this identity.
 func (s *Server) pluginDeploymentIntent(ctx context.Context, org string, item plugins.Installation, grant *model.ExternalOperationGrant, environment pluginDeploymentEnvironment, body PluginDeploymentSubmitRequest, retained *model.ExternalDispatch, withdraw bool) (model.ExternalDispatch, []byte, *plugins.InvocationResult, error) {
 	empty := model.ExternalDispatch{}
-	admission := dpapi.ExternalDeploymentAdmissionBody{OperationRef: grant.OperationID, Fence: body.GrantFence, ProjectId: environment.ProjectID, EnvId: environment.EnvironmentID, ProjectUuid: environment.ProjectUUID, EnvironmentUuid: environment.EnvironmentUUID, Mode: dpapi.ExternalDeploymentAdmissionBodyMode(body.Mode)}
+	admission := dpapi.ExternalDeploymentAdmissionBody{OperationRef: grant.OperationID, Fence: body.GrantFence, ProjectId: environment.ProjectID, EnvId: environment.EnvironmentID, ProjectUuid: environment.ProjectUUID, EnvironmentUuid: environment.EnvironmentUUID, Mode: dpapi.ExternalDeploymentAdmissionBodyMode(body.Mode), FirstForwardDeploymentId: body.FirstForwardDeploymentId}
 	targets := map[string]uuid.UUID{}
 	if body.Plan != nil {
 		admission.Plan = &dpapi.ExternalDeploymentAdmissionPlan{SnapshotId: body.Plan.SnapshotId, Fingerprint: body.Plan.Fingerprint, ExpectedModuleVersions: body.Plan.ModuleVersions}
@@ -80,7 +80,7 @@ func (s *Server) pluginDeploymentIntent(ctx context.Context, org string, item pl
 		// The receipt and target bindings were verified before recording this
 		// immutable intent. Do not refresh them from mutable history on recovery.
 		targets = retained.TargetVersions
-		admission.Rollback = &dpapi.ExternalDeploymentAdmissionRollback{ForwardDeploymentId: body.Rollback.ForwardDeploymentId}
+		admission.Rollback = &dpapi.ExternalDeploymentAdmissionRollback{ForwardDeploymentId: body.Rollback.ForwardDeploymentId, RetryOfRollbackDeploymentId: body.Rollback.RetryOfRollbackDeploymentId}
 	} else {
 		// A plugin cannot choose an arbitrary historical rollback target. Only
 		// DP's retained base of this operation's own forward effect is eligible.
@@ -98,6 +98,15 @@ func (s *Server) pluginDeploymentIntent(ctx context.Context, org string, item pl
 		if receipt.DeploymentId != body.Rollback.ForwardDeploymentId || receipt.OperationRef != grant.OperationID || receipt.EnvironmentUuid != environment.EnvironmentUUID || receipt.ProjectUuid != environment.ProjectUUID || receipt.Mode != dpapi.ExternalDeploymentStatusModeDeploy || !withdraw && (!slices.Contains([]dpapi.ExternalDeploymentStatusResponseStatus{dpapi.ExternalDeploymentStatusSucceeded, dpapi.ExternalDeploymentStatusFailed}, receipt.Status) || receipt.Status == dpapi.ExternalDeploymentStatusFailed && receipt.CompletedAt == nil) {
 			return empty, nil, nil, pluginBoundaryError(409, "plugin_operation_conflict", "Rollback requires this operation's terminal successful or failed forward Deployment and exact captured base.")
 		}
+		if err := validatePluginRollbackAnchor(body.FirstForwardDeploymentId, receipt); err != nil {
+			return empty, nil, nil, err
+		}
+		if body.Rollback.RetryOfRollbackDeploymentId != nil {
+			upstream, err := s.validatePluginRollbackRetry(ctx, org, item, grant, environment, body, receipt)
+			if err != nil || upstream != nil {
+				return empty, nil, upstream, err
+			}
+		}
 		for module, version := range receipt.RollbackModuleVersions {
 			if _, owned := grant.Intent.TargetVersions[module]; owned {
 				targets[module] = version
@@ -106,7 +115,7 @@ func (s *Server) pluginDeploymentIntent(ctx context.Context, org string, item pl
 		if len(targets) == 0 {
 			return empty, nil, nil, invalidPluginDeploymentReceipt()
 		}
-		admission.Rollback = &dpapi.ExternalDeploymentAdmissionRollback{ForwardDeploymentId: receipt.DeploymentId}
+		admission.Rollback = &dpapi.ExternalDeploymentAdmissionRollback{ForwardDeploymentId: receipt.DeploymentId, RetryOfRollbackDeploymentId: body.Rollback.RetryOfRollbackDeploymentId}
 	}
 	encoded, err := json.Marshal(admission)
 	if err != nil {
@@ -132,6 +141,9 @@ func validatePluginDeploymentSubmit(body PluginDeploymentSubmitRequest) error {
 	if body.GrantFence <= 0 || body.EnvironmentUuid == uuid.Nil || body.RequestId == "" || len(body.RequestId) > 128 || (body.Approval == nil) != (body.ApprovedPinBoundaries == nil) {
 		return invalid
 	}
+	if body.FirstForwardDeploymentId != nil && *body.FirstForwardDeploymentId == uuid.Nil {
+		return invalid
+	}
 	switch body.Mode {
 	case PluginDeploymentSubmitModeDeploy:
 		if body.Plan == nil || body.Rollback != nil || body.Plan.SnapshotId == uuid.Nil || len(body.Plan.ModuleVersions) == 0 {
@@ -141,10 +153,60 @@ func validatePluginDeploymentSubmit(body PluginDeploymentSubmitRequest) error {
 		if body.Plan != nil || body.Rollback == nil || body.Rollback.ForwardDeploymentId == uuid.Nil {
 			return invalid
 		}
+		if retry := body.Rollback.RetryOfRollbackDeploymentId; retry != nil && (*retry == uuid.Nil || *retry == body.Rollback.ForwardDeploymentId) {
+			return invalid
+		}
 	default:
 		return invalid
 	}
 	return nil
+}
+
+// Legacy first-attempt receipts may omit both fields. New lineage assertions
+// and explicit failed-rollback retries require the authoritative DP anchor.
+func validatePluginRollbackAnchor(expected *uuid.UUID, forward dpapi.ExternalDeploymentStatusResponse) error {
+	first, base := forward.FirstForwardDeploymentId, forward.RollbackBaseDeploymentId
+	if (first == nil) != (base == nil) || first != nil && (*first == uuid.Nil || *base == uuid.Nil) {
+		return invalidPluginDeploymentReceipt()
+	}
+	if expected != nil && (first == nil || *first != *expected) {
+		return pluginBoundaryError(409, "plugin_operation_conflict", "The first forward Deployment does not match this operation's immutable rollback lineage.")
+	}
+	return nil
+}
+
+func (s *Server) validatePluginRollbackRetry(ctx context.Context, org string, item plugins.Installation, grant *model.ExternalOperationGrant, environment pluginDeploymentEnvironment, body PluginDeploymentSubmitRequest, forward dpapi.ExternalDeploymentStatusResponse) (*plugins.InvocationResult, error) {
+	if forward.FirstForwardDeploymentId == nil || forward.RollbackBaseDeploymentId == nil {
+		return nil, pluginBoundaryError(409, "plugin_operation_conflict", "Rollback retry requires retained immutable deployment lineage.")
+	}
+	predecessor := *body.Rollback.RetryOfRollbackDeploymentId
+	result, err := s.readPluginDeploymentReceipt(ctx, org, item.ID, grant.ActorID, environment, predecessor, "", "retry-"+plugincontext.Digest([]byte(body.RequestId)))
+	if err != nil {
+		return nil, err
+	}
+	if result.Status != http.StatusOK {
+		return result, nil
+	}
+	var receipt dpapi.ExternalDeploymentStatusResponse
+	if err := json.Unmarshal(result.Body, &receipt); err != nil {
+		return nil, invalidPluginDeploymentReceipt()
+	}
+	admissionBase := receipt.ForwardDeploymentId
+	if receipt.RetryOfRollbackDeploymentId != nil {
+		admissionBase = receipt.RetryOfRollbackDeploymentId
+	}
+	if receipt.DeploymentId != predecessor || receipt.OperationRef != grant.OperationID || receipt.ProjectUuid != environment.ProjectUUID || receipt.EnvironmentUuid != environment.EnvironmentUUID ||
+		receipt.Mode != dpapi.ExternalDeploymentStatusModeRollback || receipt.Status != dpapi.ExternalDeploymentStatusFailed || receipt.CompletedAt == nil ||
+		receipt.ForwardDeploymentId == nil || *receipt.ForwardDeploymentId != body.Rollback.ForwardDeploymentId ||
+		receipt.FirstForwardDeploymentId == nil || *receipt.FirstForwardDeploymentId != *forward.FirstForwardDeploymentId ||
+		receipt.RollbackBaseDeploymentId == nil || *receipt.RollbackBaseDeploymentId != *forward.RollbackBaseDeploymentId ||
+		admissionBase == nil || *admissionBase == uuid.Nil || *admissionBase == predecessor ||
+		receipt.AdmissionBaseDeploymentId == nil || *receipt.AdmissionBaseDeploymentId != *admissionBase {
+		return nil, pluginBoundaryError(409, "plugin_operation_conflict", "Explicit rollback retry requires this operation's failed rollback of the same Environment to the original captured base.")
+	}
+	// DP rechecks current head, authoritative Runner completion, base and lease
+	// atomically. This preliminary read never grants infrastructure authority.
+	return nil, nil
 }
 
 func (s *Server) authorizePluginEnvironmentOperation(ctx context.Context, org string, item plugins.Installation, descriptor plugins.Descriptor, operation uuid.UUID, fence int64, environmentID uuid.UUID, action string, safety bool) (*model.ExternalOperationGrant, pluginDeploymentEnvironment, error) {

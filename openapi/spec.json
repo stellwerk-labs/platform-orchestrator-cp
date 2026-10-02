@@ -5955,6 +5955,11 @@
             "type": "string",
             "format": "uuid"
           },
+          "first_forward_deployment_id": {
+            "description": "Optional assertion of the immutable first forward Deployment in this operation and Environment. Data Plane owns the lineage; omission cannot reset an existing rollback base.",
+            "type": "string",
+            "format": "uuid"
+          },
           "mode": {
             "type": "string",
             "enum": [
@@ -6002,6 +6007,11 @@
             ],
             "properties": {
               "forward_deployment_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "retry_of_rollback_deployment_id": {
+                "description": "Explicit retry of this operation's own authoritatively failed rollback Deployment. It must remain the current Environment head and target the same immutable rollback base. Does not permit automatic infrastructure retries.",
                 "type": "string",
                 "format": "uuid"
               }

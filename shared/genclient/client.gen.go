@@ -2817,11 +2817,14 @@ type PluginDeploymentSubmitRequest struct {
 	} `json:"approval,omitempty"`
 
 	// ApprovedPinBoundaries Omit only for an approval-free operation. Otherwise include every target Module UUID and the approval's latest Pin activation UUID, or the nil UUID if no Pin activation ever existed. Requires approval actor and scope.
-	ApprovedPinBoundaries *map[string]openapi_types.UUID    `json:"approved_pin_boundaries,omitempty"`
-	EnvironmentUuid       openapi_types.UUID                `json:"environment_uuid"`
-	GrantFence            int64                             `json:"grant_fence"`
-	Mode                  PluginDeploymentSubmitRequestMode `json:"mode"`
-	Plan                  *struct {
+	ApprovedPinBoundaries *map[string]openapi_types.UUID `json:"approved_pin_boundaries,omitempty"`
+	EnvironmentUuid       openapi_types.UUID             `json:"environment_uuid"`
+
+	// FirstForwardDeploymentId Optional assertion of the immutable first forward Deployment in this operation and Environment. Data Plane owns the lineage; omission cannot reset an existing rollback base.
+	FirstForwardDeploymentId *openapi_types.UUID               `json:"first_forward_deployment_id,omitempty"`
+	GrantFence               int64                             `json:"grant_fence"`
+	Mode                     PluginDeploymentSubmitRequestMode `json:"mode"`
+	Plan                     *struct {
 		Fingerprint    string                        `json:"fingerprint"`
 		ModuleVersions map[string]openapi_types.UUID `json:"module_versions"`
 		SnapshotId     openapi_types.UUID            `json:"snapshot_id"`
@@ -2829,6 +2832,9 @@ type PluginDeploymentSubmitRequest struct {
 	RequestId string `json:"request_id"`
 	Rollback  *struct {
 		ForwardDeploymentId openapi_types.UUID `json:"forward_deployment_id"`
+
+		// RetryOfRollbackDeploymentId Explicit retry of this operation's own authoritatively failed rollback Deployment. It must remain the current Environment head and target the same immutable rollback base. Does not permit automatic infrastructure retries.
+		RetryOfRollbackDeploymentId *openapi_types.UUID `json:"retry_of_rollback_deployment_id,omitempty"`
 	} `json:"rollback,omitempty"`
 }
 

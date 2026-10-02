@@ -184,7 +184,8 @@ func TestPluginFailedForwardRollbackAndRetainedRecovery(t *testing.T) {
 				_ = json.NewEncoder(w).Encode(dpapi.Error{Error: "dispatch_not_found"})
 			})
 			request := PluginDeploymentSubmitRequest{EnvironmentUuid: env.EnvironmentID, GrantFence: grant.Revision, Mode: PluginDeploymentSubmitModeRollback, RequestId: "recover-rollback", Rollback: &struct {
-				ForwardDeploymentId uuid.UUID `json:"forward_deployment_id"`
+				ForwardDeploymentId         uuid.UUID  `json:"forward_deployment_id"`
+				RetryOfRollbackDeploymentId *uuid.UUID `json:"retry_of_rollback_deployment_id,omitempty"`
 			}{ForwardDeploymentId: forward}}
 			path := "/deployments/" + request.RequestId + "/reconcile"
 			response := call(path, ReconcilePluginDeploymentJSONBody{GrantFence: grant.Revision, OriginalRequest: &request})
