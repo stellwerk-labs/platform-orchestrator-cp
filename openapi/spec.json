@@ -457,7 +457,7 @@
       "post": {
         "operationId": "reconcilePluginDeployment",
         "summary": "Recover an exact dispatch and settle its protection only from authoritative Data Plane evidence.",
-        "description": "Does not retry execution. With withdraw=true, Core revokes further admission before waiting on the Data Plane receipt lock. Only then can authoritative absence settle an unstarted dispatch. Terminal outcomes can be recovered after suspension or entitlement expiry with current scoped authorization.",
+        "description": "Does not submit Data Plane work. An original_request can recover an intent missing from Core, preserving its original fence and exact request identity separately from the current grant_fence. Active recovery revalidates normal admission authority before recording the intent. With withdraw=true, Core records or withdraws the exact non-admitting intent before waiting on the Data Plane receipt lock. Only then can authoritative absence settle an unstarted dispatch. Terminal outcomes can be recovered after suspension or entitlement expiry with current scoped authorization.",
         "tags": [
           "Plugin"
         ],
@@ -512,6 +512,10 @@
                   },
                   "withdraw": {
                     "type": "boolean"
+                  },
+                  "original_request": {
+                    "description": "The retained original submit request, unchanged. Required only when Core has not recorded the dispatch; if supplied for a recorded dispatch it must match its immutable intent.",
+                    "$ref": "#/components/schemas/PluginDeploymentSubmitRequest"
                   }
                 }
               }

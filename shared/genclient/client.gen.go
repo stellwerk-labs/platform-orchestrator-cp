@@ -3885,8 +3885,9 @@ type ControlPluginOperationGrantJSONBodyAction string
 
 // ReconcilePluginDeploymentJSONBody defines parameters for ReconcilePluginDeployment.
 type ReconcilePluginDeploymentJSONBody struct {
-	GrantFence int64 `json:"grant_fence"`
-	Withdraw   bool  `json:"withdraw"`
+	GrantFence      int64                          `json:"grant_fence"`
+	OriginalRequest *PluginDeploymentSubmitRequest `json:"original_request,omitempty"`
+	Withdraw        bool                           `json:"withdraw"`
 }
 
 // PublishPluginEventJSONBody defines parameters for PublishPluginEvent.

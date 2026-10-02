@@ -30,17 +30,18 @@ import (
 )
 
 type pluginOperationEntitlementHTTP struct {
-	f             *pluginEntitlementAPIFixture
-	grant         *model.ExternalOperationGrant
-	item          plugins.Installation
-	denied        atomic.Bool
-	checks        atomic.Int64
-	rotateForward atomic.Bool
-	secondActor   uuid.UUID
-	proof         func(string) PluginDelegationProof
-	actorProof    func(string, uuid.UUID) PluginDelegationProof
-	call          func(string, uuid.UUID, any) *httptest.ResponseRecorder
-	moduleCall    func(string, uuid.UUID, any) *httptest.ResponseRecorder
+	f              *pluginEntitlementAPIFixture
+	grant          *model.ExternalOperationGrant
+	item           plugins.Installation
+	denied         atomic.Bool
+	checks         atomic.Int64
+	rotateForward  atomic.Bool
+	secondActor    uuid.UUID
+	proof          func(string) PluginDelegationProof
+	actorProof     func(string, uuid.UUID) PluginDelegationProof
+	call           func(string, uuid.UUID, any) *httptest.ResponseRecorder
+	moduleCall     func(string, uuid.UUID, any) *httptest.ResponseRecorder
+	deploymentCall func(string, uuid.UUID, string, any) *httptest.ResponseRecorder
 }
 
 func newPluginOperationEntitlementHTTP(t *testing.T) *pluginOperationEntitlementHTTP {
@@ -156,6 +157,7 @@ func newPluginOperationEntitlementHTTP(t *testing.T) *pluginOperationEntitlement
 	h.moduleCall = func(actor string, operation uuid.UUID, body any) *httptest.ResponseRecorder {
 		return call(actor, operation, "/modules", body)
 	}
+	h.deploymentCall = call
 	_, descriptor, found := registry.Installation(t.Context(), "acme", h.item.ID)
 	require.True(t, found)
 	require.True(t, descriptor.Entitlement.Features["feature-a"].Forward)

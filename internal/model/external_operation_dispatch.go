@@ -60,6 +60,13 @@ func validateExternalDispatch(grant *ExternalOperationGrant, dispatch ExternalDi
 	if grant.State != grantStateActive || grant.Revision != dispatch.Fence || grant.ActorID != dispatch.ActorID {
 		return NewErrConflict("operation is not active at the requested actor and fence")
 	}
+	return validateExternalDispatchScope(grant, dispatch)
+}
+
+func validateExternalDispatchScope(grant *ExternalOperationGrant, dispatch ExternalDispatch) error {
+	if dispatch.Fence <= 0 || dispatch.Fence > grant.Revision {
+		return NewErrConflict("dispatch original fence differs from the frozen operation")
+	}
 	if !slices.Contains(grant.Intent.Actions, dispatch.Action) {
 		return NewErrConflict("action is outside the frozen operation grant")
 	}
@@ -72,6 +79,22 @@ func validateExternalDispatch(grant *ExternalOperationGrant, dispatch ExternalDi
 	for _, ch := range dispatch.RequestDigest {
 		if ch < '0' || ch > '9' && ch < 'a' || ch > 'f' {
 			return NewErrBadRequest("request digest must be lowercase SHA256")
+		}
+	}
+	return nil
+}
+
+func validateExternalDispatchTargets(grant *ExternalOperationGrant, dispatch ExternalDispatch) error {
+	if len(dispatch.TargetVersions) == 0 || len(dispatch.TargetVersions) > 1000 {
+		return NewErrBadRequest("dispatch requires exact Module target identities")
+	}
+	for moduleRef, version := range dispatch.TargetVersions {
+		module, err := uuid.Parse(moduleRef)
+		if err != nil || module == uuid.Nil || version == uuid.Nil || !slices.Contains(grant.Intent.Modules, module) {
+			return NewErrConflict("dispatch Module is outside the frozen grant")
+		}
+		if dispatch.Action == "external-deployment.admit" && grant.Intent.TargetVersions[moduleRef] != version {
+			return NewErrConflict("dispatch target differs from the frozen Module Version")
 		}
 	}
 	return nil
@@ -182,8 +205,8 @@ func checkExternalDispatchBarrier(ctx context.Context, tx Tx, org string, enviro
 }
 
 func validateExternalDispatchPins(ctx context.Context, db Databaser, tx Tx, grant *ExternalOperationGrant, dispatch ExternalDispatch) error {
-	if len(dispatch.TargetVersions) == 0 || len(dispatch.TargetVersions) > 1000 {
-		return NewErrBadRequest("dispatch requires exact Module target identities")
+	if err := validateExternalDispatchTargets(grant, dispatch); err != nil {
+		return err
 	}
 	pins, err := db.ListEnvironmentModuleVersionPins(ctx, tx, dispatch.OrgID, &dispatch.EnvironmentUUID, nil, false)
 	if err != nil {
@@ -213,13 +236,7 @@ func validateExternalDispatchPins(ctx context.Context, db Databaser, tx Tx, gran
 		}
 	}
 	for moduleRef, version := range dispatch.TargetVersions {
-		module, err := uuid.Parse(moduleRef)
-		if err != nil || module == uuid.Nil || version == uuid.Nil || !slices.Contains(grant.Intent.Modules, module) {
-			return NewErrConflict("dispatch Module is outside the frozen grant")
-		}
-		if dispatch.Action == "external-deployment.admit" && grant.Intent.TargetVersions[moduleRef] != version {
-			return NewErrConflict("dispatch target differs from the frozen Module Version")
-		}
+		module := uuid.MustParse(moduleRef)
 		if dispatch.ApprovedPins != nil {
 			approved, covered := dispatch.ApprovedPins[moduleRef]
 			if !covered || approved != boundaries[moduleRef] {

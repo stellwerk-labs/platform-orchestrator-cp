@@ -2,8 +2,11 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"reflect"
 	"slices"
 
 	"github.com/google/uuid"
@@ -29,10 +32,7 @@ func (s *Server) SubmitPluginDeployment(ctx context.Context, request SubmitPlugi
 	if err := validatePluginDeploymentSubmit(*body); err != nil {
 		return nil, err
 	}
-	action := "external-deployment.admit"
-	if body.Mode == PluginDeploymentSubmitModeRollback {
-		action = "external-deployment.rollback"
-	}
+	action := pluginDeploymentSubmitAction(*body)
 	grant, environment, err := s.authorizePluginEnvironmentOperation(ctx, request.OrgId, item, descriptor, request.OperationId, body.GrantFence, body.EnvironmentUuid, action, body.Mode == PluginDeploymentSubmitModeRollback)
 	if err != nil {
 		return nil, err
@@ -40,48 +40,12 @@ func (s *Server) SubmitPluginDeployment(ctx context.Context, request SubmitPlugi
 	if grant.State != "active" {
 		return nil, pluginBoundaryError(409, "plugin_operation_conflict", "Deployment admission requires an active operation.")
 	}
-	admission := dpapi.ExternalDeploymentAdmissionBody{OperationRef: grant.OperationID, Fence: grant.Revision, ProjectId: environment.ProjectID, EnvId: environment.EnvironmentID, ProjectUuid: environment.ProjectUUID, EnvironmentUuid: environment.EnvironmentUUID, Mode: dpapi.ExternalDeploymentAdmissionBodyMode(body.Mode)}
-	targets := map[string]uuid.UUID{}
-	if body.Plan != nil {
-		admission.Plan = &dpapi.ExternalDeploymentAdmissionPlan{SnapshotId: body.Plan.SnapshotId, Fingerprint: body.Plan.Fingerprint, ExpectedModuleVersions: body.Plan.ModuleVersions}
-		targets = body.Plan.ModuleVersions
-	} else {
-		// A plugin cannot choose an arbitrary historical rollback target. Only
-		// DP's retained base of this operation's own forward effect is eligible.
-		result, err := s.readPluginDeploymentReceipt(ctx, request.OrgId, item.ID, grant.ActorID, environment, body.Rollback.ForwardDeploymentId, "", "base-"+plugincontext.Digest([]byte(body.RequestId)))
-		if err != nil {
-			return nil, err
-		}
-		if result.Status != http.StatusOK {
-			return SubmitPluginDeployment200JSONResponse{Status: result.Status, Body: result.Body}, nil
-		}
-		var receipt dpapi.ExternalDeploymentStatusResponse
-		if err := json.Unmarshal(result.Body, &receipt); err != nil {
-			return nil, invalidPluginDeploymentReceipt()
-		}
-		if receipt.DeploymentId != body.Rollback.ForwardDeploymentId || receipt.OperationRef != grant.OperationID || receipt.EnvironmentUuid != environment.EnvironmentUUID || receipt.ProjectUuid != environment.ProjectUUID || receipt.Mode != dpapi.ExternalDeploymentStatusModeDeploy || receipt.Status != dpapi.ExternalDeploymentStatusSucceeded {
-			return nil, pluginBoundaryError(409, "plugin_operation_conflict", "Rollback requires this operation's successful forward Deployment and exact captured base.")
-		}
-		for module, version := range receipt.RollbackModuleVersions {
-			if _, owned := grant.Intent.TargetVersions[module]; owned {
-				targets[module] = version
-			}
-		}
-		if len(targets) == 0 {
-			return nil, invalidPluginDeploymentReceipt()
-		}
-		admission.Rollback = &dpapi.ExternalDeploymentAdmissionRollback{ForwardDeploymentId: receipt.DeploymentId}
-	}
-	encoded, err := json.Marshal(admission)
+	dispatch, encoded, upstream, err := s.pluginDeploymentIntent(ctx, request.OrgId, item, grant, environment, *body, nil, false)
 	if err != nil {
 		return nil, err
 	}
-	dispatch := model.ExternalDispatch{OrgID: request.OrgId, PluginID: item.ID, OperationID: grant.OperationID, Fence: grant.Revision, ActorID: grant.ActorID, Action: action, DispatchID: body.RequestId, ProjectUUID: environment.ProjectUUID, EnvironmentUUID: environment.EnvironmentUUID, RequestDigest: plugincontext.Digest(encoded), TargetVersions: targets}
-	if body.ApprovedPinBoundaries != nil {
-		dispatch.ApprovedPins = *body.ApprovedPinBoundaries
-	}
-	if body.Approval != nil {
-		dispatch.Approval = &model.ExternalDispatchApproval{ActorID: body.Approval.ActorId, Scope: string(body.Approval.Scope)}
+	if upstream != nil {
+		return SubmitPluginDeployment200JSONResponse{Status: upstream.Status, Body: upstream.Body}, nil
 	}
 	if err := s.authorizePluginDispatchApproval(ctx, item, dispatch); err != nil {
 		return nil, err
@@ -94,6 +58,73 @@ func (s *Server) SubmitPluginDeployment(ctx context.Context, request SubmitPlugi
 		return nil, pluginGatewayError(err)
 	}
 	return SubmitPluginDeployment200JSONResponse{Status: result.Status, Body: result.Body}, nil
+}
+
+func pluginDeploymentSubmitAction(body PluginDeploymentSubmitRequest) string {
+	if body.Mode == PluginDeploymentSubmitModeRollback {
+		return "external-deployment.rollback"
+	}
+	return "external-deployment.admit"
+}
+
+// The original fence belongs to the downstream bytes. Recovery authorization
+// uses the current grant fence separately and never rewrites this identity.
+func (s *Server) pluginDeploymentIntent(ctx context.Context, org string, item plugins.Installation, grant *model.ExternalOperationGrant, environment pluginDeploymentEnvironment, body PluginDeploymentSubmitRequest, retained *model.ExternalDispatch, withdraw bool) (model.ExternalDispatch, []byte, *plugins.InvocationResult, error) {
+	empty := model.ExternalDispatch{}
+	admission := dpapi.ExternalDeploymentAdmissionBody{OperationRef: grant.OperationID, Fence: body.GrantFence, ProjectId: environment.ProjectID, EnvId: environment.EnvironmentID, ProjectUuid: environment.ProjectUUID, EnvironmentUuid: environment.EnvironmentUUID, Mode: dpapi.ExternalDeploymentAdmissionBodyMode(body.Mode)}
+	targets := map[string]uuid.UUID{}
+	if body.Plan != nil {
+		admission.Plan = &dpapi.ExternalDeploymentAdmissionPlan{SnapshotId: body.Plan.SnapshotId, Fingerprint: body.Plan.Fingerprint, ExpectedModuleVersions: body.Plan.ModuleVersions}
+		targets = body.Plan.ModuleVersions
+	} else if retained != nil {
+		// The receipt and target bindings were verified before recording this
+		// immutable intent. Do not refresh them from mutable history on recovery.
+		targets = retained.TargetVersions
+		admission.Rollback = &dpapi.ExternalDeploymentAdmissionRollback{ForwardDeploymentId: body.Rollback.ForwardDeploymentId}
+	} else {
+		// A plugin cannot choose an arbitrary historical rollback target. Only
+		// DP's retained base of this operation's own forward effect is eligible.
+		result, err := s.readPluginDeploymentReceipt(ctx, org, item.ID, grant.ActorID, environment, body.Rollback.ForwardDeploymentId, "", "base-"+plugincontext.Digest([]byte(body.RequestId)))
+		if err != nil {
+			return empty, nil, nil, err
+		}
+		if result.Status != http.StatusOK {
+			return empty, nil, result, nil
+		}
+		var receipt dpapi.ExternalDeploymentStatusResponse
+		if err := json.Unmarshal(result.Body, &receipt); err != nil {
+			return empty, nil, nil, invalidPluginDeploymentReceipt()
+		}
+		if receipt.DeploymentId != body.Rollback.ForwardDeploymentId || receipt.OperationRef != grant.OperationID || receipt.EnvironmentUuid != environment.EnvironmentUUID || receipt.ProjectUuid != environment.ProjectUUID || receipt.Mode != dpapi.ExternalDeploymentStatusModeDeploy || !withdraw && (!slices.Contains([]dpapi.ExternalDeploymentStatusResponseStatus{dpapi.ExternalDeploymentStatusSucceeded, dpapi.ExternalDeploymentStatusFailed}, receipt.Status) || receipt.Status == dpapi.ExternalDeploymentStatusFailed && receipt.CompletedAt == nil) {
+			return empty, nil, nil, pluginBoundaryError(409, "plugin_operation_conflict", "Rollback requires this operation's terminal successful or failed forward Deployment and exact captured base.")
+		}
+		for module, version := range receipt.RollbackModuleVersions {
+			if _, owned := grant.Intent.TargetVersions[module]; owned {
+				targets[module] = version
+			}
+		}
+		if len(targets) == 0 {
+			return empty, nil, nil, invalidPluginDeploymentReceipt()
+		}
+		admission.Rollback = &dpapi.ExternalDeploymentAdmissionRollback{ForwardDeploymentId: receipt.DeploymentId}
+	}
+	encoded, err := json.Marshal(admission)
+	if err != nil {
+		return empty, nil, nil, err
+	}
+	dispatch := model.ExternalDispatch{OrgID: org, PluginID: item.ID, OperationID: grant.OperationID, Fence: body.GrantFence, ActorID: grant.ActorID, Action: pluginDeploymentSubmitAction(body), DispatchID: body.RequestId, ProjectUUID: environment.ProjectUUID, EnvironmentUUID: environment.EnvironmentUUID, RequestDigest: plugincontext.Digest(encoded), TargetVersions: targets}
+	if retained != nil {
+		// Safety activation can rotate the current operator. Recovery retains
+		// the recorded effect's original actor; IAM checks the current operator.
+		dispatch.ActorID = retained.ActorID
+	}
+	if body.ApprovedPinBoundaries != nil {
+		dispatch.ApprovedPins = *body.ApprovedPinBoundaries
+	}
+	if body.Approval != nil {
+		dispatch.Approval = &model.ExternalDispatchApproval{ActorID: body.Approval.ActorId, Scope: string(body.Approval.Scope)}
+	}
+	return dispatch, encoded, nil, nil
 }
 
 func validatePluginDeploymentSubmit(body PluginDeploymentSubmitRequest) error {
@@ -186,21 +217,70 @@ func (s *Server) ReconcilePluginDeployment(ctx context.Context, request Reconcil
 		return nil, pluginBoundaryError(400, "plugin_request_invalid", "An exact dispatch recovery request is required.")
 	}
 	dispatch, err := model.GetExternalDispatch(ctx, s.Database, request.OrgId, item.ID, request.OperationId, request.DispatchId)
-	if err != nil {
+	missing := errors.Is(err, sql.ErrNoRows)
+	if err != nil && !missing || missing && request.Body.OriginalRequest == nil {
 		return nil, pluginModelError(err)
+	}
+	environmentID := uuid.Nil
+	if dispatch != nil {
+		environmentID = dispatch.EnvironmentUUID
+	}
+	if original := request.Body.OriginalRequest; original != nil {
+		if err := validatePluginDeploymentSubmit(*original); err != nil {
+			return nil, err
+		}
+		if original.RequestId != request.DispatchId || original.GrantFence > request.Body.GrantFence || dispatch != nil && original.EnvironmentUuid != dispatch.EnvironmentUUID {
+			return nil, pluginBoundaryError(409, "plugin_operation_conflict", "Recovery must preserve the original dispatch identity, Environment and fence.")
+		}
+		environmentID = original.EnvironmentUuid
 	}
 	action := pluginDeploymentReadAction
 	if request.Body.Withdraw {
 		action = "external-deployment.withdraw"
 	}
-	grant, environment, err := s.authorizePluginEnvironmentOperation(ctx, request.OrgId, item, descriptor, request.OperationId, request.Body.GrantFence, dispatch.EnvironmentUUID, action, true)
+	grant, environment, err := s.authorizePluginEnvironmentOperation(ctx, request.OrgId, item, descriptor, request.OperationId, request.Body.GrantFence, environmentID, action, true)
 	if err != nil {
 		return nil, err
+	}
+	if original := request.Body.OriginalRequest; original != nil {
+		originalAction := pluginDeploymentSubmitAction(*original)
+		if !slices.Contains(grant.Intent.Actions, originalAction) {
+			return nil, pluginBoundaryError(409, "plugin_operation_conflict", "The original action is outside the frozen operation grant.")
+		}
+		if _, ok := item.ServiceGrant(originalAction); !ok {
+			return nil, pluginBoundaryError(403, "plugin_service_forbidden", "The installation does not declare the original service action.")
+		}
+		recovered, _, upstream, err := s.pluginDeploymentIntent(ctx, request.OrgId, item, grant, environment, *original, dispatch, request.Body.Withdraw)
+		if err != nil {
+			return nil, err
+		}
+		if upstream != nil {
+			// A missing base receipt is not evidence that the dispatch had no
+			// effect. No exact Core barrier or dispatch lookup exists yet.
+			return nil, invalidPluginDeploymentReceipt()
+		}
+		if dispatch != nil && !reflect.DeepEqual(*dispatch, recovered) {
+			return nil, pluginBoundaryError(409, "plugin_operation_conflict", "The original request differs from Core's immutable dispatch intent.")
+		}
+		dispatch = &recovered
+		if missing && !request.Body.Withdraw {
+			// Recreate authority, not work. The subsequent DP lookup serializes
+			// with any original admission before the client may replay Submit.
+			if _, _, err := s.authorizePluginEnvironmentOperation(ctx, request.OrgId, item, descriptor, request.OperationId, original.GrantFence, environmentID, originalAction, original.Mode == PluginDeploymentSubmitModeRollback); err != nil {
+				return nil, err
+			}
+			if err := s.authorizePluginDispatchApproval(ctx, item, recovered); err != nil {
+				return nil, err
+			}
+			if err := model.RecordExternalDispatch(ctx, s.pluginEffectDatabase(request.OrgId, item, originalAction, original.Mode == PluginDeploymentSubmitModeRollback), recovered); err != nil {
+				return nil, pluginModelError(err)
+			}
+		}
 	}
 	if request.Body.Withdraw {
 		// Commit withdrawal before DP receipt acquisition. Holding a Core lock
 		// across the HTTP request would deadlock DP's admission callback.
-		if err := model.WithdrawExternalDispatch(ctx, s.pluginEffectDatabase(request.OrgId, item, action, true), request.OrgId, item.ID, request.OperationId, request.DispatchId); err != nil {
+		if err := model.RecoverWithdrawnExternalDispatch(ctx, s.pluginEffectDatabase(request.OrgId, item, action, true), *dispatch, request.Body.GrantFence); err != nil {
 			return nil, pluginModelError(err)
 		}
 	}
