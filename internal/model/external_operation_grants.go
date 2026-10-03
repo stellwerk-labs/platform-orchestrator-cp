@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/plugincontext"
 )
 
@@ -242,6 +243,9 @@ func ApplyExternalGrantCommand(ctx context.Context, db Databaser, command Extern
 			module, err := db.GetModuleCatalogue(ctx, tx, command.OrgID, moduleID.String(), GetModeForUpdate)
 			if err != nil {
 				return nil, err
+			}
+			if module.Status == moduleversions.CatalogueArchived {
+				return nil, NewErrConflict("archived Modules cannot be selected as targets for a new operation")
 			}
 			defaults[moduleID.String()] = module.CurrentDefaultVersionUUID
 			if _, err := db.GetCoreModuleVersion(ctx, tx, command.OrgID, moduleID.String(), command.Intent.TargetVersions[moduleID.String()].String(), GetModeDefault); err != nil {

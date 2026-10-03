@@ -214,6 +214,9 @@ func ApplyExternalModuleOperation(ctx context.Context, db Databaser, command Ext
 		if err != nil {
 			return nil, err
 		}
+		if command.Action == externalActionReserve && !retainActive && module.Status == moduleversions.CatalogueArchived {
+			return nil, NewErrConflict("archived Modules cannot acquire new operation reservations")
+		}
 		reservationOperationID := uuid.NewSHA1(command.OperationID, []byte(fmt.Sprintf("%s/%s/%d", command.PluginID, target.ModuleUUID, fence)))
 		if command.Action == externalActionReserve && !retainActive {
 			if _, err := db.AcquireModuleOperationReservation(ctx, tx, command.OrgID, target.ModuleUUID.String(), command.PluginID, reservationOperationID, command.OperationID.String(), command.Reason, command.ActorID); err != nil {

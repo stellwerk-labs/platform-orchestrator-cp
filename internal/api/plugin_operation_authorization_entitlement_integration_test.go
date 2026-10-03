@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stellwerk-labs/golib/hecho"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
 	iamapi "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -42,6 +43,39 @@ type pluginOperationEntitlementHTTP struct {
 	call           func(string, uuid.UUID, any) *httptest.ResponseRecorder
 	moduleCall     func(string, uuid.UUID, any) *httptest.ResponseRecorder
 	deploymentCall func(string, uuid.UUID, string, any) *httptest.ResponseRecorder
+}
+
+func TestPluginPrepareRejectsArchivedModuleThroughNativeAPI(t *testing.T) {
+	h := newPluginOperationEntitlementHTTP(t)
+	moduleID := h.grant.Intent.Modules[0]
+	module, err := h.f.db.GetModuleCatalogue(t.Context(), nil, "acme", moduleID.String(), model.GetModeDefault)
+	require.NoError(t, err)
+	tx, err := h.f.db.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	_, err = h.f.db.SetModuleCatalogueStatus(t.Context(), tx, "acme", moduleID.String(), moduleversions.CatalogueArchived,
+		h.grant.ActorID, "Retire proposed target", module.ResourceVersion)
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
+
+	operationID := uuid.New()
+	proofGrant := *h.grant
+	proofGrant.OperationID = operationID
+	h.grant = &proofGrant
+	encoded, err := json.Marshal(h.grant.Intent)
+	require.NoError(t, err)
+	var intent PluginOperationIntent
+	require.NoError(t, json.Unmarshal(encoded, &intent))
+	request := PluginOperationAuthorizationRequest{
+		Action: "prepare", ExpectedRevision: 0, Intent: &intent, Proof: h.proof("prepare"), Reason: "Prepare proposed target",
+	}
+	_, err = model.GetExternalOperationGrant(t.Context(), h.f.db, "acme", h.item.ID, operationID)
+	require.Error(t, err, "the fresh operation identity must have no prior grant")
+	response := h.call(h.item.ServiceUserID, operationID, request)
+	require.Equal(t, http.StatusConflict, response.Code, response.Body.String())
+	require.Contains(t, response.Body.String(), `"error":"plugin_operation_conflict"`)
+	require.EqualValues(t, 1, h.checks.Load(), "the real Core prepare path is reached after delegated IAM authorization")
+	_, err = model.GetExternalOperationGrant(t.Context(), h.f.db, "acme", h.item.ID, operationID)
+	require.Error(t, err, "rejected preparation must not persist the operation grant")
 }
 
 func newPluginOperationEntitlementHTTP(t *testing.T) *pluginOperationEntitlementHTTP {
