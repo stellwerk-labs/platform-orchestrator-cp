@@ -255,7 +255,14 @@ func (s *Server) authorizePluginDispatchApproval(ctx context.Context, item plugi
 	if dispatch.Approval.Scope == "project" {
 		check = projectCheck(dispatch.ProjectUUID, permission)
 	}
-	return s.pluginAuthorize(ctx, dispatch.Approval.ActorID, []orchestratoriam.ResourcePermissionCheck{check})
+	allowed, err := s.pluginAuthorizationDecision(ctx, dispatch.Approval.ActorID, []orchestratoriam.ResourcePermissionCheck{check})
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return pluginBoundaryError(403, "plugin_approval_forbidden", "The original approver no longer has the required capability and scope.")
+	}
+	return nil
 }
 
 func (s *Server) readPluginDeploymentReceipt(ctx context.Context, org, plugin string, actor uuid.UUID, environment pluginDeploymentEnvironment, deployment uuid.UUID, dispatchID, requestID string) (*plugins.InvocationResult, error) {

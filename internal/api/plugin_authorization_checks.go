@@ -102,7 +102,11 @@ func (s *Server) pluginGrantAuthorizationDecision(ctx context.Context, org strin
 	if subject != nil {
 		actor = *subject
 	}
-	return s.pluginAuthorizationDecision(ctx, actor, checks)
+	allowed, err = s.pluginAuthorizationDecision(ctx, actor, checks)
+	if err == nil && !allowed && subject != nil {
+		return false, pluginBoundaryError(403, "plugin_subject_forbidden", "The comparison subject no longer has the required capability and scope.")
+	}
+	return allowed, err
 }
 
 func (s *Server) resolvePluginAuthorizationResources(ctx context.Context, org string, policy plugins.AuthorizationPolicy, permission string, requested []struct {

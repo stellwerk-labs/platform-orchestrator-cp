@@ -52,7 +52,7 @@ func TestPluginDeploymentBoundaryApprovalAndNoEffectRecovery(t *testing.T) {
 	require.NoError(t, err)
 	publicKey, privateKey, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
-	var denyApprover, denyAtCallback, noEffect atomic.Bool
+	var denyApprover, denyAtCallback, noEffect, temporaryApprover, denyController atomic.Bool
 	var admissions, approvalChecks atomic.Int32
 	denyApprover.Store(true)
 	iam := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -64,12 +64,20 @@ func TestPluginDeploymentBoundaryApprovalAndNoEffectRecovery(t *testing.T) {
 		if body.UserId == approver {
 			approvalChecks.Add(1)
 			assert.Equal(t, []iamapi.ResourcePermissionCheck{projectCheck(env.ProjectID, approvalPermission)}, body.Checks)
+			if temporaryApprover.Load() {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
 			if denyApprover.Load() {
 				w.WriteHeader(http.StatusForbidden)
 				return
 			}
 		} else {
 			assert.Equal(t, grant.ActorID, body.UserId)
+			if denyController.Load() {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
 		}
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -143,8 +151,21 @@ func TestPluginDeploymentBoundaryApprovalAndNoEffectRecovery(t *testing.T) {
 		pinBoundaries[module] = uuid.Nil
 	}
 	submit := map[string]any{"grant_fence": grant.Revision, "request_id": "dispatch-1", "environment_uuid": env.EnvironmentID, "mode": "deploy", "plan": map[string]any{"snapshot_id": uuid.New(), "fingerprint": "sha256:" + strings.Repeat("c", 64), "module_versions": grant.Intent.TargetVersions}, "approval": map[string]any{"actor_id": approver, "scope": "project"}, "approved_pin_boundaries": pinBoundaries}
+	temporaryApprover.Store(true)
 	response := call(service, "/deployments", submit)
+	require.Equal(t, 503, response.Code, response.Body.String())
+	require.Contains(t, response.Body.String(), `"error":"authorization_unavailable"`)
+	require.Zero(t, admissions.Load())
+	temporaryApprover.Store(false)
+	denyController.Store(true)
+	response = call(service, "/deployments", submit)
 	require.Equal(t, 403, response.Code, response.Body.String())
+	require.Contains(t, response.Body.String(), `"error":"plugin_actor_forbidden"`)
+	require.Zero(t, admissions.Load())
+	denyController.Store(false)
+	response = call(service, "/deployments", submit)
+	require.Equal(t, 403, response.Code, response.Body.String())
+	require.Contains(t, response.Body.String(), `"error":"plugin_approval_forbidden"`)
 	require.Zero(t, admissions.Load(), "revoked approval must stop before dispatch")
 	denyApprover.Store(false)
 	denyAtCallback.Store(true)
@@ -153,16 +174,21 @@ func TestPluginDeploymentBoundaryApprovalAndNoEffectRecovery(t *testing.T) {
 	var upstream PluginInvocationResult
 	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &upstream))
 	require.Equal(t, 403, upstream.Status, "approval revoked between recording and admission must still fail")
+	var racedDenial Error
+	require.NoError(t, json.Unmarshal(upstream.Body, &racedDenial))
+	require.Equal(t, "plugin_approval_forbidden", racedDenial.Error)
 	require.GreaterOrEqual(t, approvalChecks.Load(), int32(3))
 	recorded, err := model.GetExternalDispatch(t.Context(), db, grant.OrgID, grant.PluginID, grant.OperationID, "dispatch-1")
 	require.NoError(t, err)
 	require.Equal(t, approver, recorded.Approval.ActorID)
 	// No-effect recovery is allowed with the current controller, but it never
 	// replays execution and cannot depend on a now-revoked approver.
+	checksBeforeWithdrawal := approvalChecks.Load()
 	response = call(service, "/deployments/dispatch-1/reconcile", ReconcilePluginDeploymentJSONBody{GrantFence: grant.Revision, Withdraw: true})
 	require.Equal(t, 200, response.Code, response.Body.String())
 	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &upstream))
 	require.Equal(t, 404, upstream.Status)
+	require.Equal(t, checksBeforeWithdrawal, approvalChecks.Load(), "withdrawal must not reauthorize the old approver")
 	check := *recorded
 	check.Approval, check.TargetVersions, check.ApprovedPins = nil, nil, nil
 	require.ErrorContains(t, model.CheckExternalDispatch(t.Context(), db, check), "settled")

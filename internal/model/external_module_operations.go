@@ -115,7 +115,11 @@ func ApplyExternalModuleOperation(ctx context.Context, db Databaser, command Ext
 		if command.SafetyReserve && (grant.State != grantStateActive || !grant.SafetyActivation) {
 			return nil, NewErrConflict("safety reservation requires the current verified safety activation")
 		}
-		allowed := grant.State == grantStateActive || command.Action == externalActionReserve && grant.State == grantStatePrepared || command.Action == externalActionRelease && grant.State == grantStateSuspended
+		// A sequenced caller may release its grant before the
+		// operation's Module reservations. The active, fenced operation below
+		// still has to prove exact ownership before that cleanup can proceed.
+		releaseCleanup := command.Action == externalActionRelease && (grant.State == grantStateSuspended || grant.State == grantStateReleased)
+		allowed := grant.State == grantStateActive || command.Action == externalActionReserve && grant.State == grantStatePrepared || releaseCleanup
 		if !allowed {
 			return nil, NewErrConflict("operation grant cannot mutate module reservations or defaults in this state")
 		}

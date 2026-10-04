@@ -39,6 +39,11 @@ func externalOperationDatabase(t *testing.T) Databaser {
 
 func externalOperationModules(t *testing.T, db Databaser, actor uuid.UUID) (string, []ExternalModuleTarget, []CoreModuleVersion) {
 	t.Helper()
+	return externalOperationModulesWithTarget(t, db, actor, "1.1.0")
+}
+
+func externalOperationModulesWithTarget(t *testing.T, db Databaser, actor uuid.UUID, targetVersion string) (string, []ExternalModuleTarget, []CoreModuleVersion) {
+	t.Helper()
 	ctx := t.Context()
 	org := "plugin-test-" + uuid.NewString()
 	_, err := db.CreateOrg(ctx, nil, &Org{Id: org, CreatedBy: actor, CreatedAt: time.Now(), Source: OrgSourceInternal, Plan: OrgPlanCustom})
@@ -61,7 +66,7 @@ func externalOperationModules(t *testing.T, db Databaser, actor uuid.UUID) (stri
 		base := publish("1.0.0")
 		base, err = db.TransitionCoreModuleVersion(ctx, tx, org, slug, base.UUID.String(), moduleversions.LifecycleDefault, base.ResourceVersion, actor, "Prepare baseline", nil)
 		require.NoError(t, err)
-		candidate := publish("1.1.0")
+		candidate := publish(targetVersion)
 		targets = append(targets, ExternalModuleTarget{ModuleUUID: module.UUID, VersionUUID: candidate.UUID, ExpectedDefaultUUID: &base.UUID, ExpectedResourceVersion: candidate.ResourceVersion})
 		previous = append(previous, *base)
 		require.NoError(t, tx.Commit())

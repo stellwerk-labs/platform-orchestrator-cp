@@ -16,8 +16,13 @@ import (
 
 func externalGrantFixture(t *testing.T, db Databaser) ExternalGrantCommand {
 	t.Helper()
+	return externalGrantFixtureWithTarget(t, db, "1.1.0")
+}
+
+func externalGrantFixtureWithTarget(t *testing.T, db Databaser, targetVersion string) ExternalGrantCommand {
+	t.Helper()
 	actor := uuid.New()
-	org, modules, _ := externalOperationModules(t, db, actor)
+	org, modules, _ := externalOperationModulesWithTarget(t, db, actor, targetVersion)
 	organization, err := db.GetOrg(t.Context(), nil, org)
 	require.NoError(t, err)
 	now := time.Now().UTC()
@@ -180,6 +185,108 @@ func TestExternalModuleOperationsAreBoundToCurrentGrantAndCapturedDefaults(t *te
 	command.Action, command.RequestID, command.GrantFence = "release", "release", grant.Revision
 	_, err = ApplyExternalModuleOperation(ctx, db, command)
 	require.NoError(t, err, "suspension permits releasing reservations but not promotion")
+}
+
+func TestReleasedGrantCanFinishOwnedModuleReservationRelease(t *testing.T) {
+	db := externalOperationDatabase(t)
+	ctx := t.Context()
+	prepare := externalGrantFixture(t, db)
+	prepare.Intent.Actions = []string{"module.reserve", "module.release", "module.promote", "module.restore"}
+	grant, err := ApplyExternalGrantCommand(ctx, db, prepare)
+	require.NoError(t, err)
+	require.Equal(t, grantStatePrepared, grant.State)
+
+	command := ExternalModuleCommand{
+		OrgID: grant.OrgID, PluginID: grant.PluginID, OperationID: grant.OperationID,
+		ActorID: grant.ActorID, RequestID: "reserve-modules", Action: externalActionReserve,
+		GrantFence: grant.Revision, Reason: "Reserve the exact reviewed module set",
+	}
+	for _, moduleID := range grant.Intent.Modules {
+		version, err := db.GetCoreModuleVersion(ctx, nil, grant.OrgID, moduleID.String(), grant.Intent.TargetVersions[moduleID.String()].String(), GetModeDefault)
+		require.NoError(t, err)
+		command.Targets = append(command.Targets, ExternalModuleTarget{
+			ModuleUUID: moduleID, VersionUUID: version.UUID,
+			ExpectedResourceVersion: version.ResourceVersion,
+			ExpectedDefaultUUID:     grant.BaselineDefaults[moduleID.String()],
+		})
+	}
+	reserved, err := ApplyExternalModuleOperation(ctx, db, command)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), reserved.Fence)
+	require.Equal(t, externalStateActive, reserved.State)
+
+	grantCommand := prepare
+	grantCommand.Intent = nil
+	grantCommand.Action, grantCommand.RequestID = "release", "return-to-draft"
+	grantCommand.ExpectedRevision = grant.Revision
+	releasedGrant, err := ApplyExternalGrantCommand(ctx, db, grantCommand)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), releasedGrant.Revision)
+	require.Equal(t, grantStateReleased, releasedGrant.State)
+
+	release := command
+	release.RequestID, release.Action = "release-modules", externalActionRelease
+	release.GrantFence, release.ExpectedFence = releasedGrant.Revision, reserved.Fence
+
+	wrongActor := release
+	wrongActor.ActorID = uuid.New()
+	wrongActor.RequestID = "release-wrong-actor"
+	_, err = ApplyExternalModuleOperation(ctx, db, wrongActor)
+	require.ErrorContains(t, err, "current operation grant")
+
+	staleGrant := release
+	staleGrant.GrantFence--
+	staleGrant.RequestID = "release-stale-grant"
+	_, err = ApplyExternalModuleOperation(ctx, db, staleGrant)
+	require.ErrorContains(t, err, "current operation grant")
+
+	staleOperation := release
+	staleOperation.ExpectedFence--
+	staleOperation.RequestID = "release-stale-operation"
+	_, err = ApplyExternalModuleOperation(ctx, db, staleOperation)
+	require.ErrorContains(t, err, "operation fence changed")
+
+	wrongModule := release
+	wrongModule.Targets = append([]ExternalModuleTarget{}, release.Targets...)
+	wrongModule.Targets[0].ModuleUUID = uuid.New()
+	wrongModule.RequestID = "release-wrong-module"
+	_, err = ApplyExternalModuleOperation(ctx, db, wrongModule)
+	require.ErrorContains(t, err, "module or target version differs from the frozen operation grant")
+
+	for _, action := range []string{externalActionReserve, externalActionPromote, externalActionRestore} {
+		forbidden := release
+		forbidden.Action = action
+		forbidden.RequestID = "released-grant-" + action
+		_, err = ApplyExternalModuleOperation(ctx, db, forbidden)
+		require.ErrorContains(t, err, "operation grant cannot mutate module reservations or defaults in this state")
+	}
+	for _, target := range release.Targets {
+		active, err := db.ListModuleOperationReservations(ctx, nil, grant.OrgID, target.ModuleUUID, false)
+		require.NoError(t, err)
+		require.Len(t, active, 1, "failed recovery attempts must leave the exact reservation active")
+		module, err := db.GetModuleCatalogue(ctx, nil, grant.OrgID, target.ModuleUUID.String(), GetModeDefault)
+		require.NoError(t, err)
+		require.Equal(t, grant.BaselineDefaults[target.ModuleUUID.String()], module.CurrentDefaultVersionUUID, "cleanup-only recovery must not change Module Defaults")
+	}
+
+	receipt, err := ApplyExternalModuleOperation(ctx, db, release)
+	require.NoError(t, err)
+	require.Equal(t, externalActionRelease, receipt.Action)
+	require.Equal(t, externalStateReleased, receipt.State)
+	require.Equal(t, reserved.Fence, receipt.Fence)
+	replayed, err := ApplyExternalModuleOperation(ctx, db, release)
+	require.NoError(t, err, "lost acknowledgement must replay the same release receipt")
+	require.Equal(t, receipt, replayed)
+
+	for _, target := range release.Targets {
+		active, err := db.ListModuleOperationReservations(ctx, nil, grant.OrgID, target.ModuleUUID, false)
+		require.NoError(t, err)
+		require.Empty(t, active)
+		history, err := db.ListModuleOperationReservations(ctx, nil, grant.OrgID, target.ModuleUUID, true)
+		require.NoError(t, err)
+		require.Len(t, history, 1)
+		require.NotNil(t, history[0].ReleasedAt)
+	}
 }
 
 func TestExternalGrantConcurrencyAndFrozenBounds(t *testing.T) {
