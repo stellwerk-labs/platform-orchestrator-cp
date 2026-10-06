@@ -20,7 +20,7 @@ func (s *Server) ListPluginContributions(ctx context.Context, request ListPlugin
 	if err := s.checkOrgAuthorization(ctx, actor, request.OrgId, PermissionOrganizationRead); err != nil {
 		return nil, err
 	}
-	response := ListPluginContributions200JSONResponse{Items: []PluginContribution{}}
+	response := ListPluginContributions200JSONResponse{ContractLevel: PluginContractLevelV1alpha, Items: []PluginContribution{}}
 	if s.PluginGateway == nil || s.PluginGateway.Registry == nil {
 		return response, nil
 	}
@@ -108,13 +108,14 @@ func (s *Server) GetPluginCapability(
 	}
 
 	return GetPluginCapability200JSONResponse{
-		Id:           descriptor.ID,
-		DisplayName:  descriptor.DisplayName,
-		Version:      ref.RefStringEmptyNil(descriptor.Version),
-		State:        PluginAvailabilityState(descriptor.State),
-		Capabilities: descriptor.Capabilities,
-		AdminAction:  ref.RefStringEmptyNil(descriptor.AdminAction),
-		Entitlement:  pluginEntitlementToAPI(descriptor.Entitlement),
+		ContractLevel: PluginContractLevelV1alpha,
+		Id:            descriptor.ID,
+		DisplayName:   descriptor.DisplayName,
+		Version:       ref.RefStringEmptyNil(descriptor.Version),
+		State:         PluginAvailabilityState(descriptor.State),
+		Capabilities:  descriptor.Capabilities,
+		AdminAction:   ref.RefStringEmptyNil(descriptor.AdminAction),
+		Entitlement:   pluginEntitlementToAPI(descriptor.Entitlement),
 	}, nil
 }
 

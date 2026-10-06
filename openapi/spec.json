@@ -6738,12 +6738,26 @@
           }
         }
       },
+      "PluginContractLevel": {
+        "type": "string",
+        "enum": [
+          "v1alpha"
+        ],
+        "x-enum-varnames": [
+          "PluginContractLevelV1alpha"
+        ],
+        "description": "Level of the plugin contracts this Control Plane implements. v1alpha supports first-party Stellwerk plugins only and is not a stable partner contract."
+      },
       "PluginContributionPage": {
         "type": "object",
         "required": [
+          "contract_level",
           "items"
         ],
         "properties": {
+          "contract_level": {
+            "$ref": "#/components/schemas/PluginContractLevel"
+          },
           "items": {
             "type": "array",
             "items": {
@@ -7598,12 +7612,16 @@
       "PluginCapability": {
         "type": "object",
         "required": [
+          "contract_level",
           "id",
           "display_name",
           "state",
           "capabilities"
         ],
         "properties": {
+          "contract_level": {
+            "$ref": "#/components/schemas/PluginContractLevel"
+          },
           "id": {
             "type": "string",
             "description": "Immutable reverse-DNS plugin identity."

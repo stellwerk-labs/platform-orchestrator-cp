@@ -28,7 +28,7 @@ func TestPluginGatewayPublicRoutesDisabledByDefault(t *testing.T) {
 	response := httptest.NewRecorder()
 	e.ServeHTTP(response, request)
 	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
-	require.JSONEq(t, `{"items":[]}`, response.Body.String())
+	require.JSONEq(t, `{"contract_level":"v1alpha","items":[]}`, response.Body.String(), "a host without plugins still reports its contract level")
 	request = httptest.NewRequest(http.MethodPost, "/orgs/acme/plugins/dev.example.change-manager/invoke", strings.NewReader(`{"operation_id":"list"}`))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("From", userid.InternalSystemUuid.String())

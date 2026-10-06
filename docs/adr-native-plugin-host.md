@@ -18,6 +18,9 @@ packaged and released separately from the Orchestrator.
 ## Implemented boundary
 
 - `GET /orgs/{orgId}/plugins` discovers organization-scoped contributions.
+- Discovery responses (`GET /orgs/{orgId}/plugins` and
+  `GET /orgs/{orgId}/plugins/{pluginId}`) carry `contract_level: v1alpha`, the
+  level of the plugin contracts this Core implements.
 - `POST /orgs/{orgId}/plugins/{pluginId}/invoke` accepts a registered operation
   ID, bounded JSON body, path parameters and repeated query values. It never
   accepts an arbitrary backend URL or forwards cookies or bearer tokens.

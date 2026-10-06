@@ -30,6 +30,7 @@ func TestGetPluginCapabilityDistinguishesUnavailableStates(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
 	assert.JSONEq(t, `{
+		"contract_level":"v1alpha",
 		"id":"dev.example.change-orchestrator",
 		"display_name":"Change Orchestrator",
 		"version":"1.0.0",
@@ -50,4 +51,5 @@ func TestGetPluginCapabilityReportsUnknownPluginAsNotInstalled(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
 	assert.Contains(t, response.Body.String(), `"state":"not_installed"`)
+	assert.Contains(t, response.Body.String(), `"contract_level":"v1alpha"`)
 }

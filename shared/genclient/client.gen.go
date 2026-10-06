@@ -497,6 +497,21 @@ func (e PluginAvailabilityState) Valid() bool {
 	}
 }
 
+// Defines values for PluginContractLevel.
+const (
+	PluginContractLevelV1alpha PluginContractLevel = "v1alpha"
+)
+
+// Valid indicates whether the value is a known member of the PluginContractLevel enum.
+func (e PluginContractLevel) Valid() bool {
+	switch e {
+	case PluginContractLevelV1alpha:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PluginContributionMode.
 const (
 	Full       PluginContributionMode = "full"
@@ -2706,7 +2721,10 @@ type PluginCapability struct {
 	// AdminAction Scope-safe remediation guidance for an administrator.
 	AdminAction  *string  `json:"admin_action,omitempty"`
 	Capabilities []string `json:"capabilities"`
-	DisplayName  string   `json:"display_name"`
+
+	// ContractLevel Level of the plugin contracts this Control Plane implements. v1alpha supports first-party Stellwerk plugins only and is not a stable partner contract.
+	ContractLevel PluginContractLevel `json:"contract_level"`
+	DisplayName   string              `json:"display_name"`
 
 	// Entitlement Non-secret server-derived licence projection. Neither this projection nor a capability grants IAM permissions or authorizes execution.
 	Entitlement *PluginEntitlementStatus `json:"entitlement,omitempty"`
@@ -2718,6 +2736,9 @@ type PluginCapability struct {
 	// Version Immutable installed plugin artifact version when installed.
 	Version *string `json:"version,omitempty"`
 }
+
+// PluginContractLevel Level of the plugin contracts this Control Plane implements. v1alpha supports first-party Stellwerk plugins only and is not a stable partner contract.
+type PluginContractLevel string
 
 // PluginContribution defines model for PluginContribution.
 type PluginContribution struct {
@@ -2786,7 +2807,9 @@ type PluginContributionUiSdkVersion string
 
 // PluginContributionPage defines model for PluginContributionPage.
 type PluginContributionPage struct {
-	Items []PluginContribution `json:"items"`
+	// ContractLevel Level of the plugin contracts this Control Plane implements. v1alpha supports first-party Stellwerk plugins only and is not a stable partner contract.
+	ContractLevel PluginContractLevel  `json:"contract_level"`
+	Items         []PluginContribution `json:"items"`
 }
 
 // PluginDelegationProof defines model for PluginDelegationProof.
