@@ -1,5 +1,5 @@
 DP_IMAGE ?= ghcr.io/stellwerk-labs/platform-orchestrator-dp:v2.0.0
-IAM_IMAGE ?= ghcr.io/stellwerk-labs/platform-orchestrator-iam:v2.2.0
+IAM_IMAGE ?= ghcr.io/stellwerk-labs/platform-orchestrator-iam@sha256:0fb4b3645ae2d7ccf366921c8d9490a6862cce111bdcb683ef6afcc852b40331
 
 compose.yaml: BUILD_ARGS := {"context":"../"}
 compose.yaml: ../score.yaml Makefile compose-mixins.yaml score.provisioners.yaml score.dp.yaml score.iam.yaml
@@ -40,6 +40,23 @@ test-iam-startup: compose.yaml
 test-startup: test-iam-startup
 	docker compose up --no-build -d platform-orchestrator-cp-platform-orchestrator-cp runner-gateway --wait --wait-timeout 90
 	timeout 60s sh -c 'until curl --fail --silent --output /dev/null http://127.0.0.1:8081/health && curl --fail --silent --output /dev/null http://127.0.0.1:8082/health; do sleep 1; done'
+
+## Run -tags integration Go package tests sequentially against the compose stack's PostgreSQL.
+## Starts a dedicated disposable NATS on 127.0.0.1:14222 for the events package and removes it after.
+.PHONY: test-integration-postgres
+test-integration-postgres: compose.yaml test-startup
+	@set -e; \
+	NATS_CNAME=cp-integ-nats-events-$$$$; \
+	docker run -d --rm --name $$NATS_CNAME -p 14222:4222 nats:2.12-alpine -js; \
+	sleep 1; \
+	PLUGIN_TEST_DATABASE_URL="$$(score-compose resources get-outputs 'postgres.default#platform-orchestrator-cp.postgres' | \
+	  jq -r '"host=127.0.0.1 port=5432 user=\(.username) password=\(.password) dbname=\(.name) sslmode=disable"')"; \
+	PLUGIN_TEST_DATABASE_URL="$$PLUGIN_TEST_DATABASE_URL" \
+	PLUGIN_EVENTS_TEST_NATS_URL=nats://127.0.0.1:14222 \
+	PLUGIN_EVENTS_TEST_DISPOSABLE=1 \
+	go test -tags=integration -count=1 -p 1 -timeout 5m \
+	  ../internal/model/... ../internal/api/... ../cmd/plugin-entitlement-dev/... ../internal/events/...; \
+	STATUS=$$?; docker stop $$NATS_CNAME 2>/dev/null || true; exit $$STATUS
 
 .PHONY: clean
 clean:
