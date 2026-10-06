@@ -6,7 +6,6 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
-	"sort"
 	"sync"
 
 	"github.com/google/uuid"
@@ -234,18 +233,12 @@ func (t *journalTransaction) Commit() error {
 		return sql.ErrTxDone
 	}
 	t.finalized = true
-	// Stable sorting retains event order within an organization while preventing
-	// two cross-organization transactions from acquiring journal heads in an
-	// inconsistent order.
-	sort.SliceStable(t.journal, func(i, j int) bool { return t.journal[i].orgID < t.journal[j].orgID })
-	for _, entry := range t.journal {
-		if err := journalExtensionResourceEvent(t.ctx, t.TxWithCommit, entry); err != nil {
-			t.journal = nil
-			_ = t.TxWithCommit.Rollback()
-			return err
-		}
-	}
+	journal := t.journal
 	t.journal = nil
+	if err := flushExtensionJournal(t.ctx, t.TxWithCommit, journal); err != nil {
+		_ = t.TxWithCommit.Rollback()
+		return err
+	}
 	return t.TxWithCommit.Commit()
 }
 

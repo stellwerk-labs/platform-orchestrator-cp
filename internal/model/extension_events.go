@@ -7,6 +7,7 @@ import (
 	"errors"
 	"math"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -40,6 +41,9 @@ type ExtensionResourceEvent struct {
 type extensionResourceJournalEntry struct {
 	orgID string
 	event ExtensionResourceEvent
+	// journaled is false when no installed plugin subscribes to the
+	// organization. The event is then not journaled, but the pause is recorded.
+	journaled bool
 }
 
 func projectExtensionResourceEvent(message *hstandardoutbox.PendingEventMessage) (*extensionResourceJournalEntry, error) {
@@ -83,8 +87,9 @@ func projectExtensionResourceEvent(message *hstandardoutbox.PendingEventMessage)
 	return &extensionResourceJournalEntry{orgID: envelope.Data.OrgID, event: event}, nil
 }
 
-// extensionJournalEntries projects the messages of organizations accepted by
-// scope. Other organizations keep only the ordinary outbox message.
+// extensionJournalEntries projects the journal events among messages. Entries
+// of organizations rejected by scope are marked not journaled: they keep only
+// the ordinary outbox message.
 func extensionJournalEntries(messages []*hstandardoutbox.PendingEventMessage, scope func(orgID string) bool) ([]extensionResourceJournalEntry, error) {
 	entries := make([]extensionResourceJournalEntry, 0, len(messages))
 	for _, message := range messages {
@@ -92,11 +97,134 @@ func extensionJournalEntries(messages []*hstandardoutbox.PendingEventMessage, sc
 		if err != nil {
 			return nil, err
 		}
-		if entry != nil && scope(entry.orgID) {
+		if entry != nil {
+			entry.journaled = scope(entry.orgID)
 			entries = append(entries, *entry)
 		}
 	}
 	return entries, nil
+}
+
+type journalOrganization struct {
+	orgID     string
+	journaled bool
+	entries   []extensionResourceJournalEntry
+}
+
+// journalOrganizations groups a transaction's entries per organization in
+// organization order, keeping event order within each organization. Every
+// writer acquires journal state and head locks in this order.
+func journalOrganizations(entries []extensionResourceJournalEntry) []journalOrganization {
+	sorted := slices.Clone(entries)
+	slices.SortStableFunc(sorted, func(a, b extensionResourceJournalEntry) int { return strings.Compare(a.orgID, b.orgID) })
+	groups := []journalOrganization{}
+	for _, entry := range sorted {
+		if len(groups) == 0 || groups[len(groups)-1].orgID != entry.orgID {
+			groups = append(groups, journalOrganization{orgID: entry.orgID, journaled: entry.journaled})
+		}
+		if entry.journaled {
+			groups[len(groups)-1].entries = append(groups[len(groups)-1].entries, entry)
+		}
+	}
+	return groups
+}
+
+func flushExtensionJournal(ctx context.Context, tx Tx, entries []extensionResourceJournalEntry) error {
+	for _, org := range journalOrganizations(entries) {
+		if !org.journaled {
+			if err := pauseExtensionResourceJournal(ctx, tx, org.orgID); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := resumeExtensionResourceJournal(ctx, tx, org.orgID); err != nil {
+			return err
+		}
+		for _, entry := range org.entries {
+			if err := journalExtensionResourceEvent(ctx, tx, entry); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// pauseExtensionResourceJournal records that an organization with a journal
+// is not journaled. A later resume then marks the gap.
+func pauseExtensionResourceJournal(ctx context.Context, tx Tx, org string) error {
+	var tracked bool
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE((SELECT journaling FROM extension_resource_event_journal_state WHERE org_id=$1),
+		EXISTS (SELECT 1 FROM extension_resource_event_heads WHERE org_id=$1))`, org).Scan(&tracked); err != nil || !tracked {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE extension_resource_event_journal_state SET journaling=false, changed_at=now() WHERE org_id=$1 AND journaling`, org); err != nil {
+		return err
+	}
+	_, err := tx.ExecContext(ctx, `INSERT INTO extension_resource_event_journal_state (org_id,journaling,changed_at)
+		SELECT org_id,false,now() FROM extension_resource_event_heads WHERE org_id=$1 ON CONFLICT (org_id) DO NOTHING`, org)
+	return err
+}
+
+// resumeExtensionResourceJournal marks a gap when the organization's journal
+// was paused. The gap takes its own cursor: every cursor issued before it
+// predates the unjournaled changes and expires; cursors from it on are valid.
+func resumeExtensionResourceJournal(ctx context.Context, tx Tx, org string) error {
+	paused := func(lock string) (bool, error) {
+		var journaling bool
+		err := tx.QueryRowContext(ctx, `SELECT journaling FROM extension_resource_event_journal_state WHERE org_id=$1`+lock, org).Scan(&journaling)
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return !journaling, err
+	}
+	if stopped, err := paused(""); err != nil || !stopped {
+		return err
+	}
+	if stopped, err := paused(" FOR UPDATE"); err != nil || !stopped {
+		return err
+	}
+	var gap int64
+	if err := tx.QueryRowContext(ctx, `INSERT INTO extension_resource_event_heads (org_id,cursor) VALUES ($1,1)
+		ON CONFLICT (org_id) DO UPDATE SET cursor=extension_resource_event_heads.cursor+1 RETURNING cursor`, org).Scan(&gap); err != nil {
+		return err
+	}
+	_, err := tx.ExecContext(ctx, `UPDATE extension_resource_event_journal_state SET journaling=true, gap_cursor=$2, changed_at=now() WHERE org_id=$1`, org, gap)
+	return err
+}
+
+// ReconcileExtensionResourceJournal runs at startup, before the server takes
+// requests. Each organization that has a journal is resumed when an installed
+// plugin subscribes to it and paused otherwise. subscribed is nil when the
+// plugin host is disabled.
+func ReconcileExtensionResourceJournal(ctx context.Context, db Databaser, subscribed func(orgID string) bool) error {
+	orgs, err := extensionJournalOrganizations(ctx, db, `SELECT org_id FROM extension_resource_event_heads
+		UNION SELECT org_id FROM extension_resource_event_journal_state ORDER BY 1`)
+	if err != nil {
+		return err
+	}
+	for _, org := range orgs {
+		if err := reconcileExtensionResourceOrganization(ctx, db, org, subscribed != nil && subscribed(org)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func reconcileExtensionResourceOrganization(ctx context.Context, db Databaser, org string, journaled bool) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if journaled {
+		err = resumeExtensionResourceJournal(ctx, tx, org)
+	} else {
+		err = pauseExtensionResourceJournal(ctx, tx, org)
+	}
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func journalExtensionResourceEvent(ctx context.Context, tx Tx, entry extensionResourceJournalEntry) error {
@@ -120,8 +248,8 @@ func journalExtensionResourceEvent(ctx context.Context, tx Tx, entry extensionRe
 // operation a journal consumer. It matches the subscription service grant.
 const extensionResourceEventsRead = "resource-events.read"
 
-// ErrExtensionResourceCursorExpired reports that the retention policy removed
-// entries after the presented cursor. Silently continuing would skip them.
+// ErrExtensionResourceCursorExpired reports that entries after the presented
+// cursor were pruned or never journaled. Silently continuing would skip them.
 var ErrExtensionResourceCursorExpired = errors.New("resource event cursor precedes retained history")
 
 // ReadExtensionResourceEvents returns the next page within the grant's frozen
@@ -133,6 +261,11 @@ func ReadExtensionResourceEvents(ctx context.Context, db Databaser, grant Extern
 	if (after != nil && *after < 0) || limit < 1 || limit > 200 {
 		return nil, 0, NewErrBadRequest("invalid resource event page")
 	}
+	// Only subscribed Control Planes serve reads. A pause recorded by another
+	// replica becomes a gap before anything is read.
+	if err := resumeExtensionResourceJournalForRead(ctx, db, grant.OrgID); err != nil {
+		return nil, 0, err
+	}
 	if after != nil {
 		if err := acknowledgeExtensionResourceCursor(ctx, db, grant, *after); err != nil {
 			return nil, 0, err
@@ -143,21 +276,16 @@ func ReadExtensionResourceEvents(ctx context.Context, db Databaser, grant Extern
 		return nil, 0, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	var head, prunedThrough int64
+	var head, horizon int64
 	err = tx.QueryRowContext(ctx, `SELECT COALESCE((SELECT cursor FROM extension_resource_event_heads WHERE org_id=$1),0),
-		COALESCE((SELECT pruned_through FROM extension_resource_event_retention WHERE org_id=$1),0)`, grant.OrgID).Scan(&head, &prunedThrough)
+		GREATEST(COALESCE((SELECT pruned_through FROM extension_resource_event_retention WHERE org_id=$1),0),
+			COALESCE((SELECT gap_cursor FROM extension_resource_event_journal_state WHERE org_id=$1),0))`, grant.OrgID).Scan(&head, &horizon)
 	if err != nil {
 		return nil, 0, err
 	}
-	start := prunedThrough
-	if after != nil {
-		if *after > head {
-			return nil, 0, NewErrBadRequest("resource event cursor is ahead of this journal")
-		}
-		if *after < prunedThrough {
-			return nil, 0, ErrExtensionResourceCursorExpired
-		}
-		start = *after
+	start, err := extensionResourceStart(after, head, horizon)
+	if err != nil {
+		return nil, 0, err
 	}
 	envs := make([]string, 0, len(grant.Intent.Environments))
 	modules := make([]string, 0, len(grant.Intent.Modules))
@@ -193,6 +321,35 @@ func ReadExtensionResourceEvents(ctx context.Context, db Databaser, grant Extern
 		}
 	}
 	return items, next, rows.Err()
+}
+
+// extensionResourceStart returns the cursor a page starts after. History up
+// to horizon, the later of the retention boundary and the latest journal gap,
+// is unavailable: an older cursor expires and a read without a cursor starts
+// at the horizon.
+func extensionResourceStart(after *int64, head, horizon int64) (int64, error) {
+	if after == nil {
+		return horizon, nil
+	}
+	if *after > head {
+		return 0, NewErrBadRequest("resource event cursor is ahead of this journal")
+	}
+	if *after < horizon {
+		return 0, ErrExtensionResourceCursorExpired
+	}
+	return *after, nil
+}
+
+func resumeExtensionResourceJournalForRead(ctx context.Context, db Databaser, org string) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := resumeExtensionResourceJournal(ctx, tx, org); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // acknowledgeExtensionResourceCursor moves the consumer's acknowledgement
@@ -247,7 +404,7 @@ func PruneExtensionResourceJournal(ctx context.Context, db Databaser, subscriber
 	if err := policy.Validate(); err != nil {
 		return 0, err
 	}
-	orgs, err := extensionJournalOrganizations(ctx, db)
+	orgs, err := extensionJournalOrganizations(ctx, db, `SELECT org_id FROM extension_resource_event_heads ORDER BY org_id`)
 	if err != nil {
 		return 0, err
 	}
@@ -262,13 +419,13 @@ func PruneExtensionResourceJournal(ctx context.Context, db Databaser, subscriber
 	return pruned, nil
 }
 
-func extensionJournalOrganizations(ctx context.Context, db Databaser) ([]string, error) {
+func extensionJournalOrganizations(ctx context.Context, db Databaser, query string) ([]string, error) {
 	tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	rows, err := tx.QueryContext(ctx, `SELECT org_id FROM extension_resource_event_heads ORDER BY org_id`)
+	rows, err := tx.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}

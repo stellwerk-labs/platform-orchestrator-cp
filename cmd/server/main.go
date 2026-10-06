@@ -144,6 +144,15 @@ func main() {
 	if err != nil {
 		zap.L().Fatal("Failed to initialize database", zap.Error(err))
 	}
+	// Record before serving whether this server journals each organization, so
+	// a subscriber returning after a pause sees the gap.
+	var journalSubscribers func(orgID string) bool
+	if gateway != nil {
+		journalSubscribers = gateway.Registry.HasResourceEventSubscriber
+	}
+	if err := model.ReconcileExtensionResourceJournal(ctx, db, journalSubscribers); err != nil {
+		zap.L().Fatal("Failed to reconcile the extension resource journal", zap.Error(err))
+	}
 	defer func() {
 		zap.L().Info("Closing database")
 		if err := db.Close(); err != nil {

@@ -48,7 +48,7 @@ func extensionEventMessage(t *testing.T, subject genevents.EventType, orgID, rea
 
 func resetExtensionEventFixtures(t *testing.T, db Databaser) {
 	t.Helper()
-	_, err := db.(*databaser).ExecContext(t.Context(), `TRUNCATE extension_resource_events, extension_resource_event_heads, extension_resource_event_consumers, extension_resource_event_retention, extension_published_events, pending_event_messages`)
+	_, err := db.(*databaser).ExecContext(t.Context(), `TRUNCATE extension_resource_events, extension_resource_event_heads, extension_resource_event_consumers, extension_resource_event_retention, extension_resource_event_journal_state, extension_published_events, pending_event_messages`)
 	require.NoError(t, err)
 }
 

@@ -40,16 +40,22 @@ func TestExtensionJournalEntriesOnlyForSubscribedOrganizations(t *testing.T) {
 	}
 	entries, err := extensionJournalEntries(messages, func(org string) bool { return org == "subscribed" })
 	require.NoError(t, err)
-	require.Len(t, entries, 2, "only journal event types of subscribed organizations are projected")
+	require.Len(t, entries, 3, "only journal event types are projected")
+	journaled := map[string]bool{}
 	for _, entry := range entries {
-		require.Equal(t, "subscribed", entry.orgID)
+		journaled[entry.orgID+" "+entry.event.Type] = entry.journaled
 	}
-	require.Equal(t, string(genevents.IoPlatformOrchestratorEnvironmentDeleted), entries[0].event.Type)
-	require.Equal(t, string(genevents.IoPlatformOrchestratorModuleCatalogueChanged), entries[1].event.Type)
+	require.Equal(t, map[string]bool{
+		"subscribed " + string(genevents.IoPlatformOrchestratorEnvironmentDeleted):     true,
+		"unsubscribed " + string(genevents.IoPlatformOrchestratorEnvironmentDeleted):   false,
+		"subscribed " + string(genevents.IoPlatformOrchestratorModuleCatalogueChanged): true,
+	}, journaled, "an unsubscribed organization is kept only to record its journal pause")
 
 	none, err := extensionJournalEntries(messages, func(string) bool { return false })
 	require.NoError(t, err)
-	require.Empty(t, none)
+	for _, entry := range none {
+		require.False(t, entry.journaled)
+	}
 
 	_, err = extensionJournalEntries([]*hstandardoutbox.PendingEventMessage{{Subject: string(genevents.IoPlatformOrchestratorEnvironmentDeleted), Payload: []byte(`{"data":{}}`)}}, func(string) bool { return true })
 	require.Error(t, err, "a journal event without an organization is rejected")
@@ -66,5 +72,59 @@ func TestExtensionResourceRetentionPolicyBounds(t *testing.T) {
 		"oversized batch": {Window: time.Hour, Batch: 100001},
 	} {
 		require.Error(t, policy.Validate(), name)
+	}
+}
+
+func TestJournalOrganizationsKeepLockOrderAndEventOrder(t *testing.T) {
+	entry := func(org, reason string, journaled bool) extensionResourceJournalEntry {
+		return extensionResourceJournalEntry{orgID: org, event: ExtensionResourceEvent{Reason: reason}, journaled: journaled}
+	}
+	groups := journalOrganizations([]extensionResourceJournalEntry{
+		entry("zeta", "z1", true), entry("alpha", "a1", true), entry("paused", "p1", false),
+		entry("zeta", "z2", true), entry("alpha", "a2", true), entry("paused", "p2", false),
+	})
+	require.Len(t, groups, 3)
+	orgs, reasons := []string{}, map[string][]string{}
+	for _, group := range groups {
+		orgs = append(orgs, group.orgID)
+		for _, item := range group.entries {
+			reasons[group.orgID] = append(reasons[group.orgID], item.event.Reason)
+		}
+	}
+	require.Equal(t, []string{"alpha", "paused", "zeta"}, orgs, "every writer locks organizations in the same order")
+	require.Equal(t, map[string][]string{"alpha": {"a1", "a2"}, "zeta": {"z1", "z2"}}, reasons, "event order is kept and paused entries are not written")
+	require.False(t, groups[1].journaled)
+}
+
+func TestExtensionResourceStartHonoursRetentionAndGaps(t *testing.T) {
+	cursor := func(value int64) *int64 { return &value }
+	for name, tc := range map[string]struct {
+		after          *int64
+		head, horizon  int64
+		start          int64
+		expired, ahead bool
+	}{
+		"fresh read starts at the horizon":        {after: nil, head: 9, horizon: 5, start: 5},
+		"fresh read of an untouched journal":      {after: nil, head: 9, horizon: 0, start: 0},
+		"cursor at the horizon is still complete": {after: cursor(5), head: 9, horizon: 5, start: 5},
+		"cursor before the horizon expires":       {after: cursor(4), head: 9, horizon: 5, expired: true},
+		"cursor issued before a gap expires":      {after: cursor(9), head: 10, horizon: 10, expired: true},
+		"cursor issued after the gap is valid":    {after: cursor(10), head: 12, horizon: 10, start: 10},
+		"cursor ahead of the journal is rejected": {after: cursor(13), head: 12, horizon: 0, ahead: true},
+		"zero cursor on a pruned journal expires": {after: cursor(0), head: 3, horizon: 1, expired: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			start, err := extensionResourceStart(tc.after, tc.head, tc.horizon)
+			switch {
+			case tc.expired:
+				require.ErrorIs(t, err, ErrExtensionResourceCursorExpired)
+			case tc.ahead:
+				_, isBadRequest := IsErrBadRequest(err)
+				require.True(t, isBadRequest, "%v", err)
+			default:
+				require.NoError(t, err)
+				require.Equal(t, tc.start, start)
+			}
+		})
 	}
 }

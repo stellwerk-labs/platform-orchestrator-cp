@@ -47,6 +47,20 @@ Initial planning reads authoritative current resource inventory, not history.
 The registry is read at startup, so installing or removing a subscription takes
 effect with the restart that applies the new installation configuration.
 
+When journaling of an organization pauses and later resumes, Core records a
+gap instead of letting a returning subscriber silently miss changes. A pause is
+recorded at startup by every Control Plane that does not journal the
+organization (subscription removed or plugin host disabled), and by a plugin
+host that skips an event of an organization with a journal. Journaling resumes
+at the startup of a subscribed Control Plane, or at its next journal write or
+read. The resume takes a gap cursor of its own. Every cursor issued before the
+latest gap returns HTTP 409 `plugin_resource_cursor_expired`, exactly like a
+cursor before pruned history, so the consumer resynchronises from current Core
+resources and reads again without a cursor. Reading without a cursor starts
+after the gap. A Control Plane with the plugin host disabled records pauses
+only at its startup, so turn the plugin host on or off for all replicas
+together, not mixed.
+
 ## Acknowledgement and retention
 
 Presenting a cursor as `after` acknowledges every entry up to it. Present only a
@@ -85,6 +99,8 @@ Retention is an explicit runtime policy, not a schema change. No down migration
 deletes delivered history: migration 37 still refuses to discard journal or
 publication history, and migration 39 refuses to downgrade once any entry was
 pruned, because the previous application could not report expired cursors.
+Migration 40, which records journal pauses and gaps, likewise refuses to
+downgrade once a pause or gap was recorded.
 Rolling back only the application after pruning keeps the tables but loses that
 expiry signal for stale cursors. Active consumers are unaffected, because their
 history was never pruned. Entries that existed before migration 39 count their
