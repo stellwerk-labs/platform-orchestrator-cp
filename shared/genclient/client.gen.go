@@ -2786,7 +2786,7 @@ type PluginDeploymentReadRequest struct {
 	// DeploymentId Required for deployment inspection of exactly one Environment.
 	DeploymentId *openapi_types.UUID `json:"deployment_id,omitempty"`
 
-	// DispatchId Required for receipt inspection after a lost dispatch response. This is a read
+	// DispatchId Required for receipt inspection after a lost dispatch response. This is a read, never a retry of execution.
 	DispatchId   *string `json:"dispatch_id,omitempty"`
 	Environments []struct {
 		EnvId     string `json:"env_id"`

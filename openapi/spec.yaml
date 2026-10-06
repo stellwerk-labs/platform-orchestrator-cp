@@ -434,7 +434,7 @@ paths:
                 occurred_at: {type: string, format: date-time}
                 data: {type: object, additionalProperties: true}
       responses:
-        '204': {description: Publication durably accepted, or the exact receipt replayed.}
+        '204': {description: 'Publication durably accepted, or the exact receipt replayed.'}
         '400': {$ref: '#/components/responses/400BadRequest'}
         '403': {$ref: '#/components/responses/403Forbidden'}
         '404': {$ref: '#/components/responses/404NotFound'}
@@ -3295,7 +3295,7 @@ components:
           maxProperties: 1000
           additionalProperties: {type: string, format: uuid}
         deployment_id: {type: string, format: uuid, description: Required for deployment inspection of exactly one Environment.}
-        dispatch_id: {type: string, minLength: 1, maxLength: 128, description: Required for receipt inspection after a lost dispatch response. This is a read, never a retry of execution.}
+        dispatch_id: {type: string, minLength: 1, maxLength: 128, description: 'Required for receipt inspection after a lost dispatch response. This is a read, never a retry of execution.'}
     ModuleVersionLifecycle:
       type: object
       required: [module_id, module_uuid, version, version_uuid, artifact_digest, status, created_at]

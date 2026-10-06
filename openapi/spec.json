@@ -1127,8 +1127,7 @@
         },
         "responses": {
           "204": {
-            "description": "Publication durably accepted",
-            "or the exact receipt replayed.": ""
+            "description": "Publication durably accepted, or the exact receipt replayed."
           },
           "400": {
             "$ref": "#/components/responses/400BadRequest"
@@ -6377,8 +6376,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "description": "Required for receipt inspection after a lost dispatch response. This is a read",
-            "never a retry of execution.": ""
+            "description": "Required for receipt inspection after a lost dispatch response. This is a read, never a retry of execution."
           }
         }
       },
