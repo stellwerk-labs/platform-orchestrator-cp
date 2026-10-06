@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"math"
 	"regexp"
 	"strings"
 	"time"
@@ -115,22 +116,48 @@ func journalExtensionResourceEvent(ctx context.Context, tx Tx, entry extensionRe
 	return err
 }
 
-func ReadExtensionResourceEvents(ctx context.Context, db Databaser, grant ExternalOperationGrant, after int64, limit int) ([]ExtensionResourceEvent, int64, error) {
-	if after < 0 || limit < 1 || limit > 200 {
+// extensionResourceEventsRead is the delegated operation action that makes an
+// operation a journal consumer. It matches the subscription service grant.
+const extensionResourceEventsRead = "resource-events.read"
+
+// ErrExtensionResourceCursorExpired reports that the retention policy removed
+// entries after the presented cursor. Silently continuing would skip them.
+var ErrExtensionResourceCursorExpired = errors.New("resource event cursor precedes retained history")
+
+// ReadExtensionResourceEvents returns the next page within the grant's frozen
+// scope. A nil cursor starts at the oldest retained entry. Presenting a cursor
+// acknowledges every entry up to it: consumers present only cursors whose
+// effects they committed, and retention never prunes past an active
+// consumer's acknowledgement.
+func ReadExtensionResourceEvents(ctx context.Context, db Databaser, grant ExternalOperationGrant, after *int64, limit int) ([]ExtensionResourceEvent, int64, error) {
+	if (after != nil && *after < 0) || limit < 1 || limit > 200 {
 		return nil, 0, NewErrBadRequest("invalid resource event page")
+	}
+	if after != nil {
+		if err := acknowledgeExtensionResourceCursor(ctx, db, grant, *after); err != nil {
+			return nil, 0, err
+		}
 	}
 	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
 	if err != nil {
 		return nil, 0, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	var head int64
-	err = tx.QueryRowContext(ctx, `SELECT COALESCE((SELECT cursor FROM extension_resource_event_heads WHERE org_id=$1),0)`, grant.OrgID).Scan(&head)
+	var head, prunedThrough int64
+	err = tx.QueryRowContext(ctx, `SELECT COALESCE((SELECT cursor FROM extension_resource_event_heads WHERE org_id=$1),0),
+		COALESCE((SELECT pruned_through FROM extension_resource_event_retention WHERE org_id=$1),0)`, grant.OrgID).Scan(&head, &prunedThrough)
 	if err != nil {
 		return nil, 0, err
 	}
-	if after > head {
-		return nil, 0, NewErrBadRequest("resource event cursor is ahead of this journal")
+	start := prunedThrough
+	if after != nil {
+		if *after > head {
+			return nil, 0, NewErrBadRequest("resource event cursor is ahead of this journal")
+		}
+		if *after < prunedThrough {
+			return nil, 0, ErrExtensionResourceCursorExpired
+		}
+		start = *after
 	}
 	envs := make([]string, 0, len(grant.Intent.Environments))
 	modules := make([]string, 0, len(grant.Intent.Modules))
@@ -143,7 +170,7 @@ func ReadExtensionResourceEvents(ctx context.Context, db Databaser, grant Extern
 	rows, err := tx.QueryContext(ctx, `SELECT cursor,event FROM extension_resource_events WHERE org_id=$1 AND cursor>$2 AND cursor<=$3
 		AND (environment_uuid IS NULL OR environment_uuid=ANY($4::uuid[]))
 		AND (module_uuid IS NULL OR module_uuid=ANY($5::uuid[]))
-		AND (environment_uuid IS NOT NULL OR module_uuid IS NOT NULL) ORDER BY cursor LIMIT $6`, grant.OrgID, after, head, pq.Array(envs), pq.Array(modules), limit)
+		AND (environment_uuid IS NOT NULL OR module_uuid IS NOT NULL) ORDER BY cursor LIMIT $6`, grant.OrgID, start, head, pq.Array(envs), pq.Array(modules), limit)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -166,6 +193,158 @@ func ReadExtensionResourceEvents(ctx context.Context, db Databaser, grant Extern
 		}
 	}
 	return items, next, rows.Err()
+}
+
+// acknowledgeExtensionResourceCursor moves the consumer's acknowledgement
+// forward. A cursor beyond the journal head is not recorded; the read rejects it.
+func acknowledgeExtensionResourceCursor(ctx context.Context, db Databaser, grant ExternalOperationGrant, cursor int64) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `INSERT INTO extension_resource_event_consumers (org_id,plugin_id,operation_id,acknowledged_cursor)
+		SELECT $1,$2,$3,$4 WHERE $4 <= COALESCE((SELECT cursor FROM extension_resource_event_heads WHERE org_id=$1),0)
+		ON CONFLICT (org_id,plugin_id,operation_id) DO UPDATE SET acknowledged_cursor=EXCLUDED.acknowledged_cursor, acknowledged_at=now()
+		WHERE extension_resource_event_consumers.acknowledged_cursor < EXCLUDED.acknowledged_cursor`,
+		grant.OrgID, grant.PluginID, grant.OperationID, cursor); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// ExtensionResourceRetention is the explicit journal retention policy. An
+// entry is pruned only when it is older than Window and below the lowest
+// acknowledged cursor of every active consumer in its organization.
+type ExtensionResourceRetention struct {
+	Window time.Duration
+	// Batch bounds the entries removed per organization and run.
+	Batch int
+}
+
+func (p ExtensionResourceRetention) Validate() error {
+	if p.Window < time.Hour {
+		return errors.New("extension resource journal retention must be at least one hour")
+	}
+	if p.Batch < 1 || p.Batch > 100000 {
+		return errors.New("extension resource journal retention batch must be between 1 and 100000")
+	}
+	return nil
+}
+
+// PruneExtensionResourceJournal applies the retention policy to every
+// journaled organization. subscribers returns the plugins currently installed
+// with a resource event subscription for an organization. Only their
+// operations count as consumers: unreleased grants that delegate
+// resource-events.read, and released ones for one more retention window so
+// that terminal reconciliation can finish. A consumer without an
+// acknowledgement holds its organization's entire history.
+//
+// Organizations are pruned under a try-advisory lock, so several Control
+// Plane replicas may run this concurrently; an organization locked by another
+// replica is skipped until the next run.
+func PruneExtensionResourceJournal(ctx context.Context, db Databaser, subscribers func(orgID string) []string, policy ExtensionResourceRetention, now time.Time) (int64, error) {
+	if err := policy.Validate(); err != nil {
+		return 0, err
+	}
+	orgs, err := extensionJournalOrganizations(ctx, db)
+	if err != nil {
+		return 0, err
+	}
+	var pruned int64
+	for _, org := range orgs {
+		count, err := pruneExtensionResourceOrganization(ctx, db, org, subscribers(org), policy, now)
+		if err != nil {
+			return pruned, err
+		}
+		pruned += count
+	}
+	return pruned, nil
+}
+
+func extensionJournalOrganizations(ctx context.Context, db Databaser) ([]string, error) {
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	rows, err := tx.QueryContext(ctx, `SELECT org_id FROM extension_resource_event_heads ORDER BY org_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	orgs := []string{}
+	for rows.Next() {
+		var org string
+		if err := rows.Scan(&org); err != nil {
+			return nil, err
+		}
+		orgs = append(orgs, org)
+	}
+	return orgs, rows.Err()
+}
+
+//	cursor:   1   2   3   4   5   6   7
+//	          [ older than window ][young]
+//	                    ^ lowest acknowledgement (5)
+//	pruned:   1   2   3   4            -> pruned_through = 4
+//
+// The bound is the longest prefix after pruned_through whose entries are all
+// older than the window and below the lowest acknowledgement, so retained
+// history always stays contiguous.
+func pruneExtensionResourceOrganization(ctx context.Context, db Databaser, org string, subscribers []string, policy ExtensionResourceRetention, now time.Time) (int64, error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var locked bool
+	if err := tx.QueryRowContext(ctx, `SELECT pg_try_advisory_xact_lock(hashtextextended($1, 4))`, "extension-resource-retention:"+org).Scan(&locked); err != nil {
+		return 0, err
+	}
+	if !locked {
+		return 0, nil
+	}
+	var prunedThrough int64
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE((SELECT pruned_through FROM extension_resource_event_retention WHERE org_id=$1),0)`, org).Scan(&prunedThrough); err != nil {
+		return 0, err
+	}
+	var lowest sql.NullInt64
+	if err := tx.QueryRowContext(ctx, `SELECT MIN(COALESCE(c.acknowledged_cursor,0)) FROM external_operation_grants g
+		LEFT JOIN extension_resource_event_consumers c ON c.org_id=g.org_id AND c.plugin_id=g.plugin_id AND c.operation_id=g.operation_id
+		WHERE g.org_id=$1 AND g.plugin_id=ANY($2) AND g.intent->'actions' @> jsonb_build_array($3::text)
+		AND (g.state<>$4 OR g.updated_at>$5)`,
+		org, pq.Array(subscribers), extensionResourceEventsRead, grantStateReleased, now.Add(-policy.Window)).Scan(&lowest); err != nil {
+		return 0, err
+	}
+	below := int64(math.MaxInt64)
+	if lowest.Valid {
+		below = lowest.Int64
+	}
+	var bound int64
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(cursor),$2) FROM (
+		SELECT cursor, bool_and(recorded_at<$3 AND cursor<$4) OVER (ORDER BY cursor) AS prunable FROM (
+			SELECT cursor, recorded_at FROM extension_resource_events WHERE org_id=$1 AND cursor>$2 ORDER BY cursor LIMIT $5
+		) candidates
+	) prefix WHERE prunable`, org, prunedThrough, now.Add(-policy.Window), below, policy.Batch).Scan(&bound); err != nil {
+		return 0, err
+	}
+	if bound <= prunedThrough {
+		return 0, nil
+	}
+	result, err := tx.ExecContext(ctx, `DELETE FROM extension_resource_events WHERE org_id=$1 AND cursor>$2 AND cursor<=$3`, org, prunedThrough, bound)
+	if err != nil {
+		return 0, err
+	}
+	pruned, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO extension_resource_event_retention (org_id,pruned_through,pruned_at) VALUES ($1,$2,now())
+		ON CONFLICT (org_id) DO UPDATE SET pruned_through=GREATEST(extension_resource_event_retention.pruned_through,EXCLUDED.pruned_through), pruned_at=now()`, org, bound); err != nil {
+		return 0, err
+	}
+	return pruned, tx.Commit()
 }
 
 type ExtensionPublishedEvent struct {

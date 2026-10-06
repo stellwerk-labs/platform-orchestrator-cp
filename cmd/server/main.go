@@ -129,10 +129,14 @@ func main() {
 	// whether Core keeps the extension resource journal at all.
 	var gateway *plugins.Gateway
 	var dbOptions []model.DatabaserOption
+	retention := model.ExtensionResourceRetention{Window: cfg.PluginEventJournalRetention, Batch: journalRetentionBatch}
 	if cfg.PluginExperimentEnabled {
 		gateway, err = plugins.LoadGateway(cfg.PluginInstallationsFile, cfg.PluginSigningKeyFile, cfg.PluginIssuer, cfg.PluginDevelopmentHTTP)
 		if err != nil {
 			zap.L().Fatal("Failed to initialize experimental plugin gateway", zap.Error(err))
+		}
+		if err := retention.Validate(); err != nil {
+			zap.L().Fatal("Invalid plugin event journal retention", zap.Error(err))
 		}
 		dbOptions = append(dbOptions, model.WithExtensionResourceJournal(gateway.Registry.HasResourceEventSubscriber))
 	}
@@ -265,8 +269,9 @@ func main() {
 
 	bgCtx, bgCancel := context.WithCancel(ctx)
 	defer bgCancel()
-	if entitlementAdapter != nil {
-		go sweepPluginEntitlements(bgCtx, entitlementAdapter, server.Logger)
+	if gateway != nil {
+		go runEvery(bgCtx, entitlementSweepInterval, entitlementSweepTimeout, server.Logger, "entitlement boundary sweep", sweepPluginEntitlements(entitlementAdapter))
+		go runEvery(bgCtx, journalRetentionInterval, journalRetentionTimeout, server.Logger, "extension journal retention", pruneExtensionJournal(db, gateway.Registry, retention, server.Logger))
 	}
 	go func() {
 		zap.L().Info("Starting scheduled flush of pending messages")

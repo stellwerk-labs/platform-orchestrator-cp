@@ -44,6 +44,9 @@ type Configuration struct {
 	PluginEntitlementMode       string `env:"PLUGIN_ENTITLEMENT_MODE, default=production" validate:"oneof=production development"`
 	PluginEntitlementTrustFile  string `env:"PLUGIN_ENTITLEMENT_TRUST_FILE"`
 	PluginEntitlementBundleFile string `env:"PLUGIN_ENTITLEMENT_BUNDLE_FILE"`
+	// PluginEventJournalRetention is the minimum age before an extension
+	// resource journal entry that every active consumer acknowledged is pruned.
+	PluginEventJournalRetention time.Duration `env:"PLUGIN_EVENT_JOURNAL_RETENTION, default=720h"`
 	// PluginDataPlaneInternalHTTP permits only the fixed Core-to-DP origin in
 	// an operator-declared trusted cluster network. It never permits HTTP
 	// plugin backends or service-user bearer credentials over HTTP.

@@ -60,17 +60,19 @@ func (s *Server) ReadPluginResourceEvents(ctx context.Context, request ReadPlugi
 		return nil, err
 	}
 	cursor := pluginResourceCursor{Org: request.OrgId, Plugin: request.PluginId, Operation: request.OperationId}
+	var after *int64
 	if request.Params.After != nil && *request.Params.After != "" {
 		encoded, err := base64.RawURLEncoding.DecodeString(*request.Params.After)
 		var decoded pluginResourceCursor
 		if err != nil || json.Unmarshal(encoded, &decoded) != nil || decoded.Org != cursor.Org || decoded.Plugin != cursor.Plugin || decoded.Operation != cursor.Operation || decoded.Sequence < 0 {
 			return nil, pluginBoundaryError(400, "plugin_cursor_invalid", "Use a cursor returned for this exact operation.")
 		}
-		cursor = decoded
+		presented := decoded.Sequence
+		after = &presented
 	}
-	events, next, err := model.ReadExtensionResourceEvents(ctx, s.Database, *grant, cursor.Sequence, ref.DerefOr(request.Params.Limit, 100))
+	events, next, err := model.ReadExtensionResourceEvents(ctx, s.Database, *grant, after, ref.DerefOr(request.Params.Limit, 100))
 	if err != nil {
-		return nil, pluginModelError(err)
+		return nil, pluginResourceEventError(err)
 	}
 	encoded, err := json.Marshal(events)
 	if err != nil {
@@ -87,6 +89,15 @@ func (s *Server) ReadPluginResourceEvents(ctx context.Context, request ReadPlugi
 	}
 	response.NextCursor = base64.RawURLEncoding.EncodeToString(encoded)
 	return response, nil
+}
+
+// pluginResourceEventError keeps an expired cursor distinguishable from an
+// ordinary conflict, so a consumer rebuilds its state instead of retrying.
+func pluginResourceEventError(err error) error {
+	if errors.Is(err, model.ErrExtensionResourceCursorExpired) {
+		return pluginBoundaryError(409, "plugin_resource_cursor_expired", "Retention removed resource events after this cursor. Rebuild state from current Core resources, then read again without a cursor.")
+	}
+	return pluginModelError(err)
 }
 
 func (s *Server) PublishPluginEvent(ctx context.Context, request PublishPluginEventRequestObject) (PublishPluginEventResponseObject, error) {

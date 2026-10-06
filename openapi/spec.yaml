@@ -380,7 +380,7 @@ paths:
       operationId: readPluginResourceEvents
       tags: [Plugin]
       security: [{userIdHeader: []}]
-      description: Read durable Core resource metadata within a frozen operation. Only the configured plugin service may call; current controller authorization is required, including during safety recovery. Cursors are opaque and scoped to this operation.
+      description: Read durable Core resource metadata within a frozen operation. Only the configured plugin service may call; current controller authorization is required, including during safety recovery. Cursors are opaque and scoped to this operation. Presenting a cursor acknowledges every event up to it, so present only a cursor whose effects are committed. Without a cursor, reading starts at the oldest retained event. Core prunes events that are older than its retention window and acknowledged by every active consumer; a cursor before the pruned history returns 409 plugin_resource_cursor_expired.
       parameters:
         - $ref: '#/components/parameters/orgIdPathParam'
         - {name: pluginId, in: path, required: true, schema: {type: string}}

@@ -28,10 +28,8 @@ introducing a head-lock/resource-lock inversion in bulk commands. A database
 sequence alone could skip a lower cursor that commits later. A page
 may contain no matching events while still advancing its cursor. Consumers must
 commit their cursor and effects atomically, and deduplicate by immutable event ID.
-There is no retention purge in this experiment. Migration 37 refuses a schema
-downgrade that would discard event history. Application rollback keeps the
-additive tables. Events before this migration are not retroactively synthesized;
-initial planning still reads authoritative current resource inventory.
+Migration 37 refuses a schema downgrade that would discard event history.
+Application rollback keeps the additive tables.
 
 ## Journal scope
 
@@ -48,6 +46,49 @@ synthesize entries for changes made before that, or while no plugin subscribed.
 Initial planning reads authoritative current resource inventory, not history.
 The registry is read at startup, so installing or removing a subscription takes
 effect with the restart that applies the new installation configuration.
+
+## Acknowledgement and retention
+
+Presenting a cursor as `after` acknowledges every entry up to it. Present only a
+cursor whose effects you have committed; never read ahead with an uncommitted
+cursor. Reading without a cursor starts at the oldest retained entry.
+
+The retention policy removes an entry only when both hold:
+
+- it is older than `PLUGIN_EVENT_JOURNAL_RETENTION` (default `720h`, 30 days;
+  a value below one hour stops startup), and
+- its cursor is below the lowest acknowledgement of every active consumer in
+  the organization.
+
+Active consumers are operations of currently installed subscribing plugins whose
+frozen intent delegates `resource-events.read` and that are not released, plus
+released operations for one further retention window so terminal reconciliation
+can finish. An active consumer that never presented a cursor holds its
+organization's entire history, so release abandoned operations. Operations of an
+uninstalled plugin do not hold history.
+
+Pruning always removes a contiguous prefix, so retained history has no holes. A
+cursor older than the pruned history returns HTTP 409
+`plugin_resource_cursor_expired` instead of silently skipping entries. The
+consumer then rebuilds its state from current Core resources and reads again
+without a cursor. Retention never prunes past an active consumer's cursor, so
+this only affects consumers that were inactive or restored an older cursor.
+
+Every Control Plane replica runs retention at startup and then every ten
+minutes, removing at most 10,000 entries per organization and run. Each
+organization is pruned under a PostgreSQL try-advisory lock, so a concurrent
+replica skips it and no replica waits for another. Retention runs only with the
+plugin host enabled; without it the journal neither grows nor shrinks. Request
+handling never depends on a retention run.
+
+Retention is an explicit runtime policy, not a schema change. No down migration
+deletes delivered history: migration 37 still refuses to discard journal or
+publication history, and migration 39 refuses to downgrade once any entry was
+pruned, because the previous application could not report expired cursors.
+Rolling back only the application after pruning keeps the tables but loses that
+expiry signal for stale cursors. Active consumers are unaffected, because their
+history was never pruned. Entries that existed before migration 39 count their
+age from the upgrade.
 
 ## Publication
 

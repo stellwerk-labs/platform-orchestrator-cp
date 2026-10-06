@@ -54,3 +54,17 @@ func TestExtensionJournalEntriesOnlyForSubscribedOrganizations(t *testing.T) {
 	_, err = extensionJournalEntries([]*hstandardoutbox.PendingEventMessage{{Subject: string(genevents.IoPlatformOrchestratorEnvironmentDeleted), Payload: []byte(`{"data":{}}`)}}, func(string) bool { return true })
 	require.Error(t, err, "a journal event without an organization is rejected")
 }
+
+func TestExtensionResourceRetentionPolicyBounds(t *testing.T) {
+	require.NoError(t, ExtensionResourceRetention{Window: 30 * 24 * time.Hour, Batch: 10000}.Validate())
+	require.NoError(t, ExtensionResourceRetention{Window: time.Hour, Batch: 1}.Validate())
+	for name, policy := range map[string]ExtensionResourceRetention{
+		"zero window":     {Window: 0, Batch: 10000},
+		"negative window": {Window: -time.Hour, Batch: 10000},
+		"below one hour":  {Window: 59 * time.Minute, Batch: 10000},
+		"zero batch":      {Window: time.Hour, Batch: 0},
+		"oversized batch": {Window: time.Hour, Batch: 100001},
+	} {
+		require.Error(t, policy.Validate(), name)
+	}
+}

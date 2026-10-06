@@ -15,6 +15,7 @@ import (
 	"github.com/pressly/goose/v3"
 	"github.com/stellwerk-labs/golib/hstandardoutbox"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genevents"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -47,7 +48,7 @@ func extensionEventMessage(t *testing.T, subject genevents.EventType, orgID, rea
 
 func resetExtensionEventFixtures(t *testing.T, db Databaser) {
 	t.Helper()
-	_, err := db.(*databaser).ExecContext(t.Context(), `TRUNCATE extension_resource_events, extension_resource_event_heads, extension_published_events, pending_event_messages`)
+	_, err := db.(*databaser).ExecContext(t.Context(), `TRUNCATE extension_resource_events, extension_resource_event_heads, extension_resource_event_consumers, extension_resource_event_retention, extension_published_events, pending_event_messages`)
 	require.NoError(t, err)
 }
 
@@ -101,7 +102,7 @@ func TestExtensionResourceJournalIsAtomicWithOutboxAndProjectsTrustedFields(t *t
 	require.NoError(t, err)
 	grant, err := ApplyExternalGrantCommand(t.Context(), db, grantCommand)
 	require.NoError(t, err)
-	items, next, err := ReadExtensionResourceEvents(t.Context(), db, *grant, 0, 20)
+	items, next, err := ReadExtensionResourceEvents(t.Context(), db, *grant, nil, 20)
 	require.NoError(t, err)
 	require.Equal(t, int64(2), next)
 	require.Len(t, items, 2)
@@ -136,26 +137,26 @@ func TestExtensionResourceJournalScopesPaginationReplayAndReconnect(t *testing.T
 	_, err = db.InsertPendingEventMessages(t.Context(), nil, messages)
 	require.NoError(t, err)
 
-	first, next, err := ReadExtensionResourceEvents(t.Context(), db, *grant, 0, 2)
+	first, next, err := ReadExtensionResourceEvents(t.Context(), db, *grant, nil, 2)
 	require.NoError(t, err)
 	require.Equal(t, []string{"visible-env", "visible-module"}, []string{first[0].Reason, first[1].Reason})
 	require.Equal(t, int64(3), next)
-	replayed, replayNext, err := ReadExtensionResourceEvents(t.Context(), db, *grant, 0, 2)
+	replayed, replayNext, err := ReadExtensionResourceEvents(t.Context(), db, *grant, nil, 2)
 	require.NoError(t, err)
 	require.Equal(t, first, replayed)
 	require.Equal(t, next, replayNext)
-	second, finalCursor, err := ReadExtensionResourceEvents(t.Context(), db, *grant, next, 2)
+	second, finalCursor, err := ReadExtensionResourceEvents(t.Context(), db, *grant, &next, 2)
 	require.NoError(t, err)
 	require.Len(t, second, 1)
 	require.Equal(t, "visible-both", second[0].Reason)
 	require.Equal(t, int64(6), finalCursor, "the cursor advances across filtered events without exposing them")
-	empty, stableCursor, err := ReadExtensionResourceEvents(t.Context(), db, *grant, finalCursor, 2)
+	empty, stableCursor, err := ReadExtensionResourceEvents(t.Context(), db, *grant, &finalCursor, 2)
 	require.NoError(t, err)
 	require.Empty(t, empty)
 	require.Equal(t, finalCursor, stableCursor)
-	_, _, err = ReadExtensionResourceEvents(t.Context(), db, *grant, finalCursor+1, 2)
+	_, _, err = ReadExtensionResourceEvents(t.Context(), db, *grant, ref.Ref(finalCursor+1), 2)
 	require.ErrorContains(t, err, "ahead")
-	_, _, err = ReadExtensionResourceEvents(t.Context(), db, *grant, 0, 201)
+	_, _, err = ReadExtensionResourceEvents(t.Context(), db, *grant, nil, 201)
 	require.ErrorContains(t, err, "invalid")
 
 	var schema string
@@ -163,7 +164,7 @@ func TestExtensionResourceJournalScopesPaginationReplayAndReconnect(t *testing.T
 	reconnected, err := NewDatabaser(t.Context(), zap.NewNop(), os.Getenv("PLUGIN_TEST_DATABASE_URL")+" search_path="+schema, WithExtensionResourceJournal(journalEveryOrganization))
 	require.NoError(t, err)
 	defer func() { require.NoError(t, reconnected.Close()) }()
-	afterReconnect, reconnectCursor, err := ReadExtensionResourceEvents(t.Context(), reconnected, *grant, next, 2)
+	afterReconnect, reconnectCursor, err := ReadExtensionResourceEvents(t.Context(), reconnected, *grant, &next, 2)
 	require.NoError(t, err)
 	require.Equal(t, second, afterReconnect)
 	require.Equal(t, finalCursor, reconnectCursor)
@@ -189,18 +190,18 @@ func TestExtensionResourceCursorFollowsCommitOrderWithoutSkippingOpenTransaction
 		extensionEventMessage(t, genevents.IoPlatformOrchestratorModuleVersionPublished, grant.OrgID, "second-committed", nil, &moduleID),
 	})
 	require.NoError(t, err, "event collection must not wait on another transaction's journal head")
-	before, cursor, err := ReadExtensionResourceEvents(t.Context(), db, *grant, 0, 20)
+	before, cursor, err := ReadExtensionResourceEvents(t.Context(), db, *grant, nil, 20)
 	require.NoError(t, err)
 	require.Empty(t, before)
 	require.Zero(t, cursor)
 	require.NoError(t, secondTx.Commit())
-	firstPage, cursor, err := ReadExtensionResourceEvents(t.Context(), db, *grant, 0, 20)
+	firstPage, cursor, err := ReadExtensionResourceEvents(t.Context(), db, *grant, nil, 20)
 	require.NoError(t, err)
 	require.Len(t, firstPage, 1)
 	require.Equal(t, "second-committed", firstPage[0].Reason)
 	require.Equal(t, int64(1), cursor)
 	require.NoError(t, firstTx.Commit())
-	secondPage, cursor, err := ReadExtensionResourceEvents(t.Context(), db, *grant, cursor, 20)
+	secondPage, cursor, err := ReadExtensionResourceEvents(t.Context(), db, *grant, &cursor, 20)
 	require.NoError(t, err)
 	require.Len(t, secondPage, 1)
 	require.Equal(t, "first-open", secondPage[0].Reason)
