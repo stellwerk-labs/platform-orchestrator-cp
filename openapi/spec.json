@@ -1,8 +1,8 @@
 {
   "openapi": "3.0.0",
   "info": {
-    "title": "",
-    "version": ""
+    "title": "Stellwerk Control Plane API",
+    "version": "unreleased"
   },
   "paths": {
     "/orgs/{orgId}/plugins/{pluginId}/entitlement": {
@@ -2398,7 +2398,9 @@
                 "type": "string"
               }
             },
-            "example": "development",
+            "example": [
+              "development"
+            ],
             "required": false
           }
         ],
@@ -2657,7 +2659,9 @@
                 "type": "string"
               }
             },
-            "example": "development",
+            "example": [
+              "development"
+            ],
             "required": false
           }
         ],
@@ -7639,7 +7643,7 @@
           "id_prefix": {
             "description": "An id prefix for the org. If will be a prefix to the auto-generated id.",
             "type": "string",
-            "example": "workshop-",
+            "example": "workshop",
             "minLength": 1,
             "maxLength": 15,
             "pattern": "^[a-z](?:-?[a-z0-9]+)+$",
