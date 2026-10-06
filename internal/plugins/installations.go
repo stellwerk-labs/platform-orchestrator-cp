@@ -77,7 +77,7 @@ type Operation struct {
 	ServiceActionPathValues map[string]map[string][]string `json:"service_action_path_values,omitempty"`
 }
 
-// Installation is operator-controlled experimental configuration, not a signed
+// Installation is operator-controlled configuration, not a signed
 // commercial entitlement. Entitlement verification belongs to a separate gate.
 type Installation struct {
 	InstallationID             string                       `json:"installation_id,omitempty"`

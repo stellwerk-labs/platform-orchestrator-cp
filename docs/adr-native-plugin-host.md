@@ -1,6 +1,7 @@
-# ADR: bounded native add-on extraction experiment
+# ADR: bounded native plugin host
 
-Status: experiment, not a supported plugin SDK or production installation flow.
+Status: plugin contract level `v1alpha` for first-party plugins; not a stable
+partner SDK.
 Date: 2026-09-28.
 
 ## Decision
@@ -23,10 +24,10 @@ packaged and released separately from the Orchestrator.
 - The gateway uses the existing authenticated Orchestrator actor context and
   checks organization read access. The receiving add-on must independently
   check resource-specific IAM. A gateway assertion does not grant Core rights.
-- Experimental `shared/plugincontext` signs an exact method, request URI,
+- `shared/plugincontext` signs an exact method, request URI,
   body hash, actor, organization, plugin, API operation and request ID with
   Ed25519. Assertions last at most 60 seconds and bind the receiver audience.
-  This is an experimental versioned envelope, not a general bearer token or
+  This is a versioned `v1alpha` envelope, not a general bearer token or
   JWT. It is not a replacement for production workload-token exchange.
 - Mutations require durable idempotency at the receiver. Signature checking
   alone does not make a command single-use. The verifier requires the operation
@@ -41,7 +42,7 @@ packaged and released separately from the Orchestrator.
 - Reservation epochs have fencing values. Release and reacquisition invalidate
   old epochs. Authorization must be checked before every receipt replay.
 
-## Experimental configuration
+## Configuration
 
 ### Original-approver decisions
 
@@ -60,7 +61,7 @@ unused coverage. A committed receipt still consumes the approval regardless of
 later IAM changes. No endpoint, permission, request field or generated DTO is
 added, and controller checks plus final admission revalidation remain mandatory.
 
-`PLUGIN_EXPERIMENT_ENABLED` defaults to false. Enabling it requires absolute
+`PLUGIN_HOST_ENABLED` defaults to false. Enabling it requires absolute
 `PLUGIN_INSTALLATIONS_FILE` and `PLUGIN_SIGNING_KEY_FILE` paths. The key is an
 operator-owned PKCS8 Ed25519 PEM file and must not be committed. Installation
 configuration is strict JSON, per organization, and permits only registered
@@ -70,7 +71,7 @@ Origins require HTTPS unless the operator explicitly selects
 `PLUGIN_DEVELOPMENT_HTTP=true`. Backend addresses are not returned by discovery.
 The Console must independently reject a UI origin equal to the host origin.
 
-Configured availability states model the experiment only. They are **not**
+Configured availability states are operator configuration only. They are **not**
 commercial entitlement verification. Signed package verification, durable
 installation state, workload identity exchange and COSE entitlement validation
 remain separate integration gates. No configuration boolean is represented as
@@ -146,4 +147,4 @@ counted as end-to-end IAM verification. It does not supply fake successful Core
 operations to the plugin.
 
 No second Runner implementation, direct plugin Core-database access, secret
-decryption shortcut, or public distribution is permitted by this experiment.
+decryption shortcut is part of the plugin host.

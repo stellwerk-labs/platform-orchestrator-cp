@@ -1,6 +1,6 @@
 # Development-only offline entitlement issuer
 
-`cmd/plugin-entitlement-dev` is a standalone experiment tool. It is not part of
+`cmd/plugin-entitlement-dev` is a standalone development tool. It is not part of
 the Core server startup path or a production issuer. A fresh invocation creates
 an Ed25519 key and issuer, a strict development trust file, and one signed
 COSE_Sign1 grant bundle. No network or existing key is used for fresh issuance.

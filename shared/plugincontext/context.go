@@ -1,4 +1,4 @@
-// Package plugincontext implements the experimental v1 request-bound context
+// Package plugincontext implements the v1alpha request-bound context
 // passed from the Orchestrator gateway to a separately running add-on. It is
 // deliberately not a bearer session or a grant of arbitrary Core permissions.
 package plugincontext

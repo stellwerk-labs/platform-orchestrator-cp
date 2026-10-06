@@ -1,6 +1,6 @@
 # Local plugin protocol harness
 
-This command is a loopback-only component harness for the experimental plugin
+This command is a loopback-only component harness for the plugin
 protocol. It loads the real operator installation registry and
 `plugins.Gateway`, then exposes only the generic discovery and invoke routes:
 

@@ -130,10 +130,10 @@ func main() {
 	var gateway *plugins.Gateway
 	var dbOptions []model.DatabaserOption
 	retention := model.ExtensionResourceRetention{Window: cfg.PluginEventJournalRetention, Batch: journalRetentionBatch}
-	if cfg.PluginExperimentEnabled {
+	if cfg.PluginHostEnabled {
 		gateway, err = plugins.LoadGateway(cfg.PluginInstallationsFile, cfg.PluginSigningKeyFile, cfg.PluginIssuer, cfg.PluginDevelopmentHTTP)
 		if err != nil {
-			zap.L().Fatal("Failed to initialize experimental plugin gateway", zap.Error(err))
+			zap.L().Fatal("Failed to initialize plugin gateway", zap.Error(err))
 		}
 		if err := retention.Validate(); err != nil {
 			zap.L().Fatal("Invalid plugin event journal retention", zap.Error(err))

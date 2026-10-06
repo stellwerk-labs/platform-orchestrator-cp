@@ -37,7 +37,7 @@ Core keeps the journal only for organizations in which an installed plugin
 subscribes: its installation lists the organization and has a
 `resource-events.read` service grant. The installation registry is the only
 source; there is no separate switch. A Control Plane without the plugin host
-(`PLUGIN_EXPERIMENT_ENABLED=false`), or without any subscribing installation,
+(`PLUGIN_HOST_ENABLED=false`), or without any subscribing installation,
 writes no journal entries and uses the plain transactional outbox path. Ordinary
 outbox events are unaffected either way.
 

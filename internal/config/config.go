@@ -33,7 +33,7 @@ type Configuration struct {
 	OTELEnabled   bool          `env:"OTEL_ENABLE, default=false"`
 	LogLevel      string        `env:"LOG_LEVEL, default=INFO"`
 
-	PluginExperimentEnabled bool   `env:"PLUGIN_EXPERIMENT_ENABLED, default=false"`
+	PluginHostEnabled       bool   `env:"PLUGIN_HOST_ENABLED, default=false"`
 	PluginInstallationsFile string `env:"PLUGIN_INSTALLATIONS_FILE"`
 	PluginSigningKeyFile    string `env:"PLUGIN_SIGNING_KEY_FILE"`
 	PluginIssuer            string `env:"PLUGIN_ISSUER, default=stellwerk-control-plane"`

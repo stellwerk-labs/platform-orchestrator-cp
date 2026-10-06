@@ -191,7 +191,7 @@ func ApplyExternalPinCommand(ctx context.Context, db Databaser, command External
 		if fingerprint != priorFingerprint {
 			return nil, NewErrConflict("Pin request identity was used by another command or actor")
 		}
-		// Earlier experiment receipts contained only the Pin array. Exact
+		// Earlier receipts contained only the Pin array. Exact
 		// actor-bound replay remains compatible; read-only recovery requires
 		// the action metadata of the new envelope and never guesses it.
 		var result []EnvironmentModuleVersionPin

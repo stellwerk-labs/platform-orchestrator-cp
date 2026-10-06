@@ -1,6 +1,6 @@
 # Environment admission guards
 
-Environment admission guards are an experimental coordination boundary between
+Environment admission guards are a coordination boundary between
 the ordinary Data Plane Deployment path and Core-owned Module Version Pins.
 They do not execute infrastructure and are not a replacement Deployment engine.
 
@@ -81,7 +81,7 @@ one typed DP service-user UUID. DP requires both
 error. With neither configured, the released ordinary path remains unchanged
 and no Pin-race guarantee is claimed.
 
-This is a local native-plugin experiment contract. It requires coordinated Core
+This is part of the `v1alpha` plugin host contract. It requires coordinated Core
 and DP revisions plus gateway-authenticated internal listeners. It is not a
 published partner SDK, a general delegation token, or evidence that a complete
 plugin acceptance suite has passed.
