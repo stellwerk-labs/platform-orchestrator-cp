@@ -5153,6 +5153,9 @@ type ClientInterface interface {
 
 	PublishPluginEvent(ctx context.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID, body PublishPluginEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ReadPluginOperationInventory request
+	ReadPluginOperationInventory(ctx context.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ApplyPluginModuleOperationWithBody request with any body
 	ApplyPluginModuleOperationWithBody(ctx context.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -6796,6 +6799,18 @@ func (c *Client) PublishPluginEventWithBody(ctx context.Context, orgId OrgIdPath
 
 func (c *Client) PublishPluginEvent(ctx context.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID, body PublishPluginEventJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPublishPluginEventRequest(c.Server, orgId, pluginId, operationId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ReadPluginOperationInventory(ctx context.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReadPluginOperationInventoryRequest(c.Server, orgId, pluginId, operationId)
 	if err != nil {
 		return nil, err
 	}
@@ -12235,6 +12250,54 @@ func NewPublishPluginEventRequestWithBody(server string, orgId OrgIdPathParam, p
 	return req, nil
 }
 
+// NewReadPluginOperationInventoryRequest generates requests for ReadPluginOperationInventory
+func NewReadPluginOperationInventoryRequest(server string, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "orgId", orgId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "pluginId", pluginId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "operationId", operationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/orgs/%s/plugins/%s/operations/%s/inventory", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewApplyPluginModuleOperationRequest calls the generic ApplyPluginModuleOperation builder with application/json body
 func NewApplyPluginModuleOperationRequest(server string, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID, body ApplyPluginModuleOperationJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -14740,6 +14803,9 @@ type ClientWithResponsesInterface interface {
 
 	PublishPluginEventWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID, body PublishPluginEventJSONRequestBody, reqEditors ...RequestEditorFn) (*PublishPluginEventResponse, error)
 
+	// ReadPluginOperationInventoryWithResponse request
+	ReadPluginOperationInventoryWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*ReadPluginOperationInventoryResponse, error)
+
 	// ApplyPluginModuleOperationWithBodyWithResponse request with any body
 	ApplyPluginModuleOperationWithBodyWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApplyPluginModuleOperationResponse, error)
 
@@ -16927,6 +16993,31 @@ func (r PublishPluginEventResponse) StatusCode() int {
 	return 0
 }
 
+type ReadPluginOperationInventoryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *PluginInventory
+	JSON403      *N403Forbidden
+	JSON404      *N404NotFound
+	JSON409      *N409Conflict
+}
+
+// Status returns HTTPResponse.Status
+func (r ReadPluginOperationInventoryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReadPluginOperationInventoryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ApplyPluginModuleOperationResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -18849,6 +18940,15 @@ func (c *ClientWithResponses) PublishPluginEventWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParsePublishPluginEventResponse(rsp)
+}
+
+// ReadPluginOperationInventoryWithResponse request returning *ReadPluginOperationInventoryResponse
+func (c *ClientWithResponses) ReadPluginOperationInventoryWithResponse(ctx context.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID, reqEditors ...RequestEditorFn) (*ReadPluginOperationInventoryResponse, error) {
+	rsp, err := c.ReadPluginOperationInventory(ctx, orgId, pluginId, operationId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReadPluginOperationInventoryResponse(rsp)
 }
 
 // ApplyPluginModuleOperationWithBodyWithResponse request with arbitrary body returning *ApplyPluginModuleOperationResponse
@@ -22888,6 +22988,53 @@ func ParsePublishPluginEventResponse(rsp *http.Response) (*PublishPluginEventRes
 			return nil, err
 		}
 		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest N403Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest N404NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest N409Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseReadPluginOperationInventoryResponse parses an HTTP response from a ReadPluginOperationInventoryWithResponse call
+func ParseReadPluginOperationInventoryResponse(rsp *http.Response) (*ReadPluginOperationInventoryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReadPluginOperationInventoryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PluginInventory
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
 		var dest N403Forbidden

@@ -50,6 +50,32 @@ func ReadExternalInventory(ctx context.Context, db Databaser, org string, module
 	if len(moduleRefs) > 1000 || len(selector.EnvironmentIDs) > maxExternalInventoryItems || len(selector.ProjectIDs) > 1000 || len(selector.EnvironmentTypes) > 1000 || len(selector.Labels) > 50 {
 		return nil, NewErrBadRequest("inventory request exceeds its bounded resource limit")
 	}
+	return readExternalInventory(ctx, db, org, moduleRefs, selector.EnvironmentTypes, selector.Matches)
+}
+
+// ReadExternalOperationInventory returns the inventory of exactly a grant's
+// frozen Modules and Environments, the scope its resource journal exposes.
+// Grant bounds already limit both sets.
+func ReadExternalOperationInventory(ctx context.Context, db Databaser, grant ExternalOperationGrant) (*ExternalInventory, error) {
+	modules, inScope := externalOperationInventoryScope(grant)
+	return readExternalInventory(ctx, db, grant.OrgID, modules, nil, inScope)
+}
+
+// externalOperationInventoryScope never widens an empty Environment set: an
+// operation without Environments sees none, unlike an empty selector.
+func externalOperationInventoryScope(grant ExternalOperationGrant) ([]string, func(Environment) bool) {
+	modules := make([]string, 0, len(grant.Intent.Modules))
+	for _, module := range grant.Intent.Modules {
+		modules = append(modules, module.String())
+	}
+	environments := make(map[uuid.UUID]bool, len(grant.Intent.Environments))
+	for _, environment := range grant.Intent.Environments {
+		environments[environment.EnvironmentID] = true
+	}
+	return modules, func(environment Environment) bool { return environments[environment.Uuid] }
+}
+
+func readExternalInventory(ctx context.Context, db Databaser, org string, moduleRefs []string, environmentTypes []string, matches func(Environment) bool) (*ExternalInventory, error) {
 	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
 	if err != nil {
 		return nil, err
@@ -60,12 +86,12 @@ func ReadExternalInventory(ctx context.Context, db Databaser, org string, module
 	}
 	result := &ExternalInventory{}
 	for page := ""; ; {
-		items, next, err := db.ListEnvironmentsInOrg(ctx, tx, org, page, 200, ListEnvironmentsParams{ByEnvTypeIds: selector.EnvironmentTypes})
+		items, next, err := db.ListEnvironmentsInOrg(ctx, tx, org, page, 200, ListEnvironmentsParams{ByEnvTypeIds: environmentTypes})
 		if err != nil {
 			return nil, err
 		}
 		for _, item := range items {
-			if selector.Matches(item) {
+			if matches(item) {
 				result.Environments = append(result.Environments, item)
 			}
 		}

@@ -123,6 +123,10 @@ snapshots and retained encrypted material remain DP-owned. Plugin memory and
 storage must not receive raw secret-bearing manifest/graph parameters merely
 to draw a plan. Use value-free structural projections and an authoritative
 fingerprint/reference; rollback is performed by DP from retained exact bases.
+`GET /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/inventory`
+returns the same projection unattended, for exactly an operation's frozen scope,
+when that operation delegates `inventory.read` and may still reconcile (active,
+suspended, or released within one journal retention window).
 
 `GET /orgs/{orgId}/module-versions/proposed` is independent of plugins and
 entitlements. It excludes archived Modules and returns immutable identity and

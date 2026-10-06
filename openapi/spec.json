@@ -1054,6 +1054,58 @@
         }
       }
     },
+    "/orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/inventory": {
+      "get": {
+        "operationId": "readPluginOperationInventory",
+        "tags": [
+          "Plugin"
+        ],
+        "description": "Read, without a user, the current inventory of exactly the frozen Modules and Environments of an operation, for example to resynchronise after plugin_resource_cursor_expired. Only the configured plugin service may call. The frozen operation must delegate inventory.read, the operator must register that service grant, and the operation's controller must still pass current scoped IAM checks. Active and suspended operations may read, and released ones for one journal retention window after their release, like journal safety reconciliation; prepared operations are rejected. Contains no Module source, provider configuration or secrets.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/orgIdPathParam"
+          },
+          {
+            "name": "pluginId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One repeatable-read snapshot of the operation scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginInventory"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/403Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/404NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/409Conflict"
+          }
+        }
+      }
+    },
     "/orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/events": {
       "post": {
         "operationId": "publishPluginEvent",

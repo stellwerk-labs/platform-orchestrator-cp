@@ -347,6 +347,10 @@ func validateServiceGrants(item Installation) error {
 // to an organization's resource event journal.
 const ResourceEventsReadAction = "resource-events.read"
 
+// InventoryReadAction is the service grant for inventory reads: with a user
+// delegation, or unattended within an operation that delegates it.
+const InventoryReadAction = "inventory.read"
+
 // ResourceEventSubscribers returns, sorted, the installed plugins configured
 // for the organization with a resource event subscription. Core journals an
 // organization's resource events only while this list is non-empty.

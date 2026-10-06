@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
@@ -39,11 +40,11 @@ func (s *Server) ReadPluginInventory(ctx context.Context, request ReadPluginInve
 	if request.Body == nil {
 		return nil, pluginBoundaryError(400, "plugin_request_invalid", "An inventory request is required.")
 	}
-	policy, ok := item.ServiceGrant("inventory.read")
+	policy, ok := item.ServiceGrant(plugins.InventoryReadAction)
 	if !ok {
 		return nil, pluginBoundaryError(403, "plugin_service_forbidden", "The installation has no inventory read grant.")
 	}
-	claims, err := s.PluginGateway.VerifyServiceReadDelegation(ctx, request.OrgId, request.PluginId, item.ServiceUserID, "inventory.read", pluginProofFromAPI(request.Body.Proof))
+	claims, err := s.PluginGateway.VerifyServiceReadDelegation(ctx, request.OrgId, request.PluginId, item.ServiceUserID, plugins.InventoryReadAction, pluginProofFromAPI(request.Body.Proof))
 	if err != nil {
 		var denied *plugins.GatewayError
 		if errors.As(err, &denied) {
@@ -72,6 +73,30 @@ func (s *Server) ReadPluginInventory(ctx context.Context, request ReadPluginInve
 		return nil, err
 	}
 	return ReadPluginInventory200JSONResponse(externalInventoryToAPI(snapshot)), nil
+}
+
+// ReadPluginOperationInventory lets the plugin service resynchronise without a
+// user, for example after plugin_resource_cursor_expired. It reads exactly the
+// operation's frozen Modules and Environments, never a caller-chosen selector,
+// and rechecks the operation actor's current IAM. Suspended and recently
+// released operations keep this safety reconciliation, as with the journal.
+func (s *Server) ReadPluginOperationInventory(ctx context.Context, request ReadPluginOperationInventoryRequestObject) (ReadPluginOperationInventoryResponseObject, error) {
+	grant, _, err := s.pluginOperationServiceGrant(ctx, request.OrgId, request.PluginId, request.OperationId, plugins.InventoryReadAction)
+	if err != nil {
+		return nil, err
+	}
+	reconciles, err := model.ExternalOperationReconciles(ctx, s.Database, *grant, time.Now(), s.PluginJournalRetention)
+	if err != nil {
+		return nil, pluginModelError(err)
+	}
+	if !reconciles {
+		return nil, pluginBoundaryError(409, "plugin_operation_conflict", "Unattended inventory reads require an active, suspended or recently released operation.")
+	}
+	snapshot, err := model.ReadExternalOperationInventory(ctx, s.Database, *grant)
+	if err != nil {
+		return nil, pluginModelError(err)
+	}
+	return ReadPluginOperationInventory200JSONResponse(externalInventoryToAPI(snapshot)), nil
 }
 
 func externalInventoryToAPI(snapshot *model.ExternalInventory) PluginInventory {

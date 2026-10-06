@@ -84,9 +84,10 @@ uninstalled plugin do not hold history.
 Pruning always removes a contiguous prefix, so retained history has no holes. A
 cursor older than the pruned history returns HTTP 409
 `plugin_resource_cursor_expired` instead of silently skipping entries. The
-consumer then rebuilds its state from current Core resources and reads again
-without a cursor. Retention never prunes past an active consumer's cursor, so
-this only affects consumers that were inactive or restored an older cursor.
+consumer then rebuilds its state from current Core resources (see
+Resynchronisation) and reads again without a cursor. Retention never prunes
+past an active consumer's cursor, so this only affects consumers that were
+inactive or restored an older cursor.
 
 Every Control Plane replica runs retention at startup and then every ten
 minutes, removing at most 10,000 entries per organization and run. Each
@@ -105,6 +106,38 @@ Rolling back only the application after pruning keeps the tables but loses that
 expiry signal for stale cursors. Active consumers are unaffected, because their
 history was never pruned. Entries that existed before migration 39 count their
 age from the upgrade.
+
+## Resynchronisation
+
+After `plugin_resource_cursor_expired` a consumer rebuilds its state from
+current Core resources without a user:
+
+```text
+GET /orgs/{org}/plugins/{plugin}/operations/{operation}/inventory
+```
+
+The response is the `PluginInventory` snapshot of the user-delegated
+`POST /orgs/{org}/plugins/{plugin}/inventory`, but for exactly the operation's
+frozen Module and Environment UUIDs, the scope its resource journal exposes. It
+accepts no selector, so it can never widen that scope; an operation without
+Environments sees none. Only the installation's configured service identity may
+call. As with journal safety reconciliation, active and suspended operations may
+read, and released ones for one `PLUGIN_EVENT_JOURNAL_RETENTION` window after
+their release. Prepared operations return 409 `plugin_operation_conflict`, as do
+operations released longer ago; unknown operations return 404
+`plugin_operation_not_found`. The operation's controller must still pass current
+scoped IAM, as for the journal. The user-delegated inventory read is unchanged.
+
+The plugin declares the read exactly like the journal subscription:
+
+- an installation `service_grants` entry with `"action": "inventory.read"`, the
+  plugin's own `permission` and a `scope` of `environment` or `organization`;
+- `inventory.read` in the `service_actions` of the plugin operation that
+  prepares the operation grant;
+- `inventory.read` in the frozen intent `actions` of that grant.
+
+Without any of these the read returns 403 `plugin_service_forbidden`. Grants
+prepared before the plugin declared `inventory.read` cannot read unattended.
 
 ## Publication
 

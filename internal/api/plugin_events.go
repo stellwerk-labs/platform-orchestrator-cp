@@ -22,9 +22,11 @@ type pluginResourceCursor struct {
 	Sequence  int64     `json:"sequence"`
 }
 
-// Event reconciliation does not expand an operation's frozen scope and remains
-// useful after release. Current IAM is still required for the original actor.
-func (s *Server) pluginEventGrant(ctx context.Context, org, plugin string, operation uuid.UUID, action string) (*model.ExternalOperationGrant, plugins.Installation, error) {
+// pluginOperationServiceGrant authorizes an unattended service call within an
+// operation's frozen scope. Event reconciliation remains useful after release;
+// callers that need an active grant check its state. Current IAM is still
+// required for the original actor.
+func (s *Server) pluginOperationServiceGrant(ctx context.Context, org, plugin string, operation uuid.UUID, action string) (*model.ExternalOperationGrant, plugins.Installation, error) {
 	item, descriptor, err := s.pluginInstallationCaller(ctx, org, plugin, false)
 	if err != nil {
 		return nil, item, err
@@ -35,7 +37,7 @@ func (s *Server) pluginEventGrant(ctx context.Context, org, plugin string, opera
 	}
 	policy, ok := item.ServiceGrant(action)
 	if !ok || !slices.Contains(grant.Intent.Actions, action) {
-		return nil, item, pluginBoundaryError(403, "plugin_service_forbidden", "The frozen operation did not delegate this event action.")
+		return nil, item, pluginBoundaryError(403, "plugin_service_forbidden", "The frozen operation did not delegate this action.")
 	}
 	if err := pluginFeatureAllowed(descriptor, policy.RequiredFeature, false, false); err != nil {
 		return nil, item, err
@@ -55,7 +57,7 @@ func (s *Server) pluginEventGrant(ctx context.Context, org, plugin string, opera
 }
 
 func (s *Server) ReadPluginResourceEvents(ctx context.Context, request ReadPluginResourceEventsRequestObject) (ReadPluginResourceEventsResponseObject, error) {
-	grant, item, err := s.pluginEventGrant(ctx, request.OrgId, request.PluginId, request.OperationId, plugins.ResourceEventsReadAction)
+	grant, item, err := s.pluginOperationServiceGrant(ctx, request.OrgId, request.PluginId, request.OperationId, plugins.ResourceEventsReadAction)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +103,7 @@ func pluginResourceEventError(err error) error {
 }
 
 func (s *Server) PublishPluginEvent(ctx context.Context, request PublishPluginEventRequestObject) (PublishPluginEventResponseObject, error) {
-	grant, item, err := s.pluginEventGrant(ctx, request.OrgId, request.PluginId, request.OperationId, "events.publish")
+	grant, item, err := s.pluginOperationServiceGrant(ctx, request.OrgId, request.PluginId, request.OperationId, "events.publish")
 	if err != nil {
 		return nil, err
 	}

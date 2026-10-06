@@ -419,6 +419,41 @@ func PruneExtensionResourceJournal(ctx context.Context, db Databaser, subscriber
 	return pruned, nil
 }
 
+// extensionJournalReleaseCutoff is the release time after which a released
+// operation still reconciles from Core: one journal retention window back.
+func extensionJournalReleaseCutoff(now time.Time, window time.Duration) time.Time {
+	return now.Add(-window)
+}
+
+// ExternalOperationReconciles reports whether an operation may still
+// reconcile from Core without a user: active and suspended operations, and
+// released ones for one journal retention window, during which the journal also
+// keeps their history. Prepared operations have not started.
+func ExternalOperationReconciles(ctx context.Context, db Databaser, grant ExternalOperationGrant, now time.Time, window time.Duration) (bool, error) {
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var state string
+	var updated time.Time
+	if err := tx.QueryRowContext(ctx, `SELECT state, updated_at FROM external_operation_grants WHERE org_id=$1 AND plugin_id=$2 AND operation_id=$3`,
+		grant.OrgID, grant.PluginID, grant.OperationID).Scan(&state, &updated); err != nil {
+		return false, err
+	}
+	return externalOperationReconcilesAt(state, updated, now, window), nil
+}
+
+func externalOperationReconcilesAt(state string, updated, now time.Time, window time.Duration) bool {
+	switch state {
+	case grantStateActive, grantStateSuspended:
+		return true
+	case grantStateReleased:
+		return updated.After(extensionJournalReleaseCutoff(now, window))
+	}
+	return false
+}
+
 func extensionJournalOrganizations(ctx context.Context, db Databaser, query string) ([]string, error) {
 	tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
@@ -471,7 +506,7 @@ func pruneExtensionResourceOrganization(ctx context.Context, db Databaser, org s
 		LEFT JOIN extension_resource_event_consumers c ON c.org_id=g.org_id AND c.plugin_id=g.plugin_id AND c.operation_id=g.operation_id
 		WHERE g.org_id=$1 AND g.plugin_id=ANY($2) AND g.intent->'actions' @> jsonb_build_array($3::text)
 		AND (g.state<>$4 OR g.updated_at>$5)`,
-		org, pq.Array(subscribers), extensionResourceEventsRead, grantStateReleased, now.Add(-policy.Window)).Scan(&lowest); err != nil {
+		org, pq.Array(subscribers), extensionResourceEventsRead, grantStateReleased, extensionJournalReleaseCutoff(now, policy.Window)).Scan(&lowest); err != nil {
 		return 0, err
 	}
 	below := int64(math.MaxInt64)

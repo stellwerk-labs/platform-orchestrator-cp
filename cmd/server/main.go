@@ -241,6 +241,7 @@ func main() {
 			zap.L().Fatal("Failed to initialize verified plugin transport", zap.Error(err))
 		}
 		server.PluginGateway = gateway
+		server.PluginJournalRetention = retention.Window
 		server.Plugins = gateway.Registry
 		entitlementAdapter, err = pluginentitlements.New(ctx, db, gateway.Registry.Installations(), entitlements.TrustClass(cfg.PluginEntitlementMode), cfg.PluginEntitlementTrustFile, cfg.PluginEntitlementBundleFile, time.Now)
 		if err != nil {
