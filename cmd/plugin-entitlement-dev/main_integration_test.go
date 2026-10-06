@@ -16,6 +16,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/entitlements"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pgtest"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginentitlements"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -29,7 +30,7 @@ func TestDevelopmentRenewalImportsAfterExpiryWithMonotonicSequences(t *testing.T
 	schema := "plugin_dev_renewal_" + strings.ReplaceAll(uuid.NewString(), "-", "")
 	_, err = admin.Exec(`CREATE SCHEMA ` + schema)
 	require.NoError(t, err)
-	db, err := model.NewDatabaser(t.Context(), zap.NewNop(), dsn+" search_path="+schema)
+	db, err := model.NewDatabaser(t.Context(), zap.NewNop(), pgtest.WithSearchPath(dsn, schema))
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, db.Close())

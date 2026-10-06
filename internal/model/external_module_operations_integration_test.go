@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/opt"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pgtest"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
@@ -40,7 +41,7 @@ func externalOperationDatabaseWith(t *testing.T, options ...DatabaserOption) Dat
 		require.NoError(t, err)
 		require.NoError(t, admin.Close())
 	})
-	db, err := NewDatabaser(t.Context(), zap.NewNop(), dsn+" search_path="+schema, options...)
+	db, err := NewDatabaser(t.Context(), zap.NewNop(), pgtest.WithSearchPath(dsn, schema), options...)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	return db

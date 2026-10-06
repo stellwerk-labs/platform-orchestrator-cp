@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pgtest"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
@@ -77,7 +78,7 @@ func TestExtensionResourceJournalGapFromAPausedReplica(t *testing.T) {
 	// Another replica runs without the subscription and handles a change.
 	var schema string
 	require.NoError(t, db.(*databaser).DB.QueryRowContext(t.Context(), `SELECT current_schema()`).Scan(&schema))
-	paused, err := NewDatabaser(t.Context(), zap.NewNop(), os.Getenv("PLUGIN_TEST_DATABASE_URL")+" search_path="+schema,
+	paused, err := NewDatabaser(t.Context(), zap.NewNop(), pgtest.WithSearchPath(os.Getenv("PLUGIN_TEST_DATABASE_URL"), schema),
 		WithExtensionResourceJournal(func(string) bool { return false }))
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, paused.Close()) })

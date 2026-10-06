@@ -15,6 +15,7 @@ import (
 	"github.com/pressly/goose/v3"
 	"github.com/stellwerk-labs/golib/hstandardoutbox"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pgtest"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genevents"
 	"github.com/stretchr/testify/require"
@@ -161,7 +162,7 @@ func TestExtensionResourceJournalScopesPaginationReplayAndReconnect(t *testing.T
 
 	var schema string
 	require.NoError(t, db.(*databaser).DB.QueryRowContext(t.Context(), `SELECT current_schema()`).Scan(&schema))
-	reconnected, err := NewDatabaser(t.Context(), zap.NewNop(), os.Getenv("PLUGIN_TEST_DATABASE_URL")+" search_path="+schema, WithExtensionResourceJournal(journalEveryOrganization))
+	reconnected, err := NewDatabaser(t.Context(), zap.NewNop(), pgtest.WithSearchPath(os.Getenv("PLUGIN_TEST_DATABASE_URL"), schema), WithExtensionResourceJournal(journalEveryOrganization))
 	require.NoError(t, err)
 	defer func() { require.NoError(t, reconnected.Close()) }()
 	afterReconnect, reconnectCursor, err := ReadExtensionResourceEvents(t.Context(), reconnected, *grant, &next, 2)
