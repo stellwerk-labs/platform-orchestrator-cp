@@ -33,6 +33,22 @@ downgrade that would discard event history. Application rollback keeps the
 additive tables. Events before this migration are not retroactively synthesized;
 initial planning still reads authoritative current resource inventory.
 
+## Journal scope
+
+Core keeps the journal only for organizations in which an installed plugin
+subscribes: its installation lists the organization and has a
+`resource-events.read` service grant. The installation registry is the only
+source; there is no separate switch. A Control Plane without the plugin host
+(`PLUGIN_EXPERIMENT_ENABLED=false`), or without any subscribing installation,
+writes no journal entries and uses the plain transactional outbox path. Ordinary
+outbox events are unaffected either way.
+
+A consumer's history starts when its subscription is installed. Core does not
+synthesize entries for changes made before that, or while no plugin subscribed.
+Initial planning reads authoritative current resource inventory, not history.
+The registry is read at startup, so installing or removing a subscription takes
+effect with the restart that applies the new installation configuration.
+
 ## Publication
 
 `POST /orgs/{org}/plugins/{plugin}/operations/{operation}/events` requires

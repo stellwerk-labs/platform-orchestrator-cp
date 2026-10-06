@@ -82,6 +82,22 @@ func projectExtensionResourceEvent(message *hstandardoutbox.PendingEventMessage)
 	return &extensionResourceJournalEntry{orgID: envelope.Data.OrgID, event: event}, nil
 }
 
+// extensionJournalEntries projects the messages of organizations accepted by
+// scope. Other organizations keep only the ordinary outbox message.
+func extensionJournalEntries(messages []*hstandardoutbox.PendingEventMessage, scope func(orgID string) bool) ([]extensionResourceJournalEntry, error) {
+	entries := make([]extensionResourceJournalEntry, 0, len(messages))
+	for _, message := range messages {
+		entry, err := projectExtensionResourceEvent(message)
+		if err != nil {
+			return nil, err
+		}
+		if entry != nil && scope(entry.orgID) {
+			entries = append(entries, *entry)
+		}
+	}
+	return entries, nil
+}
+
 func journalExtensionResourceEvent(ctx context.Context, tx Tx, entry extensionResourceJournalEntry) error {
 	encoded, err := json.Marshal(entry.event)
 	if err != nil {

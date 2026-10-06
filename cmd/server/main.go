@@ -125,7 +125,18 @@ func main() {
 	dbConnStr := fmt.Sprintf(
 		"dbname=%s user=%s password=%s host=%s port=%s connect_timeout=5 sslmode=disable",
 		cfg.DatabaseName, cfg.DatabaseUser, cfg.DatabasePassword, cfg.DatabaseHost, cfg.DatabasePort)
-	db, err := model.NewDatabaser(ctx, zap.L(), dbConnStr)
+	// The installation registry is loaded first: its event subscriptions decide
+	// whether Core keeps the extension resource journal at all.
+	var gateway *plugins.Gateway
+	var dbOptions []model.DatabaserOption
+	if cfg.PluginExperimentEnabled {
+		gateway, err = plugins.LoadGateway(cfg.PluginInstallationsFile, cfg.PluginSigningKeyFile, cfg.PluginIssuer, cfg.PluginDevelopmentHTTP)
+		if err != nil {
+			zap.L().Fatal("Failed to initialize experimental plugin gateway", zap.Error(err))
+		}
+		dbOptions = append(dbOptions, model.WithExtensionResourceJournal(gateway.Registry.HasResourceEventSubscriber))
+	}
+	db, err := model.NewDatabaser(ctx, zap.L(), dbConnStr, dbOptions...)
 	if err != nil {
 		zap.L().Fatal("Failed to initialize database", zap.Error(err))
 	}
@@ -204,11 +215,7 @@ func main() {
 		}
 	}
 	var entitlementAdapter *pluginentitlements.Adapter
-	if cfg.PluginExperimentEnabled {
-		gateway, err := plugins.LoadGateway(cfg.PluginInstallationsFile, cfg.PluginSigningKeyFile, cfg.PluginIssuer, cfg.PluginDevelopmentHTTP)
-		if err != nil {
-			zap.L().Fatal("Failed to initialize experimental plugin gateway", zap.Error(err))
-		}
+	if gateway != nil {
 		var caPEM []byte
 		if cfg.PluginCAFile != "" {
 			caPEM, err = os.ReadFile(cfg.PluginCAFile)

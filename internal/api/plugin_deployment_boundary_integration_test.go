@@ -221,7 +221,8 @@ func pluginDeploymentBoundaryDatabase(t *testing.T, extraActions ...string) (mod
 	schema := "plugin_api_" + strings.ReplaceAll(uuid.NewString(), "-", "")
 	_, err = admin.Exec(`CREATE SCHEMA ` + schema)
 	require.NoError(t, err)
-	db, err := model.NewDatabaser(t.Context(), zap.NewNop(), dsn+" search_path="+schema)
+	db, err := model.NewDatabaser(t.Context(), zap.NewNop(), dsn+" search_path="+schema,
+		model.WithExtensionResourceJournal(func(string) bool { return true }))
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, db.Close())

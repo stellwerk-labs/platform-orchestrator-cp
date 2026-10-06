@@ -160,7 +160,7 @@ func TestExtensionResourceJournalScopesPaginationReplayAndReconnect(t *testing.T
 
 	var schema string
 	require.NoError(t, db.(*databaser).DB.QueryRowContext(t.Context(), `SELECT current_schema()`).Scan(&schema))
-	reconnected, err := NewDatabaser(t.Context(), zap.NewNop(), os.Getenv("PLUGIN_TEST_DATABASE_URL")+" search_path="+schema)
+	reconnected, err := NewDatabaser(t.Context(), zap.NewNop(), os.Getenv("PLUGIN_TEST_DATABASE_URL")+" search_path="+schema, WithExtensionResourceJournal(journalEveryOrganization))
 	require.NoError(t, err)
 	defer func() { require.NoError(t, reconnected.Close()) }()
 	afterReconnect, reconnectCursor, err := ReadExtensionResourceEvents(t.Context(), reconnected, *grant, next, 2)

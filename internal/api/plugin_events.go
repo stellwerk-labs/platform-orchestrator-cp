@@ -55,7 +55,7 @@ func (s *Server) pluginEventGrant(ctx context.Context, org, plugin string, opera
 }
 
 func (s *Server) ReadPluginResourceEvents(ctx context.Context, request ReadPluginResourceEventsRequestObject) (ReadPluginResourceEventsResponseObject, error) {
-	grant, item, err := s.pluginEventGrant(ctx, request.OrgId, request.PluginId, request.OperationId, "resource-events.read")
+	grant, item, err := s.pluginEventGrant(ctx, request.OrgId, request.PluginId, request.OperationId, plugins.ResourceEventsReadAction)
 	if err != nil {
 		return nil, err
 	}

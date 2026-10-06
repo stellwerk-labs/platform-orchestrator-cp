@@ -32,6 +32,19 @@ const UniqueViolationErrorCode string = "unique_violation"
 type databaser struct {
 	*sql.DB
 	logger *zap.Logger
+	// journalScope reports whether an organization has an installed resource
+	// event subscriber. Nil disables the extension resource journal.
+	journalScope func(orgID string) bool
+}
+
+// DatabaserOption configures optional Databaser behaviour.
+type DatabaserOption func(*databaser)
+
+// WithExtensionResourceJournal records the extension resource journal for the
+// organizations accepted by scope. Without this option Core writes no journal
+// entries and keeps the plain transactional outbox path.
+func WithExtensionResourceJournal(scope func(orgID string) bool) DatabaserOption {
+	return func(d *databaser) { d.journalScope = scope }
 }
 
 type gooseZapLogger struct {
@@ -43,7 +56,7 @@ func (g *gooseZapLogger) Printf(format string, v ...interface{}) {
 }
 
 // NewDatabaser creates a new database provider instance
-func NewDatabaser(ctx context.Context, logger *zap.Logger, connStr string) (Databaser, error) {
+func NewDatabaser(ctx context.Context, logger *zap.Logger, connStr string, options ...DatabaserOption) (Databaser, error) {
 	goose.SetLogger(&gooseZapLogger{SugaredLogger: logger.Named("goose").Sugar()})
 	goose.SetBaseFS(embedMigrations)
 	goose.SetVerbose(logger.Level() <= zap.DebugLevel)
@@ -59,7 +72,11 @@ func NewDatabaser(ctx context.Context, logger *zap.Logger, connStr string) (Data
 	} else if err := goose.Up(inner.DB, "migrations"); err != nil {
 		return nil, err
 	} else {
-		return &databaser{DB: inner.DB, logger: logger}, nil
+		d := &databaser{DB: inner.DB, logger: logger}
+		for _, option := range options {
+			option(d)
+		}
+		return d, nil
 	}
 }
 
@@ -255,6 +272,9 @@ func (d *databaser) BeginTx(ctx context.Context, opts *sql.TxOptions) (TxWithCom
 	if err != nil {
 		return nil, err
 	}
+	if d.journalScope == nil {
+		return tx, nil
+	}
 	return &journalTransaction{TxWithCommit: tx, ctx: ctx}, nil
 }
 
@@ -263,6 +283,9 @@ func (d *databaser) AsReliableOutboxStore() reliableoutbox.Store[*hstandardoutbo
 }
 
 func (d *databaser) InsertPendingEventMessages(ctx context.Context, optionalTx Tx, messages []*hstandardoutbox.PendingEventMessage) ([]*hstandardoutbox.PendingEventMessage, error) {
+	if d.journalScope == nil {
+		return hstandardoutbox.InsertPendingEventMessages(ctx, d.txOrDb(optionalTx), messages)
+	}
 	if optionalTx == nil {
 		tx, err := d.BeginTx(ctx, nil)
 		if err != nil {
@@ -275,15 +298,9 @@ func (d *databaser) InsertPendingEventMessages(ctx context.Context, optionalTx T
 		}
 		return result, tx.Commit()
 	}
-	entries := make([]extensionResourceJournalEntry, 0, len(messages))
-	for _, message := range messages {
-		entry, err := projectExtensionResourceEvent(message)
-		if err != nil {
-			return nil, err
-		}
-		if entry != nil {
-			entries = append(entries, *entry)
-		}
+	entries, err := extensionJournalEntries(messages, d.journalScope)
+	if err != nil {
+		return nil, err
 	}
 	journalTx, ok := optionalTx.(*journalTransaction)
 	if len(entries) > 0 && !ok {

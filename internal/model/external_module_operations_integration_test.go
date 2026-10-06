@@ -17,7 +17,16 @@ import (
 	"go.uber.org/zap"
 )
 
+// journalEveryOrganization stands in for a registry in which every test
+// organization has an installed resource event subscriber.
+func journalEveryOrganization(string) bool { return true }
+
 func externalOperationDatabase(t *testing.T) Databaser {
+	t.Helper()
+	return externalOperationDatabaseWith(t, WithExtensionResourceJournal(journalEveryOrganization))
+}
+
+func externalOperationDatabaseWith(t *testing.T, options ...DatabaserOption) Databaser {
 	t.Helper()
 	dsn := os.Getenv("PLUGIN_TEST_DATABASE_URL")
 	require.NotEmpty(t, dsn, "PLUGIN_TEST_DATABASE_URL must identify a disposable PostgreSQL instance")
@@ -31,7 +40,7 @@ func externalOperationDatabase(t *testing.T) Databaser {
 		require.NoError(t, err)
 		require.NoError(t, admin.Close())
 	})
-	db, err := NewDatabaser(t.Context(), zap.NewNop(), dsn+" search_path="+schema)
+	db, err := NewDatabaser(t.Context(), zap.NewNop(), dsn+" search_path="+schema, options...)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	return db

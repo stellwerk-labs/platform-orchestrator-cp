@@ -343,6 +343,36 @@ func validateServiceGrants(item Installation) error {
 	return nil
 }
 
+// ResourceEventsReadAction is the service grant that subscribes an installation
+// to an organization's resource event journal.
+const ResourceEventsReadAction = "resource-events.read"
+
+// ResourceEventSubscribers returns, sorted, the installed plugins configured
+// for the organization with a resource event subscription. Core journals an
+// organization's resource events only while this list is non-empty.
+func (r *InstallationRegistry) ResourceEventSubscribers(orgID string) []string {
+	subscribers := []string{}
+	if r == nil {
+		return subscribers
+	}
+	for id, item := range r.installations {
+		if _, configured := item.Organizations[orgID]; !configured {
+			continue
+		}
+		if _, subscribed := item.ServiceGrant(ResourceEventsReadAction); subscribed {
+			subscribers = append(subscribers, id)
+		}
+	}
+	slices.Sort(subscribers)
+	return subscribers
+}
+
+// HasResourceEventSubscriber reports whether any installed plugin subscribes
+// to the organization's resource event journal.
+func (r *InstallationRegistry) HasResourceEventSubscriber(orgID string) bool {
+	return len(r.ResourceEventSubscribers(orgID)) > 0
+}
+
 func (item Installation) ServiceGrant(action string) (ServiceGrant, bool) {
 	for _, grant := range item.ServiceGrants {
 		if grant.Action == action {

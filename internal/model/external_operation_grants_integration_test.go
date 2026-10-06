@@ -100,7 +100,7 @@ func TestExternalGrantPersistenceFencingAndDispatch(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, tx.QueryRowContext(ctx, `SELECT current_schema()`).Scan(&schema))
 	require.NoError(t, tx.Rollback())
-	reconnected, err := NewDatabaser(ctx, zap.NewNop(), os.Getenv("PLUGIN_TEST_DATABASE_URL")+" search_path="+schema)
+	reconnected, err := NewDatabaser(ctx, zap.NewNop(), os.Getenv("PLUGIN_TEST_DATABASE_URL")+" search_path="+schema, WithExtensionResourceJournal(journalEveryOrganization))
 	require.NoError(t, err)
 	defer func() { require.NoError(t, reconnected.Close()) }()
 	loaded, err := GetExternalOperationGrant(ctx, reconnected, command.OrgID, command.PluginID, command.OperationID)
