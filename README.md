@@ -28,10 +28,11 @@ go vet ./...
 make lint
 ```
 
-Run the integration suite with:
+Run the integration suite and the PostgreSQL-backed package tests with:
 
 ```shell
 make test-integration
+make test-integration-postgres
 make clean
 ```
 

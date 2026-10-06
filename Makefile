@@ -57,19 +57,17 @@ clean:
 .PHONY: test-integration
 test-integration: build
 	$(MAKE) -C integration-tests test
-	$(MAKE) -C integration-tests test-integration-postgres
 
-## Run -tags integration Go package tests sequentially (requires PLUGIN_TEST_DATABASE_URL in keyword=value form).
-## Use make test-integration to derive credentials automatically from the compose stack.
+## Run the PostgreSQL-backed package tests (build tag integration), starting docker compose containers if necessary
 .PHONY: test-integration-postgres
-test-integration-postgres:
-	$(GO) test -tags=integration -count=1 -p 1 -timeout 5m \
-		./internal/model/... ./internal/api/... ./cmd/plugin-entitlement-dev/... ./internal/events/...
+test-integration-postgres: build
+	$(MAKE) -C integration-tests test-integration-postgres
 
 ## Run golang tests
 .PHONY: test-unit
 test-unit:
-	go tool gotestsum --format testname -- -coverprofile=cover.out ./internal/...
+	go tool gotestsum --format testname -- -coverprofile=cover.out ./internal/... ./cmd/...
+	cd shared && GOWORK=off go test -count=1 ./...
 
 ## Lint the code
 .PHONY: lint

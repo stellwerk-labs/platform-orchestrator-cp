@@ -58,6 +58,7 @@ jobs:
       - commitlint
       - unit
       - integration
+      - integration-postgres
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: public-release-candidate
@@ -244,6 +245,54 @@ jobs:
         if: always()
         run: make clean
 
+  integration-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      IAM_IMAGE: ${{ vars.CORE_IAM_INTEGRATION_IMAGE }}
+      DP_IMAGE: ${{ vars.CORE_DP_INTEGRATION_IMAGE }}
+    steps:
+      - name: Require compatible digest-pinned integration dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          for image_variable in IAM_IMAGE DP_IMAGE; do
+            if [[ ! "${!image_variable}" =~ @sha256:[0-9a-f]{64}$ ]]; then
+              echo "::error::Set CORE_${image_variable%_IMAGE}_INTEGRATION_IMAGE to a compatible public image digest before running CI."
+              exit 1
+            fi
+          done
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.candidate_sha || github.ref }}
+
+      - name: Setup Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Setup Score Compose
+        uses: score-spec/setup-score@888a7deafd396c3f3f05e00d2d9b0ab225799ac0 # v3.2.4
+        with:
+          file: score-compose
+          version: 0.17.0
+
+      - name: Setup Helm
+        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
+
+      - name: Run PostgreSQL integration tests
+        run: make test-integration-postgres
+
+      - name: Show integration logs
+        if: always()
+        run: make test-integration-logs
+
+      - name: Clean integration environment
+        if: always()
+        run: make clean
+
   commitlint:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -277,6 +326,7 @@ jobs:
       - commitlint
       - unit
       - integration
+      - integration-postgres
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
