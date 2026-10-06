@@ -1398,6 +1398,55 @@ paths:
           $ref: '#/components/responses/404NotFound'
         '409':
           $ref: '#/components/responses/409Conflict'
+  /orgs/{orgId}/projects/{projectId}/envs/{envId}/deployments/{deploymentId}/actions/acknowledge-outcome:
+    post:
+      operationId: acknowledgeDeploymentOutcome
+      summary: Acknowledge the unknown Runner outcome of a failed plugin-dispatched Deployment.
+      description: |
+        Records, exactly once and attributed to the acting user, that an operator has confirmed the Runner attempt
+        of this failed plugin-dispatched Deployment of the Environment can no longer change it. The Data Plane
+        accepts only the current Environment head without Runner stop evidence after its Runner dispatch window
+        closed; the acknowledgement then lets the next Deployment of the Environment proceed. It does not change
+        the Deployment's status or history. Requires the `deployment.outcome.acknowledge` permission on the
+        Environment, with the organization as fallback. Organization tokens and the system user are rejected
+        because the actor is the audit record. Repeating the identical request returns the stored acknowledgement
+        with status 200; a different request for the same Deployment returns 409.
+      tags:
+        - Environment
+      security:
+        - userIdHeader: []
+      parameters:
+        - $ref: '#/components/parameters/orgIdPathParam'
+        - $ref: '#/components/parameters/projectIdPathParam'
+        - $ref: '#/components/parameters/envIdPathParam'
+        - {name: deploymentId, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeploymentOutcomeAcknowledgementBody'
+      responses:
+        '200':
+          description: The identical acknowledgement was already recorded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentOutcomeAcknowledgement'
+        '201':
+          description: The acknowledgement was recorded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentOutcomeAcknowledgement'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '403':
+          $ref: '#/components/responses/403Forbidden'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '409':
+          $ref: '#/components/responses/409Conflict'
   /orgs/{orgId}/projects/{projectId}/envs/{envId}/available-resource-types:
     get:
       operationId: listAvailableResourceTypes
@@ -3181,6 +3230,31 @@ components:
           type: object
           maxProperties: 1000
           additionalProperties: {type: string, format: uuid}
+    DeploymentOutcomeAcknowledgementBody:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Why the operator is certain the Runner attempt can no longer change the Environment, for example the confirmed removal of its job.
+    DeploymentOutcomeAcknowledgement:
+      type: object
+      additionalProperties: false
+      required: [deployment_id, environment_id, plugin_id, operation_ref, actor_id, reason, acknowledged_at, replayed]
+      properties:
+        deployment_id: {type: string, format: uuid}
+        environment_id: {type: string, format: uuid}
+        plugin_id: {type: string}
+        operation_ref: {type: string}
+        actor_id: {type: string, format: uuid}
+        reason: {type: string}
+        acknowledged_at: {type: string, format: date-time}
+        replayed:
+          type: boolean
+          description: True when this identical acknowledgement had already been recorded.
     DeploymentAdmissionRequest:
       type: object
       additionalProperties: false

@@ -1229,6 +1229,26 @@ type DeploymentAdmissionRequest struct {
 // DeploymentAdmissionRequestMode defines model for DeploymentAdmissionRequest.Mode.
 type DeploymentAdmissionRequestMode string
 
+// DeploymentOutcomeAcknowledgement defines model for DeploymentOutcomeAcknowledgement.
+type DeploymentOutcomeAcknowledgement struct {
+	AcknowledgedAt time.Time          `json:"acknowledged_at"`
+	ActorId        openapi_types.UUID `json:"actor_id"`
+	DeploymentId   openapi_types.UUID `json:"deployment_id"`
+	EnvironmentId  openapi_types.UUID `json:"environment_id"`
+	OperationRef   string             `json:"operation_ref"`
+	PluginId       string             `json:"plugin_id"`
+	Reason         string             `json:"reason"`
+
+	// Replayed True when this identical acknowledgement had already been recorded.
+	Replayed bool `json:"replayed"`
+}
+
+// DeploymentOutcomeAcknowledgementBody defines model for DeploymentOutcomeAcknowledgementBody.
+type DeploymentOutcomeAcknowledgementBody struct {
+	// Reason Why the operator is certain the Runner attempt can no longer change the Environment, for example the confirmed removal of its job.
+	Reason string `json:"reason"`
+}
+
 // Environment An environment.
 type Environment struct {
 	// CreatedAt The date and time when the resource type was created
@@ -4171,6 +4191,9 @@ type CreateEnvironmentJSONRequestBody = EnvironmentCreateBody
 // UpdateEnvironmentJSONRequestBody defines body for UpdateEnvironment for application/json ContentType.
 type UpdateEnvironmentJSONRequestBody = EnvironmentUpdateBody
 
+// AcknowledgeDeploymentOutcomeJSONRequestBody defines body for AcknowledgeDeploymentOutcome for application/json ContentType.
+type AcknowledgeDeploymentOutcomeJSONRequestBody = DeploymentOutcomeAcknowledgementBody
+
 // CreateResourceTypeJSONRequestBody defines body for CreateResourceType for application/json ContentType.
 type CreateResourceTypeJSONRequestBody = ResourceTypeCreateBody
 
@@ -5172,6 +5195,11 @@ type ClientInterface interface {
 
 	// GetEnvironmentDeletionImpact request
 	GetEnvironmentDeletionImpact(ctx context.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AcknowledgeDeploymentOutcomeWithBody request with any body
+	AcknowledgeDeploymentOutcomeWithBody(ctx context.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam, deploymentId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	AcknowledgeDeploymentOutcome(ctx context.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam, deploymentId openapi_types.UUID, body AcknowledgeDeploymentOutcomeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListResourceTypes request
 	ListResourceTypes(ctx context.Context, orgId OrgIdPathParam, params *ListResourceTypesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -7033,6 +7061,30 @@ func (c *Client) ListAvailableResourceTypes(ctx context.Context, orgId OrgIdPath
 
 func (c *Client) GetEnvironmentDeletionImpact(ctx context.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetEnvironmentDeletionImpactRequest(c.Server, orgId, projectId, envId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) AcknowledgeDeploymentOutcomeWithBody(ctx context.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam, deploymentId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAcknowledgeDeploymentOutcomeRequestWithBody(c.Server, orgId, projectId, envId, deploymentId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) AcknowledgeDeploymentOutcome(ctx context.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam, deploymentId openapi_types.UUID, body AcknowledgeDeploymentOutcomeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAcknowledgeDeploymentOutcomeRequest(c.Server, orgId, projectId, envId, deploymentId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -13367,6 +13419,74 @@ func NewGetEnvironmentDeletionImpactRequest(server string, orgId OrgIdPathParam,
 	return req, nil
 }
 
+// NewAcknowledgeDeploymentOutcomeRequest calls the generic AcknowledgeDeploymentOutcome builder with application/json body
+func NewAcknowledgeDeploymentOutcomeRequest(server string, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam, deploymentId openapi_types.UUID, body AcknowledgeDeploymentOutcomeJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewAcknowledgeDeploymentOutcomeRequestWithBody(server, orgId, projectId, envId, deploymentId, "application/json", bodyReader)
+}
+
+// NewAcknowledgeDeploymentOutcomeRequestWithBody generates requests for AcknowledgeDeploymentOutcome with any type of body
+func NewAcknowledgeDeploymentOutcomeRequestWithBody(server string, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam, deploymentId openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "orgId", orgId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "projectId", projectId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "envId", envId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/orgs/%s/projects/%s/envs/%s/deployments/%s/actions/acknowledge-outcome", pathParam0, pathParam1, pathParam2, pathParam3)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListResourceTypesRequest generates requests for ListResourceTypes
 func NewListResourceTypesRequest(server string, orgId OrgIdPathParam, params *ListResourceTypesParams) (*http.Request, error) {
 	var err error
@@ -14662,6 +14782,11 @@ type ClientWithResponsesInterface interface {
 
 	// GetEnvironmentDeletionImpactWithResponse request
 	GetEnvironmentDeletionImpactWithResponse(ctx context.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam, reqEditors ...RequestEditorFn) (*GetEnvironmentDeletionImpactResponse, error)
+
+	// AcknowledgeDeploymentOutcomeWithBodyWithResponse request with any body
+	AcknowledgeDeploymentOutcomeWithBodyWithResponse(ctx context.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam, deploymentId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AcknowledgeDeploymentOutcomeResponse, error)
+
+	AcknowledgeDeploymentOutcomeWithResponse(ctx context.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam, deploymentId openapi_types.UUID, body AcknowledgeDeploymentOutcomeJSONRequestBody, reqEditors ...RequestEditorFn) (*AcknowledgeDeploymentOutcomeResponse, error)
 
 	// ListResourceTypesWithResponse request
 	ListResourceTypesWithResponse(ctx context.Context, orgId OrgIdPathParam, params *ListResourceTypesParams, reqEditors ...RequestEditorFn) (*ListResourceTypesResponse, error)
@@ -17221,6 +17346,33 @@ func (r GetEnvironmentDeletionImpactResponse) StatusCode() int {
 	return 0
 }
 
+type AcknowledgeDeploymentOutcomeResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DeploymentOutcomeAcknowledgement
+	JSON201      *DeploymentOutcomeAcknowledgement
+	JSON400      *N400BadRequest
+	JSON403      *N403Forbidden
+	JSON404      *N404NotFound
+	JSON409      *N409Conflict
+}
+
+// Status returns HTTPResponse.Status
+func (r AcknowledgeDeploymentOutcomeResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r AcknowledgeDeploymentOutcomeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListResourceTypesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -18884,6 +19036,23 @@ func (c *ClientWithResponses) GetEnvironmentDeletionImpactWithResponse(ctx conte
 		return nil, err
 	}
 	return ParseGetEnvironmentDeletionImpactResponse(rsp)
+}
+
+// AcknowledgeDeploymentOutcomeWithBodyWithResponse request with arbitrary body returning *AcknowledgeDeploymentOutcomeResponse
+func (c *ClientWithResponses) AcknowledgeDeploymentOutcomeWithBodyWithResponse(ctx context.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam, deploymentId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AcknowledgeDeploymentOutcomeResponse, error) {
+	rsp, err := c.AcknowledgeDeploymentOutcomeWithBody(ctx, orgId, projectId, envId, deploymentId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAcknowledgeDeploymentOutcomeResponse(rsp)
+}
+
+func (c *ClientWithResponses) AcknowledgeDeploymentOutcomeWithResponse(ctx context.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam, deploymentId openapi_types.UUID, body AcknowledgeDeploymentOutcomeJSONRequestBody, reqEditors ...RequestEditorFn) (*AcknowledgeDeploymentOutcomeResponse, error) {
+	rsp, err := c.AcknowledgeDeploymentOutcome(ctx, orgId, projectId, envId, deploymentId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAcknowledgeDeploymentOutcomeResponse(rsp)
 }
 
 // ListResourceTypesWithResponse request returning *ListResourceTypesResponse
@@ -23483,6 +23652,67 @@ func ParseGetEnvironmentDeletionImpactResponse(rsp *http.Response) (*GetEnvironm
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseAcknowledgeDeploymentOutcomeResponse parses an HTTP response from a AcknowledgeDeploymentOutcomeWithResponse call
+func ParseAcknowledgeDeploymentOutcomeResponse(rsp *http.Response) (*AcknowledgeDeploymentOutcomeResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &AcknowledgeDeploymentOutcomeResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeploymentOutcomeAcknowledgement
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest DeploymentOutcomeAcknowledgement
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest N400BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest N403Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest N404NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest N409Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	}
 
