@@ -106,29 +106,11 @@ func TestAvailabilityIsDerivedFromInstallationAndEnablement(t *testing.T) {
 	require.Error(t, err, "an unknown registration kind is never served")
 }
 
-func TestOnlyConfiguredOperatorsHoldPluginManagerPermissions(t *testing.T) {
-	writer, reader, orgAdmin := userid.NewHumanUserId(), userid.NewHumanUserId(), userid.NewHumanUserId()
+func TestPluginManagerRequiresItsDependencies(t *testing.T) {
 	adapter, _, err := pluginentitlements.New(unusedDatabase{}, "development", "", nil)
 	require.NoError(t, err)
-	manager, err := New(Config{Database: unusedDatabase{}, Registry: &plugins.InstallationRegistry{}, Entitlements: adapter, StatusClient: http.DefaultClient, Readers: []uuid.UUID{reader}, Writers: []uuid.UUID{writer}})
+	_, err = New(Config{Database: unusedDatabase{}, Registry: &plugins.InstallationRegistry{}, Entitlements: adapter, StatusClient: http.DefaultClient})
 	require.NoError(t, err)
-	require.True(t, manager.Authorize(writer, PermissionWrite))
-	require.True(t, manager.Authorize(writer, PermissionRead), "writers read")
-	require.True(t, manager.Authorize(reader, PermissionRead))
-	require.False(t, manager.Authorize(reader, PermissionWrite))
-	for name, actor := range map[string]uuid.UUID{
-		"organization admin": orgAdmin, "plugin workload": userid.NewServiceUserTokenId(), "internal system": userid.InternalSystemUuid, "nil": uuid.Nil,
-	} {
-		require.False(t, manager.Authorize(actor, PermissionRead), name)
-		require.False(t, manager.Authorize(actor, PermissionWrite), name)
-	}
-	var disabled *Manager
-	require.False(t, disabled.Authorize(writer, PermissionRead), "no Plugin Manager, no holder")
-
-	for name, holder := range map[string]uuid.UUID{"service user": userid.NewServiceUserTokenId(), "internal system": userid.InternalSystemUuid, "nil": uuid.Nil} {
-		_, err := New(Config{Database: unusedDatabase{}, Registry: &plugins.InstallationRegistry{}, Entitlements: adapter, StatusClient: http.DefaultClient, Writers: []uuid.UUID{holder}})
-		require.Error(t, err, "%s can never hold a Plugin Manager permission", name)
-	}
 	_, err = New(Config{Registry: &plugins.InstallationRegistry{}, Entitlements: adapter, StatusClient: http.DefaultClient})
 	require.Error(t, err)
 	_, err = New(Config{Database: unusedDatabase{}, Registry: &plugins.InstallationRegistry{}, Entitlements: adapter})

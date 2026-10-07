@@ -8,27 +8,15 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"net/http"
-	"slices"
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"go.uber.org/zap"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginentitlements"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
-)
-
-// Permission is a platform permission of the Plugin Manager.
-type Permission string
-
-const (
-	PermissionRead  Permission = "plugin_manager_read"
-	PermissionWrite Permission = "plugin_manager_write"
 )
 
 // Config wires a Manager.
@@ -41,10 +29,7 @@ type Config struct {
 	StatusClient *http.Client
 	// AllowDevelopmentHTTP permits HTTP plugin origins in development only.
 	AllowDevelopmentHTTP bool
-	// Readers and Writers hold plugin_manager_read and plugin_manager_write.
-	// Writers can also read.
-	Readers, Writers []uuid.UUID
-	Logger           *zap.Logger
+	Logger               *zap.Logger
 }
 
 // Manager executes operator commands and refreshes this replica's snapshot.
@@ -54,46 +39,20 @@ type Manager struct {
 	entitlements         *pluginentitlements.Adapter
 	statusClient         *http.Client
 	allowDevelopmentHTTP bool
-	readers, writers     []uuid.UUID
 	logger               *zap.Logger
 	refresh              sync.Mutex
 }
 
-// New validates the configuration. Permission holders must be users that can
-// never be a plugin workload: plugin workloads authenticate as IAM service
-// users, so service users are refused here and again on every request.
+// New validates the configuration.
 func New(config Config) (*Manager, error) {
 	if config.Database == nil || config.Registry == nil || config.Entitlements == nil || config.StatusClient == nil {
 		return nil, errors.New("the Plugin Manager needs a database, a registry, the entitlement adapter and a plugin status client")
-	}
-	for _, holder := range slices.Concat(config.Readers, config.Writers) {
-		if !eligibleOperator(holder) {
-			return nil, fmt.Errorf("plugin manager permission holder %s must be a user, never a service user or the internal system identity", holder)
-		}
 	}
 	logger := config.Logger
 	if logger == nil {
 		logger = zap.NewNop()
 	}
-	return &Manager{db: config.Database, registry: config.Registry, entitlements: config.Entitlements, statusClient: config.StatusClient, allowDevelopmentHTTP: config.AllowDevelopmentHTTP,
-		readers: slices.Clone(config.Readers), writers: slices.Clone(config.Writers), logger: logger}, nil
-}
-
-func eligibleOperator(id uuid.UUID) bool {
-	return id != uuid.Nil && id != userid.InternalSystemUuid && !userid.IsServiceUser(id)
-}
-
-// Authorize reports whether actor holds permission. Holders are configured
-// platform operators; organization roles are never consulted, and a plugin
-// workload never qualifies even when configured by mistake.
-func (m *Manager) Authorize(actor uuid.UUID, permission Permission) bool {
-	if m == nil || !eligibleOperator(actor) {
-		return false
-	}
-	if slices.Contains(m.writers, actor) {
-		return true
-	}
-	return permission == PermissionRead && slices.Contains(m.readers, actor)
+	return &Manager{db: config.Database, registry: config.Registry, entitlements: config.Entitlements, statusClient: config.StatusClient, allowDevelopmentHTTP: config.AllowDevelopmentHTTP, logger: logger}, nil
 }
 
 // Refresh publishes the current Plugin Manager state to the registry when its

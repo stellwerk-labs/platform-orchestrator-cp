@@ -3,9 +3,13 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"github.com/pkg/errors"
+	iamauthz "github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
+	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/api/middleware"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
@@ -14,9 +18,9 @@ import (
 )
 
 // pluginManagerCaller authorizes a platform-scoped Plugin Manager request.
-// Only configured platform operators hold the permissions; organization roles
-// are never consulted and plugin workloads never qualify.
-func (s *Server) pluginManagerCaller(ctx context.Context, permission pluginmanager.Permission) (uuid.UUID, error) {
+// IAM decides: only operators configured there hold the platform
+// permissions; organization roles and plugin workloads never qualify.
+func (s *Server) pluginManagerCaller(ctx context.Context, permission string) (uuid.UUID, error) {
 	if s.PluginManager == nil {
 		return uuid.Nil, pluginBoundaryError(404, "plugin_host_disabled", "The plugin host is disabled on this Control Plane.")
 	}
@@ -24,15 +28,25 @@ func (s *Server) pluginManagerCaller(ctx context.Context, permission pluginmanag
 	if err != nil {
 		return uuid.Nil, err
 	}
-	if !s.PluginManager.Authorize(actor, permission) {
-		return uuid.Nil, pluginBoundaryError(403, "plugin_manager_forbidden", "The platform permission "+string(permission)+" is required.")
+	response, err := s.IamClient.InternalAuthorizeWithResponse(ctx, orchestratoriam.InternalAuthorizeBody{
+		UserId: actor, Checks: []orchestratoriam.ResourcePermissionCheck{iamauthz.PlatformCheck(permission)},
+	})
+	if err != nil {
+		return uuid.Nil, errors.Wrap(err, "failed to check the platform permission")
+	}
+	switch response.StatusCode() {
+	case http.StatusNoContent:
+	case http.StatusForbidden:
+		return uuid.Nil, pluginBoundaryError(403, "plugin_manager_forbidden", "The platform permission "+permission+" is required.")
+	default:
+		return uuid.Nil, errors.Errorf("unexpected status code when checking the platform permission: %s", response.Status())
 	}
 	middleware.SetAuthCheckedCtx(ctx)
 	return actor, nil
 }
 
 func (s *Server) pluginManagerCommand(ctx context.Context, idempotencyKey string, expectedRevision int64, reason string) (pluginmanager.Command, error) {
-	actor, err := s.pluginManagerCaller(ctx, pluginmanager.PermissionWrite)
+	actor, err := s.pluginManagerCaller(ctx, iamauthz.PermissionPluginManagerWrite)
 	if err != nil {
 		return pluginmanager.Command{}, err
 	}
@@ -75,7 +89,7 @@ func pluginInstallationResult[T any](installation pluginmanager.Installation, er
 }
 
 func (s *Server) ListPluginPackages(ctx context.Context, _ ListPluginPackagesRequestObject) (ListPluginPackagesResponseObject, error) {
-	if _, err := s.pluginManagerCaller(ctx, pluginmanager.PermissionRead); err != nil {
+	if _, err := s.pluginManagerCaller(ctx, iamauthz.PermissionPluginManagerRead); err != nil {
 		return nil, err
 	}
 	page, err := s.PluginManager.Packages(ctx)
@@ -101,7 +115,7 @@ func (s *Server) PushPluginPackage(ctx context.Context, request PushPluginPackag
 }
 
 func (s *Server) ListPluginInstallations(ctx context.Context, _ ListPluginInstallationsRequestObject) (ListPluginInstallationsResponseObject, error) {
-	if _, err := s.pluginManagerCaller(ctx, pluginmanager.PermissionRead); err != nil {
+	if _, err := s.pluginManagerCaller(ctx, iamauthz.PermissionPluginManagerRead); err != nil {
 		return nil, err
 	}
 	page, err := s.PluginManager.Installations(ctx)
@@ -123,7 +137,7 @@ func (s *Server) CreatePluginInstallation(ctx context.Context, request CreatePlu
 }
 
 func (s *Server) GetPluginInstallation(ctx context.Context, request GetPluginInstallationRequestObject) (GetPluginInstallationResponseObject, error) {
-	if _, err := s.pluginManagerCaller(ctx, pluginmanager.PermissionRead); err != nil {
+	if _, err := s.pluginManagerCaller(ctx, iamauthz.PermissionPluginManagerRead); err != nil {
 		return nil, err
 	}
 	return pluginInstallationResult[GetPluginInstallation200JSONResponse](s.PluginManager.Installation(ctx, request.InstallationId))
@@ -212,7 +226,7 @@ func (s *Server) ImportPluginEntitlementBundle(ctx context.Context, request Impo
 }
 
 func (s *Server) ListPluginAuditEvents(ctx context.Context, request ListPluginAuditEventsRequestObject) (ListPluginAuditEventsResponseObject, error) {
-	if _, err := s.pluginManagerCaller(ctx, pluginmanager.PermissionRead); err != nil {
+	if _, err := s.pluginManagerCaller(ctx, iamauthz.PermissionPluginManagerRead); err != nil {
 		return nil, err
 	}
 	page, err := s.PluginManager.AuditEvents(ctx, ref.DerefOr(request.Params.After, 0), ref.DerefOr(request.Params.Limit, 100))

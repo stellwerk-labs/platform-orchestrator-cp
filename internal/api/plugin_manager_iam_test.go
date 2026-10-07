@@ -1,0 +1,136 @@
+package api
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"slices"
+	"sync"
+	"sync/atomic"
+	"testing"
+
+	"github.com/google/uuid"
+	"github.com/stellwerk-labs/golib/hecho"
+	"github.com/stellwerk-labs/golib/herrors"
+	iamauthz "github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
+	iamapi "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
+	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
+	"github.com/stretchr/testify/require"
+
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginmanager"
+)
+
+// iamPeer stands in for IAM behind its internal HTTP contract. It answers
+// platform checks from the operators configured for each permission, and
+// allows every organization check as for an organization administrator and
+// counts them.
+type iamPeer struct {
+	mu        sync.Mutex
+	holders   map[string][]uuid.UUID
+	platform  []iamapi.ResourcePermissionCheck
+	orgChecks atomic.Int32
+}
+
+func (p *iamPeer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch {
+	case r.Method == http.MethodPost && r.URL.Path == "/internal/authorize":
+		var body iamapi.InternalAuthorizeBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		failed := []iamapi.ResourcePermissionCheck{}
+		p.mu.Lock()
+		for _, check := range body.Checks {
+			if check.Resource != iamauthz.PlatformResource {
+				p.orgChecks.Add(1)
+				continue
+			}
+			p.platform = append(p.platform, check)
+			if !slices.Contains(p.holders[check.Permission], body.UserId) {
+				failed = append(failed, check)
+			}
+		}
+		p.mu.Unlock()
+		if len(failed) == 0 {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_ = json.NewEncoder(w).Encode(map[string]any{"error": "HTTP-403", "message": "denied", "details": map[string]any{"failed_checks": failed}})
+	default:
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+}
+
+// platformChecks returns the platform checks asked so far.
+func (p *iamPeer) platformChecks() []iamapi.ResourcePermissionCheck {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return slices.Clone(p.platform)
+}
+
+// newIAMPeer serves an iamPeer in which writers hold plugin_manager_write
+// and readers plugin_manager_read, and returns a client for it.
+func newIAMPeer(t *testing.T, writers, readers []uuid.UUID) (*iamPeer, iamapi.ClientWithResponsesInterface) {
+	t.Helper()
+	peer := &iamPeer{holders: map[string][]uuid.UUID{
+		iamauthz.PermissionPluginManagerRead:  readers,
+		iamauthz.PermissionPluginManagerWrite: writers,
+	}}
+	iam := httptest.NewServer(peer)
+	t.Cleanup(iam.Close)
+	client, err := iamapi.NewClientWithResponses(iam.URL)
+	require.NoError(t, err)
+	return peer, client
+}
+
+func TestOnlyConfiguredOperatorsHoldPluginManagerPermissions(t *testing.T) {
+	writer, reader := userid.NewHumanUserId(), userid.NewHumanUserId()
+	peer, client := newIAMPeer(t, []uuid.UUID{writer}, []uuid.UUID{writer, reader})
+	s := &Server{IamClient: client, PluginManager: &pluginmanager.Manager{}}
+	as := func(actor uuid.UUID) context.Context {
+		return context.WithValue(t.Context(), hecho.ContextKeyUserID, actor.String())
+	}
+	allowed := func(actor uuid.UUID, permission string) bool {
+		t.Helper()
+		caller, err := s.pluginManagerCaller(as(actor), permission)
+		if err != nil {
+			var refused *herrors.PlatformOrchestratorError
+			require.ErrorAs(t, err, &refused)
+			require.Equal(t, http.StatusForbidden, refused.StatusCode)
+			require.Equal(t, "plugin_manager_forbidden", refused.Code)
+			return false
+		}
+		require.Equal(t, actor, caller)
+		return true
+	}
+
+	require.True(t, allowed(writer, iamauthz.PermissionPluginManagerWrite))
+	require.True(t, allowed(writer, iamauthz.PermissionPluginManagerRead))
+	require.True(t, allowed(reader, iamauthz.PermissionPluginManagerRead))
+	require.False(t, allowed(reader, iamauthz.PermissionPluginManagerWrite))
+	for name, actor := range map[string]uuid.UUID{
+		"organization admin": userid.NewHumanUserId(), "plugin workload": userid.NewServiceUserTokenId(), "internal system": userid.InternalSystemUuid,
+	} {
+		require.False(t, allowed(actor, iamauthz.PermissionPluginManagerRead), name)
+	}
+	require.Equal(t, iamauthz.PlatformCheck(iamauthz.PermissionPluginManagerRead), peer.platformChecks()[len(peer.platformChecks())-1],
+		"Core asks IAM for the platform permission, never for an organization role")
+	require.Zero(t, peer.orgChecks.Load())
+
+	asked := len(peer.platformChecks())
+	disabled := &Server{IamClient: client}
+	_, err := disabled.pluginManagerCaller(as(writer), iamauthz.PermissionPluginManagerRead)
+	require.ErrorContains(t, err, "plugin_host_disabled")
+	require.Len(t, peer.platformChecks(), asked, "no Plugin Manager, no IAM question")
+
+	unavailable, err := iamapi.NewClientWithResponses("http://127.0.0.1:1")
+	require.NoError(t, err)
+	_, err = (&Server{IamClient: unavailable, PluginManager: &pluginmanager.Manager{}}).pluginManagerCaller(as(writer), iamauthz.PermissionPluginManagerWrite)
+	require.Error(t, err)
+	var refused *herrors.PlatformOrchestratorError
+	require.NotErrorAs(t, err, &refused, "an unreachable IAM is an error, never a decision")
+}

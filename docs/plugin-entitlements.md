@@ -100,9 +100,8 @@ features activated under a grant. Core-only operations are unaffected.
 
 Core configuration that is not entitlement material still fails fast, because
 it describes Core itself and affects every plugin equally: an invalid
-`PLUGIN_ENTITLEMENT_MODE`, the Plugin Manager permission holders
-(`PLUGIN_MANAGER_READERS`, `PLUGIN_MANAGER_WRITERS`) and refresh interval, the
-first load of the Plugin Manager state, the plugin assertion signing key
+`PLUGIN_ENTITLEMENT_MODE`, the Plugin Manager refresh interval, the first load
+of the Plugin Manager state, the plugin assertion signing key
 (`PLUGIN_SIGNING_KEY_FILE`), the plugin CA bundle (`PLUGIN_CA_FILE`), the fixed
 Data Plane plugin port and `PLUGIN_EVENT_JOURNAL_RETENTION`. An installation
 whose stored state no longer validates is not served and is logged; the

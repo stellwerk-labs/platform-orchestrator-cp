@@ -9,7 +9,7 @@
       "get": {
         "operationId": "listPluginPackages",
         "summary": "List the plugin packages known to the Plugin Manager.",
-        "description": "Platform-scoped. Requires the platform permission plugin_manager_read, held only by configured platform operators; organization roles and plugin workloads never qualify. Returns 404 plugin_host_disabled while the plugin host is off.",
+        "description": "Platform-scoped. Requires the platform permission plugin_manager_read, held only by the operators configured in IAM; organization roles and plugin workloads never qualify. Returns 404 plugin_host_disabled while the plugin host is off.",
         "tags": [
           "Plugin Manager"
         ],

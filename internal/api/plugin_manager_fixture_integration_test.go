@@ -26,7 +26,7 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/pluginstatus"
 )
 
-// pluginOperator holds plugin_manager_write in every test Plugin Manager.
+// pluginOperator holds both Plugin Manager permissions in every test IAM peer.
 var pluginOperator = userid.NewHumanUserId()
 
 // runningPlugins stands in for the plugin runtimes: each backend host serves
@@ -63,16 +63,14 @@ func (p *runningPlugins) serve(t *testing.T, backend string, installation uuid.U
 }
 
 // testPluginManager is a Plugin Manager over db that serves registry.
-// pluginOperator writes; readers only read.
-func testPluginManager(t *testing.T, db model.Databaser, registry *plugins.InstallationRegistry, adapter *pluginentitlements.Adapter, readers ...uuid.UUID) *pluginmanager.Manager {
+func testPluginManager(t *testing.T, db model.Databaser, registry *plugins.InstallationRegistry, adapter *pluginentitlements.Adapter) *pluginmanager.Manager {
 	t.Helper()
 	if adapter == nil {
 		var err error
 		adapter, _, err = pluginentitlements.New(db, entitlements.Development, "", nil)
 		require.NoError(t, err)
 	}
-	manager, err := pluginmanager.New(pluginmanager.Config{Database: db, Registry: registry, Entitlements: adapter, StatusClient: &http.Client{Transport: fleet},
-		Readers: readers, Writers: []uuid.UUID{pluginOperator}})
+	manager, err := pluginmanager.New(pluginmanager.Config{Database: db, Registry: registry, Entitlements: adapter, StatusClient: &http.Client{Transport: fleet}})
 	require.NoError(t, err)
 	return manager
 }

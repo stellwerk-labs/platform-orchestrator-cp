@@ -53,13 +53,16 @@ change advances the revision and writes one audit event. A step whose target
 state already holds changes nothing and writes no audit event, so an
 interrupted installation resumes by running its steps again.
 
-Holders of the platform permissions `plugin_manager_read` and
-`plugin_manager_write` are configured users (`PLUGIN_MANAGER_READERS`,
-`PLUGIN_MANAGER_WRITERS`; writers also read). Plugin workloads authenticate as
-IAM service users, and a service user never holds either permission, even when
-configured; Core refuses such a configuration at start-up. Organization roles
-are never consulted. With the plugin host disabled every route returns
-`404 plugin_host_disabled`; Core-only operation is unaffected.
+IAM decides who operates the Plugin Manager. The platform permissions
+`plugin_manager_read` and `plugin_manager_write` are held by the users IAM is
+configured with (`PLUGIN_MANAGER_READERS`, `PLUGIN_MANAGER_WRITERS`; writers
+also read). Core asks IAM on every request (`POST /internal/authorize` with the
+resource `platform`) and answers `403 plugin_manager_forbidden` when IAM
+refuses. Plugin workloads authenticate as IAM service users: IAM does not start
+when a service user is configured as a holder and never lets a plugin workload
+hold a platform permission. Organization roles are never consulted. With the
+plugin host disabled every route returns `404 plugin_host_disabled`; Core-only
+operation is unaffected.
 
 ### Propagation and authority
 
@@ -178,7 +181,7 @@ verification and revisit this decision.
   and removing a single organization's enablement does not wait for that
   organization's safety work.
 - Verifying service identities against IAM workload bindings and the service
-  user's organization, and holding the platform permissions in IAM.
+  user's organization.
 - Collision checks beyond the UI route prefix.
 
 ## Consequences

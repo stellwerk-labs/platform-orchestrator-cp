@@ -63,22 +63,15 @@ func TestPluginManagerConfiguration(t *testing.T) {
 	defaults, err := load()
 	require.NoError(t, err)
 	assert.Equal(t, 2*time.Second, defaults.PluginManagerRefreshInterval, "a replica serves changes within two seconds by default")
-	assert.Empty(t, defaults.PluginManagerReaders)
-	assert.Empty(t, defaults.PluginManagerWriters, "nobody operates the Plugin Manager unless configured")
 
-	t.Setenv("PLUGIN_MANAGER_READERS", "0199a0c1-1d6e-71f1-8000-000000000001")
-	t.Setenv("PLUGIN_MANAGER_WRITERS", "0199a0c1-1d6e-71f1-8000-000000000002,0199a0c1-1d6e-71f1-8000-000000000003")
 	t.Setenv("PLUGIN_MANAGER_REFRESH_INTERVAL", "500ms")
 	configured, err := load()
 	require.NoError(t, err)
-	assert.Equal(t, []string{"0199a0c1-1d6e-71f1-8000-000000000001"}, configured.PluginManagerReaders)
-	assert.Equal(t, []string{"0199a0c1-1d6e-71f1-8000-000000000002", "0199a0c1-1d6e-71f1-8000-000000000003"}, configured.PluginManagerWriters)
 	assert.Equal(t, 500*time.Millisecond, configured.PluginManagerRefreshInterval)
 
 	for name, setting := range map[string][2]string{
-		"holder that is not a UUID": {"PLUGIN_MANAGER_WRITERS", "platform-admins"},
-		"refresh below 100ms":       {"PLUGIN_MANAGER_REFRESH_INTERVAL", "10ms"},
-		"refresh above a minute":    {"PLUGIN_MANAGER_REFRESH_INTERVAL", "2m"},
+		"refresh below 100ms":    {"PLUGIN_MANAGER_REFRESH_INTERVAL", "10ms"},
+		"refresh above a minute": {"PLUGIN_MANAGER_REFRESH_INTERVAL", "2m"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Setenv(setting[0], setting[1])

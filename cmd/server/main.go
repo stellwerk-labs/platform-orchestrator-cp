@@ -259,7 +259,7 @@ func main() {
 		server.PluginEntitlements = entitlementAdapter
 		server.PluginManager, err = pluginmanager.New(pluginmanager.Config{
 			Database: db, Registry: registry, Entitlements: entitlementAdapter, StatusClient: gateway.Client, AllowDevelopmentHTTP: cfg.PluginDevelopmentHTTP,
-			Readers: operatorIDs(cfg.PluginManagerReaders), Writers: operatorIDs(cfg.PluginManagerWriters), Logger: zap.L(),
+			Logger: zap.L(),
 		})
 		if err != nil {
 			zap.L().Fatal("Invalid Plugin Manager configuration", zap.Error(err))

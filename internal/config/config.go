@@ -38,12 +38,6 @@ type Configuration struct {
 	PluginIssuer          string `env:"PLUGIN_ISSUER, default=stellwerk-control-plane"`
 	PluginDevelopmentHTTP bool   `env:"PLUGIN_DEVELOPMENT_HTTP, default=false"`
 	PluginCAFile          string `env:"PLUGIN_CA_FILE"`
-	// PluginManagerReaders and PluginManagerWriters hold the platform
-	// permissions plugin_manager_read and plugin_manager_write; writers also
-	// read. Holders must be users: service users, and so plugin workloads,
-	// never qualify.
-	PluginManagerReaders []string `env:"PLUGIN_MANAGER_READERS" validate:"dive,uuid"`
-	PluginManagerWriters []string `env:"PLUGIN_MANAGER_WRITERS" validate:"dive,uuid"`
 	// PluginManagerRefreshInterval bounds how stale a replica's plugin read
 	// snapshot (discovery, routing, UI) can be.
 	PluginManagerRefreshInterval time.Duration `env:"PLUGIN_MANAGER_REFRESH_INTERVAL, default=2s" validate:"min=100ms,max=1m"`

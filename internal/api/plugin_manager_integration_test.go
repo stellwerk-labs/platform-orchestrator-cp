@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -19,7 +18,7 @@ import (
 	"github.com/stellwerk-labs/golib/hecho"
 	"github.com/stellwerk-labs/golib/herrors"
 	"github.com/stellwerk-labs/golib/hstandardoutbox"
-	iamapi "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
+	iamauthz "github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -34,31 +33,24 @@ import (
 // operatorAPI drives one Control Plane replica over HTTP, through the
 // generated router and OpenAPI request validation.
 type operatorAPI struct {
-	t        *testing.T
-	server   *Server
-	e        *echo.Echo
-	iamCalls *atomic.Int32
+	t      *testing.T
+	server *Server
+	e      *echo.Echo
+	iam    *iamPeer
 }
 
-// newOperatorAPI serves s. Its IAM peer allows every organization check, as
-// for an organization administrator, and counts the checks.
-func newOperatorAPI(t *testing.T, s *Server) *operatorAPI {
+// newOperatorAPI serves s. pluginOperator holds both Plugin Manager
+// permissions in IAM; readers hold plugin_manager_read.
+func newOperatorAPI(t *testing.T, s *Server, readers ...uuid.UUID) *operatorAPI {
 	t.Helper()
-	calls := &atomic.Int32{}
-	iam := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		calls.Add(1)
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	t.Cleanup(iam.Close)
-	client, err := iamapi.NewClientWithResponses(iam.URL)
-	require.NoError(t, err)
+	peer, client := newIAMPeer(t, []uuid.UUID{pluginOperator}, append([]uuid.UUID{pluginOperator}, readers...))
 	s.IamClient, s.Logger = client, zap.NewNop()
 	e, err := hecho.DefaultEchoServerWithValidation(&hecho.ValidatedServerConfig{AppName: "plugin-manager-test", Logger: zap.NewNop(), OpenAPIRawSchema: MustDecodeOpenApiSpec()})
 	require.NoError(t, err)
 	e.Use(middleware.EchoCtxMiddleware)
 	e.Use(echomiddleware.RequestID())
 	s.MapRoutes(e)
-	return &operatorAPI{t: t, server: s, e: e, iamCalls: calls}
+	return &operatorAPI{t: t, server: s, e: e, iam: peer}
 }
 
 func (a *operatorAPI) call(actor uuid.UUID, method, path, key string, body any) *httptest.ResponseRecorder {
@@ -134,10 +126,10 @@ func sha256Hex(raw []byte) string {
 }
 
 // pluginManagerServer is a plugin host replica over db.
-func pluginManagerServer(t *testing.T, db model.Databaser, readers ...uuid.UUID) *Server {
+func pluginManagerServer(t *testing.T, db model.Databaser) *Server {
 	t.Helper()
 	registry := &plugins.InstallationRegistry{}
-	manager := testPluginManager(t, db, registry, nil, readers...)
+	manager := testPluginManager(t, db, registry, nil)
 	require.NoError(t, manager.Refresh(t.Context()))
 	return &Server{Database: db, Plugins: registry, PluginGateway: &plugins.Gateway{Registry: registry}, PluginManager: manager}
 }
@@ -230,11 +222,11 @@ func TestPluginManagerOperatorAPIInstallsWithoutRestart(t *testing.T) {
 func TestOnlyPlatformOperatorsReachThePluginManager(t *testing.T) {
 	db, grant := pluginDeploymentBoundaryDatabase(t)
 	reader := userid.NewHumanUserId()
-	api := newOperatorAPI(t, pluginManagerServer(t, db, reader))
+	api := newOperatorAPI(t, pluginManagerServer(t, db), reader)
 	item := workflowPlugin(grant, "external-deployment.admit")
 	installation := api.install(item, grant.OrgID)
 	audited := len(decode[PluginAuditEventPage](t, api.call(pluginOperator, http.MethodGet, "/plugin-audit-events", "", nil), http.StatusOK).Items)
-	api.iamCalls.Store(0)
+	api.iam.orgChecks.Store(0)
 
 	denied := map[string]uuid.UUID{
 		"organization administrator": userid.NewHumanUserId(),
@@ -250,13 +242,19 @@ func TestOnlyPlatformOperatorsReachThePluginManager(t *testing.T) {
 			require.Contains(t, response.Body.String(), `"error":"plugin_manager_forbidden"`)
 		}
 		response := api.call(reader, route.method, route.path, uuid.NewString(), route.body)
+		required := iamauthz.PermissionPluginManagerRead
+		if route.write {
+			required = iamauthz.PermissionPluginManagerWrite
+		}
+		checks := api.iam.platformChecks()
+		require.Equal(t, iamauthz.PlatformCheck(required), checks[len(checks)-1], "%s %s asks IAM for exactly %s", route.method, route.path, required)
 		if route.write {
 			requireErrorCode(t, response, http.StatusForbidden, "plugin_manager_forbidden")
 		} else {
 			require.Equal(t, http.StatusOK, response.Code, "%s %s: %s", route.method, route.path, response.Body.String())
 		}
 	}
-	require.Zero(t, api.iamCalls.Load(), "organization roles are never consulted")
+	require.Zero(t, api.iam.orgChecks.Load(), "organization roles are never consulted")
 	require.Len(t, decode[PluginAuditEventPage](t, api.call(pluginOperator, http.MethodGet, "/plugin-audit-events", "", nil), http.StatusOK).Items, audited, "denied calls change nothing")
 }
 

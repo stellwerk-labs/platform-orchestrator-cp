@@ -118,7 +118,7 @@ func newReplicaReading(t *testing.T, db model.Databaser, client *http.Client) re
 	adapter, _, err := pluginentitlements.New(db, entitlements.Development, "", nil)
 	require.NoError(t, err)
 	registry := &plugins.InstallationRegistry{Entitlements: adapter}
-	manager, err := New(Config{Database: db, Registry: registry, Entitlements: adapter, StatusClient: client, Writers: []uuid.UUID{operator}})
+	manager, err := New(Config{Database: db, Registry: registry, Entitlements: adapter, StatusClient: client})
 	require.NoError(t, err)
 	require.NoError(t, manager.Refresh(t.Context()))
 	return replica{manager: manager, registry: registry}

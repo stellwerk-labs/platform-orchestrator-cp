@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
@@ -61,14 +60,4 @@ func pruneExtensionJournal(db model.Databaser, policy model.ExtensionResourceRet
 		}
 		return err
 	}
-}
-
-// operatorIDs parses configured permission holders; the configuration
-// validates them as UUIDs.
-func operatorIDs(values []string) []uuid.UUID {
-	ids := make([]uuid.UUID, 0, len(values))
-	for _, value := range values {
-		ids = append(ids, uuid.MustParse(value))
-	}
-	return ids
 }
