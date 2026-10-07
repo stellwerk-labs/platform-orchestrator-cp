@@ -151,12 +151,12 @@ func (a *Adapter) ImportBundle(ctx context.Context, path string) []Diagnostic {
 	grants, snapshots, rejected := verifyBundle(bundle, a.trust, a.mode, candidates, a.now().UTC())
 	diagnostics = append(diagnostics, rejected...)
 	for _, grant := range grants {
-		if _, err := model.ImportPluginEntitlementGrant(ctx, a.db, grant.Grant, operatorImporter, bundle.Digest); err != nil {
+		if _, err := model.ImportPluginEntitlementGrant(ctx, a.db, nil, grant.Grant, operatorImporter, bundle.Digest); err != nil {
 			diagnostics = append(diagnostics, Diagnostic{DiagnosticGrantRejected, fmt.Sprintf("grant %d was not imported: %v", grant.index, err)})
 		}
 	}
 	for _, snapshot := range snapshots {
-		if _, err := model.ImportPluginEntitlementRevocations(ctx, a.db, snapshot.Revocations, operatorImporter, bundle.Digest); err != nil {
+		if _, err := model.ImportPluginEntitlementRevocations(ctx, a.db, nil, snapshot.Revocations, operatorImporter, bundle.Digest); err != nil {
 			diagnostics = append(diagnostics, Diagnostic{DiagnosticRevocationsRejected, fmt.Sprintf("revocation snapshot %d was not imported: %v", snapshot.index, err)})
 		}
 	}

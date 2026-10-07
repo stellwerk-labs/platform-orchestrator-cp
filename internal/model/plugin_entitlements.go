@@ -79,6 +79,25 @@ func entitlementAudit(ctx context.Context, db Databaser, tx Tx, issuer string, b
 	return err
 }
 
+// inTransaction runs work in the caller's transaction, or in its own one that
+// commits only when work succeeds.
+func inTransaction[T any](ctx context.Context, db Databaser, optionalTx Tx, work func(Tx) (T, error)) (T, error) {
+	if optionalTx != nil {
+		return work(optionalTx)
+	}
+	var zero T
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return zero, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	result, err := work(tx)
+	if err != nil {
+		return zero, err
+	}
+	return result, tx.Commit()
+}
+
 func validEntitlementImport(envelope []byte, digest [32]byte, issuer, importer string, sourceDigest [32]byte, class entitlements.TrustClass) error {
 	if issuer == "" || importer == "" || class != entitlements.Production && class != entitlements.Development || len(envelope) == 0 || len(envelope) > entitlements.MaxEnvelopeBytes || sha256.Sum256(envelope) != digest || sourceDigest == [32]byte{} {
 		return NewErrBadRequest("verified entitlement evidence, importer and source digest are required")
@@ -88,8 +107,9 @@ func validEntitlementImport(envelope []byte, digest [32]byte, issuer, importer s
 
 // ImportPluginEntitlementGrant accepts only the result of the strict local
 // verifier. The caller must exact-match its binding to the installed package.
-// Exact replay is idempotent; changed or lower sequences conflict.
-func ImportPluginEntitlementGrant(ctx context.Context, db Databaser, grant entitlements.Grant, importer string, sourceDigest [32]byte) (bool, error) {
+// Exact replay is idempotent; changed or lower sequences conflict. It runs in
+// optionalTx, or in its own transaction when that is nil.
+func ImportPluginEntitlementGrant(ctx context.Context, db Databaser, optionalTx Tx, grant entitlements.Grant, importer string, sourceDigest [32]byte) (bool, error) {
 	if err := validEntitlementImport(grant.Envelope, grant.Digest, grant.Issuer, importer, sourceDigest, grant.TrustClass); err != nil {
 		return false, err
 	}
@@ -97,177 +117,173 @@ func ImportPluginEntitlementGrant(ctx context.Context, db Databaser, grant entit
 		return false, NewErrBadRequest("invalid verified grant projection")
 	}
 	binding := entitlements.Binding{InstallationID: grant.InstallationID, PluginID: grant.PluginID, OrganizationID: grant.OrganizationID}
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return false, err
-	}
-	defer func() { _ = tx.Rollback() }()
-	if err := entitlementIssuerLock(ctx, tx, grant.Issuer, false); err != nil {
-		return false, err
-	}
-	if err := entitlementBindingLock(ctx, tx, binding); err != nil {
-		return false, err
-	}
-	var oldIssuer string
-	var oldIssuance uuid.UUID
-	var oldSequence int64
-	err = tx.QueryRowContext(ctx, `SELECT issuer,issuance_id,grant_sequence FROM plugin_entitlement_bindings WHERE installation_uuid=$1 AND plugin_id=$2 AND organization_uuid=$3 FOR UPDATE`, binding.InstallationID, binding.PluginID, binding.OrganizationID).Scan(&oldIssuer, &oldIssuance, &oldSequence)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return false, err
-	}
-	newBinding := errors.Is(err, sql.ErrNoRows)
-	if err == nil {
-		if oldIssuer != grant.Issuer {
-			return false, NewErrConflict("entitlement issuer changed for an existing binding")
+	return inTransaction(ctx, db, optionalTx, func(tx Tx) (bool, error) {
+		var err error
+		if err := entitlementIssuerLock(ctx, tx, grant.Issuer, false); err != nil {
+			return false, err
 		}
-		if grant.Sequence < oldSequence {
-			return false, NewErrConflict("stale entitlement grant sequence")
+		if err := entitlementBindingLock(ctx, tx, binding); err != nil {
+			return false, err
 		}
-		if grant.Sequence == oldSequence {
-			var oldDigest []byte
-			if err := tx.QueryRowContext(ctx, `SELECT digest FROM plugin_entitlement_grants WHERE issuer=$1 AND issuance_id=$2`, oldIssuer, oldIssuance).Scan(&oldDigest); err != nil {
-				return false, err
+		var oldIssuer string
+		var oldIssuance uuid.UUID
+		var oldSequence int64
+		err = tx.QueryRowContext(ctx, `SELECT issuer,issuance_id,grant_sequence FROM plugin_entitlement_bindings WHERE installation_uuid=$1 AND plugin_id=$2 AND organization_uuid=$3 FOR UPDATE`, binding.InstallationID, binding.PluginID, binding.OrganizationID).Scan(&oldIssuer, &oldIssuance, &oldSequence)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return false, err
+		}
+		newBinding := errors.Is(err, sql.ErrNoRows)
+		if err == nil {
+			if oldIssuer != grant.Issuer {
+				return false, NewErrConflict("entitlement issuer changed for an existing binding")
 			}
-			if oldIssuance != grant.IssuanceID || !bytes.Equal(oldDigest, grant.Digest[:]) {
-				return false, NewErrConflict("changed entitlement at the same grant sequence")
+			if grant.Sequence < oldSequence {
+				return false, NewErrConflict("stale entitlement grant sequence")
 			}
-			return false, nil
+			if grant.Sequence == oldSequence {
+				var oldDigest []byte
+				if err := tx.QueryRowContext(ctx, `SELECT digest FROM plugin_entitlement_grants WHERE issuer=$1 AND issuance_id=$2`, oldIssuer, oldIssuance).Scan(&oldDigest); err != nil {
+					return false, err
+				}
+				if oldIssuance != grant.IssuanceID || !bytes.Equal(oldDigest, grant.Digest[:]) {
+					return false, NewErrConflict("changed entitlement at the same grant sequence")
+				}
+				return false, nil
+			}
+			if oldIssuance == grant.IssuanceID {
+				return false, NewErrConflict("issuance ID cannot be reused at a higher sequence")
+			}
 		}
-		if oldIssuance == grant.IssuanceID {
-			return false, NewErrConflict("issuance ID cannot be reused at a higher sequence")
+		limits, err := json.Marshal(grant.Limits)
+		if err != nil {
+			return false, err
 		}
-	}
-	limits, err := json.Marshal(grant.Limits)
-	if err != nil {
-		return false, err
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO plugin_entitlement_grants(issuer,issuance_id,grant_sequence,installation_uuid,plugin_id,organization_uuid,cose,digest,key_id,features,limits,issued_at,not_before,expires_at,grace_until,trust_class,importer,source_digest)
+		if _, err := tx.ExecContext(ctx, `INSERT INTO plugin_entitlement_grants(issuer,issuance_id,grant_sequence,installation_uuid,plugin_id,organization_uuid,cose,digest,key_id,features,limits,issued_at,not_before,expires_at,grace_until,trust_class,importer,source_digest)
 		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`, grant.Issuer, grant.IssuanceID, grant.Sequence, grant.InstallationID, grant.PluginID, grant.OrganizationID, grant.Envelope, grant.Digest[:], grant.KeyID, pq.Array(grant.Features), string(limits), time.Unix(grant.IssuedAt, 0).UTC(), time.Unix(grant.NotBefore, 0).UTC(), time.Unix(grant.ExpiresAt, 0).UTC(), time.Unix(grant.GraceUntil, 0).UTC(), grant.TrustClass, importer, sourceDigest[:]); err != nil {
-		return false, err
-	}
-	if newBinding {
-		_, err = tx.ExecContext(ctx, `INSERT INTO plugin_entitlement_bindings(installation_uuid,plugin_id,organization_uuid,issuer,issuance_id,grant_sequence,revision) VALUES($1,$2,$3,$4,$5,$6,1)`, binding.InstallationID, binding.PluginID, binding.OrganizationID, grant.Issuer, grant.IssuanceID, grant.Sequence)
-	} else {
-		_, err = tx.ExecContext(ctx, `UPDATE plugin_entitlement_bindings SET issuance_id=$4,grant_sequence=$5,observed_grace_at=NULL,observed_expired_at=NULL,revision=revision+1 WHERE installation_uuid=$1 AND plugin_id=$2 AND organization_uuid=$3`, binding.InstallationID, binding.PluginID, binding.OrganizationID, grant.IssuanceID, grant.Sequence)
-	}
-	if err != nil {
-		return false, err
-	}
-	if err := entitlementAudit(ctx, db, tx, grant.Issuer, &binding, "grant_imported", grant.Sequence, grant.TrustClass, importer, sourceDigest); err != nil {
-		return false, err
-	}
-	return true, tx.Commit()
+			return false, err
+		}
+		if newBinding {
+			_, err = tx.ExecContext(ctx, `INSERT INTO plugin_entitlement_bindings(installation_uuid,plugin_id,organization_uuid,issuer,issuance_id,grant_sequence,revision) VALUES($1,$2,$3,$4,$5,$6,1)`, binding.InstallationID, binding.PluginID, binding.OrganizationID, grant.Issuer, grant.IssuanceID, grant.Sequence)
+		} else {
+			_, err = tx.ExecContext(ctx, `UPDATE plugin_entitlement_bindings SET issuance_id=$4,grant_sequence=$5,observed_grace_at=NULL,observed_expired_at=NULL,revision=revision+1 WHERE installation_uuid=$1 AND plugin_id=$2 AND organization_uuid=$3`, binding.InstallationID, binding.PluginID, binding.OrganizationID, grant.IssuanceID, grant.Sequence)
+		}
+		if err != nil {
+			return false, err
+		}
+		if err := entitlementAudit(ctx, db, tx, grant.Issuer, &binding, "grant_imported", grant.Sequence, grant.TrustClass, importer, sourceDigest); err != nil {
+			return false, err
+		}
+		return true, nil
+	})
 }
 
 // ImportPluginEntitlementRevocations persists full signed snapshots and only
 // adds revocation rows. The issuer exclusive lock fences all forward decisions.
-func ImportPluginEntitlementRevocations(ctx context.Context, db Databaser, snapshot entitlements.Revocations, importer string, sourceDigest [32]byte) (bool, error) {
+func ImportPluginEntitlementRevocations(ctx context.Context, db Databaser, optionalTx Tx, snapshot entitlements.Revocations, importer string, sourceDigest [32]byte) (bool, error) {
 	if err := validEntitlementImport(snapshot.Envelope, snapshot.Digest, snapshot.Issuer, importer, sourceDigest, snapshot.TrustClass); err != nil {
 		return false, err
 	}
 	if snapshot.Sequence <= 0 || len(snapshot.KeyID) == 0 || len(snapshot.KeyID) > 64 {
 		return false, NewErrBadRequest("invalid verified revocation projection")
 	}
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return false, err
-	}
-	defer func() { _ = tx.Rollback() }()
-	if err := entitlementIssuerLock(ctx, tx, snapshot.Issuer, true); err != nil {
-		return false, err
-	}
-	var priorSequence int64
-	var priorDigest []byte
-	err = tx.QueryRowContext(ctx, `SELECT revocation_sequence,digest FROM plugin_entitlement_revocation_snapshots WHERE issuer=$1 ORDER BY revocation_sequence DESC LIMIT 1`, snapshot.Issuer).Scan(&priorSequence, &priorDigest)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return false, err
-	}
-	if err == nil {
-		if snapshot.Sequence < priorSequence || snapshot.Sequence == priorSequence && !bytes.Equal(snapshot.Digest[:], priorDigest) {
-			return false, NewErrConflict("stale or changed revocation sequence")
-		}
-		if snapshot.Sequence == priorSequence {
-			return false, nil
-		}
-	}
-	previous, err := tx.QueryContext(ctx, `SELECT issuance_id FROM plugin_entitlement_revocations WHERE issuer=$1`, snapshot.Issuer)
-	if err != nil {
-		return false, err
-	}
-	defer func() { _ = previous.Close() }()
-	priorIDs := []uuid.UUID{}
-	for previous.Next() {
-		var id uuid.UUID
-		if err := previous.Scan(&id); err != nil {
-			_ = previous.Close()
+	return inTransaction(ctx, db, optionalTx, func(tx Tx) (bool, error) {
+		var err error
+		if err := entitlementIssuerLock(ctx, tx, snapshot.Issuer, true); err != nil {
 			return false, err
 		}
-		priorIDs = append(priorIDs, id)
-	}
-	err = previous.Err()
-	_ = previous.Close()
-	if err != nil {
-		return false, err
-	}
-	incoming := make(map[uuid.UUID]bool, len(snapshot.IssuanceIDs))
-	for _, id := range snapshot.IssuanceIDs {
-		if id == uuid.Nil || incoming[id] {
-			return false, NewErrBadRequest("revocation IDs must be unique canonical UUIDs")
-		}
-		incoming[id] = true
-	}
-	for _, id := range priorIDs {
-		if !incoming[id] {
-			return false, NewErrConflict("revocation snapshot must include all previously revoked issuances")
-		}
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO plugin_entitlement_revocation_snapshots(issuer,revocation_sequence,cose,digest,key_id,issued_at,trust_class,importer,source_digest) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, snapshot.Issuer, snapshot.Sequence, snapshot.Envelope, snapshot.Digest[:], snapshot.KeyID, time.Unix(snapshot.IssuedAt, 0).UTC(), snapshot.TrustClass, importer, sourceDigest[:]); err != nil {
-		return false, err
-	}
-	newIDs := make([]string, 0, len(snapshot.IssuanceIDs))
-	for _, id := range snapshot.IssuanceIDs {
-		var inserted uuid.UUID
-		err := tx.QueryRowContext(ctx, `INSERT INTO plugin_entitlement_revocations(issuer,issuance_id,first_snapshot_sequence,revoked_at) VALUES($1,$2,$3,$4) ON CONFLICT (issuer,issuance_id) DO NOTHING RETURNING issuance_id`, snapshot.Issuer, id, snapshot.Sequence, time.Unix(snapshot.IssuedAt, 0).UTC()).Scan(&inserted)
+		var priorSequence int64
+		var priorDigest []byte
+		err = tx.QueryRowContext(ctx, `SELECT revocation_sequence,digest FROM plugin_entitlement_revocation_snapshots WHERE issuer=$1 ORDER BY revocation_sequence DESC LIMIT 1`, snapshot.Issuer).Scan(&priorSequence, &priorDigest)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return false, err
 		}
 		if err == nil {
-			newIDs = append(newIDs, inserted.String())
+			if snapshot.Sequence < priorSequence || snapshot.Sequence == priorSequence && !bytes.Equal(snapshot.Digest[:], priorDigest) {
+				return false, NewErrConflict("stale or changed revocation sequence")
+			}
+			if snapshot.Sequence == priorSequence {
+				return false, nil
+			}
 		}
-	}
-	if len(newIDs) > 0 {
-		rows, err := tx.QueryContext(ctx, `SELECT installation_uuid,plugin_id,organization_uuid FROM plugin_entitlement_bindings WHERE issuer=$1 AND issuance_id=ANY($2::uuid[]) ORDER BY installation_uuid::text COLLATE "C",plugin_id COLLATE "C",organization_uuid::text COLLATE "C"`, snapshot.Issuer, pq.Array(newIDs))
+		previous, err := tx.QueryContext(ctx, `SELECT issuance_id FROM plugin_entitlement_revocations WHERE issuer=$1`, snapshot.Issuer)
 		if err != nil {
 			return false, err
 		}
-		defer func() { _ = rows.Close() }()
-		bindings := []entitlements.Binding{}
-		for rows.Next() {
-			var binding entitlements.Binding
-			if err := rows.Scan(&binding.InstallationID, &binding.PluginID, &binding.OrganizationID); err != nil {
-				_ = rows.Close()
+		defer func() { _ = previous.Close() }()
+		priorIDs := []uuid.UUID{}
+		for previous.Next() {
+			var id uuid.UUID
+			if err := previous.Scan(&id); err != nil {
+				_ = previous.Close()
 				return false, err
 			}
-			bindings = append(bindings, binding)
+			priorIDs = append(priorIDs, id)
 		}
-		err = rows.Err()
-		_ = rows.Close()
+		err = previous.Err()
+		_ = previous.Close()
 		if err != nil {
 			return false, err
 		}
-		for _, binding := range bindings {
-			if err := entitlementBindingLock(ctx, tx, binding); err != nil {
-				return false, err
+		incoming := make(map[uuid.UUID]bool, len(snapshot.IssuanceIDs))
+		for _, id := range snapshot.IssuanceIDs {
+			if id == uuid.Nil || incoming[id] {
+				return false, NewErrBadRequest("revocation IDs must be unique canonical UUIDs")
 			}
-			if _, err := tx.ExecContext(ctx, `UPDATE plugin_entitlement_bindings SET revision=revision+1 WHERE installation_uuid=$1 AND plugin_id=$2 AND organization_uuid=$3`, binding.InstallationID, binding.PluginID, binding.OrganizationID); err != nil {
-				return false, err
+			incoming[id] = true
+		}
+		for _, id := range priorIDs {
+			if !incoming[id] {
+				return false, NewErrConflict("revocation snapshot must include all previously revoked issuances")
 			}
 		}
-	}
-	if err := entitlementAudit(ctx, db, tx, snapshot.Issuer, nil, "revocations_imported", snapshot.Sequence, snapshot.TrustClass, importer, sourceDigest); err != nil {
-		return false, err
-	}
-	return true, tx.Commit()
+		if _, err := tx.ExecContext(ctx, `INSERT INTO plugin_entitlement_revocation_snapshots(issuer,revocation_sequence,cose,digest,key_id,issued_at,trust_class,importer,source_digest) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, snapshot.Issuer, snapshot.Sequence, snapshot.Envelope, snapshot.Digest[:], snapshot.KeyID, time.Unix(snapshot.IssuedAt, 0).UTC(), snapshot.TrustClass, importer, sourceDigest[:]); err != nil {
+			return false, err
+		}
+		newIDs := make([]string, 0, len(snapshot.IssuanceIDs))
+		for _, id := range snapshot.IssuanceIDs {
+			var inserted uuid.UUID
+			err := tx.QueryRowContext(ctx, `INSERT INTO plugin_entitlement_revocations(issuer,issuance_id,first_snapshot_sequence,revoked_at) VALUES($1,$2,$3,$4) ON CONFLICT (issuer,issuance_id) DO NOTHING RETURNING issuance_id`, snapshot.Issuer, id, snapshot.Sequence, time.Unix(snapshot.IssuedAt, 0).UTC()).Scan(&inserted)
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return false, err
+			}
+			if err == nil {
+				newIDs = append(newIDs, inserted.String())
+			}
+		}
+		if len(newIDs) > 0 {
+			rows, err := tx.QueryContext(ctx, `SELECT installation_uuid,plugin_id,organization_uuid FROM plugin_entitlement_bindings WHERE issuer=$1 AND issuance_id=ANY($2::uuid[]) ORDER BY installation_uuid::text COLLATE "C",plugin_id COLLATE "C",organization_uuid::text COLLATE "C"`, snapshot.Issuer, pq.Array(newIDs))
+			if err != nil {
+				return false, err
+			}
+			defer func() { _ = rows.Close() }()
+			bindings := []entitlements.Binding{}
+			for rows.Next() {
+				var binding entitlements.Binding
+				if err := rows.Scan(&binding.InstallationID, &binding.PluginID, &binding.OrganizationID); err != nil {
+					_ = rows.Close()
+					return false, err
+				}
+				bindings = append(bindings, binding)
+			}
+			err = rows.Err()
+			_ = rows.Close()
+			if err != nil {
+				return false, err
+			}
+			for _, binding := range bindings {
+				if err := entitlementBindingLock(ctx, tx, binding); err != nil {
+					return false, err
+				}
+				if _, err := tx.ExecContext(ctx, `UPDATE plugin_entitlement_bindings SET revision=revision+1 WHERE installation_uuid=$1 AND plugin_id=$2 AND organization_uuid=$3`, binding.InstallationID, binding.PluginID, binding.OrganizationID); err != nil {
+					return false, err
+				}
+			}
+		}
+		if err := entitlementAudit(ctx, db, tx, snapshot.Issuer, nil, "revocations_imported", snapshot.Sequence, snapshot.TrustClass, importer, sourceDigest); err != nil {
+			return false, err
+		}
+		return true, nil
+	})
 }
 
 // DecidePluginEntitlementTx is the authoritative admission point. The caller

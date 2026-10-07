@@ -92,10 +92,10 @@ func TestPluginEntitlementImportTimeActivationAndTrust(t *testing.T) {
 	source := sha256.Sum256([]byte("operator-file"))
 	id1 := uuid.New()
 	first := f.grant(t, id1, 1, 100, 200, 250, []string{"feature-a"})
-	imported, err := ImportPluginEntitlementGrant(t.Context(), f.db, first, "internal_system", source)
+	imported, err := ImportPluginEntitlementGrant(t.Context(), f.db, nil, first, "internal_system", source)
 	require.NoError(t, err)
 	require.True(t, imported)
-	imported, err = ImportPluginEntitlementGrant(t.Context(), f.db, first, "internal_system", source)
+	imported, err = ImportPluginEntitlementGrant(t.Context(), f.db, nil, first, "internal_system", source)
 	require.NoError(t, err)
 	require.False(t, imported)
 	require.True(t, f.decide(t, 150, "feature-a", true).Forward)
@@ -110,10 +110,10 @@ func TestPluginEntitlementImportTimeActivationAndTrust(t *testing.T) {
 	require.True(t, expired.Safety)
 	require.Equal(t, "expired", f.decide(t, 150, "feature-a", false).State, "clock rollback cannot restore forward authority")
 	changed := f.grant(t, uuid.New(), 1, 100, 400, 450, []string{"feature-a"})
-	_, err = ImportPluginEntitlementGrant(t.Context(), f.db, changed, "internal_system", source)
+	_, err = ImportPluginEntitlementGrant(t.Context(), f.db, nil, changed, "internal_system", source)
 	require.ErrorContains(t, err, "same grant sequence")
 	second := f.grant(t, uuid.New(), 2, 100, 400, 450, []string{"feature-b"})
-	imported, err = ImportPluginEntitlementGrant(t.Context(), f.db, second, "internal_system", source)
+	imported, err = ImportPluginEntitlementGrant(t.Context(), f.db, nil, second, "internal_system", source)
 	require.NoError(t, err)
 	require.True(t, imported)
 	require.False(t, f.decide(t, 300, "feature-a", false).Forward, "old feature cannot be restored by activation")
@@ -125,7 +125,7 @@ func TestPluginEntitlementImportTimeActivationAndTrust(t *testing.T) {
 	require.True(t, f.decide(t, 300, "feature-b", true).Forward)
 	require.NoError(t, f.db.(*databaser).DB.QueryRowContext(t.Context(), `SELECT count(*) FROM plugin_entitlement_audit_events WHERE kind='feature_activated'`).Scan(&activationAudits))
 	require.Equal(t, 2, activationAudits, "ordinary forward checks do not rewrite activation evidence")
-	_, err = ImportPluginEntitlementGrant(t.Context(), f.db, first, "internal_system", source)
+	_, err = ImportPluginEntitlementGrant(t.Context(), f.db, nil, first, "internal_system", source)
 	require.ErrorContains(t, err, "stale")
 	otherBinding := f.binding
 	otherBinding.OrganizationID = uuid.New()
@@ -164,7 +164,7 @@ func TestPluginEntitlementRevocationAndForwardSerialize(t *testing.T) {
 	f := newEntitlementFixture(t)
 	source := sha256.Sum256([]byte("operator-file"))
 	grant := f.grant(t, uuid.New(), 1, 100, 400, 450, []string{"feature-a"})
-	_, err := ImportPluginEntitlementGrant(t.Context(), f.db, grant, "internal_system", source)
+	_, err := ImportPluginEntitlementGrant(t.Context(), f.db, nil, grant, "internal_system", source)
 	require.NoError(t, err)
 	initial := f.decide(t, 150, "feature-a", true)
 	require.True(t, initial.Forward)
@@ -176,7 +176,7 @@ func TestPluginEntitlementRevocationAndForwardSerialize(t *testing.T) {
 	snapshot := f.revocations(t, 1, grant.IssuanceID)
 	finished := make(chan error, 1)
 	go func() {
-		_, importErr := ImportPluginEntitlementRevocations(context.Background(), f.db, snapshot, "internal_system", source)
+		_, importErr := ImportPluginEntitlementRevocations(context.Background(), f.db, nil, snapshot, "internal_system", source)
 		finished <- importErr
 	}()
 	select {
@@ -191,21 +191,21 @@ func TestPluginEntitlementRevocationAndForwardSerialize(t *testing.T) {
 	require.False(t, revoked.Forward)
 	require.True(t, revoked.Safety)
 	require.Greater(t, revoked.Revision, forward.Revision)
-	imported, err := ImportPluginEntitlementRevocations(t.Context(), f.db, snapshot, "internal_system", source)
+	imported, err := ImportPluginEntitlementRevocations(t.Context(), f.db, nil, snapshot, "internal_system", source)
 	require.NoError(t, err)
 	require.False(t, imported)
 	changed := f.revocations(t, 1)
-	_, err = ImportPluginEntitlementRevocations(t.Context(), f.db, changed, "internal_system", source)
+	_, err = ImportPluginEntitlementRevocations(t.Context(), f.db, nil, changed, "internal_system", source)
 	require.ErrorContains(t, err, "changed")
 	missing := f.revocations(t, 2)
-	_, err = ImportPluginEntitlementRevocations(t.Context(), f.db, missing, "internal_system", source)
+	_, err = ImportPluginEntitlementRevocations(t.Context(), f.db, nil, missing, "internal_system", source)
 	require.ErrorContains(t, err, "include all")
-	_, err = ImportPluginEntitlementRevocations(t.Context(), f.db, f.revocations(t, 2, grant.IssuanceID), "internal_system", source)
+	_, err = ImportPluginEntitlementRevocations(t.Context(), f.db, nil, f.revocations(t, 2, grant.IssuanceID), "internal_system", source)
 	require.NoError(t, err)
-	_, err = ImportPluginEntitlementRevocations(t.Context(), f.db, snapshot, "internal_system", source)
+	_, err = ImportPluginEntitlementRevocations(t.Context(), f.db, nil, snapshot, "internal_system", source)
 	require.ErrorContains(t, err, "stale")
 	renewal := f.grant(t, uuid.New(), 2, 100, 400, 450, []string{"feature-a"})
-	_, err = ImportPluginEntitlementGrant(t.Context(), f.db, renewal, "internal_system", source)
+	_, err = ImportPluginEntitlementGrant(t.Context(), f.db, nil, renewal, "internal_system", source)
 	require.NoError(t, err)
 	require.True(t, f.decide(t, 160, "feature-a", false).Forward, "new higher-sequence issuance may restore forward authority")
 }
@@ -214,7 +214,7 @@ func TestPluginEntitlementConcurrentHigherGrants(t *testing.T) {
 	f := newEntitlementFixture(t)
 	source := sha256.Sum256([]byte("operator-file"))
 	first := f.grant(t, uuid.New(), 1, 100, 500, 500, []string{"feature-a"})
-	_, err := ImportPluginEntitlementGrant(t.Context(), f.db, first, "internal_system", source)
+	_, err := ImportPluginEntitlementGrant(t.Context(), f.db, nil, first, "internal_system", source)
 	require.NoError(t, err)
 	grants := []entitlements.Grant{f.grant(t, uuid.New(), 2, 100, 500, 500, []string{"feature-a"}), f.grant(t, uuid.New(), 3, 100, 500, 500, []string{"feature-a"})}
 	var wg sync.WaitGroup
@@ -223,7 +223,7 @@ func TestPluginEntitlementConcurrentHigherGrants(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := ImportPluginEntitlementGrant(context.Background(), f.db, grant, "internal_system", source)
+			_, err := ImportPluginEntitlementGrant(context.Background(), f.db, nil, grant, "internal_system", source)
 			results <- err
 		}()
 	}
@@ -247,7 +247,7 @@ func TestPluginEntitlementMigrationDownRefusesEvidence(t *testing.T) {
 	_, err = provider.UpTo(t.Context(), 38)
 	require.NoError(t, err)
 	grant := f.grant(t, uuid.New(), 1, 100, 200, 200, []string{"feature-a"})
-	_, err = ImportPluginEntitlementGrant(t.Context(), f.db, grant, "internal_system", sha256.Sum256([]byte("operator-file")))
+	_, err = ImportPluginEntitlementGrant(t.Context(), f.db, nil, grant, "internal_system", sha256.Sum256([]byte("operator-file")))
 	require.NoError(t, err)
 	_, err = provider.DownTo(t.Context(), 37)
 	require.ErrorContains(t, err, "cannot discard plugin entitlement evidence")
@@ -259,7 +259,7 @@ func TestPluginEntitlementMigrationDownRefusesEvidence(t *testing.T) {
 func TestPluginEntitlementSweepPersistsBoundaries(t *testing.T) {
 	f := newEntitlementFixture(t)
 	grant := f.grant(t, uuid.New(), 1, 100, 200, 250, []string{"feature-a"})
-	_, err := ImportPluginEntitlementGrant(t.Context(), f.db, grant, "internal_system", sha256.Sum256([]byte("operator-file")))
+	_, err := ImportPluginEntitlementGrant(t.Context(), f.db, nil, grant, "internal_system", sha256.Sum256([]byte("operator-file")))
 	require.NoError(t, err)
 	count, err := SweepPluginEntitlementBoundaries(t.Context(), f.db, time.Unix(200, 0), 100)
 	require.NoError(t, err)
@@ -281,7 +281,7 @@ func TestPluginEntitlementImportRollbackLeavesNoEvidence(t *testing.T) {
 	f := newEntitlementFixture(t)
 	f.binding.OrganizationID = uuid.New() // Valid signed binding, absent from this database.
 	grant := f.grant(t, uuid.New(), 1, 100, 200, 200, []string{"feature-a"})
-	_, err := ImportPluginEntitlementGrant(t.Context(), f.db, grant, "internal_system", sha256.Sum256([]byte("operator-file")))
+	_, err := ImportPluginEntitlementGrant(t.Context(), f.db, nil, grant, "internal_system", sha256.Sum256([]byte("operator-file")))
 	require.Error(t, err)
 	for _, table := range []string{"plugin_entitlement_grants", "plugin_entitlement_bindings", "plugin_entitlement_audit_events"} {
 		var count int
@@ -298,7 +298,7 @@ func TestPluginEntitlementOutboxFailureRollsBackImport(t *testing.T) {
 	_, err := f.db.(*databaser).ExecContext(t.Context(), `DROP TABLE pending_event_messages`)
 	require.NoError(t, err)
 	grant := f.grant(t, uuid.New(), 1, 100, 200, 200, []string{"feature-a"})
-	_, err = ImportPluginEntitlementGrant(t.Context(), f.db, grant, "internal_system", sha256.Sum256([]byte("operator-file")))
+	_, err = ImportPluginEntitlementGrant(t.Context(), f.db, nil, grant, "internal_system", sha256.Sum256([]byte("operator-file")))
 	require.Error(t, err)
 	for _, table := range []string{"plugin_entitlement_grants", "plugin_entitlement_bindings", "plugin_entitlement_audit_events"} {
 		var count int

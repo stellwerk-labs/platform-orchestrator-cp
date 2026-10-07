@@ -229,7 +229,7 @@ func TestPluginEffectDatabaseSerializesRevocationWithBusinessCommit(t *testing.T
 	snapshot := f.signRevocation(t, f.grant.IssuanceID)
 	done := make(chan error, 1)
 	go func() {
-		_, importErr := model.ImportPluginEntitlementRevocations(context.Background(), f.db, snapshot, "internal_system", sha256.Sum256([]byte("operator-file")))
+		_, importErr := model.ImportPluginEntitlementRevocations(context.Background(), f.db, nil, snapshot, "internal_system", sha256.Sum256([]byte("operator-file")))
 		done <- importErr
 	}()
 	select {

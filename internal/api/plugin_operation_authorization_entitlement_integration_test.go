@@ -214,7 +214,7 @@ func TestPluginOperationRollbackActivationRetainsSafetyAfterEntitlementLoss(t *t
 			if state == "expired" {
 				h.f.clock.Store(h.f.base + 21)
 			} else {
-				_, err := model.ImportPluginEntitlementRevocations(t.Context(), h.f.db, h.f.signRevocation(t, h.f.grant.IssuanceID), "internal_system", sha256.Sum256([]byte("operator-revocation")))
+				_, err := model.ImportPluginEntitlementRevocations(t.Context(), h.f.db, nil, h.f.signRevocation(t, h.f.grant.IssuanceID), "internal_system", sha256.Sum256([]byte("operator-revocation")))
 				require.NoError(t, err)
 			}
 			body := h.activation("resume")
@@ -352,7 +352,7 @@ func TestPluginCompletedRollbackReacquiresOnlyRetainedModulesAfterEntitlementLos
 			if state == "expired" {
 				h.f.clock.Store(h.f.base + 21)
 			} else {
-				_, err := model.ImportPluginEntitlementRevocations(t.Context(), h.f.db, h.f.signRevocation(t, h.f.grant.IssuanceID), "internal_system", sha256.Sum256([]byte("module-revocation")))
+				_, err := model.ImportPluginEntitlementRevocations(t.Context(), h.f.db, nil, h.f.signRevocation(t, h.f.grant.IssuanceID), "internal_system", sha256.Sum256([]byte("module-revocation")))
 				require.NoError(t, err)
 			}
 			response := h.moduleCall(h.item.ServiceUserID, h.grant.OperationID, h.moduleRequest("reserve", fence))
@@ -598,7 +598,7 @@ func TestPluginActiveReauthorizationRequiresCurrentForwardEntitlementAndIAM(t *t
 			case "expired":
 				h.f.clock.Store(h.f.base + 21)
 			case "revoked":
-				_, err := model.ImportPluginEntitlementRevocations(t.Context(), h.f.db, h.f.signRevocation(t, h.f.grant.IssuanceID), "internal_system", sha256.Sum256([]byte("active-reauthorization-revocation")))
+				_, err := model.ImportPluginEntitlementRevocations(t.Context(), h.f.db, nil, h.f.signRevocation(t, h.f.grant.IssuanceID), "internal_system", sha256.Sum256([]byte("active-reauthorization-revocation")))
 				require.NoError(t, err)
 			}
 			h.denied.Store(true)
