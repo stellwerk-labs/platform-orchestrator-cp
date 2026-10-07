@@ -117,6 +117,7 @@ func (a *operatorAPI) install(item plugins.Installation, org string) PluginInsta
 	installation := decode[PluginInstallation](t, a.call(pluginOperator, http.MethodPost, "/plugin-installations", uuid.NewString(),
 		PluginInstallationCreate{ExpectedRevision: *pkg.Revision, Reason: "Install the plugin", PackageSha256: digest, BackendUrl: item.Backend}), http.StatusCreated)
 	require.Equal(t, PluginInstallationStateInstalled, installation.State)
+	fleet.serve(t, item.Backend, installation.InstallationId, digest)
 	path := "/plugin-installations/" + installation.InstallationId.String()
 	installation = decode[PluginInstallation](t, a.call(pluginOperator, http.MethodPut, path+"/identity", uuid.NewString(),
 		PluginInstallationIdentity{ExpectedRevision: *installation.Revision, Reason: "Bind the service identities", ServiceUserId: uuid.MustParse(item.ServiceUserID), AdmissionCheckerId: uuid.MustParse(item.AdmissionCheckerID)}), http.StatusOK)

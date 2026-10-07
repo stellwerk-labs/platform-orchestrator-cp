@@ -16,8 +16,8 @@ type PackagePage struct {
 
 // InstallationPage lists every installation at one revision.
 type InstallationPage struct {
-	Revision int64                      `json:"revision"`
-	Items    []model.PluginInstallation `json:"items"`
+	Revision int64          `json:"revision"`
+	Items    []Installation `json:"items"`
 }
 
 // AuditPage is one page of the audit trail.
@@ -46,19 +46,35 @@ func (m *Manager) Installations(ctx context.Context) (InstallationPage, error) {
 		if page.Revision, err = model.PluginManagerRevision(ctx, tx); err != nil {
 			return err
 		}
-		page.Items, err = model.ListPluginInstallations(ctx, tx)
-		return err
+		installations, err := model.ListPluginInstallations(ctx, tx)
+		if err != nil {
+			return err
+		}
+		page.Items = make([]Installation, 0, len(installations))
+		for _, installation := range installations {
+			item, err := describe(ctx, tx, installation, page.Revision)
+			if err != nil {
+				return err
+			}
+			page.Items = append(page.Items, item)
+		}
+		return nil
 	})
 	return page, err
 }
 
 func (m *Manager) Installation(ctx context.Context, id uuid.UUID) (Installation, error) {
 	result := Installation{}
-	err := readOnly(ctx, m.db, func(tx model.Tx) (err error) {
-		if result.Revision, err = model.PluginManagerRevision(ctx, tx); err != nil {
+	err := readOnly(ctx, m.db, func(tx model.Tx) error {
+		revision, err := model.PluginManagerRevision(ctx, tx)
+		if err != nil {
 			return err
 		}
-		result.PluginInstallation, err = model.GetPluginInstallation(ctx, tx, id, false)
+		installation, err := model.GetPluginInstallation(ctx, tx, id, false)
+		if err != nil {
+			return err
+		}
+		result, err = describe(ctx, tx, installation, revision)
 		return err
 	})
 	return result, err

@@ -2,6 +2,7 @@ package pluginmanager
 
 import (
 	"encoding/json"
+	"net/http"
 	"slices"
 	"strings"
 	"testing"
@@ -109,7 +110,7 @@ func TestOnlyConfiguredOperatorsHoldPluginManagerPermissions(t *testing.T) {
 	writer, reader, orgAdmin := userid.NewHumanUserId(), userid.NewHumanUserId(), userid.NewHumanUserId()
 	adapter, _, err := pluginentitlements.New(unusedDatabase{}, "development", "", nil)
 	require.NoError(t, err)
-	manager, err := New(Config{Database: unusedDatabase{}, Registry: &plugins.InstallationRegistry{}, Entitlements: adapter, Readers: []uuid.UUID{reader}, Writers: []uuid.UUID{writer}})
+	manager, err := New(Config{Database: unusedDatabase{}, Registry: &plugins.InstallationRegistry{}, Entitlements: adapter, StatusClient: http.DefaultClient, Readers: []uuid.UUID{reader}, Writers: []uuid.UUID{writer}})
 	require.NoError(t, err)
 	require.True(t, manager.Authorize(writer, PermissionWrite))
 	require.True(t, manager.Authorize(writer, PermissionRead), "writers read")
@@ -125,11 +126,13 @@ func TestOnlyConfiguredOperatorsHoldPluginManagerPermissions(t *testing.T) {
 	require.False(t, disabled.Authorize(writer, PermissionRead), "no Plugin Manager, no holder")
 
 	for name, holder := range map[string]uuid.UUID{"service user": userid.NewServiceUserTokenId(), "internal system": userid.InternalSystemUuid, "nil": uuid.Nil} {
-		_, err := New(Config{Database: unusedDatabase{}, Registry: &plugins.InstallationRegistry{}, Entitlements: adapter, Writers: []uuid.UUID{holder}})
+		_, err := New(Config{Database: unusedDatabase{}, Registry: &plugins.InstallationRegistry{}, Entitlements: adapter, StatusClient: http.DefaultClient, Writers: []uuid.UUID{holder}})
 		require.Error(t, err, "%s can never hold a Plugin Manager permission", name)
 	}
-	_, err = New(Config{Registry: &plugins.InstallationRegistry{}, Entitlements: adapter})
+	_, err = New(Config{Registry: &plugins.InstallationRegistry{}, Entitlements: adapter, StatusClient: http.DefaultClient})
 	require.Error(t, err)
+	_, err = New(Config{Database: unusedDatabase{}, Registry: &plugins.InstallationRegistry{}, Entitlements: adapter})
+	require.Error(t, err, "activation cannot read plugin status without a client")
 }
 
 // unusedDatabase satisfies the configuration; these tests never reach it.

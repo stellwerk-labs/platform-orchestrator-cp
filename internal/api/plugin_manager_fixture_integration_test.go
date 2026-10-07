@@ -3,9 +3,15 @@
 package api
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -17,10 +23,44 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginentitlements"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginmanager"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/pluginstatus"
 )
 
 // pluginOperator holds plugin_manager_write in every test Plugin Manager.
 var pluginOperator = userid.NewHumanUserId()
+
+// runningPlugins stands in for the plugin runtimes: each backend host serves
+// the status handler of the plugin SDK with what its runtime was configured
+// with. Nothing listens on any other host.
+type runningPlugins struct {
+	mu      sync.Mutex
+	reports map[string]pluginstatus.Report
+}
+
+var fleet = &runningPlugins{reports: map[string]pluginstatus.Report{}}
+
+func (p *runningPlugins) RoundTrip(request *http.Request) (*http.Response, error) {
+	p.mu.Lock()
+	report, running := p.reports[request.URL.Host]
+	p.mu.Unlock()
+	if !running {
+		return nil, fmt.Errorf("dial tcp %s: connect: connection refused", request.URL.Host)
+	}
+	recorder := httptest.NewRecorder()
+	pluginstatus.Handler(func(context.Context) (pluginstatus.Report, error) { return report, nil }).ServeHTTP(recorder, request)
+	return recorder.Result(), nil
+}
+
+// serve makes the plugin behind backend report what its runtime was given:
+// the installation UUID and the package digest, with no plugin-owned schema.
+func (p *runningPlugins) serve(t *testing.T, backend string, installation uuid.UUID, digest string) {
+	t.Helper()
+	parsed, err := url.Parse(backend)
+	require.NoError(t, err)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.reports[parsed.Host] = pluginstatus.Report{InstallationID: installation.String(), PackageSHA256: digest}
+}
 
 // testPluginManager is a Plugin Manager over db that serves registry.
 // pluginOperator writes; readers only read.
@@ -31,7 +71,8 @@ func testPluginManager(t *testing.T, db model.Databaser, registry *plugins.Insta
 		adapter, _, err = pluginentitlements.New(db, entitlements.Development, "", nil)
 		require.NoError(t, err)
 	}
-	manager, err := pluginmanager.New(pluginmanager.Config{Database: db, Registry: registry, Entitlements: adapter, Readers: readers, Writers: []uuid.UUID{pluginOperator}})
+	manager, err := pluginmanager.New(pluginmanager.Config{Database: db, Registry: registry, Entitlements: adapter, StatusClient: &http.Client{Transport: fleet},
+		Readers: readers, Writers: []uuid.UUID{pluginOperator}})
 	require.NoError(t, err)
 	return manager
 }
@@ -87,6 +128,7 @@ func installPlugin(t *testing.T, db model.Databaser, item plugins.Installation) 
 	}
 	installation := steps.installation(steps.manager.CreateInstallation(ctx, steps.command("Install the fixture plugin"), digest, item.Backend, uiOrigin))
 	id := installation.InstallationID
+	fleet.serve(t, item.Backend, id, digest)
 	if item.ServiceUserID != "" {
 		steps.installation(steps.manager.SetIdentity(ctx, steps.command("Bind the fixture identities"), id, item.ServiceUserID, item.AdmissionCheckerID))
 	}

@@ -32,10 +32,18 @@ type Package struct {
 	Revision int64 `json:"revision"`
 }
 
-// Installation is an installation as of a Plugin Manager revision.
+// Installation is an installation as of a Plugin Manager revision, with what
+// Core derives from it.
 type Installation struct {
 	model.PluginInstallation
-	Revision int64 `json:"revision"`
+	// Availability is derived from the state: available while active,
+	// not_enabled (safety-only) while disabled, unavailable while installed
+	// and not yet proven by the running plugin.
+	Availability plugins.AvailabilityState `json:"availability"`
+	// Diagnostic explains why the plugin's last status does not prove the
+	// package Core is to serve.
+	Diagnostic *Diagnostic `json:"diagnostic,omitempty"`
+	Revision   int64       `json:"revision"`
 }
 
 // BundleImport reports an entitlement bundle import.
@@ -48,8 +56,8 @@ type BundleImport struct {
 type Action string
 
 const (
-	// ActionActivate materialises the package registrations of an installed
-	// installation and serves them.
+	// ActionActivate serves the package registrations of an installed
+	// installation once its running plugin proves the recorded package.
 	ActionActivate Action = "activate"
 	// ActionDisable keeps an active installation safety-only.
 	ActionDisable Action = "disable"
@@ -114,8 +122,36 @@ func (m *Manager) execute(ctx context.Context, command Command, name string, pay
 func (m *Manager) respondInstallation(id uuid.UUID) func(context.Context, model.Tx, int64) (any, error) {
 	return func(ctx context.Context, tx model.Tx, revision int64) (any, error) {
 		installation, err := model.GetPluginInstallation(ctx, tx, id, false)
-		return Installation{PluginInstallation: installation, Revision: revision}, err
+		if err != nil {
+			return nil, err
+		}
+		return describe(ctx, tx, installation, revision)
 	}
+}
+
+// describe derives availability and the status diagnostic of an
+// installation.
+func describe(ctx context.Context, tx model.Tx, installation model.PluginInstallation, revision int64) (Installation, error) {
+	result := Installation{PluginInstallation: installation, Availability: plugins.StateUnavailable, Revision: revision}
+	switch installation.State {
+	case model.PluginInstallationActive:
+		result.Availability = plugins.StateAvailable
+	case model.PluginInstallationDisabled:
+		result.Availability = plugins.StateNotEnabled
+	}
+	if installation.Observation == nil {
+		return result, nil
+	}
+	pkg, err := model.GetPluginPackage(ctx, tx, installation.PackageSHA256)
+	if err != nil {
+		return result, err
+	}
+	manifest, err := plugins.DecodeManifest(pkg.Manifest)
+	if err != nil {
+		return result, err
+	}
+	result.Diagnostic = diagnose(installation.Observation, installation.InstallationID, pkg.ManifestSHA256, manifest.MigrationGeneration)
+	return result, nil
 }
 
 // PushPackage registers an immutable package. Pushing the same digest and
@@ -243,26 +279,18 @@ func (m *Manager) SetIdentity(ctx context.Context, command Command, id uuid.UUID
 // Transition applies an installation-wide lifecycle step. A step whose
 // target state already holds changes nothing.
 func (m *Manager) Transition(ctx context.Context, command Command, id uuid.UUID, action Action) (Installation, error) {
+	if action == ActionActivate {
+		return m.activate(ctx, command, id)
+	}
 	var result Installation
 	err := m.execute(ctx, command, "plugin_installation."+string(action), installationPayload{InstallationID: id},
 		func(ctx context.Context, tx model.Tx) (*model.PluginManagerChange, error) {
-			before, manifest, err := m.lockInstallation(ctx, tx, id)
+			before, _, err := m.lockInstallation(ctx, tx, id)
 			if err != nil {
 				return nil, err
 			}
 			after := before
 			switch action {
-			case ActionActivate:
-				if before.State == model.PluginInstallationActive {
-					return nil, nil
-				}
-				if before.State != model.PluginInstallationInstalled {
-					return nil, stateConflict("Only an installed installation is activated; a disabled one is enabled.")
-				}
-				if err := m.activate(ctx, tx, before, manifest); err != nil {
-					return nil, err
-				}
-				after.State = model.PluginInstallationActive
 			case ActionDisable, ActionEnable:
 				target := map[Action]string{ActionDisable: model.PluginInstallationDisabled, ActionEnable: model.PluginInstallationActive}[action]
 				if before.State == target {
@@ -283,9 +311,67 @@ func (m *Manager) Transition(ctx context.Context, command Command, id uuid.UUID,
 	return result, err
 }
 
-// activate validates the complete installation and materialises its
-// package registrations.
-func (m *Manager) activate(ctx context.Context, tx model.Tx, installation model.PluginInstallation, manifest plugins.Manifest) error {
+// activate serves the package registrations of an installed installation.
+// Core first reads the running plugin's status, outside the serialised
+// command, and records what it observed. The command then refuses with the
+// diagnostic unless the plugin reports exactly the installation UUID, package
+// digest and migration generation Core recorded; a refusal changes nothing,
+// so the operator activates again once the plugin runtime caught up.
+func (m *Manager) activate(ctx context.Context, command Command, id uuid.UUID) (Installation, error) {
+	current, err := m.Installation(ctx, id)
+	if err != nil {
+		return Installation{}, err
+	}
+	var observed *model.PluginStatusObservation
+	if current.State == model.PluginInstallationInstalled {
+		observation := m.readStatus(ctx, current.BackendURL)
+		if err := model.RecordPluginStatusObservation(ctx, m.db, id, observation); err != nil {
+			return Installation{}, err
+		}
+		observed = &observation
+	}
+	var result Installation
+	err = m.execute(ctx, command, "plugin_installation."+string(ActionActivate), installationPayload{InstallationID: id},
+		func(ctx context.Context, tx model.Tx) (*model.PluginManagerChange, error) {
+			before, manifest, err := m.lockInstallation(ctx, tx, id)
+			if err != nil {
+				return nil, err
+			}
+			if before.State == model.PluginInstallationActive {
+				return nil, nil
+			}
+			if before.State != model.PluginInstallationInstalled {
+				return nil, stateConflict("Only an installed installation is activated; a disabled one is enabled.")
+			}
+			after := before
+			after.State = model.PluginInstallationActive
+			if err := m.validateServed(after, manifest); err != nil {
+				return nil, err
+			}
+			if observed == nil {
+				return nil, stateConflict("The installation changed while Core read the plugin status. Read it and activate again.")
+			}
+			if diagnostic := diagnose(observed, id, after.PackageSHA256, manifest.MigrationGeneration); diagnostic != nil {
+				return nil, model.ErrConflict{Code: diagnostic.Code, Message: diagnostic.Message}
+			}
+			rows, err := registrations(manifest)
+			if err != nil {
+				return nil, err
+			}
+			if err := model.ReplacePluginRegistrations(ctx, tx, after, rows); err != nil {
+				return nil, err
+			}
+			if err := model.UpdatePluginInstallation(ctx, tx, after, command.Actor); err != nil {
+				return nil, err
+			}
+			return m.installationChange(ctx, tx, "plugin_installation."+string(ActionActivate), before, "")
+		}, m.respondInstallation(id), &result)
+	return result, err
+}
+
+// validateServed checks that Core can serve the complete installation with
+// the package manifest.
+func (m *Manager) validateServed(installation model.PluginInstallation, manifest plugins.Manifest) error {
 	item, err := view(installation, manifest)
 	if err != nil {
 		return err
@@ -299,11 +385,7 @@ func (m *Manager) activate(ctx context.Context, tx model.Tx, installation model.
 	if err := plugins.ValidateInstallation(item, m.allowDevelopmentHTTP); err != nil {
 		return model.ErrConflict{Code: "plugin_installation_incomplete", Message: "The installation cannot be activated: " + err.Error()}
 	}
-	rows, err := registrations(manifest)
-	if err != nil {
-		return err
-	}
-	return model.ReplacePluginRegistrations(ctx, tx, installation, rows)
+	return nil
 }
 
 // PutEnablement enables or disables an active installation for one

@@ -58,6 +58,19 @@ type PluginInstallation struct {
 	CreatedBy          uuid.UUID          `json:"created_by"`
 	UpdatedAt          time.Time          `json:"updated_at"`
 	UpdatedBy          uuid.UUID          `json:"updated_by"`
+	// Observation is what Core last read from the running plugin's status.
+	Observation *PluginStatusObservation `json:"observation,omitempty"`
+}
+
+// PluginStatusObservation is what Core last read from the status endpoint of
+// an installation's running plugin: the report, or why none could be read.
+type PluginStatusObservation struct {
+	ObservedAt          time.Time  `json:"observed_at"`
+	Failure             string     `json:"failure,omitempty"`
+	Detail              string     `json:"detail,omitempty"`
+	InstallationID      *uuid.UUID `json:"installation_id,omitempty"`
+	PackageSHA256       string     `json:"package_sha256,omitempty"`
+	MigrationGeneration *int64     `json:"migration_generation,omitempty"`
 }
 
 // PluginEnablement enables an installation for one organization.
@@ -260,22 +273,41 @@ func InsertPluginPackage(ctx context.Context, tx Tx, item PluginPackage) error {
 	return err
 }
 
-const pluginInstallationColumns = `installation_uuid, plugin_id, package_sha256, state, backend_url, COALESCE(ui_origin,''),
-	COALESCE(service_user_id::text,''), COALESCE(admission_checker_id::text,''), created_at, created_by, updated_at, updated_by`
+const pluginInstallationColumns = `i.installation_uuid, i.plugin_id, i.package_sha256, i.state, i.backend_url, COALESCE(i.ui_origin,''),
+	COALESCE(i.service_user_id::text,''), COALESCE(i.admission_checker_id::text,''), i.created_at, i.created_by, i.updated_at, i.updated_by,
+	o.observed_at, COALESCE(o.failure,''), COALESCE(o.detail,''), o.reported_installation_uuid, COALESCE(o.reported_package_sha256,''),
+	o.reported_migration_generation
+	FROM plugin_installations i LEFT JOIN plugin_status_observations o ON o.installation_uuid=i.installation_uuid`
 
 func scanPluginInstallation(row interface{ Scan(...any) error }) (PluginInstallation, error) {
 	var item PluginInstallation
+	var observedAt sql.NullTime
+	var observation PluginStatusObservation
+	var reportedInstallation uuid.NullUUID
+	var reportedGeneration sql.NullInt64
 	err := row.Scan(&item.InstallationID, &item.PluginID, &item.PackageSHA256, &item.State, &item.BackendURL, &item.UIOrigin,
-		&item.ServiceUserID, &item.AdmissionCheckerID, &item.CreatedAt, &item.CreatedBy, &item.UpdatedAt, &item.UpdatedBy)
-	return item, err
+		&item.ServiceUserID, &item.AdmissionCheckerID, &item.CreatedAt, &item.CreatedBy, &item.UpdatedAt, &item.UpdatedBy,
+		&observedAt, &observation.Failure, &observation.Detail, &reportedInstallation, &observation.PackageSHA256, &reportedGeneration)
+	if err != nil || !observedAt.Valid {
+		return item, err
+	}
+	observation.ObservedAt = observedAt.Time
+	if reportedInstallation.Valid {
+		observation.InstallationID = &reportedInstallation.UUID
+	}
+	if reportedGeneration.Valid {
+		observation.MigrationGeneration = &reportedGeneration.Int64
+	}
+	item.Observation = &observation
+	return item, nil
 }
 
-// GetPluginInstallation returns an installation with its enablements. lock
-// takes the installation row for update.
+// GetPluginInstallation returns an installation with its enablements and
+// last status observation. lock takes the installation row for update.
 func GetPluginInstallation(ctx context.Context, tx Tx, id uuid.UUID, lock bool) (PluginInstallation, error) {
-	query := `SELECT ` + pluginInstallationColumns + ` FROM plugin_installations WHERE installation_uuid=$1`
+	query := `SELECT ` + pluginInstallationColumns + ` WHERE i.installation_uuid=$1`
 	if lock {
-		query += ` FOR UPDATE`
+		query += ` FOR UPDATE OF i`
 	}
 	item, err := scanPluginInstallation(tx.QueryRowContext(ctx, query, id))
 	if errors.Is(err, sql.ErrNoRows) {
@@ -295,9 +327,10 @@ func GetPluginInstallation(ctx context.Context, tx Tx, id uuid.UUID, lock bool) 
 	return item, nil
 }
 
-// ListPluginInstallations returns every installation with its enablements.
+// ListPluginInstallations returns every installation with its enablements
+// and last status observation.
 func ListPluginInstallations(ctx context.Context, tx Tx) ([]PluginInstallation, error) {
-	rows, err := tx.QueryContext(ctx, `SELECT `+pluginInstallationColumns+` FROM plugin_installations ORDER BY plugin_id, created_at, installation_uuid`)
+	rows, err := tx.QueryContext(ctx, `SELECT `+pluginInstallationColumns+` ORDER BY i.plugin_id, i.created_at, i.installation_uuid`)
 	if err != nil {
 		return nil, err
 	}
@@ -372,6 +405,37 @@ func UpdatePluginInstallation(ctx context.Context, tx Tx, item PluginInstallatio
 		sql.NullString{String: item.ServiceUserID, Valid: item.ServiceUserID != ""},
 		sql.NullString{String: item.AdmissionCheckerID, Valid: item.AdmissionCheckerID != ""}, actor)
 	return err
+}
+
+// RecordPluginStatusObservation keeps what Core read from the installation's
+// running plugin. An older observation never replaces a newer one.
+func RecordPluginStatusObservation(ctx context.Context, db Databaser, id uuid.UUID, observation PluginStatusObservation) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var reportedInstallation uuid.NullUUID
+	if observation.InstallationID != nil {
+		reportedInstallation = uuid.NullUUID{UUID: *observation.InstallationID, Valid: true}
+	}
+	var reportedGeneration sql.NullInt64
+	if observation.MigrationGeneration != nil {
+		reportedGeneration = sql.NullInt64{Int64: *observation.MigrationGeneration, Valid: true}
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO plugin_status_observations
+		(installation_uuid, observed_at, failure, detail, reported_installation_uuid, reported_package_sha256, reported_migration_generation)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)
+		ON CONFLICT (installation_uuid) DO UPDATE SET observed_at=EXCLUDED.observed_at, failure=EXCLUDED.failure, detail=EXCLUDED.detail,
+			reported_installation_uuid=EXCLUDED.reported_installation_uuid, reported_package_sha256=EXCLUDED.reported_package_sha256,
+			reported_migration_generation=EXCLUDED.reported_migration_generation
+		WHERE plugin_status_observations.observed_at <= EXCLUDED.observed_at`,
+		id, observation.ObservedAt, sql.NullString{String: observation.Failure, Valid: observation.Failure != ""},
+		sql.NullString{String: observation.Detail, Valid: observation.Detail != ""}, reportedInstallation,
+		sql.NullString{String: observation.PackageSHA256, Valid: observation.PackageSHA256 != ""}, reportedGeneration); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // ReplacePluginRegistrations materialises the registrations of an

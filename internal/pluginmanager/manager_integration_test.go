@@ -9,6 +9,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -25,9 +28,50 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pgtest"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginentitlements"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/pluginstatus"
 )
 
 var operator = userid.NewHumanUserId()
+
+// runningPlugins stands in for the plugin runtimes: each backend host serves
+// the status handler of the plugin SDK with what its runtime was configured
+// with. Nothing listens on any other host.
+type runningPlugins struct {
+	mu      sync.Mutex
+	reports map[string]pluginstatus.Report
+}
+
+var fleet = &runningPlugins{reports: map[string]pluginstatus.Report{}}
+
+func (p *runningPlugins) RoundTrip(request *http.Request) (*http.Response, error) {
+	p.mu.Lock()
+	report, running := p.reports[request.URL.Host]
+	p.mu.Unlock()
+	if !running {
+		return nil, fmt.Errorf("dial tcp %s: connect: connection refused", request.URL.Host)
+	}
+	recorder := httptest.NewRecorder()
+	pluginstatus.Handler(func(context.Context) (pluginstatus.Report, error) { return report, nil }).ServeHTTP(recorder, request)
+	return recorder.Result(), nil
+}
+
+// serve makes the plugin behind backend report report.
+func (p *runningPlugins) serve(t *testing.T, backend string, report pluginstatus.Report) {
+	t.Helper()
+	parsed, err := url.Parse(backend)
+	require.NoError(t, err)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.reports[parsed.Host] = report
+}
+
+// run starts the installation's plugin as a correctly configured runtime
+// does: with the Core-assigned UUID, the recorded package and no plugin-owned
+// schema.
+func (p *runningPlugins) run(t *testing.T, installation Installation) {
+	t.Helper()
+	p.serve(t, installation.BackendURL, pluginstatus.Report{InstallationID: installation.InstallationID.String(), PackageSHA256: installation.PackageSHA256})
+}
 
 func testDatabase(t *testing.T) model.Databaser {
 	t.Helper()
@@ -65,10 +109,16 @@ type replica struct {
 
 func newReplica(t *testing.T, db model.Databaser) replica {
 	t.Helper()
+	return newReplicaReading(t, db, &http.Client{Transport: fleet})
+}
+
+// newReplicaReading is a replica that reads plugin status with client.
+func newReplicaReading(t *testing.T, db model.Databaser, client *http.Client) replica {
+	t.Helper()
 	adapter, _, err := pluginentitlements.New(db, entitlements.Development, "", nil)
 	require.NoError(t, err)
 	registry := &plugins.InstallationRegistry{Entitlements: adapter}
-	manager, err := New(Config{Database: db, Registry: registry, Entitlements: adapter, Writers: []uuid.UUID{operator}})
+	manager, err := New(Config{Database: db, Registry: registry, Entitlements: adapter, StatusClient: client, Writers: []uuid.UUID{operator}})
 	require.NoError(t, err)
 	require.NoError(t, manager.Refresh(t.Context()))
 	return replica{manager: manager, registry: registry}
@@ -121,6 +171,7 @@ func (s *session) install(plugin, org string) Installation {
 	require.NoError(s.t, err)
 	s.revision = pkg.Revision
 	installation := s.installation(s.manager.CreateInstallation(ctx, s.command(""), digest, "https://"+plugin+".example.test", "https://ui."+plugin+".example.test"))
+	fleet.run(s.t, installation)
 	s.installation(s.manager.SetIdentity(ctx, s.command(""), installation.InstallationID, userid.NewServiceUserTokenId().String(), userid.NewServiceUserTokenId().String()))
 	s.installation(s.manager.Transition(ctx, s.command(""), installation.InstallationID, ActionActivate))
 	return s.installation(s.manager.PutEnablement(ctx, s.command(""), installation.InstallationID, org, model.PluginEnablementEnabled, "Europe/Berlin", nil))
@@ -306,6 +357,7 @@ func TestInterruptedInstallationResumesWithoutDuplicates(t *testing.T) {
 					installation, err = writer.manager.CreateInstallation(ctx, command, digest, "https://"+plugin+".example.test", "https://ui."+plugin+".example.test")
 					if err == nil {
 						id = installation.InstallationID
+						fleet.run(t, installation)
 					}
 				case 2:
 					installation, err = writer.manager.SetIdentity(ctx, command, id, service, checker)
@@ -427,6 +479,7 @@ func TestCommandsRejectInvalidAndOutOfOrderSteps(t *testing.T) {
 	requireCode(t, err, "plugin_installation_invalid", "the package contributes a UI")
 	installation := ops.installation(writer.manager.CreateInstallation(ctx, ops.command(""), digest, "https://rollouts.example.test", "https://ui.example.test"))
 	id := installation.InstallationID
+	fleet.run(t, installation)
 
 	_, err = writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "", nil)
 	requireCode(t, err, "plugin_installation_state", "enablement needs an active installation")
@@ -475,6 +528,7 @@ func TestCommandsRejectInvalidAndOutOfOrderSteps(t *testing.T) {
 	require.NoError(t, err)
 	ops.revision = pkg.Revision
 	otherInstallation := ops.installation(writer.manager.CreateInstallation(ctx, ops.command(""), hex.EncodeToString(otherSum[:]), "https://other.example.test", "https://ui.other.example.test"))
+	fleet.run(t, otherInstallation)
 	ops.installation(writer.manager.SetIdentity(ctx, ops.command(""), otherInstallation.InstallationID, userid.NewServiceUserTokenId().String(), userid.NewServiceUserTokenId().String()))
 	_, err = writer.manager.Transition(ctx, ops.command(""), otherInstallation.InstallationID, ActionActivate)
 	requireCode(t, err, "plugin_registration_conflict")

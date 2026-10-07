@@ -14,14 +14,18 @@ import (
 // MaxManifestBytes bounds one encoded registration manifest.
 const MaxManifestBytes = 1 << 20
 
-// Manifest is what a plugin package declares to Core: identity, operations,
-// UI contribution, service grants, authorization policies and the entitlement
-// declaration. Origins, service identities and organization enablement are
-// operator data and never part of it.
+// Manifest is what a plugin package declares to Core: identity, migration
+// generation, operations, UI contribution, service grants, authorization
+// policies and the entitlement declaration. Origins, service identities and
+// organization enablement are operator data and never part of it.
 type Manifest struct {
-	ID                    string                  `json:"id"`
-	DisplayName           string                  `json:"display_name"`
-	Version               string                  `json:"version"`
+	ID          string `json:"id"`
+	DisplayName string `json:"display_name"`
+	Version     string `json:"version"`
+	// MigrationGeneration is the plugin-owned schema generation this package
+	// runs on; 0 while the plugin owns no schema. Core serves the package only
+	// once the running plugin reports its database at exactly this generation.
+	MigrationGeneration   int64                   `json:"migration_generation,omitempty"`
 	Capabilities          []string                `json:"capabilities,omitempty"`
 	UI                    *UIContribution         `json:"ui,omitempty"`
 	Operations            []Operation             `json:"operations,omitempty"`
@@ -39,6 +43,10 @@ var contextualRoute = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9/-]*[a-z0-9])?$`)
 var contextualQueryKey = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)
 
 const orgPathParameter = "orgId"
+
+// reservedPathPrefix belongs to Core's contract with the plugin backend, such
+// as the plugin status endpoint; no plugin operation routes there.
+const reservedPathPrefix = "/.well-known/"
 const environmentScope = "environment"
 
 // DecodeManifest reads exactly one bounded JSON manifest and rejects unknown
@@ -67,6 +75,9 @@ func (m Manifest) Validate() error {
 	}
 	if !identifier.MatchString(m.ID) || m.DisplayName == "" || !canonicalVersion.MatchString(m.Version) {
 		return fmt.Errorf("invalid plugin identity")
+	}
+	if m.MigrationGeneration < 0 {
+		return fmt.Errorf("the migration generation must not be negative")
 	}
 	if m.UI != nil {
 		if m.UI.Origin != "" {
@@ -109,6 +120,9 @@ func validateOperations(m Manifest) (map[string]bool, error) {
 	for _, op := range m.Operations {
 		if !operationIdentifier.MatchString(op.ID) || reservedHostOperation(op.ID) || seen[op.ID] || !safePath(op.Path) {
 			return nil, fmt.Errorf("invalid or duplicate plugin operation")
+		}
+		if strings.HasPrefix(op.Path, reservedPathPrefix) {
+			return nil, fmt.Errorf("plugin operations cannot use the reserved path prefix %s", reservedPathPrefix)
 		}
 		seen[op.ID] = true
 		for _, action := range op.ServiceActions {

@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/http"
 	"slices"
 	"sync"
 	"time"
@@ -35,6 +36,9 @@ type Config struct {
 	Database     model.Databaser
 	Registry     *plugins.InstallationRegistry
 	Entitlements *pluginentitlements.Adapter
+	// StatusClient reads plugin status endpoints. It carries the operator's
+	// plugin CA, like the client that calls plugin operations.
+	StatusClient *http.Client
 	// AllowDevelopmentHTTP permits HTTP plugin origins in development only.
 	AllowDevelopmentHTTP bool
 	// Readers and Writers hold plugin_manager_read and plugin_manager_write.
@@ -48,6 +52,7 @@ type Manager struct {
 	db                   model.Databaser
 	registry             *plugins.InstallationRegistry
 	entitlements         *pluginentitlements.Adapter
+	statusClient         *http.Client
 	allowDevelopmentHTTP bool
 	readers, writers     []uuid.UUID
 	logger               *zap.Logger
@@ -58,8 +63,8 @@ type Manager struct {
 // never be a plugin workload: plugin workloads authenticate as IAM service
 // users, so service users are refused here and again on every request.
 func New(config Config) (*Manager, error) {
-	if config.Database == nil || config.Registry == nil || config.Entitlements == nil {
-		return nil, errors.New("the Plugin Manager needs a database, a registry and the entitlement adapter")
+	if config.Database == nil || config.Registry == nil || config.Entitlements == nil || config.StatusClient == nil {
+		return nil, errors.New("the Plugin Manager needs a database, a registry, the entitlement adapter and a plugin status client")
 	}
 	for _, holder := range slices.Concat(config.Readers, config.Writers) {
 		if !eligibleOperator(holder) {
@@ -70,7 +75,7 @@ func New(config Config) (*Manager, error) {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
-	return &Manager{db: config.Database, registry: config.Registry, entitlements: config.Entitlements, allowDevelopmentHTTP: config.AllowDevelopmentHTTP,
+	return &Manager{db: config.Database, registry: config.Registry, entitlements: config.Entitlements, statusClient: config.StatusClient, allowDevelopmentHTTP: config.AllowDevelopmentHTTP,
 		readers: slices.Clone(config.Readers), writers: slices.Clone(config.Writers), logger: logger}, nil
 }
 

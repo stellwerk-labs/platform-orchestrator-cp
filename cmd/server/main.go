@@ -258,7 +258,7 @@ func main() {
 		registry.Entitlements = entitlementAdapter
 		server.PluginEntitlements = entitlementAdapter
 		server.PluginManager, err = pluginmanager.New(pluginmanager.Config{
-			Database: db, Registry: registry, Entitlements: entitlementAdapter, AllowDevelopmentHTTP: cfg.PluginDevelopmentHTTP,
+			Database: db, Registry: registry, Entitlements: entitlementAdapter, StatusClient: gateway.Client, AllowDevelopmentHTTP: cfg.PluginDevelopmentHTTP,
 			Readers: operatorIDs(cfg.PluginManagerReaders), Writers: operatorIDs(cfg.PluginManagerWriters), Logger: zap.L(),
 		})
 		if err != nil {
