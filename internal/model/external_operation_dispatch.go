@@ -193,13 +193,13 @@ func checkExternalDispatchBarrier(ctx context.Context, tx Tx, org string, enviro
 		return err
 	}
 	if pending {
-		return NewErrConflict("Environment has an unresolved external Deployment dispatch")
+		return ErrConflict{Code: EnvironmentBusy, Message: "Environment has an unresolved external Deployment dispatch"}
 	}
 	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM deployment_admission_guards WHERE org_id=$1 AND environment_uuid=$2 AND outcome IS NULL)`, org, environment).Scan(&pending); err != nil {
 		return err
 	}
 	if pending {
-		return NewErrConflict("Environment has an unresolved ordinary Deployment admission")
+		return ErrConflict{Code: EnvironmentBusy, Message: "Environment has an unresolved ordinary Deployment admission"}
 	}
 	return nil
 }

@@ -47,8 +47,12 @@ func deploymentAdmissionModelError(err error) error {
 	if _, ok := model.IsErrBadRequest(err); ok {
 		return pluginBoundaryError(400, "deployment_admission_invalid", err.Error())
 	}
-	if _, ok := model.IsErrConflict(err); ok {
-		return pluginBoundaryError(409, "deployment_admission_conflict", err.Error())
+	if conflict, ok := model.IsErrConflict(err); ok {
+		code := conflict.Code
+		if code == "" {
+			code = "deployment_admission_conflict"
+		}
+		return pluginBoundaryError(409, code, err.Error())
 	}
 	return err
 }

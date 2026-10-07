@@ -47,6 +47,17 @@ type ErrConflict struct {
 // ModuleHistoryRetained identifies immutable history, not a transient deletion blocker.
 const ModuleHistoryRetained = "module_history_retained"
 
+// Stable codes of Deployment admission conflicts. The Data Plane retries an
+// EnvironmentBusy admission later and rejects the others for good.
+const (
+	// EnvironmentBusy: an earlier ordinary admission or plugin dispatch of the Environment is unresolved.
+	EnvironmentBusy = "environment_busy"
+	// PinProtection: the resolved Deployment does not preserve an active Environment Pin.
+	PinProtection = "pin_protection"
+	// ModuleVersionLifecycle: a selected Module Version's lifecycle forbids this adoption.
+	ModuleVersionLifecycle = "module_version_lifecycle"
+)
+
 func (e ErrConflict) Error() string {
 	return fmt.Sprintf("conflict: %s", e.Message)
 }

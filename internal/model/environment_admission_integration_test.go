@@ -385,3 +385,46 @@ func TestEnvironmentAdmissionSealedAbsenceSerializesWithAuthorize(t *testing.T) 
 		// guard, allowing a new identity without reopening the closed attempt.
 	}
 }
+
+// The Data Plane retries an admission refused as environment_busy and rejects
+// other refusals for good, so each refusal must carry its stable code.
+func TestEnvironmentAdmissionConflictsCarryStableCodes(t *testing.T) {
+	requireCode := func(t *testing.T, err error, code string) {
+		t.Helper()
+		conflict, ok := IsErrConflict(err)
+		require.True(t, ok, "expected a conflict, got %v", err)
+		require.Equal(t, code, conflict.Code)
+	}
+	db, grant, request := admissionFixture(t)
+	_, err := AuthorizeDeploymentAdmission(t.Context(), db, request)
+	require.NoError(t, err)
+	second := request
+	second.AdmissionID = uuid.New()
+	_, err = AuthorizeDeploymentAdmission(t.Context(), db, second)
+	requireCode(t, err, EnvironmentBusy)
+	dispatch := ExternalDispatch{OrgID: grant.OrgID, PluginID: grant.PluginID, OperationID: grant.OperationID, ActorID: grant.ActorID, Fence: grant.Revision, Action: "external-deployment.admit", DispatchID: "blocked-by-ordinary", ProjectUUID: request.ProjectUUID, EnvironmentUUID: request.EnvironmentUUID, RequestDigest: grant.Intent.Fingerprint, TargetVersions: grant.Intent.TargetVersions}
+	requireCode(t, RecordExternalDispatch(t.Context(), db, dispatch), EnvironmentBusy)
+	_, err = SettleDeploymentAdmission(t.Context(), db, request.OrgID, request.AdmissionID, request.ProjectUUID, request.EnvironmentUUID, request.RequestDigest, "succeeded")
+	require.NoError(t, err)
+
+	dispatch.DispatchID = "external-first"
+	require.NoError(t, RecordExternalDispatch(t.Context(), db, dispatch))
+	_, err = AuthorizeDeploymentAdmission(t.Context(), db, second)
+	requireCode(t, err, EnvironmentBusy)
+	require.NoError(t, CompleteExternalDispatch(t.Context(), db, grant.OrgID, grant.PluginID, grant.OperationID, dispatch.DispatchID, ExternalDispatchCompletion{DeploymentID: uuid.New(), EnvironmentUUID: request.EnvironmentUUID, ProjectUUID: request.ProjectUUID, RequestDigest: dispatch.RequestDigest, Status: "succeeded"}))
+
+	fresh := second
+	fresh.AdmissionID = uuid.New()
+	fresh.CarryForwardModuleVersions = nil
+	_, err = AuthorizeDeploymentAdmission(t.Context(), db, fresh)
+	requireCode(t, err, ModuleVersionLifecycle)
+
+	module := grant.Intent.Modules[0]
+	tx, err := db.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	_, err = db.CreateEnvironmentModuleVersionPin(t.Context(), tx, grant.OrgID, request.ProjectUUID, "project", request.EnvironmentUUID, "development", module, *grant.BaselineDefaults[module.String()], grant.ActorID, "user", "Protect baseline", nil, false)
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
+	_, err = AuthorizeDeploymentAdmission(t.Context(), db, second)
+	requireCode(t, err, PinProtection)
+}

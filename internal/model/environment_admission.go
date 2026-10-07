@@ -222,7 +222,7 @@ func AuthorizeDeploymentAdmission(ctx context.Context, db Databaser, value Deplo
 			continue
 		}
 		if value.Mode == admissionModeDestroy || value.ModuleVersions[pin.ModuleUUID.String()] != pin.VersionUUID {
-			return nil, NewErrConflict("resolved Deployment does not preserve current Pin protection")
+			return nil, ErrConflict{Code: PinProtection, Message: "resolved Deployment does not preserve current Pin protection"}
 		}
 	}
 	activePins := make(map[string]uuid.UUID)
@@ -246,21 +246,21 @@ func AuthorizeDeploymentAdmission(ctx context.Context, db Databaser, value Deplo
 			return nil, err
 		}
 		if catalogue.Status == moduleversions.CatalogueArchived && value.Mode != deploymentModeRollback && value.CarryForwardModuleVersions[module] != versionUUID {
-			return nil, NewErrConflict("archived Modules permit only exact carry-forward or rollback Versions")
+			return nil, ErrConflict{Code: ModuleVersionLifecycle, Message: "archived Modules permit only exact carry-forward or rollback Versions"}
 		}
 		pinned := activePins[module] == versionUUID
 		switch version.LifecycleStatus {
 		case moduleversions.LifecycleProposed:
 			if !pinned && value.Mode != deploymentModeRollback && value.CarryForwardModuleVersions[module] != versionUUID && !policy.AllowFreshProposed {
-				return nil, NewErrConflict("fresh Proposed Module Versions require current scoped authority")
+				return nil, ErrConflict{Code: ModuleVersionLifecycle, Message: "fresh Proposed Module Versions require current scoped authority"}
 			}
 		case moduleversions.LifecycleDeprecated:
 			if !pinned && value.Mode != deploymentModeRollback {
-				return nil, NewErrConflict("Deprecated Module Versions require an active Pin or rollback")
+				return nil, ErrConflict{Code: ModuleVersionLifecycle, Message: "Deprecated Module Versions require an active Pin or rollback"}
 			}
 		case moduleversions.LifecycleDefective:
 			if _, ok := confirmed[versionUUID]; !ok || !pinned && value.Mode != deploymentModeRollback {
-				return nil, NewErrConflict("Defective Module Versions require exact confirmation and an active Pin or rollback")
+				return nil, ErrConflict{Code: ModuleVersionLifecycle, Message: "Defective Module Versions require exact confirmation and an active Pin or rollback"}
 			}
 			delete(confirmed, versionUUID)
 		}

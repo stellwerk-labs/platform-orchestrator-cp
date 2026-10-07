@@ -31,7 +31,10 @@ func pluginModelError(err error) error {
 	if _, ok := model.IsErrBadRequest(err); ok {
 		return pluginBoundaryError(400, "plugin_request_invalid", "The operation request is invalid.")
 	}
-	if _, ok := model.IsErrConflict(err); ok {
+	if conflict, ok := model.IsErrConflict(err); ok {
+		if conflict.Code == model.EnvironmentBusy {
+			return pluginBoundaryError(409, model.EnvironmentBusy, "The Environment has an unresolved Deployment admission or dispatch; retry later.")
+		}
 		return pluginBoundaryError(409, "plugin_operation_conflict", "The operation changed or its exact request identity was already used.")
 	}
 	return err
