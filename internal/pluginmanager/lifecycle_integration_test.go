@@ -10,7 +10,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
@@ -173,4 +175,225 @@ func TestProbeFailureLeavesTheInstallationUnavailable(t *testing.T) {
 	require.Len(t, page.Items, 1)
 	require.Equal(t, plugins.StateUnavailable, page.Items[0].Availability, "lists derive the same availability")
 	require.Equal(t, DiagnosticStatusUnreachable, page.Items[0].Diagnostic.Code)
+}
+
+// withOperation adds a GET operation to a package and returns its digest.
+func withOperation(t *testing.T, raw json.RawMessage, id string) (json.RawMessage, string) {
+	t.Helper()
+	var manifest map[string]any
+	require.NoError(t, json.Unmarshal(raw, &manifest))
+	manifest["operations"] = append(manifest["operations"].([]any), map[string]any{"id": id, "method": "GET", "path": "/orgs/{orgId}/" + id})
+	encoded, err := json.Marshal(manifest)
+	require.NoError(t, err)
+	sum := sha256.Sum256(encoded)
+	return encoded, hex.EncodeToString(sum[:])
+}
+
+// served is what one replica serves for a plugin: package and operations.
+type served struct {
+	digest     string
+	operations int
+}
+
+func requireEffect(t *testing.T, db model.Databaser, use model.PluginUse) error {
+	t.Helper()
+	tx, err := db.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	defer func() { _ = tx.Rollback() }()
+	return model.RequirePluginEnablement(t.Context(), tx, use)
+}
+
+func TestUpgradeSwitchesRegistrationsAtomicallyOnceTheSuccessorReports(t *testing.T) {
+	db := testDatabase(t)
+	org := testOrganization(t, db)
+	process := startPlugin(t)
+	writer := newReplicaReading(t, db, process.Client())
+	reader := newReplica(t, db)
+	ops := newSession(t, writer.manager)
+	ctx := t.Context()
+	const plugin = "dev.example.rollouts"
+	v1, v1Digest := versionedPackage(t, plugin, "1.0.0", 1)
+	v2, v2Digest := withOperation(t, mustVersion(t, plugin, "1.1.0", 2), "pause")
+	installation := ops.installed(plugin, process.URL, v1, v1Digest)
+	id := installation.InstallationID
+	process.reports(id, v1Digest, 1)
+	ops.installation(writer.manager.Transition(ctx, ops.command(""), id, ActionActivate))
+	ops.installation(writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "", nil))
+	pkg, err := writer.manager.PushPackage(ctx, ops.command(""), v2Digest, v2)
+	require.NoError(t, err)
+	ops.revision = pkg.Revision
+
+	// A reader replica polls throughout; every snapshot it serves is the
+	// predecessor or the successor, never a mix.
+	predecessor, successor := served{v1Digest, 2}, served{v2Digest, 3}
+	readerCtx, stopReader := context.WithCancel(ctx)
+	polled, sampled := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(polled)
+		reader.manager.Run(readerCtx, 5*time.Millisecond)
+	}()
+	var samples []served
+	var sawSuccessor atomic.Bool
+	go func() {
+		defer close(sampled)
+		for readerCtx.Err() == nil {
+			if item, _, found := reader.registry.Installation(readerCtx, org, plugin); found {
+				sample := served{item.ManifestSHA256, len(item.Operations)}
+				samples = append(samples, sample)
+				sawSuccessor.Store(sawSuccessor.Load() || sample == successor)
+			}
+			time.Sleep(time.Millisecond)
+		}
+	}()
+	servedBy := func(replica replica) served {
+		item, descriptor, found := replica.registry.Installation(ctx, org, plugin)
+		require.True(t, found)
+		require.Equal(t, plugins.StateAvailable, descriptor.State)
+		require.Equal(t, id.String(), item.InstallationID, "the installation UUID, and with it the licence binding, never changes")
+		return served{item.ManifestSHA256, len(item.Operations)}
+	}
+	use := model.PluginUse{OrgID: org, PluginID: plugin, InstallationID: id.String(), PackageSHA256: v1Digest}
+
+	upgrading := ops.installation(writer.manager.Upgrade(ctx, ops.command(""), id, v2Digest))
+	require.Equal(t, v1Digest, upgrading.PackageSHA256)
+	require.Equal(t, v2Digest, upgrading.TargetPackageSHA256)
+	require.Equal(t, predecessor, servedBy(writer), "Core keeps serving the predecessor")
+	require.NoError(t, requireEffect(t, db, use), "effects bound to the predecessor go on")
+
+	// The plugin runtime rolls: old pods still answer, then new pods whose
+	// migrations have not yet run.
+	_, err = writer.manager.Transition(ctx, ops.command(""), id, ActionActivate)
+	requireCode(t, err, DiagnosticPackageMismatch)
+	process.reports(id, v2Digest, 1)
+	_, err = writer.manager.Transition(ctx, ops.command(""), id, ActionActivate)
+	requireCode(t, err, DiagnosticMigrationMismatch)
+	pending, err := writer.manager.Installation(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, plugins.StateAvailable, pending.Availability, "a pending upgrade never degrades the served package")
+	require.Equal(t, DiagnosticMigrationMismatch, pending.Diagnostic.Code)
+	require.Equal(t, predecessor, servedBy(writer))
+	require.Equal(t, ops.revision, pending.Revision, "refusals change nothing")
+
+	process.reports(id, v2Digest, 2)
+	switched := ops.installation(writer.manager.Transition(ctx, ops.command(""), id, ActionActivate))
+	require.Equal(t, v2Digest, switched.PackageSHA256)
+	require.Empty(t, switched.TargetPackageSHA256)
+	require.Equal(t, model.PluginInstallationActive, switched.State)
+	require.Nil(t, switched.Diagnostic)
+	require.Equal(t, successor, servedBy(writer))
+	require.Eventually(t, sawSuccessor.Load, 2*time.Second, 5*time.Millisecond, "the reader replica serves the successor within its refresh bound")
+	stopReader()
+	<-sampled
+	<-polled
+	require.Contains(t, samples, predecessor)
+	require.Contains(t, samples, successor)
+	for _, sample := range samples {
+		require.Contains(t, []served{predecessor, successor}, sample, "a replica never serves a mix of both packages")
+	}
+	require.Equal(t, []string{v2Digest}, registeredPackages(t, db, id), "every registration belongs to the successor")
+	requireCode(t, requireEffect(t, db, use), "plugin_not_installed", "an effect bound to the replaced package is refused")
+	use.PackageSHA256 = v2Digest
+	require.NoError(t, requireEffect(t, db, use))
+
+	events := auditEvents(t, writer.manager)
+	var before, after model.PluginInstallation
+	last := events[len(events)-1]
+	require.Equal(t, "plugin_installation.activate", last.Action)
+	require.NoError(t, json.Unmarshal(last.Before, &before))
+	require.NoError(t, json.Unmarshal(last.After, &after))
+	require.Equal(t, v1Digest, before.PackageSHA256)
+	require.Equal(t, v2Digest, before.TargetPackageSHA256)
+	require.Equal(t, v2Digest, after.PackageSHA256)
+	require.Equal(t, "plugin_installation.upgrade", events[len(events)-2].Action)
+
+	regressing, regressingDigest := versionedPackage(t, plugin, "1.2.0", 1)
+	pkg, err = writer.manager.PushPackage(ctx, ops.command(""), regressingDigest, regressing)
+	require.NoError(t, err)
+	ops.revision = pkg.Revision
+	_, err = writer.manager.Upgrade(ctx, ops.command(""), id, regressingDigest)
+	requireCode(t, err, "plugin_upgrade_invalid", "a later version never runs on an earlier schema generation")
+
+	// A disabled installation is upgraded too and stays safety-only.
+	v3, v3Digest := versionedPackage(t, plugin, "1.3.0", 2)
+	pkg, err = writer.manager.PushPackage(ctx, ops.command(""), v3Digest, v3)
+	require.NoError(t, err)
+	ops.revision = pkg.Revision
+	ops.installation(writer.manager.Transition(ctx, ops.command(""), id, ActionDisable))
+	ops.installation(writer.manager.Upgrade(ctx, ops.command(""), id, v3Digest))
+	process.reports(id, v3Digest, 2)
+	disabled := ops.installation(writer.manager.Transition(ctx, ops.command(""), id, ActionActivate))
+	require.Equal(t, model.PluginInstallationDisabled, disabled.State)
+	require.Equal(t, v3Digest, disabled.PackageSHA256)
+	require.Equal(t, plugins.StateNotEnabled, disabled.Availability)
+}
+
+// registeredPackages lists the packages the installation's registrations
+// belong to.
+func registeredPackages(t *testing.T, db model.Databaser, id uuid.UUID) []string {
+	t.Helper()
+	tx, err := db.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	defer func() { _ = tx.Rollback() }()
+	rows, err := tx.QueryContext(t.Context(), `SELECT DISTINCT package_sha256 FROM plugin_extension_registrations WHERE installation_uuid=$1 ORDER BY 1`, id)
+	require.NoError(t, err)
+	defer func() { _ = rows.Close() }()
+	digests := []string{}
+	for rows.Next() {
+		var digest string
+		require.NoError(t, rows.Scan(&digest))
+		digests = append(digests, digest)
+	}
+	require.NoError(t, rows.Err())
+	return digests
+}
+
+// mustVersion is the test package of plugin at version and generation.
+func mustVersion(t *testing.T, plugin, version string, generation int64) json.RawMessage {
+	t.Helper()
+	raw, _ := versionedPackage(t, plugin, version, generation)
+	return raw
+}
+
+func TestUpgradeAcceptsOnlyALaterPackageOfThePlugin(t *testing.T) {
+	db := testDatabase(t)
+	writer := newReplica(t, db)
+	ops := newSession(t, writer.manager)
+	ctx := t.Context()
+	const plugin = "dev.example.rollouts"
+	installation := ops.install(plugin, testOrganization(t, db))
+	id := installation.InstallationID
+	push := func(raw json.RawMessage, digest string) string {
+		pkg, err := writer.manager.PushPackage(ctx, ops.command(""), digest, raw)
+		require.NoError(t, err)
+		ops.revision = pkg.Revision
+		return digest
+	}
+	older := push(versionedPackage(t, plugin, "0.9.0", 0))
+	prerelease := push(versionedPackage(t, plugin, "1.0.0-rc.1", 0))
+	otherRaw, _ := versionedPackage(t, "dev.example.other", "2.0.0", 0)
+	foreign := push(otherRaw, hexDigest(otherRaw))
+	later := push(versionedPackage(t, plugin, "1.1.0", 0))
+	require.NoError(t, writer.manager.Refresh(ctx))
+
+	for name, digest := range map[string]string{"older": older, "prerelease of the served version": prerelease, "other plugin": foreign} {
+		_, err := writer.manager.Upgrade(ctx, ops.command(""), id, digest)
+		requireCode(t, err, "plugin_upgrade_invalid", name)
+	}
+	_, err := writer.manager.Upgrade(ctx, ops.command(""), id, strings.Repeat("0", 64))
+	requireCode(t, err, "plugin_package_not_found")
+
+	pending := ops.installation(writer.manager.Upgrade(ctx, ops.command(""), id, later))
+	require.Equal(t, later, pending.TargetPackageSHA256)
+	same := ops.installation(writer.manager.Upgrade(ctx, ops.command(""), id, later))
+	require.Equal(t, pending.Revision, same.Revision, "requesting the pending target again changes nothing")
+	withdrawn := ops.installation(writer.manager.Upgrade(ctx, ops.command(""), id, installation.PackageSHA256))
+	require.Empty(t, withdrawn.TargetPackageSHA256, "requesting the served package withdraws the upgrade")
+	require.Equal(t, installation.PackageSHA256, withdrawn.PackageSHA256)
+	unchanged := ops.installation(writer.manager.Upgrade(ctx, ops.command(""), id, installation.PackageSHA256))
+	require.Equal(t, withdrawn.Revision, unchanged.Revision)
+}
+
+func hexDigest(raw []byte) string {
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:])
 }

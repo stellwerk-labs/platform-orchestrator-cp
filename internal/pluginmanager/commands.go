@@ -1,6 +1,7 @@
 package pluginmanager
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -12,6 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginentitlements"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
 )
@@ -70,6 +72,11 @@ var manifestDigest = regexp.MustCompile(`^[0-9a-f]{64}$`)
 // Command payloads identify a request in its idempotency fingerprint.
 type installationPayload struct {
 	InstallationID uuid.UUID `json:"installation_id"`
+}
+
+type upgradePayload struct {
+	InstallationID uuid.UUID `json:"installation_id"`
+	PackageSHA256  string    `json:"package_sha256"`
 }
 
 type identityPayload struct {
@@ -142,7 +149,7 @@ func describe(ctx context.Context, tx model.Tx, installation model.PluginInstall
 	if installation.Observation == nil {
 		return result, nil
 	}
-	pkg, err := model.GetPluginPackage(ctx, tx, installation.PackageSHA256)
+	pkg, err := model.GetPluginPackage(ctx, tx, cmp.Or(installation.TargetPackageSHA256, installation.PackageSHA256))
 	if err != nil {
 		return result, err
 	}
@@ -311,19 +318,25 @@ func (m *Manager) Transition(ctx context.Context, command Command, id uuid.UUID,
 	return result, err
 }
 
-// activate serves the package registrations of an installed installation.
-// Core first reads the running plugin's status, outside the serialised
-// command, and records what it observed. The command then refuses with the
-// diagnostic unless the plugin reports exactly the installation UUID, package
-// digest and migration generation Core recorded; a refusal changes nothing,
-// so the operator activates again once the plugin runtime caught up.
+// activate serves the package registrations of an installed installation,
+// or completes a pending upgrade. Core first reads the running plugin's
+// status, outside the serialised command, and records what it observed. The
+// command then refuses with the diagnostic unless the plugin reports exactly
+// the installation UUID, the package digest (the upgrade target, if one is
+// pending) and its migration generation; a refusal changes nothing, so the
+// operator activates again once the plugin runtime caught up.
+//
+// An upgrade switches package and registrations in one transaction, so every
+// replica serves either the predecessor or the successor, never a mix. Until
+// then the predecessor stays served through the rolling update of the plugin
+// runtime. A disabled installation stays disabled.
 func (m *Manager) activate(ctx context.Context, command Command, id uuid.UUID) (Installation, error) {
 	current, err := m.Installation(ctx, id)
 	if err != nil {
 		return Installation{}, err
 	}
 	var observed *model.PluginStatusObservation
-	if current.State == model.PluginInstallationInstalled {
+	if awaitsProof(current.PluginInstallation) {
 		observation := m.readStatus(ctx, current.BackendURL)
 		if err := model.RecordPluginStatusObservation(ctx, m.db, id, observation); err != nil {
 			return Installation{}, err
@@ -337,14 +350,22 @@ func (m *Manager) activate(ctx context.Context, command Command, id uuid.UUID) (
 			if err != nil {
 				return nil, err
 			}
-			if before.State == model.PluginInstallationActive {
-				return nil, nil
-			}
-			if before.State != model.PluginInstallationInstalled {
-				return nil, stateConflict("Only an installed installation is activated; a disabled one is enabled.")
+			if !awaitsProof(before) {
+				if before.State == model.PluginInstallationActive {
+					return nil, nil
+				}
+				return nil, stateConflict("Only an installed installation or a pending upgrade is activated; a disabled installation is enabled.")
 			}
 			after := before
-			after.State = model.PluginInstallationActive
+			if before.State == model.PluginInstallationInstalled {
+				after.State = model.PluginInstallationActive
+			}
+			if before.TargetPackageSHA256 != "" {
+				if manifest, err = m.packageManifest(ctx, tx, before.TargetPackageSHA256); err != nil {
+					return nil, err
+				}
+				after.PackageSHA256, after.TargetPackageSHA256 = before.TargetPackageSHA256, ""
+			}
 			if err := m.validateServed(after, manifest); err != nil {
 				return nil, err
 			}
@@ -367,6 +388,103 @@ func (m *Manager) activate(ctx context.Context, command Command, id uuid.UUID) (
 			return m.installationChange(ctx, tx, "plugin_installation."+string(ActionActivate), before, "")
 		}, m.respondInstallation(id), &result)
 	return result, err
+}
+
+// awaitsProof reports whether an activation has to read the running plugin:
+// before the first activation and while an upgrade is pending.
+func awaitsProof(installation model.PluginInstallation) bool {
+	switch installation.State {
+	case model.PluginInstallationInstalled:
+		return true
+	case model.PluginInstallationActive, model.PluginInstallationDisabled:
+		return installation.TargetPackageSHA256 != ""
+	}
+	return false
+}
+
+// Upgrade requests the package the installation is to serve next. Core keeps
+// serving the current package and its registrations until an activation
+// reads the target digest from the running plugin; the installation UUID and
+// with it the licence binding stay. The target must be a later version of the
+// same plugin that Core can serve with the installation's origins,
+// identities and approval policies. Requesting the served package withdraws
+// a pending upgrade.
+func (m *Manager) Upgrade(ctx context.Context, command Command, id uuid.UUID, digest string) (Installation, error) {
+	var result Installation
+	err := m.execute(ctx, command, "plugin_installation.upgrade", upgradePayload{InstallationID: id, PackageSHA256: digest},
+		func(ctx context.Context, tx model.Tx) (*model.PluginManagerChange, error) {
+			before, served, err := m.lockInstallation(ctx, tx, id)
+			if err != nil {
+				return nil, err
+			}
+			switch before.State {
+			case model.PluginInstallationInstalled, model.PluginInstallationActive, model.PluginInstallationDisabled:
+			default:
+				return nil, stateConflict("Only an installed, active or disabled installation is upgraded.")
+			}
+			after := before
+			switch digest {
+			case before.TargetPackageSHA256:
+				return nil, nil
+			case before.PackageSHA256:
+				if before.TargetPackageSHA256 == "" {
+					return nil, nil
+				}
+				after.TargetPackageSHA256 = ""
+			default:
+				if err := m.validateUpgrade(ctx, tx, before, served, digest); err != nil {
+					return nil, err
+				}
+				after.TargetPackageSHA256 = digest
+			}
+			if err := model.UpdatePluginInstallation(ctx, tx, after, command.Actor); err != nil {
+				return nil, err
+			}
+			return m.installationChange(ctx, tx, "plugin_installation.upgrade", before, "")
+		}, m.respondInstallation(id), &result)
+	return result, err
+}
+
+// validateUpgrade checks that Core can serve the target package in place of
+// the served one. Downgrades are refused: no package declares compatible
+// migrations in v1alpha.
+func (m *Manager) validateUpgrade(ctx context.Context, tx model.Tx, installation model.PluginInstallation, served plugins.Manifest, digest string) error {
+	pkg, err := model.GetPluginPackage(ctx, tx, digest)
+	if err != nil {
+		return err
+	}
+	if pkg.PluginID != installation.PluginID {
+		return invalid("plugin_upgrade_invalid", fmt.Errorf("the package belongs to plugin %s, not %s", pkg.PluginID, installation.PluginID))
+	}
+	target, err := plugins.DecodeManifest(pkg.Manifest)
+	if err != nil {
+		return err
+	}
+	from, err := moduleversions.ParseVersion(served.Version)
+	if err != nil {
+		return err
+	}
+	to, err := moduleversions.ParseVersion(target.Version)
+	if err != nil {
+		return err
+	}
+	if to.Compare(from) <= 0 {
+		return invalid("plugin_upgrade_invalid", fmt.Errorf("version %s does not follow the served version %s; downgrades are not supported", target.Version, served.Version))
+	}
+	if target.MigrationGeneration < served.MigrationGeneration {
+		return invalid("plugin_upgrade_invalid", fmt.Errorf("migration generation %d precedes the served generation %d", target.MigrationGeneration, served.MigrationGeneration))
+	}
+	candidate := installation
+	candidate.PackageSHA256 = digest
+	return m.validateServed(candidate, target)
+}
+
+func (m *Manager) packageManifest(ctx context.Context, tx model.Tx, digest string) (plugins.Manifest, error) {
+	pkg, err := model.GetPluginPackage(ctx, tx, digest)
+	if err != nil {
+		return plugins.Manifest{}, err
+	}
+	return plugins.DecodeManifest(pkg.Manifest)
 }
 
 // validateServed checks that Core can serve the complete installation with
@@ -475,16 +593,13 @@ func (m *Manager) ImportEntitlementBundle(ctx context.Context, command Command, 
 	return result, err
 }
 
+// lockInstallation locks the installation and decodes its served package.
 func (m *Manager) lockInstallation(ctx context.Context, tx model.Tx, id uuid.UUID) (model.PluginInstallation, plugins.Manifest, error) {
 	installation, err := model.GetPluginInstallation(ctx, tx, id, true)
 	if err != nil {
 		return installation, plugins.Manifest{}, err
 	}
-	pkg, err := model.GetPluginPackage(ctx, tx, installation.PackageSHA256)
-	if err != nil {
-		return installation, plugins.Manifest{}, err
-	}
-	manifest, err := plugins.DecodeManifest(pkg.Manifest)
+	manifest, err := m.packageManifest(ctx, tx, installation.PackageSHA256)
 	return installation, manifest, err
 }
 

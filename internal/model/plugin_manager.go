@@ -45,19 +45,22 @@ type PluginPackage struct {
 
 // PluginInstallation is the operator record of one installed plugin.
 type PluginInstallation struct {
-	InstallationID     uuid.UUID          `json:"installation_id"`
-	PluginID           string             `json:"plugin_id"`
-	PackageSHA256      string             `json:"package_sha256"`
-	State              string             `json:"state"`
-	BackendURL         string             `json:"backend_url"`
-	UIOrigin           string             `json:"ui_origin,omitempty"`
-	ServiceUserID      string             `json:"service_user_id,omitempty"`
-	AdmissionCheckerID string             `json:"admission_checker_id,omitempty"`
-	Organizations      []PluginEnablement `json:"organizations"`
-	CreatedAt          time.Time          `json:"created_at"`
-	CreatedBy          uuid.UUID          `json:"created_by"`
-	UpdatedAt          time.Time          `json:"updated_at"`
-	UpdatedBy          uuid.UUID          `json:"updated_by"`
+	InstallationID uuid.UUID `json:"installation_id"`
+	PluginID       string    `json:"plugin_id"`
+	PackageSHA256  string    `json:"package_sha256"`
+	// TargetPackageSHA256 is the package of a pending upgrade. Core serves
+	// PackageSHA256 until an activation reads the target from the plugin.
+	TargetPackageSHA256 string             `json:"target_package_sha256,omitempty"`
+	State               string             `json:"state"`
+	BackendURL          string             `json:"backend_url"`
+	UIOrigin            string             `json:"ui_origin,omitempty"`
+	ServiceUserID       string             `json:"service_user_id,omitempty"`
+	AdmissionCheckerID  string             `json:"admission_checker_id,omitempty"`
+	Organizations       []PluginEnablement `json:"organizations"`
+	CreatedAt           time.Time          `json:"created_at"`
+	CreatedBy           uuid.UUID          `json:"created_by"`
+	UpdatedAt           time.Time          `json:"updated_at"`
+	UpdatedBy           uuid.UUID          `json:"updated_by"`
 	// Observation is what Core last read from the running plugin's status.
 	Observation *PluginStatusObservation `json:"observation,omitempty"`
 }
@@ -273,7 +276,7 @@ func InsertPluginPackage(ctx context.Context, tx Tx, item PluginPackage) error {
 	return err
 }
 
-const pluginInstallationColumns = `i.installation_uuid, i.plugin_id, i.package_sha256, i.state, i.backend_url, COALESCE(i.ui_origin,''),
+const pluginInstallationColumns = `i.installation_uuid, i.plugin_id, i.package_sha256, COALESCE(i.target_package_sha256,''), i.state, i.backend_url, COALESCE(i.ui_origin,''),
 	COALESCE(i.service_user_id::text,''), COALESCE(i.admission_checker_id::text,''), i.created_at, i.created_by, i.updated_at, i.updated_by,
 	o.observed_at, COALESCE(o.failure,''), COALESCE(o.detail,''), o.reported_installation_uuid, COALESCE(o.reported_package_sha256,''),
 	o.reported_migration_generation
@@ -285,7 +288,7 @@ func scanPluginInstallation(row interface{ Scan(...any) error }) (PluginInstalla
 	var observation PluginStatusObservation
 	var reportedInstallation uuid.NullUUID
 	var reportedGeneration sql.NullInt64
-	err := row.Scan(&item.InstallationID, &item.PluginID, &item.PackageSHA256, &item.State, &item.BackendURL, &item.UIOrigin,
+	err := row.Scan(&item.InstallationID, &item.PluginID, &item.PackageSHA256, &item.TargetPackageSHA256, &item.State, &item.BackendURL, &item.UIOrigin,
 		&item.ServiceUserID, &item.AdmissionCheckerID, &item.CreatedAt, &item.CreatedBy, &item.UpdatedAt, &item.UpdatedBy,
 		&observedAt, &observation.Failure, &observation.Detail, &reportedInstallation, &observation.PackageSHA256, &reportedGeneration)
 	if err != nil || !observedAt.Valid {
@@ -397,11 +400,13 @@ func InsertPluginInstallation(ctx context.Context, tx Tx, item PluginInstallatio
 	return err
 }
 
-// UpdatePluginInstallation stores the state and identities of a locked
-// installation.
+// UpdatePluginInstallation stores the state, packages and identities of a
+// locked installation.
 func UpdatePluginInstallation(ctx context.Context, tx Tx, item PluginInstallation, actor uuid.UUID) error {
-	_, err := tx.ExecContext(ctx, `UPDATE plugin_installations SET state=$2, service_user_id=$3, admission_checker_id=$4, updated_at=now(), updated_by=$5
-		WHERE installation_uuid=$1`, item.InstallationID, item.State,
+	_, err := tx.ExecContext(ctx, `UPDATE plugin_installations SET state=$2, package_sha256=$3, target_package_sha256=$4, service_user_id=$5,
+		admission_checker_id=$6, updated_at=now(), updated_by=$7
+		WHERE installation_uuid=$1`, item.InstallationID, item.State, item.PackageSHA256,
+		sql.NullString{String: item.TargetPackageSHA256, Valid: item.TargetPackageSHA256 != ""},
 		sql.NullString{String: item.ServiceUserID, Valid: item.ServiceUserID != ""},
 		sql.NullString{String: item.AdmissionCheckerID, Valid: item.AdmissionCheckerID != ""}, actor)
 	return err
