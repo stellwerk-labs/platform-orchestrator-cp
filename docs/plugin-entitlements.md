@@ -19,7 +19,10 @@ see [adr-plugin-manager.md](adr-plugin-manager.md)). The request carries the
 exact bundle file bytes, base64-encoded. An import applies without a restart
 and reports how many documents it imported, with one diagnostic per skipped
 document. A grant matches only the binding (installation UUID, plugin,
-organization) of an installation enabled for that organization.
+organization) of an installation enabled for that organization. Upgrade,
+disable, uninstall and reinstall keep the installation UUID, so imported
+grants keep applying once the installation serves the organization again; a
+purge retires the UUID and its grants never match again.
 
 ## Feature states
 

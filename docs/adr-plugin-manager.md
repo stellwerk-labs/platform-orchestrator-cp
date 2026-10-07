@@ -20,8 +20,9 @@ and never write it.
 
 | Resource | Content |
 |---|---|
-| Package | Immutable registration manifest of one plugin version (identity, operations, UI contribution, service grants, authorization policies, entitlement declaration), keyed by the SHA-256 of the package manifest. |
-| Installation | Core-assigned immutable installation UUID, package, state (`installed`, `active`, `disabled`), backend and UI origins, service user and admission checker. |
+| Package | Immutable registration manifest of one plugin version (identity, migration generation, operations, UI contribution, service grants, authorization policies, entitlement declaration), keyed by the SHA-256 of the package manifest. |
+| Installation | Core-assigned immutable installation UUID, served package and the target of a pending upgrade, state (`installed`, `active`, `disabled`, `uninstalled`, `purged`), backend and UI origins, service user and admission checker. |
+| Status observation | What Core last read from the running plugin's status endpoint. A fact the plugin reports, not operator state. |
 | Enablement | One organization of an installation: `enabled` or `disabled`, IANA timezone, deployment approval policies. In `v1alpha` an installation has exactly one. |
 | Registration | The contributions an active installation serves, materialised from its package on activation. A UI route prefix belongs to one installation. |
 | Audit event | One per committed change, with actor, reason, request ID, idempotency key digest, state before and after. Never updated or deleted. |
@@ -35,7 +36,10 @@ Platform-scoped routes, outside any organization:
 | `GET`, `POST /plugin-packages` | List; register a package. The same digest with the same manifest changes nothing. |
 | `GET`, `POST /plugin-installations`, `GET /plugin-installations/{id}` | List and read; install a package. Core assigns the UUID. A plugin has at most one installation. |
 | `PUT /plugin-installations/{id}/identity` | Record the service user and admission checker before activation. |
-| `POST /plugin-installations/{id}/actions/{activate,disable,enable}` | Serve the package registrations; keep the installation safety-only for every organization; return it to active. |
+| `POST /plugin-installations/{id}/actions/{activate,disable,enable}` | Serve the package registrations once the running plugin proves the package, or complete a pending upgrade; keep the installation safety-only for every organization; return it to active. |
+| `POST /plugin-installations/{id}/upgrade` | Request the package the installation serves next. |
+| `POST /plugin-installations/{id}/actions/{uninstall,reinstall}` | Remove registrations and enablements and keep the UUID and plugin data; return the retained installation to installed. |
+| `DELETE /plugin-installations/{id}` | Purge an uninstalled installation and retire its UUID. |
 | `PUT`, `DELETE /plugin-installations/{id}/organizations/{orgId}` | Enable or disable for the organization (disabled is safety-only); remove the enablement. |
 | `POST /plugin-entitlement-bundles` | Import signed grants and revocations ([plugin-entitlements.md](plugin-entitlements.md)). |
 | `GET /plugin-audit-events` | Page the audit trail. |
@@ -79,6 +83,61 @@ Availability is derived, never configured: `available` while the installation
 is active and the organization enabled, `not_enabled` (safety-only) while
 either is disabled, then refined by the signed licence.
 
+### Activation, upgrade and removal
+
+A running plugin serves its status at `/.well-known/stellwerk/plugin-status`
+on its backend origin (`shared/pluginstatus`): the installation UUID the
+plugin runtime configured, the package digest the runtime verified before it
+started the process, and the migration generation applied in the plugin's
+database, read on every request. A package declares the generation it runs
+on in its registration manifest; `/.well-known/` is reserved for Core and no
+plugin operation routes there.
+
+`activate` reads that status outside the serialised command, with the
+operator's plugin CA and without following redirects, and records what it
+observed. The command then serves the package registrations only when the
+plugin reports exactly the installation UUID, the package digest (the target
+of a pending upgrade, if any) and its migration generation. Otherwise it
+changes nothing and answers `409` with a stable diagnostic:
+`plugin_status_unreachable`, `plugin_status_invalid`,
+`plugin_installation_mismatch`, `plugin_package_digest_mismatch` or
+`plugin_migration_generation_mismatch`. Installation reads derive the
+availability (`unavailable` until the first activation) and the same
+diagnostic from the last observation. Because a refusal changes no revision,
+the operator retries the same command once the plugin runtime caught up.
+Observations are not audited: they never change what Core serves or
+authorizes, and the activation that acts on one is.
+
+`upgrade` records the target package: a later version of the same plugin
+that does not lower the migration generation and that Core can serve with the
+installation's origins, identities and approval policies. Core keeps serving
+the current package, its registrations and every effect bound to its digest
+while the plugin runtime rolls. The next `activate` that reads the target
+digest and generation switches package and registrations in one
+transaction, so a replica serves either package, never a mix. During the
+rolling update the successor must serve the predecessor's registrations,
+because Core routes those until the switch. Effects that a replica
+authorized from its snapshot of the predecessor are refused with
+`409 plugin_not_installed` for at most one refresh interval after the switch
+and succeed on retry. The installation UUID, and with it the licence binding,
+never changes; a disabled installation stays disabled. Downgrades are refused.
+
+`uninstall` is refused with `409 plugin_work_unsettled` while Core holds
+safety work of the plugin in any organization: operation grants not
+released, dispatches not settled or Module reservations still active. There
+is no force option. Until it succeeds the plugin's cancel, rollback and read
+paths stay available; disabling first stops forward work. New work
+share-locks the installation row that uninstall locks for update, so the
+check cannot race it. Uninstall removes the registrations and organization
+enablements (their journals pause with a gap) and keeps the UUID, package,
+identities and the plugin's own data. `reinstall` returns that installation,
+with its UUID, to `installed`; it is activated and enabled again like a new
+one, and its licence grants match again. A plugin keeps at most one
+installation that is not purged, so a new installation never shadows a
+retained one. `purge` is a separate step that requires a prior uninstall and
+retires the UUID for good; Core does not own plugin data, which the operator
+deletes through the plugin runtime.
+
 ### Resource event journal
 
 An organization is journaled exactly while a plugin is enabled for it (in
@@ -98,9 +157,9 @@ Core does not verify package signatures. The plugin runtime verifies the signed
 package against the operator's publisher trust before it starts the plugin
 process. Core records the package manifest digest with the registration
 manifest, binds the installation, its entitlement grants and every effect check
-to that digest, and is to bind activation to the digest the running plugin
-reports. An operator holding `plugin_manager_write` is therefore trusted to
-register the manifest that belongs to a digest.
+to that digest, and serves a package only after the running plugin reports
+that digest. An operator holding `plugin_manager_write` is therefore trusted
+to register the manifest that belongs to a digest.
 
 Verifying in Core as well would duplicate the runtime's verifier and its trust
 distribution without adding a check the runtime and the reported digest do not
@@ -109,11 +168,15 @@ verification and revisit this decision.
 
 ## Not yet implemented
 
-- Activation does not yet require the running plugin to report the recorded
-  installation UUID, package digest and migration generation, and Core does
-  not probe plugin health; `unavailable` and `incompatible` come only from the
-  licence.
-- Upgrade, uninstall, reinstall and purge.
+- The plugin runtime does not yet pass the installation UUID and verified
+  package digest to the plugin process, and plugins do not yet serve the
+  status endpoint.
+- Core reads plugin status only on activation; it does not observe the health
+  of an active installation, and per-organization `unavailable` and
+  `incompatible` still come only from the licence.
+- Uninstall does not yet ask the plugin whether it is ready to decommission,
+  and removing a single organization's enablement does not wait for that
+  organization's safety work.
 - Verifying service identities against IAM workload bindings and the service
   user's organization, and holding the platform permissions in IAM.
 - Collision checks beyond the UI route prefix.
@@ -125,4 +188,7 @@ verification and revisit this decision.
 - Read decisions may lag a change by one refresh interval; effects never do.
 - Writes serialise globally; the Plugin Manager is an operator interface, not a
   high-rate path.
-- A downgrade below this schema is refused once an audit event exists.
+- Plugin releases must keep serving their predecessor's registrations during
+  a rolling update, and the operator activates once the runtime rolled out.
+- A downgrade below this schema is refused once an audit event exists, and
+  below the purged state once an installation is purged.
