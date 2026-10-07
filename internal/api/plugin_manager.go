@@ -151,6 +151,28 @@ func (s *Server) TransitionPluginInstallation(ctx context.Context, request Trans
 	return pluginInstallationResult[TransitionPluginInstallation200JSONResponse](s.PluginManager.Transition(ctx, command, request.InstallationId, pluginmanager.Action(request.InstallationAction)))
 }
 
+func (s *Server) UpgradePluginInstallation(ctx context.Context, request UpgradePluginInstallationRequestObject) (UpgradePluginInstallationResponseObject, error) {
+	if request.Body == nil {
+		return nil, pluginBoundaryError(400, "plugin_manager_request_invalid", "The target package is required.")
+	}
+	command, err := s.pluginManagerCommand(ctx, request.Params.IdempotencyKey, request.Body.ExpectedRevision, request.Body.Reason)
+	if err != nil {
+		return nil, err
+	}
+	return pluginInstallationResult[UpgradePluginInstallation200JSONResponse](s.PluginManager.Upgrade(ctx, command, request.InstallationId, request.Body.PackageSha256))
+}
+
+func (s *Server) PurgePluginInstallation(ctx context.Context, request PurgePluginInstallationRequestObject) (PurgePluginInstallationResponseObject, error) {
+	if request.Body == nil {
+		return nil, pluginBoundaryError(400, "plugin_manager_request_invalid", "The expected revision and a reason are required.")
+	}
+	command, err := s.pluginManagerCommand(ctx, request.Params.IdempotencyKey, request.Body.ExpectedRevision, request.Body.Reason)
+	if err != nil {
+		return nil, err
+	}
+	return pluginInstallationResult[PurgePluginInstallation200JSONResponse](s.PluginManager.Transition(ctx, command, request.InstallationId, pluginmanager.ActionPurge))
+}
+
 func (s *Server) PutPluginEnablement(ctx context.Context, request PutPluginEnablementRequestObject) (PutPluginEnablementResponseObject, error) {
 	if request.Body == nil {
 		return nil, pluginBoundaryError(400, "plugin_manager_request_invalid", "An enablement is required.")

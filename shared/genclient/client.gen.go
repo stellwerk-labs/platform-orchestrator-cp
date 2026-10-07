@@ -739,6 +739,7 @@ const (
 	PluginInstallationStateActive      PluginInstallationState = "active"
 	PluginInstallationStateDisabled    PluginInstallationState = "disabled"
 	PluginInstallationStateInstalled   PluginInstallationState = "installed"
+	PluginInstallationStatePurged      PluginInstallationState = "purged"
 	PluginInstallationStateUninstalled PluginInstallationState = "uninstalled"
 )
 
@@ -751,7 +752,36 @@ func (e PluginInstallationState) Valid() bool {
 		return true
 	case PluginInstallationStateInstalled:
 		return true
+	case PluginInstallationStatePurged:
+		return true
 	case PluginInstallationStateUninstalled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginInstallationDiagnosticCode.
+const (
+	PluginDiagnosticInstallationMismatch        PluginInstallationDiagnosticCode = "plugin_installation_mismatch"
+	PluginDiagnosticMigrationGenerationMismatch PluginInstallationDiagnosticCode = "plugin_migration_generation_mismatch"
+	PluginDiagnosticPackageDigestMismatch       PluginInstallationDiagnosticCode = "plugin_package_digest_mismatch"
+	PluginDiagnosticStatusInvalid               PluginInstallationDiagnosticCode = "plugin_status_invalid"
+	PluginDiagnosticStatusUnreachable           PluginInstallationDiagnosticCode = "plugin_status_unreachable"
+)
+
+// Valid indicates whether the value is a known member of the PluginInstallationDiagnosticCode enum.
+func (e PluginInstallationDiagnosticCode) Valid() bool {
+	switch e {
+	case PluginDiagnosticInstallationMismatch:
+		return true
+	case PluginDiagnosticMigrationGenerationMismatch:
+		return true
+	case PluginDiagnosticPackageDigestMismatch:
+		return true
+	case PluginDiagnosticStatusInvalid:
+		return true
+	case PluginDiagnosticStatusUnreachable:
 		return true
 	default:
 		return false
@@ -890,6 +920,24 @@ func (e PluginPinOperationRequestAction) Valid() bool {
 	case PluginPinReconcile:
 		return true
 	case PluginPinRestore:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginStatusObservationFailure.
+const (
+	PluginStatusFailureInvalid     PluginStatusObservationFailure = "plugin_status_invalid"
+	PluginStatusFailureUnreachable PluginStatusObservationFailure = "plugin_status_unreachable"
+)
+
+// Valid indicates whether the value is a known member of the PluginStatusObservationFailure enum.
+func (e PluginStatusObservationFailure) Valid() bool {
+	switch e {
+	case PluginStatusFailureInvalid:
+		return true
+	case PluginStatusFailureUnreachable:
 		return true
 	default:
 		return false
@@ -1126,9 +1174,11 @@ func (e ChangeResourceTypeCatalogueStatusParamsCatalogueAction) Valid() bool {
 
 // Defines values for TransitionPluginInstallationParamsInstallationAction.
 const (
-	PluginInstallationActionActivate TransitionPluginInstallationParamsInstallationAction = "activate"
-	PluginInstallationActionDisable  TransitionPluginInstallationParamsInstallationAction = "disable"
-	PluginInstallationActionEnable   TransitionPluginInstallationParamsInstallationAction = "enable"
+	PluginInstallationActionActivate  TransitionPluginInstallationParamsInstallationAction = "activate"
+	PluginInstallationActionDisable   TransitionPluginInstallationParamsInstallationAction = "disable"
+	PluginInstallationActionEnable    TransitionPluginInstallationParamsInstallationAction = "enable"
+	PluginInstallationActionReinstall TransitionPluginInstallationParamsInstallationAction = "reinstall"
+	PluginInstallationActionUninstall TransitionPluginInstallationParamsInstallationAction = "uninstall"
 )
 
 // Valid indicates whether the value is a known member of the TransitionPluginInstallationParamsInstallationAction enum.
@@ -1139,6 +1189,10 @@ func (e TransitionPluginInstallationParamsInstallationAction) Valid() bool {
 	case PluginInstallationActionDisable:
 		return true
 	case PluginInstallationActionEnable:
+		return true
+	case PluginInstallationActionReinstall:
+		return true
+	case PluginInstallationActionUninstall:
 		return true
 	default:
 		return false
@@ -3126,22 +3180,34 @@ type PluginFeatureAccess struct {
 
 // PluginInstallation defines model for PluginInstallation.
 type PluginInstallation struct {
-	AdmissionCheckerId *openapi_types.UUID `json:"admission_checker_id,omitempty"`
-	BackendUrl         string              `json:"backend_url"`
-	CreatedAt          time.Time           `json:"created_at"`
-	CreatedBy          openapi_types.UUID  `json:"created_by"`
-	InstallationId     openapi_types.UUID  `json:"installation_id"`
-	Organizations      []PluginEnablement  `json:"organizations"`
-	PackageSha256      string              `json:"package_sha256"`
-	PluginId           string              `json:"plugin_id"`
+	AdmissionCheckerId *openapi_types.UUID     `json:"admission_checker_id,omitempty"`
+	Availability       PluginAvailabilityState `json:"availability"`
+	BackendUrl         string                  `json:"backend_url"`
+	CreatedAt          time.Time               `json:"created_at"`
+	CreatedBy          openapi_types.UUID      `json:"created_by"`
+
+	// Diagnostic Why the last status read from the running plugin does not prove the package Core is to serve (the pending upgrade's, if any). Absent while it does or before Core read it.
+	Diagnostic     *PluginInstallationDiagnostic `json:"diagnostic,omitempty"`
+	InstallationId openapi_types.UUID            `json:"installation_id"`
+
+	// Observation What Core last read from the running plugin's status endpoint, on activation. Either the report or a failure with its detail.
+	Observation   *PluginStatusObservation `json:"observation,omitempty"`
+	Organizations []PluginEnablement       `json:"organizations"`
+
+	// PackageSha256 The package Core serves.
+	PackageSha256 string `json:"package_sha256"`
+	PluginId      string `json:"plugin_id"`
 
 	// Revision The Plugin Manager revision this response reflects.
 	Revision      *int64                  `json:"revision,omitempty"`
 	ServiceUserId *openapi_types.UUID     `json:"service_user_id,omitempty"`
 	State         PluginInstallationState `json:"state"`
-	UiOrigin      *string                 `json:"ui_origin,omitempty"`
-	UpdatedAt     time.Time               `json:"updated_at"`
-	UpdatedBy     openapi_types.UUID      `json:"updated_by"`
+
+	// TargetPackageSha256 The package of a pending upgrade. Core serves package_sha256 until an activate reads this digest from the running plugin.
+	TargetPackageSha256 *string            `json:"target_package_sha256,omitempty"`
+	UiOrigin            *string            `json:"ui_origin,omitempty"`
+	UpdatedAt           time.Time          `json:"updated_at"`
+	UpdatedBy           openapi_types.UUID `json:"updated_by"`
 }
 
 // PluginInstallationState defines model for PluginInstallation.State.
@@ -3159,6 +3225,15 @@ type PluginInstallationCreate struct {
 	UiOrigin *string `json:"ui_origin,omitempty"`
 }
 
+// PluginInstallationDiagnostic Why the last status read from the running plugin does not prove the package Core is to serve (the pending upgrade's, if any). Absent while it does or before Core read it.
+type PluginInstallationDiagnostic struct {
+	Code    PluginInstallationDiagnosticCode `json:"code"`
+	Message string                           `json:"message"`
+}
+
+// PluginInstallationDiagnosticCode defines model for PluginInstallationDiagnostic.Code.
+type PluginInstallationDiagnosticCode string
+
 // PluginInstallationIdentity defines model for PluginInstallationIdentity.
 type PluginInstallationIdentity struct {
 	AdmissionCheckerId openapi_types.UUID `json:"admission_checker_id"`
@@ -3171,6 +3246,15 @@ type PluginInstallationIdentity struct {
 type PluginInstallationPage struct {
 	Items    []PluginInstallation `json:"items"`
 	Revision int64                `json:"revision"`
+}
+
+// PluginInstallationUpgrade defines model for PluginInstallationUpgrade.
+type PluginInstallationUpgrade struct {
+	ExpectedRevision int64 `json:"expected_revision"`
+
+	// PackageSha256 A registered package of the same plugin.
+	PackageSha256 string `json:"package_sha256"`
+	Reason        string `json:"reason"`
 }
 
 // PluginInventory defines model for PluginInventory.
@@ -3333,7 +3417,7 @@ type PluginPackagePage struct {
 type PluginPackagePush struct {
 	ExpectedRevision int64 `json:"expected_revision"`
 
-	// Manifest The registration manifest of the package (identity, operations, UI contribution, service grants, authorization policies, entitlement declaration). Unknown fields are rejected.
+	// Manifest The registration manifest of the package (identity, migration generation, operations, UI contribution, service grants, authorization policies, entitlement declaration). Unknown fields are rejected. migration_generation is the plugin-owned schema generation the package runs on, 0 or absent while the plugin owns no schema.
 	Manifest json.RawMessage `json:"manifest"`
 
 	// ManifestSha256 SHA-256 of the package manifest the plugin runtime verifies.
@@ -3391,6 +3475,26 @@ type PluginResourceEvent struct {
 	Type              string              `json:"type"`
 	VersionUuid       *openapi_types.UUID `json:"version_uuid,omitempty"`
 }
+
+// PluginStatusObservation What Core last read from the running plugin's status endpoint, on activation. Either the report or a failure with its detail.
+type PluginStatusObservation struct {
+	// Detail The cause of a failure.
+	Detail  *string                         `json:"detail,omitempty"`
+	Failure *PluginStatusObservationFailure `json:"failure,omitempty"`
+
+	// InstallationId The installation UUID the plugin reported.
+	InstallationId *openapi_types.UUID `json:"installation_id,omitempty"`
+
+	// MigrationGeneration The migration generation applied in the plugin database.
+	MigrationGeneration *int64    `json:"migration_generation,omitempty"`
+	ObservedAt          time.Time `json:"observed_at"`
+
+	// PackageSha256 The package digest the plugin reported.
+	PackageSha256 *string `json:"package_sha256,omitempty"`
+}
+
+// PluginStatusObservationFailure defines model for PluginStatusObservation.Failure.
+type PluginStatusObservationFailure string
 
 // Project A project.
 type Project struct {
@@ -4371,6 +4475,12 @@ type CreatePluginInstallationParams struct {
 	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
 }
 
+// PurgePluginInstallationParams defines parameters for PurgePluginInstallation.
+type PurgePluginInstallationParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
 // TransitionPluginInstallationParams defines parameters for TransitionPluginInstallation.
 type TransitionPluginInstallationParams struct {
 	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
@@ -4394,6 +4504,12 @@ type RemovePluginEnablementParams struct {
 
 // PutPluginEnablementParams defines parameters for PutPluginEnablement.
 type PutPluginEnablementParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// UpgradePluginInstallationParams defines parameters for UpgradePluginInstallation.
+type UpgradePluginInstallationParams struct {
 	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
 	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
 }
@@ -4578,6 +4694,9 @@ type ImportPluginEntitlementBundleJSONRequestBody = PluginEntitlementBundleImpor
 // CreatePluginInstallationJSONRequestBody defines body for CreatePluginInstallation for application/json ContentType.
 type CreatePluginInstallationJSONRequestBody = PluginInstallationCreate
 
+// PurgePluginInstallationJSONRequestBody defines body for PurgePluginInstallation for application/json ContentType.
+type PurgePluginInstallationJSONRequestBody = PluginManagerCommand
+
 // TransitionPluginInstallationJSONRequestBody defines body for TransitionPluginInstallation for application/json ContentType.
 type TransitionPluginInstallationJSONRequestBody = PluginManagerCommand
 
@@ -4589,6 +4708,9 @@ type RemovePluginEnablementJSONRequestBody = PluginManagerCommand
 
 // PutPluginEnablementJSONRequestBody defines body for PutPluginEnablement for application/json ContentType.
 type PutPluginEnablementJSONRequestBody = PluginEnablementPut
+
+// UpgradePluginInstallationJSONRequestBody defines body for UpgradePluginInstallation for application/json ContentType.
+type UpgradePluginInstallationJSONRequestBody = PluginInstallationUpgrade
 
 // PushPluginPackageJSONRequestBody defines body for PushPluginPackage for application/json ContentType.
 type PushPluginPackageJSONRequestBody = PluginPackagePush
@@ -5658,6 +5780,11 @@ type ClientInterface interface {
 
 	CreatePluginInstallation(ctx context.Context, params *CreatePluginInstallationParams, body CreatePluginInstallationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// PurgePluginInstallationWithBody request with any body
+	PurgePluginInstallationWithBody(ctx context.Context, installationId InstallationIdPathParam, params *PurgePluginInstallationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PurgePluginInstallation(ctx context.Context, installationId InstallationIdPathParam, params *PurgePluginInstallationParams, body PurgePluginInstallationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetPluginInstallation request
 	GetPluginInstallation(ctx context.Context, installationId InstallationIdPathParam, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -5680,6 +5807,11 @@ type ClientInterface interface {
 	PutPluginEnablementWithBody(ctx context.Context, installationId InstallationIdPathParam, orgId OrgIdPathParam, params *PutPluginEnablementParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	PutPluginEnablement(ctx context.Context, installationId InstallationIdPathParam, orgId OrgIdPathParam, params *PutPluginEnablementParams, body PutPluginEnablementJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpgradePluginInstallationWithBody request with any body
+	UpgradePluginInstallationWithBody(ctx context.Context, installationId InstallationIdPathParam, params *UpgradePluginInstallationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpgradePluginInstallation(ctx context.Context, installationId InstallationIdPathParam, params *UpgradePluginInstallationParams, body UpgradePluginInstallationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListPluginPackages request
 	ListPluginPackages(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -7862,6 +7994,30 @@ func (c *Client) CreatePluginInstallation(ctx context.Context, params *CreatePlu
 	return c.Client.Do(req)
 }
 
+func (c *Client) PurgePluginInstallationWithBody(ctx context.Context, installationId InstallationIdPathParam, params *PurgePluginInstallationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPurgePluginInstallationRequestWithBody(c.Server, installationId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PurgePluginInstallation(ctx context.Context, installationId InstallationIdPathParam, params *PurgePluginInstallationParams, body PurgePluginInstallationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPurgePluginInstallationRequest(c.Server, installationId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) GetPluginInstallation(ctx context.Context, installationId InstallationIdPathParam, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPluginInstallationRequest(c.Server, installationId)
 	if err != nil {
@@ -7960,6 +8116,30 @@ func (c *Client) PutPluginEnablementWithBody(ctx context.Context, installationId
 
 func (c *Client) PutPluginEnablement(ctx context.Context, installationId InstallationIdPathParam, orgId OrgIdPathParam, params *PutPluginEnablementParams, body PutPluginEnablementJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPutPluginEnablementRequest(c.Server, installationId, orgId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpgradePluginInstallationWithBody(ctx context.Context, installationId InstallationIdPathParam, params *UpgradePluginInstallationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpgradePluginInstallationRequestWithBody(c.Server, installationId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpgradePluginInstallation(ctx context.Context, installationId InstallationIdPathParam, params *UpgradePluginInstallationParams, body UpgradePluginInstallationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpgradePluginInstallationRequest(c.Server, installationId, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -15241,6 +15421,66 @@ func NewCreatePluginInstallationRequestWithBody(server string, params *CreatePlu
 	return req, nil
 }
 
+// NewPurgePluginInstallationRequest calls the generic PurgePluginInstallation builder with application/json body
+func NewPurgePluginInstallationRequest(server string, installationId InstallationIdPathParam, params *PurgePluginInstallationParams, body PurgePluginInstallationJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPurgePluginInstallationRequestWithBody(server, installationId, params, "application/json", bodyReader)
+}
+
+// NewPurgePluginInstallationRequestWithBody generates requests for PurgePluginInstallation with any type of body
+func NewPurgePluginInstallationRequestWithBody(server string, installationId InstallationIdPathParam, params *PurgePluginInstallationParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "installationId", installationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/plugin-installations/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Idempotency-Key", headerParam0)
+
+	}
+
+	return req, nil
+}
+
 // NewGetPluginInstallationRequest generates requests for GetPluginInstallation
 func NewGetPluginInstallationRequest(server string, installationId InstallationIdPathParam) (*http.Request, error) {
 	var err error
@@ -15514,6 +15754,66 @@ func NewPutPluginEnablementRequestWithBody(server string, installationId Install
 	}
 
 	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Idempotency-Key", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewUpgradePluginInstallationRequest calls the generic UpgradePluginInstallation builder with application/json body
+func NewUpgradePluginInstallationRequest(server string, installationId InstallationIdPathParam, params *UpgradePluginInstallationParams, body UpgradePluginInstallationJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpgradePluginInstallationRequestWithBody(server, installationId, params, "application/json", bodyReader)
+}
+
+// NewUpgradePluginInstallationRequestWithBody generates requests for UpgradePluginInstallation with any type of body
+func NewUpgradePluginInstallationRequestWithBody(server string, installationId InstallationIdPathParam, params *UpgradePluginInstallationParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "installationId", installationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/plugin-installations/%s/upgrade", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -16144,6 +16444,11 @@ type ClientWithResponsesInterface interface {
 
 	CreatePluginInstallationWithResponse(ctx context.Context, params *CreatePluginInstallationParams, body CreatePluginInstallationJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePluginInstallationResponse, error)
 
+	// PurgePluginInstallationWithBodyWithResponse request with any body
+	PurgePluginInstallationWithBodyWithResponse(ctx context.Context, installationId InstallationIdPathParam, params *PurgePluginInstallationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PurgePluginInstallationResponse, error)
+
+	PurgePluginInstallationWithResponse(ctx context.Context, installationId InstallationIdPathParam, params *PurgePluginInstallationParams, body PurgePluginInstallationJSONRequestBody, reqEditors ...RequestEditorFn) (*PurgePluginInstallationResponse, error)
+
 	// GetPluginInstallationWithResponse request
 	GetPluginInstallationWithResponse(ctx context.Context, installationId InstallationIdPathParam, reqEditors ...RequestEditorFn) (*GetPluginInstallationResponse, error)
 
@@ -16166,6 +16471,11 @@ type ClientWithResponsesInterface interface {
 	PutPluginEnablementWithBodyWithResponse(ctx context.Context, installationId InstallationIdPathParam, orgId OrgIdPathParam, params *PutPluginEnablementParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutPluginEnablementResponse, error)
 
 	PutPluginEnablementWithResponse(ctx context.Context, installationId InstallationIdPathParam, orgId OrgIdPathParam, params *PutPluginEnablementParams, body PutPluginEnablementJSONRequestBody, reqEditors ...RequestEditorFn) (*PutPluginEnablementResponse, error)
+
+	// UpgradePluginInstallationWithBodyWithResponse request with any body
+	UpgradePluginInstallationWithBodyWithResponse(ctx context.Context, installationId InstallationIdPathParam, params *UpgradePluginInstallationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpgradePluginInstallationResponse, error)
+
+	UpgradePluginInstallationWithResponse(ctx context.Context, installationId InstallationIdPathParam, params *UpgradePluginInstallationParams, body UpgradePluginInstallationJSONRequestBody, reqEditors ...RequestEditorFn) (*UpgradePluginInstallationResponse, error)
 
 	// ListPluginPackagesWithResponse request
 	ListPluginPackagesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListPluginPackagesResponse, error)
@@ -19184,6 +19494,32 @@ func (r CreatePluginInstallationResponse) StatusCode() int {
 	return 0
 }
 
+type PurgePluginInstallationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *PluginInstallation
+	JSON400      *N400BadRequest
+	JSON403      *N403Forbidden
+	JSON404      *N404NotFound
+	JSON409      *N409Conflict
+}
+
+// Status returns HTTPResponse.Status
+func (r PurgePluginInstallationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PurgePluginInstallationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type GetPluginInstallationResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -19306,6 +19642,32 @@ func (r PutPluginEnablementResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r PutPluginEnablementResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpgradePluginInstallationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *PluginInstallation
+	JSON400      *N400BadRequest
+	JSON403      *N403Forbidden
+	JSON404      *N404NotFound
+	JSON409      *N409Conflict
+}
+
+// Status returns HTTPResponse.Status
+func (r UpgradePluginInstallationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpgradePluginInstallationResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -20933,6 +21295,23 @@ func (c *ClientWithResponses) CreatePluginInstallationWithResponse(ctx context.C
 	return ParseCreatePluginInstallationResponse(rsp)
 }
 
+// PurgePluginInstallationWithBodyWithResponse request with arbitrary body returning *PurgePluginInstallationResponse
+func (c *ClientWithResponses) PurgePluginInstallationWithBodyWithResponse(ctx context.Context, installationId InstallationIdPathParam, params *PurgePluginInstallationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PurgePluginInstallationResponse, error) {
+	rsp, err := c.PurgePluginInstallationWithBody(ctx, installationId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePurgePluginInstallationResponse(rsp)
+}
+
+func (c *ClientWithResponses) PurgePluginInstallationWithResponse(ctx context.Context, installationId InstallationIdPathParam, params *PurgePluginInstallationParams, body PurgePluginInstallationJSONRequestBody, reqEditors ...RequestEditorFn) (*PurgePluginInstallationResponse, error) {
+	rsp, err := c.PurgePluginInstallation(ctx, installationId, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePurgePluginInstallationResponse(rsp)
+}
+
 // GetPluginInstallationWithResponse request returning *GetPluginInstallationResponse
 func (c *ClientWithResponses) GetPluginInstallationWithResponse(ctx context.Context, installationId InstallationIdPathParam, reqEditors ...RequestEditorFn) (*GetPluginInstallationResponse, error) {
 	rsp, err := c.GetPluginInstallation(ctx, installationId, reqEditors...)
@@ -21008,6 +21387,23 @@ func (c *ClientWithResponses) PutPluginEnablementWithResponse(ctx context.Contex
 		return nil, err
 	}
 	return ParsePutPluginEnablementResponse(rsp)
+}
+
+// UpgradePluginInstallationWithBodyWithResponse request with arbitrary body returning *UpgradePluginInstallationResponse
+func (c *ClientWithResponses) UpgradePluginInstallationWithBodyWithResponse(ctx context.Context, installationId InstallationIdPathParam, params *UpgradePluginInstallationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpgradePluginInstallationResponse, error) {
+	rsp, err := c.UpgradePluginInstallationWithBody(ctx, installationId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpgradePluginInstallationResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpgradePluginInstallationWithResponse(ctx context.Context, installationId InstallationIdPathParam, params *UpgradePluginInstallationParams, body UpgradePluginInstallationJSONRequestBody, reqEditors ...RequestEditorFn) (*UpgradePluginInstallationResponse, error) {
+	rsp, err := c.UpgradePluginInstallation(ctx, installationId, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpgradePluginInstallationResponse(rsp)
 }
 
 // ListPluginPackagesWithResponse request returning *ListPluginPackagesResponse
@@ -26324,6 +26720,60 @@ func ParseCreatePluginInstallationResponse(rsp *http.Response) (*CreatePluginIns
 	return response, nil
 }
 
+// ParsePurgePluginInstallationResponse parses an HTTP response from a PurgePluginInstallationWithResponse call
+func ParsePurgePluginInstallationResponse(rsp *http.Response) (*PurgePluginInstallationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PurgePluginInstallationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PluginInstallation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest N400BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest N403Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest N404NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest N409Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetPluginInstallationResponse parses an HTTP response from a GetPluginInstallationWithResponse call
 func ParseGetPluginInstallationResponse(rsp *http.Response) (*GetPluginInstallationResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -26535,6 +26985,60 @@ func ParsePutPluginEnablementResponse(rsp *http.Response) (*PutPluginEnablementR
 	}
 
 	response := &PutPluginEnablementResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PluginInstallation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest N400BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest N403Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest N404NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest N409Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpgradePluginInstallationResponse parses an HTTP response from a UpgradePluginInstallationWithResponse call
+func ParseUpgradePluginInstallationResponse(rsp *http.Response) (*UpgradePluginInstallationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpgradePluginInstallationResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
