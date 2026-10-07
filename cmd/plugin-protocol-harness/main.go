@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -13,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -20,6 +23,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
+	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 )
 
 const (
@@ -42,13 +46,15 @@ type invocationResponse struct {
 }
 
 func main() {
-	var installations, signingKey, issuer string
+	var manifestPath, backend, uiOrigin, signingKey, issuer string
 	var cfg config
 	flag.StringVar(&cfg.ListenAddress, "listen", "127.0.0.1:18093", "loopback listen address")
 	flag.StringVar(&cfg.BrowserOrigin, "browser-origin", "", "exact browser origin permitted by CORS")
 	flag.StringVar(&cfg.OrgID, "org", "", "single local harness organization")
 	flag.StringVar(&cfg.ActorID, "actor", "", "single local harness actor UUID")
-	flag.StringVar(&installations, "installations", "", "absolute plugin installation JSON path")
+	flag.StringVar(&manifestPath, "manifest", "", "absolute plugin registration manifest JSON path")
+	flag.StringVar(&backend, "backend", "", "plugin backend origin")
+	flag.StringVar(&uiOrigin, "ui-origin", "", "plugin UI origin, when the manifest contributes a UI")
 	flag.StringVar(&signingKey, "signing-key", "", "absolute PKCS8 Ed25519 private key path")
 	flag.StringVar(&issuer, "issuer", "cp-local-protocol-harness", "plugin context issuer")
 	flag.Parse()
@@ -56,10 +62,19 @@ func main() {
 	if err := validateConfig(cfg); err != nil {
 		log.Fatal(err)
 	}
-	gateway, err := plugins.LoadGateway(installations, signingKey, issuer, true)
+	manifest, err := readManifest(manifestPath)
 	if err != nil {
 		log.Fatal(err)
 	}
+	registry, err := harnessRegistry(cfg.OrgID, manifest, backend, uiOrigin)
+	if err != nil {
+		log.Fatal(err)
+	}
+	key, err := plugins.LoadSigningKey(signingKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+	gateway := &plugins.Gateway{Registry: registry, SigningKey: key, Issuer: issuer}
 	handler, err := newHandler(cfg, gateway)
 	if err != nil {
 		log.Fatal(err)
@@ -81,6 +96,46 @@ func main() {
 			log.Fatal(err)
 		}
 	}
+}
+
+func readManifest(path string) ([]byte, error) {
+	if !filepath.IsAbs(path) {
+		return nil, fmt.Errorf("the plugin manifest requires an absolute path")
+	}
+	file, err := os.OpenInRoot(filepath.Dir(path), filepath.Base(path))
+	if err != nil {
+		return nil, fmt.Errorf("open plugin manifest: %w", err)
+	}
+	defer func() { _ = file.Close() }()
+	return io.ReadAll(io.LimitReader(file, plugins.MaxManifestBytes+1))
+}
+
+// harnessRegistry serves one plugin, built from its registration manifest,
+// as available to the single harness organization. The harness serves no
+// plugin service routes, so a package with service grants gets synthetic
+// service identities that never authenticate anywhere. A licensed plugin has
+// no verifier here and fails closed.
+func harnessRegistry(org string, raw []byte, backend, uiOrigin string) (*plugins.InstallationRegistry, error) {
+	manifest, err := plugins.DecodeManifest(raw)
+	if err != nil {
+		return nil, err
+	}
+	digest := sha256.Sum256(raw)
+	item := plugins.Installation{
+		InstallationID: uuid.NewString(), ManifestSHA256: hex.EncodeToString(digest[:]), Entitlement: manifest.Entitlement,
+		ID: manifest.ID, DisplayName: manifest.DisplayName, Version: manifest.Version, Backend: backend,
+		Organizations: map[string]plugins.AvailabilityState{org: plugins.StateAvailable},
+		Capabilities:  manifest.Capabilities, Operations: manifest.Operations, ServiceGrants: manifest.ServiceGrants, AuthorizationPolicies: manifest.AuthorizationPolicies,
+	}
+	if manifest.UI != nil {
+		ui := *manifest.UI
+		ui.Origin = uiOrigin
+		item.UI = &ui
+	}
+	if len(manifest.ServiceGrants) > 0 {
+		item.ServiceUserID, item.AdmissionCheckerID = userid.NewServiceUserTokenId().String(), userid.NewServiceUserTokenId().String()
+	}
+	return plugins.NewInstallationRegistry([]plugins.Installation{item}, true)
 }
 
 func validateConfig(cfg config) error {

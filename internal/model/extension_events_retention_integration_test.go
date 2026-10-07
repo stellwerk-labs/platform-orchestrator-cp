@@ -61,17 +61,16 @@ func TestExtensionResourceRetentionNeverPassesAnActiveConsumer(t *testing.T) {
 	command := externalGrantFixture(t, db)
 	resetExtensionEventFixtures(t, db)
 	first := journalConsumer(t, db, command, "consumer-first", "e")
-	subscribers := func(string) []string { return []string{first.PluginID} }
 	journalEnvironmentEvents(t, db, first, 6)
 	ageJournal(t, db, first.OrgID, 5)
 
-	pruned, err := PruneExtensionResourceJournal(t.Context(), db, subscribers, testRetention, time.Now())
+	pruned, err := PruneExtensionResourceJournal(t.Context(), db, testRetention, time.Now())
 	require.NoError(t, err)
 	require.Zero(t, pruned, "a consumer without an acknowledgement holds all history")
 
 	_, _, err = ReadExtensionResourceEvents(t.Context(), db, *first, ref.Ref(int64(4)), 10)
 	require.NoError(t, err)
-	pruned, err = PruneExtensionResourceJournal(t.Context(), db, subscribers, testRetention, time.Now())
+	pruned, err = PruneExtensionResourceJournal(t.Context(), db, testRetention, time.Now())
 	require.NoError(t, err)
 	require.Equal(t, int64(3), pruned)
 	require.Equal(t, []int64{4, 5, 6}, journalCursors(t, db, first.OrgID), "the acknowledged cursor itself is retained")
@@ -79,7 +78,7 @@ func TestExtensionResourceRetentionNeverPassesAnActiveConsumer(t *testing.T) {
 
 	_, _, err = ReadExtensionResourceEvents(t.Context(), db, *first, ref.Ref(int64(6)), 10)
 	require.NoError(t, err)
-	pruned, err = PruneExtensionResourceJournal(t.Context(), db, subscribers, testRetention, time.Now())
+	pruned, err = PruneExtensionResourceJournal(t.Context(), db, testRetention, time.Now())
 	require.NoError(t, err)
 	require.Equal(t, int64(2), pruned)
 	require.Equal(t, []int64{6}, journalCursors(t, db, first.OrgID), "entries younger than the window are retained")
@@ -100,14 +99,14 @@ func TestExtensionResourceRetentionNeverPassesAnActiveConsumer(t *testing.T) {
 	ageJournal(t, db, first.OrgID, 9)
 	_, _, err = ReadExtensionResourceEvents(t.Context(), db, *first, ref.Ref(int64(9)), 10)
 	require.NoError(t, err)
-	pruned, err = PruneExtensionResourceJournal(t.Context(), db, subscribers, testRetention, time.Now())
+	pruned, err = PruneExtensionResourceJournal(t.Context(), db, testRetention, time.Now())
 	require.NoError(t, err)
 	require.Zero(t, pruned, "the lowest acknowledgement across consumers bounds retention")
 	_, secondCursor, err := ReadExtensionResourceEvents(t.Context(), db, *second, nil, 10)
 	require.NoError(t, err)
 	_, _, err = ReadExtensionResourceEvents(t.Context(), db, *second, &secondCursor, 10)
 	require.NoError(t, err)
-	pruned, err = PruneExtensionResourceJournal(t.Context(), db, subscribers, testRetention, time.Now())
+	pruned, err = PruneExtensionResourceJournal(t.Context(), db, testRetention, time.Now())
 	require.NoError(t, err)
 	require.Equal(t, int64(3), pruned)
 	require.Equal(t, []int64{9}, journalCursors(t, db, first.OrgID))
@@ -118,14 +117,17 @@ func TestExtensionResourceRetentionHonoursReleaseWindowAndUninstall(t *testing.T
 	command := externalGrantFixture(t, db)
 	resetExtensionEventFixtures(t, db)
 	consumer := journalConsumer(t, db, command, "consumer", "e")
-	installed := func(string) []string { return []string{consumer.PluginID} }
-	uninstalled := func(string) []string { return []string{} }
 	journalEnvironmentEvents(t, db, consumer, 2)
 	ageJournal(t, db, consumer.OrgID, 2)
 
-	pruned, err := PruneExtensionResourceJournal(t.Context(), db, uninstalled, testRetention, time.Now())
+	// Another subscriber keeps the journal running while the consumer's
+	// plugin is not enabled for the organization.
+	subscribeToResourceEvents(t, db, consumer.OrgID, "dev.example.keeper")
+	unsubscribeFromResourceEvents(t, db, consumer.OrgID, consumer.PluginID)
+	pruned, err := PruneExtensionResourceJournal(t.Context(), db, testRetention, time.Now())
 	require.NoError(t, err)
 	require.Equal(t, int64(2), pruned, "operations of a plugin that is no longer installed are not consumers")
+	subscribeToResourceEvents(t, db, consumer.OrgID, consumer.PluginID)
 
 	journalEnvironmentEvents(t, db, consumer, 2)
 	ageJournal(t, db, consumer.OrgID, 4)
@@ -136,11 +138,11 @@ func TestExtensionResourceRetentionHonoursReleaseWindowAndUninstall(t *testing.T
 		require.NoError(t, err)
 	}
 	release("now()")
-	pruned, err = PruneExtensionResourceJournal(t.Context(), db, installed, testRetention, time.Now())
+	pruned, err = PruneExtensionResourceJournal(t.Context(), db, testRetention, time.Now())
 	require.NoError(t, err)
 	require.Zero(t, pruned, "a recently released operation keeps reconciling for one retention window")
 	release("now()-interval '40 days'")
-	pruned, err = PruneExtensionResourceJournal(t.Context(), db, installed, testRetention, time.Now())
+	pruned, err = PruneExtensionResourceJournal(t.Context(), db, testRetention, time.Now())
 	require.NoError(t, err)
 	require.Equal(t, int64(2), pruned)
 	require.Empty(t, journalCursors(t, db, consumer.OrgID))
@@ -152,23 +154,24 @@ func TestExtensionResourceRetentionIsBatchedAndSkipsLockedOrganizations(t *testi
 	command := externalGrantFixture(t, db)
 	resetExtensionEventFixtures(t, db)
 	consumer := journalConsumer(t, db, command, "consumer", "e")
-	uninstalled := func(string) []string { return []string{} }
 	journalEnvironmentEvents(t, db, consumer, 5)
 	ageJournal(t, db, consumer.OrgID, 5)
+	subscribeToResourceEvents(t, db, consumer.OrgID, "dev.example.keeper")
+	unsubscribeFromResourceEvents(t, db, consumer.OrgID, consumer.PluginID)
 
 	// Another replica holding the organization's retention lock wins.
 	holder, err := db.(*databaser).DB.BeginTx(t.Context(), nil)
 	require.NoError(t, err)
 	_, err = holder.ExecContext(t.Context(), `SELECT pg_advisory_xact_lock(hashtextextended($1, 4))`, "extension-resource-retention:"+consumer.OrgID)
 	require.NoError(t, err)
-	pruned, err := PruneExtensionResourceJournal(t.Context(), db, uninstalled, testRetention, time.Now())
+	pruned, err := PruneExtensionResourceJournal(t.Context(), db, testRetention, time.Now())
 	require.NoError(t, err)
 	require.Zero(t, pruned)
 	require.NoError(t, holder.Rollback())
 
 	batched := ExtensionResourceRetention{Window: testRetention.Window, Batch: 2}
 	for _, expected := range [][]int64{{3, 4, 5}, {5}, {}} {
-		_, err = PruneExtensionResourceJournal(t.Context(), db, uninstalled, batched, time.Now())
+		_, err = PruneExtensionResourceJournal(t.Context(), db, batched, time.Now())
 		require.NoError(t, err)
 		require.Equal(t, expected, journalCursors(t, db, consumer.OrgID))
 	}
@@ -182,8 +185,11 @@ func TestExtensionResourceRetentionMigrationRefusesDowngradeAfterPruning(t *test
 	consumer := journalConsumer(t, db, command, "consumer", "e")
 	journalEnvironmentEvents(t, db, consumer, 1)
 	ageJournal(t, db, consumer.OrgID, 1)
-	_, err := PruneExtensionResourceJournal(t.Context(), db, func(string) []string { return []string{} }, testRetention, time.Now())
+	subscribeToResourceEvents(t, db, consumer.OrgID, "dev.example.keeper")
+	unsubscribeFromResourceEvents(t, db, consumer.OrgID, consumer.PluginID)
+	_, err := PruneExtensionResourceJournal(t.Context(), db, testRetention, time.Now())
 	require.NoError(t, err)
+	require.Equal(t, int64(1), prunedThrough(t, db, consumer.OrgID))
 	provider := extensionMigrationProvider(t, db)
 	_, err = provider.DownTo(t.Context(), 38)
 	require.ErrorContains(t, err, "cannot remove extension event retention evidence after pruning")

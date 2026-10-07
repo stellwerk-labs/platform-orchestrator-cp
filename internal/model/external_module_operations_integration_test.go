@@ -18,13 +18,9 @@ import (
 	"go.uber.org/zap"
 )
 
-// journalEveryOrganization stands in for a registry in which every test
-// organization has an installed resource event subscriber.
-func journalEveryOrganization(string) bool { return true }
-
 func externalOperationDatabase(t *testing.T) Databaser {
 	t.Helper()
-	return externalOperationDatabaseWith(t, WithExtensionResourceJournal(journalEveryOrganization))
+	return externalOperationDatabaseWith(t, WithExtensionResourceJournal())
 }
 
 func externalOperationDatabaseWith(t *testing.T, options ...DatabaserOption) Databaser {
@@ -58,6 +54,7 @@ func externalOperationModulesWithTarget(t *testing.T, db Databaser, actor uuid.U
 	org := "plugin-test-" + uuid.NewString()
 	_, err := db.CreateOrg(ctx, nil, &Org{Id: org, CreatedBy: actor, CreatedAt: time.Now(), Source: OrgSourceInternal, Plan: OrgPlanCustom})
 	require.NoError(t, err)
+	journalFixtureOrganization(t, db, org)
 	_, err = db.CreateResourceType(ctx, nil, &ResourceType{OrgId: opt.Of(org), Id: "generic", OutputsSchema: map[string]any{"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string"}}}})
 	require.NoError(t, err)
 	targets := []ExternalModuleTarget{}

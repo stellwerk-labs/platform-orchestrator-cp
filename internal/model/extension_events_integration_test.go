@@ -51,6 +51,7 @@ func resetExtensionEventFixtures(t *testing.T, db Databaser) {
 	t.Helper()
 	_, err := db.(*databaser).ExecContext(t.Context(), `TRUNCATE extension_resource_events, extension_resource_event_heads, extension_resource_event_consumers, extension_resource_event_retention, extension_resource_event_journal_state, extension_published_events, pending_event_messages`)
 	require.NoError(t, err)
+	require.NoError(t, ReconcileExtensionResourceJournal(t.Context(), db, true), "subscribed organizations journal again")
 }
 
 func extensionMigrationProvider(t *testing.T, db Databaser) *goose.Provider {
@@ -162,7 +163,7 @@ func TestExtensionResourceJournalScopesPaginationReplayAndReconnect(t *testing.T
 
 	var schema string
 	require.NoError(t, db.(*databaser).DB.QueryRowContext(t.Context(), `SELECT current_schema()`).Scan(&schema))
-	reconnected, err := NewDatabaser(t.Context(), zap.NewNop(), pgtest.WithSearchPath(os.Getenv("PLUGIN_TEST_DATABASE_URL"), schema), WithExtensionResourceJournal(journalEveryOrganization))
+	reconnected, err := NewDatabaser(t.Context(), zap.NewNop(), pgtest.WithSearchPath(os.Getenv("PLUGIN_TEST_DATABASE_URL"), schema), WithExtensionResourceJournal())
 	require.NoError(t, err)
 	defer func() { require.NoError(t, reconnected.Close()) }()
 	afterReconnect, reconnectCursor, err := ReadExtensionResourceEvents(t.Context(), reconnected, *grant, &next, 2)
@@ -223,13 +224,16 @@ func TestExtensionResourceJournalRejectsRawTransactionsAndRollsBackFlushFailures
 	require.ErrorContains(t, err, "require a Databaser transaction")
 	require.NoError(t, rawTx.Rollback())
 
+	// Occupy the cursor the next journal entry takes, so the flush fails.
+	_, err = db.(*databaser).ExecContext(t.Context(), `INSERT INTO extension_resource_events (org_id,cursor,event_id,event) VALUES ($1,1,$2,'{}')`, command.OrgID, uuid.New())
+	require.NoError(t, err)
 	tx, err := db.BeginTx(t.Context(), nil)
 	require.NoError(t, err)
 	_, err = db.InsertPendingEventMessages(t.Context(), tx, []*hstandardoutbox.PendingEventMessage{
-		extensionEventMessage(t, genevents.IoPlatformOrchestratorModuleVersionPublished, "missing-org", "flush-failure", nil, &moduleID),
+		extensionEventMessage(t, genevents.IoPlatformOrchestratorModuleVersionPublished, command.OrgID, "flush-failure", nil, &moduleID),
 	})
 	require.NoError(t, err, "the outbox write and immutable projection are prepared before commit")
-	require.Error(t, tx.Commit(), "the journal foreign key must fail closed for an unknown organization")
+	require.Error(t, tx.Commit(), "a failing journal write must fail the commit closed")
 	var outboxRows int
 	require.NoError(t, db.(*databaser).DB.QueryRowContext(t.Context(), `SELECT count(*) FROM pending_event_messages WHERE payload::text LIKE '%flush-failure%'`).Scan(&outboxRows))
 	require.Zero(t, outboxRows, "a failed projection flush must roll back its transactional outbox write")
@@ -300,6 +304,7 @@ func TestExtensionResourceJournalSortsOrganizationHeadLocks(t *testing.T) {
 	for _, orgID := range []string{"journal-lock-a", "journal-lock-b"} {
 		_, err := db.CreateOrg(t.Context(), nil, &Org{Id: orgID, CreatedBy: actor, CreatedAt: time.Now(), Source: OrgSourceInternal, Plan: OrgPlanCustom})
 		require.NoError(t, err)
+		subscribeToResourceEvents(t, db, orgID, "dev.example."+orgID)
 	}
 	moduleID := uuid.New()
 	firstTx, err := db.BeginTx(t.Context(), nil)

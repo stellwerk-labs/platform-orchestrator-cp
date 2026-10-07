@@ -16,6 +16,7 @@ import (
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/api/middleware"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginmanager"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/token"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/vault"
@@ -34,6 +35,8 @@ type Server struct {
 	PluginGateway      *plugins.Gateway
 	PluginDataPlane    *plugins.DataPlanePort
 	PluginEntitlements PluginEntitlementGuard
+	// PluginManager is nil while the plugin host is disabled.
+	PluginManager *pluginmanager.Manager
 	// PluginJournalRetention is how long released operations still reconcile.
 	PluginJournalRetention        time.Duration
 	DeploymentAdmissionIdentities map[string]uuid.UUID

@@ -35,6 +35,9 @@ func pluginModelError(err error) error {
 		if conflict.Code == model.EnvironmentBusy {
 			return pluginBoundaryError(409, model.EnvironmentBusy, "The Environment has an unresolved Deployment admission or dispatch; retry later.")
 		}
+		if conflict.Code == pluginNotInstalled || conflict.Code == pluginNotEnabled {
+			return pluginBoundaryError(409, conflict.Code, conflict.Message)
+		}
 		return pluginBoundaryError(409, "plugin_operation_conflict", "The operation changed or its exact request identity was already used.")
 	}
 	return err
@@ -48,7 +51,7 @@ func (s *Server) pluginInstallationCaller(ctx context.Context, org, plugin strin
 	if err != nil {
 		return item, descriptor, err
 	}
-	if item.Entitlement != nil && item.Entitlement.Mode == "required" && descriptor.Mode == plugins.ModeHidden {
+	if item.Licensed() && descriptor.Mode == plugins.ModeHidden {
 		return plugins.Installation{}, plugins.Descriptor{}, pluginFeatureAllowed(descriptor, "", false, false)
 	}
 	return item, descriptor, nil

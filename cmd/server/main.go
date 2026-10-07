@@ -36,6 +36,7 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/events"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginentitlements"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginmanager"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/vault"
@@ -125,20 +126,15 @@ func main() {
 	dbConnStr := fmt.Sprintf(
 		"dbname=%s user=%s password=%s host=%s port=%s connect_timeout=5 sslmode=disable",
 		cfg.DatabaseName, cfg.DatabaseUser, cfg.DatabasePassword, cfg.DatabaseHost, cfg.DatabasePort)
-	// The installation registry is loaded first: its event subscriptions decide
-	// whether Core keeps the extension resource journal at all.
-	var gateway *plugins.Gateway
+	// Only a plugin host keeps the extension resource journal. Which
+	// organizations it journals is Plugin Manager state in the database.
 	var dbOptions []model.DatabaserOption
 	retention := model.ExtensionResourceRetention{Window: cfg.PluginEventJournalRetention, Batch: journalRetentionBatch}
 	if cfg.PluginHostEnabled {
-		gateway, err = plugins.LoadGateway(cfg.PluginInstallationsFile, cfg.PluginSigningKeyFile, cfg.PluginIssuer, cfg.PluginDevelopmentHTTP)
-		if err != nil {
-			zap.L().Fatal("Failed to initialize plugin gateway", zap.Error(err))
-		}
 		if err := retention.Validate(); err != nil {
 			zap.L().Fatal("Invalid plugin event journal retention", zap.Error(err))
 		}
-		dbOptions = append(dbOptions, model.WithExtensionResourceJournal(gateway.Registry.HasResourceEventSubscriber))
+		dbOptions = append(dbOptions, model.WithExtensionResourceJournal())
 	}
 	db, err := model.NewDatabaser(ctx, zap.L(), dbConnStr, dbOptions...)
 	if err != nil {
@@ -146,11 +142,7 @@ func main() {
 	}
 	// Record before serving whether this server journals each organization, so
 	// a subscriber returning after a pause sees the gap.
-	var journalSubscribers func(orgID string) bool
-	if gateway != nil {
-		journalSubscribers = gateway.Registry.HasResourceEventSubscriber
-	}
-	if err := model.ReconcileExtensionResourceJournal(ctx, db, journalSubscribers); err != nil {
+	if err := model.ReconcileExtensionResourceJournal(ctx, db, cfg.PluginHostEnabled); err != nil {
 		zap.L().Fatal("Failed to reconcile the extension resource journal", zap.Error(err))
 	}
 	defer func() {
@@ -227,8 +219,18 @@ func main() {
 			zap.L().Fatal("Invalid Deployment admission service identities", zap.Error(err))
 		}
 	}
+	var gateway *plugins.Gateway
 	var entitlementAdapter *pluginentitlements.Adapter
-	if gateway != nil {
+	if cfg.PluginHostEnabled {
+		signingKey, err := plugins.LoadSigningKey(cfg.PluginSigningKeyFile)
+		if err != nil {
+			zap.L().Fatal("Failed to initialize plugin gateway", zap.Error(err))
+		}
+		registry := &plugins.InstallationRegistry{}
+		gateway = &plugins.Gateway{Registry: registry, SigningKey: signingKey, Issuer: cfg.PluginIssuer}
+		if err := gateway.Validate(); err != nil {
+			zap.L().Fatal("Failed to initialize plugin gateway", zap.Error(err))
+		}
 		var caPEM []byte
 		if cfg.PluginCAFile != "" {
 			caPEM, err = os.ReadFile(cfg.PluginCAFile)
@@ -242,9 +244,9 @@ func main() {
 		}
 		server.PluginGateway = gateway
 		server.PluginJournalRetention = retention.Window
-		server.Plugins = gateway.Registry
+		server.Plugins = registry
 		var diagnostics []pluginentitlements.Diagnostic
-		entitlementAdapter, diagnostics, err = pluginentitlements.New(ctx, db, gateway.Registry.Installations(), entitlements.TrustClass(cfg.PluginEntitlementMode), cfg.PluginEntitlementTrustFile, cfg.PluginEntitlementBundleFile, time.Now)
+		entitlementAdapter, diagnostics, err = pluginentitlements.New(db, entitlements.TrustClass(cfg.PluginEntitlementMode), cfg.PluginEntitlementTrustFile, time.Now)
 		if err != nil {
 			zap.L().Fatal("Failed to initialize offline plugin entitlements", zap.Error(err))
 		}
@@ -253,8 +255,19 @@ func main() {
 		for _, diagnostic := range diagnostics {
 			zap.L().Error("Plugin entitlement material was not applied; affected plugins stay unentitled", zap.String("diagnostic", diagnostic.Code), zap.String("detail", diagnostic.Detail))
 		}
-		gateway.Registry.Entitlements = entitlementAdapter
+		registry.Entitlements = entitlementAdapter
 		server.PluginEntitlements = entitlementAdapter
+		server.PluginManager, err = pluginmanager.New(pluginmanager.Config{
+			Database: db, Registry: registry, Entitlements: entitlementAdapter, AllowDevelopmentHTTP: cfg.PluginDevelopmentHTTP,
+			Readers: operatorIDs(cfg.PluginManagerReaders), Writers: operatorIDs(cfg.PluginManagerWriters), Logger: zap.L(),
+		})
+		if err != nil {
+			zap.L().Fatal("Invalid Plugin Manager configuration", zap.Error(err))
+		}
+		// Serve plugins only once this replica holds a snapshot.
+		if err := server.PluginManager.Refresh(ctx); err != nil {
+			zap.L().Fatal("Failed to load the Plugin Manager state", zap.Error(err))
+		}
 		server.PluginDataPlane, err = plugins.NewDataPlanePort(cfg.DataPlaneUrl, gateway, cfg.PluginDevelopmentHTTP || cfg.PluginDataPlaneInternalHTTP)
 		if err != nil {
 			zap.L().Fatal("Failed to initialize the fixed Data Plane plugin port", zap.Error(err))
@@ -286,8 +299,9 @@ func main() {
 	bgCtx, bgCancel := context.WithCancel(ctx)
 	defer bgCancel()
 	if gateway != nil {
+		go server.PluginManager.Run(bgCtx, cfg.PluginManagerRefreshInterval)
 		go runEvery(bgCtx, entitlementSweepInterval, entitlementSweepTimeout, server.Logger, "entitlement boundary sweep", sweepPluginEntitlements(entitlementAdapter))
-		go runEvery(bgCtx, journalRetentionInterval, journalRetentionTimeout, server.Logger, "extension journal retention", pruneExtensionJournal(db, gateway.Registry, retention, server.Logger))
+		go runEvery(bgCtx, journalRetentionInterval, journalRetentionTimeout, server.Logger, "extension journal retention", pruneExtensionJournal(db, retention, server.Logger))
 	}
 	go func() {
 		zap.L().Info("Starting scheduled flush of pending messages")

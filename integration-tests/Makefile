@@ -60,7 +60,7 @@ test-integration-postgres: compose.yaml test-startup
 	PLUGIN_EVENTS_TEST_NATS_URL=nats://127.0.0.1:14222 \
 	PLUGIN_EVENTS_TEST_DISPOSABLE=1 \
 	go test -tags=integration -count=1 -p 1 -timeout 5m \
-	  ../internal/model/... ../internal/api/... ../cmd/plugin-entitlement-dev/... ../internal/events/...
+	  ../internal/model/... ../internal/api/... ../internal/pluginmanager/... ../cmd/plugin-entitlement-dev/... ../internal/events/...
 
 .PHONY: clean
 clean:

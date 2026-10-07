@@ -24,7 +24,9 @@ func TestExtensionEventTypeHasUnambiguousPluginOwnership(t *testing.T) {
 	}
 }
 
-func TestExtensionJournalEntriesOnlyForSubscribedOrganizations(t *testing.T) {
+// Whether an organization journals its entries is its journal state, read
+// when the transaction commits; projection keeps every organization.
+func TestExtensionJournalEntriesProjectEveryOrganization(t *testing.T) {
 	message := func(subject genevents.EventType, org string) *hstandardoutbox.PendingEventMessage {
 		envID := uuid.New()
 		payload, err := json.Marshal(map[string]any{"time": time.Date(2026, 10, 6, 9, 0, 0, 0, time.UTC),
@@ -38,26 +40,19 @@ func TestExtensionJournalEntriesOnlyForSubscribedOrganizations(t *testing.T) {
 		message(genevents.IoPlatformOrchestratorModuleCatalogueChanged, "subscribed"),
 		{Subject: "io.platform-orchestrator.deployment.started", Payload: []byte(`{"data":{"org_id":"subscribed"}}`)},
 	}
-	entries, err := extensionJournalEntries(messages, func(org string) bool { return org == "subscribed" })
+	entries, err := extensionJournalEntries(messages)
 	require.NoError(t, err)
-	require.Len(t, entries, 3, "only journal event types are projected")
-	journaled := map[string]bool{}
+	projected := []string{}
 	for _, entry := range entries {
-		journaled[entry.orgID+" "+entry.event.Type] = entry.journaled
+		projected = append(projected, entry.orgID+" "+entry.event.Type)
 	}
-	require.Equal(t, map[string]bool{
-		"subscribed " + string(genevents.IoPlatformOrchestratorEnvironmentDeleted):     true,
-		"unsubscribed " + string(genevents.IoPlatformOrchestratorEnvironmentDeleted):   false,
-		"subscribed " + string(genevents.IoPlatformOrchestratorModuleCatalogueChanged): true,
-	}, journaled, "an unsubscribed organization is kept only to record its journal pause")
+	require.Equal(t, []string{
+		"subscribed " + string(genevents.IoPlatformOrchestratorEnvironmentDeleted),
+		"unsubscribed " + string(genevents.IoPlatformOrchestratorEnvironmentDeleted),
+		"subscribed " + string(genevents.IoPlatformOrchestratorModuleCatalogueChanged),
+	}, projected, "only journal event types are projected, in order")
 
-	none, err := extensionJournalEntries(messages, func(string) bool { return false })
-	require.NoError(t, err)
-	for _, entry := range none {
-		require.False(t, entry.journaled)
-	}
-
-	_, err = extensionJournalEntries([]*hstandardoutbox.PendingEventMessage{{Subject: string(genevents.IoPlatformOrchestratorEnvironmentDeleted), Payload: []byte(`{"data":{}}`)}}, func(string) bool { return true })
+	_, err = extensionJournalEntries([]*hstandardoutbox.PendingEventMessage{{Subject: string(genevents.IoPlatformOrchestratorEnvironmentDeleted), Payload: []byte(`{"data":{}}`)}})
 	require.Error(t, err, "a journal event without an organization is rejected")
 }
 
@@ -76,12 +71,12 @@ func TestExtensionResourceRetentionPolicyBounds(t *testing.T) {
 }
 
 func TestJournalOrganizationsKeepLockOrderAndEventOrder(t *testing.T) {
-	entry := func(org, reason string, journaled bool) extensionResourceJournalEntry {
-		return extensionResourceJournalEntry{orgID: org, event: ExtensionResourceEvent{Reason: reason}, journaled: journaled}
+	entry := func(org, reason string) extensionResourceJournalEntry {
+		return extensionResourceJournalEntry{orgID: org, event: ExtensionResourceEvent{Reason: reason}}
 	}
 	groups := journalOrganizations([]extensionResourceJournalEntry{
-		entry("zeta", "z1", true), entry("alpha", "a1", true), entry("paused", "p1", false),
-		entry("zeta", "z2", true), entry("alpha", "a2", true), entry("paused", "p2", false),
+		entry("zeta", "z1"), entry("alpha", "a1"), entry("paused", "p1"),
+		entry("zeta", "z2"), entry("alpha", "a2"), entry("paused", "p2"),
 	})
 	require.Len(t, groups, 3)
 	orgs, reasons := []string{}, map[string][]string{}
@@ -92,8 +87,7 @@ func TestJournalOrganizationsKeepLockOrderAndEventOrder(t *testing.T) {
 		}
 	}
 	require.Equal(t, []string{"alpha", "paused", "zeta"}, orgs, "every writer locks organizations in the same order")
-	require.Equal(t, map[string][]string{"alpha": {"a1", "a2"}, "zeta": {"z1", "z2"}}, reasons, "event order is kept and paused entries are not written")
-	require.False(t, groups[1].journaled)
+	require.Equal(t, map[string][]string{"alpha": {"a1", "a2"}, "paused": {"p1", "p2"}, "zeta": {"z1", "z2"}}, reasons, "event order is kept within each organization")
 }
 
 func TestExtensionResourceStartHonoursRetentionAndGaps(t *testing.T) {

@@ -60,16 +60,25 @@ func pluginServiceWarning(item plugins.Installation, descriptor plugins.Descript
 	return pluginEntitlementWarningToAPI(descriptor.Entitlement.GraceWarning(policy.RequiredFeature))
 }
 
+// Availability codes of the in-transaction enablement check.
+const (
+	pluginNotInstalled = "plugin_not_installed"
+	pluginNotEnabled   = "plugin_not_enabled"
+)
+
+// pluginEffectDatabase wraps the database of every Core effect performed for
+// a plugin. Each transaction it begins first re-verifies, inside that
+// transaction, that the installation the caller's snapshot named is still
+// installed and enabled for the organization, then the licence of a licensed
+// plugin. The snapshot is only a preflight; this is the authority.
+//
 // Only explicit plugin-effect calls receive this wrapper. Ordinary Module
-// Management and deployment paths never acquire an entitlement dependency.
+// Management and deployment paths never acquire a plugin dependency.
 func (s *Server) pluginEffectDatabase(org string, item plugins.Installation, action string, safety bool) model.Databaser {
-	if item.Entitlement == nil || item.Entitlement.Mode == "none" {
-		return s.Database
-	}
-	return &pluginEntitlementDatabase{Databaser: s.Database, guard: s.PluginEntitlements, org: org, item: item, action: action, safety: safety}
+	return &pluginEffectDatabase{Databaser: s.Database, guard: s.PluginEntitlements, org: org, item: item, action: action, safety: safety}
 }
 
-type pluginEntitlementDatabase struct {
+type pluginEffectDatabase struct {
 	model.Databaser
 	guard  PluginEntitlementGuard
 	org    string
@@ -78,25 +87,34 @@ type pluginEntitlementDatabase struct {
 	safety bool
 }
 
-func (db *pluginEntitlementDatabase) BeginTx(ctx context.Context, options *sql.TxOptions) (model.TxWithCommit, error) {
+func (db *pluginEffectDatabase) BeginTx(ctx context.Context, options *sql.TxOptions) (model.TxWithCommit, error) {
+	licensed := db.item.Licensed()
 	policy, exists := db.item.ServiceGrant(db.action)
-	if !exists || policy.RequiredFeature == "" || db.guard == nil {
+	if licensed && (!exists || policy.RequiredFeature == "" || db.guard == nil) {
 		return nil, pluginBoundaryError(409, "plugin_not_entitled", "The plugin requires a verified signed licence before this operation can proceed.")
 	}
-	// Entitlement decisions persist their monotonic clock and audit evidence.
-	// No effect caller may accidentally substitute a read-only transaction.
+	// Enablement checks hold row locks and entitlement decisions persist their
+	// monotonic clock and audit evidence. No effect caller may accidentally
+	// substitute a read-only transaction.
 	if options != nil && options.ReadOnly {
-		return nil, pluginBoundaryError(500, "plugin_entitlement_transaction_invalid", "The plugin effect requires a writable authorization transaction.")
+		return nil, pluginBoundaryError(500, "plugin_effect_transaction_invalid", "The plugin effect requires a writable authorization transaction.")
 	}
 	tx, err := db.Databaser.BeginTx(ctx, options)
 	if err != nil {
 		return nil, err
 	}
+	if err := model.RequirePluginEnablement(ctx, tx, model.PluginUse{OrgID: db.org, PluginID: db.item.ID, InstallationID: db.item.InstallationID, PackageSHA256: db.item.ManifestSHA256, Safety: db.safety}); err != nil {
+		_ = tx.Rollback()
+		return nil, pluginModelError(err)
+	}
+	if !licensed {
+		return tx, nil
+	}
 	if err := db.guard.Guard(ctx, db.Databaser, tx, db.org, db.item, policy.RequiredFeature, true, db.safety); err != nil {
 		// No business code has run yet. Persist an observed expiry even when
 		// denying the command, so a later clock rollback cannot revive it.
 		var denied *herrors.PlatformOrchestratorError
-		if errors.As(err, &denied) && (denied.Code == "plugin_not_entitled" || denied.Code == "plugin_not_enabled") {
+		if errors.As(err, &denied) && (denied.Code == "plugin_not_entitled" || denied.Code == pluginNotEnabled) {
 			if commitErr := tx.Commit(); commitErr != nil {
 				return nil, commitErr
 			}

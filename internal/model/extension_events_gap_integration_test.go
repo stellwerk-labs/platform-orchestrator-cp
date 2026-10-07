@@ -4,7 +4,6 @@ package model
 
 import (
 	"os"
-	"sync/atomic"
 	"testing"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pgtest"
@@ -21,10 +20,7 @@ func journalState(t *testing.T, db Databaser, org string) (bool, int64) {
 }
 
 func TestExtensionResourceJournalGapAfterSubscriptionReturns(t *testing.T) {
-	var subscribed atomic.Bool
-	subscribed.Store(true)
-	scope := func(string) bool { return subscribed.Load() }
-	db := externalOperationDatabaseWith(t, WithExtensionResourceJournal(scope))
+	db := externalOperationDatabase(t)
 	command := externalGrantFixture(t, db)
 	resetExtensionEventFixtures(t, db)
 	consumer := journalConsumer(t, db, command, "consumer", "e")
@@ -34,18 +30,16 @@ func TestExtensionResourceJournalGapAfterSubscriptionReturns(t *testing.T) {
 	require.Equal(t, int64(2), cursor)
 
 	// Restart with the plugin host disabled: nothing is journaled meanwhile.
-	subscribed.Store(false)
-	require.NoError(t, ReconcileExtensionResourceJournal(t.Context(), db, nil))
+	require.NoError(t, ReconcileExtensionResourceJournal(t.Context(), db, false))
 	journaling, gap := journalState(t, db, consumer.OrgID)
 	require.False(t, journaling)
 	require.Zero(t, gap)
 	journalEnvironmentEvents(t, db, consumer, 1)
 	require.Equal(t, []int64{1, 2}, journalCursors(t, db, consumer.OrgID))
 
-	// Restart with the subscription restored.
-	subscribed.Store(true)
-	require.NoError(t, ReconcileExtensionResourceJournal(t.Context(), db, scope))
-	require.NoError(t, ReconcileExtensionResourceJournal(t.Context(), db, scope), "reconciliation is idempotent")
+	// Restart with the plugin host enabled: the subscription still exists.
+	require.NoError(t, ReconcileExtensionResourceJournal(t.Context(), db, true))
+	require.NoError(t, ReconcileExtensionResourceJournal(t.Context(), db, true), "reconciliation is idempotent")
 	journaling, gap = journalState(t, db, consumer.OrgID)
 	require.True(t, journaling)
 	require.Equal(t, int64(3), gap, "the gap takes its own cursor after every cursor issued before it")
@@ -75,30 +69,40 @@ func TestExtensionResourceJournalGapFromAPausedReplica(t *testing.T) {
 	_, cursor, err := ReadExtensionResourceEvents(t.Context(), db, *consumer, nil, 10)
 	require.NoError(t, err)
 
-	// Another replica runs without the subscription and handles a change.
+	// Another replica removes the only subscription: the pause is shared
+	// state, so no replica journals the changes either one handles meanwhile.
 	var schema string
 	require.NoError(t, db.(*databaser).DB.QueryRowContext(t.Context(), `SELECT current_schema()`).Scan(&schema))
-	paused, err := NewDatabaser(t.Context(), zap.NewNop(), pgtest.WithSearchPath(os.Getenv("PLUGIN_TEST_DATABASE_URL"), schema),
-		WithExtensionResourceJournal(func(string) bool { return false }))
+	other, err := NewDatabaser(t.Context(), zap.NewNop(), pgtest.WithSearchPath(os.Getenv("PLUGIN_TEST_DATABASE_URL"), schema), WithExtensionResourceJournal())
 	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, paused.Close()) })
-	journalEnvironmentEvents(t, paused, consumer, 1)
+	t.Cleanup(func() { require.NoError(t, other.Close()) })
+	unsubscribeFromResourceEvents(t, other, consumer.OrgID, consumer.PluginID)
 	journaling, _ := journalState(t, db, consumer.OrgID)
-	require.False(t, journaling, "skipping an event of a journaled organization records the pause")
+	require.False(t, journaling, "removing the only subscription pauses the journal in the same transaction")
+	journalEnvironmentEvents(t, other, consumer, 1)
+	journalEnvironmentEvents(t, db, consumer, 1)
+	require.Equal(t, []int64{1}, journalCursors(t, db, consumer.OrgID), "nothing is journaled without a subscriber")
+	_, _, err = ReadExtensionResourceEvents(t.Context(), db, *consumer, nil, 10)
+	conflict, ok := IsErrConflict(err)
+	require.True(t, ok, "an unsubscribed plugin cannot read the journal: %v", err)
+	require.Equal(t, "plugin_not_installed", conflict.Code)
 
-	// The subscribed replica marks the gap on the next read, without waiting for a write.
+	// The subscription returns through the other replica; this one sees the gap.
+	subscribeToResourceEvents(t, other, consumer.OrgID, consumer.PluginID)
 	_, _, err = ReadExtensionResourceEvents(t.Context(), db, *consumer, &cursor, 10)
 	require.ErrorIs(t, err, ErrExtensionResourceCursorExpired)
 	journaling, gap := journalState(t, db, consumer.OrgID)
 	require.True(t, journaling)
 	require.Equal(t, int64(2), gap)
 
-	// A write by the subscribed replica after another pause records a new gap.
-	journalEnvironmentEvents(t, paused, consumer, 1)
+	// Another subscriber keeps the journal running while one plugin leaves.
+	subscribeToResourceEvents(t, other, consumer.OrgID, "dev.example.keeper")
+	unsubscribeFromResourceEvents(t, other, consumer.OrgID, consumer.PluginID)
 	journalEnvironmentEvents(t, db, consumer, 1)
-	_, newGap := journalState(t, db, consumer.OrgID)
-	require.Equal(t, int64(3), newGap)
-	require.Equal(t, []int64{1, 4}, journalCursors(t, db, consumer.OrgID))
+	journaling, sameGap := journalState(t, db, consumer.OrgID)
+	require.True(t, journaling)
+	require.Equal(t, gap, sameGap)
+	require.Equal(t, []int64{1, 3}, journalCursors(t, db, consumer.OrgID))
 }
 
 func TestExtensionResourceJournalStateMigrationRefusesDowngradeAfterAPause(t *testing.T) {
@@ -107,7 +111,7 @@ func TestExtensionResourceJournalStateMigrationRefusesDowngradeAfterAPause(t *te
 	resetExtensionEventFixtures(t, db)
 	consumer := journalConsumer(t, db, command, "consumer", "e")
 	journalEnvironmentEvents(t, db, consumer, 1)
-	require.NoError(t, ReconcileExtensionResourceJournal(t.Context(), db, nil))
+	require.NoError(t, ReconcileExtensionResourceJournal(t.Context(), db, false))
 	provider := extensionMigrationProvider(t, db)
 	_, err := provider.DownTo(t.Context(), 39)
 	require.ErrorContains(t, err, "cannot remove recorded extension journal pauses or gaps")

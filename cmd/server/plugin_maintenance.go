@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginentitlements"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
 )
 
 // Plugin maintenance runs in every replica. Each job is safe to run
@@ -52,13 +52,23 @@ func sweepPluginEntitlements(adapter *pluginentitlements.Adapter) func(context.C
 }
 
 // pruneExtensionJournal applies the explicit journal retention policy for the
-// subscriptions in the installation registry.
-func pruneExtensionJournal(db model.Databaser, registry *plugins.InstallationRegistry, policy model.ExtensionResourceRetention, logger *zap.Logger) func(context.Context) error {
+// subscriptions recorded by the Plugin Manager.
+func pruneExtensionJournal(db model.Databaser, policy model.ExtensionResourceRetention, logger *zap.Logger) func(context.Context) error {
 	return func(ctx context.Context) error {
-		pruned, err := model.PruneExtensionResourceJournal(ctx, db, registry.ResourceEventSubscribers, policy, time.Now())
+		pruned, err := model.PruneExtensionResourceJournal(ctx, db, policy, time.Now())
 		if pruned > 0 {
 			logger.Info("Pruned extension resource journal entries", zap.Int64("entries", pruned))
 		}
 		return err
 	}
+}
+
+// operatorIDs parses configured permission holders; the configuration
+// validates them as UUIDs.
+func operatorIDs(values []string) []uuid.UUID {
+	ids := make([]uuid.UUID, 0, len(values))
+	for _, value := range values {
+		ids = append(ids, uuid.MustParse(value))
+	}
+	return ids
 }

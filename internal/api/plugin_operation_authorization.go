@@ -27,7 +27,7 @@ func (s *Server) GetPluginOperationGrant(ctx context.Context, request GetPluginO
 	if err != nil {
 		return nil, pluginModelError(err)
 	}
-	if item.Entitlement != nil && item.Entitlement.Mode == "required" {
+	if item.Licensed() {
 		for _, action := range grant.Intent.Actions {
 			if err := pluginServiceAllowed(item, descriptor, action, false, false); err != nil {
 				return nil, err

@@ -47,10 +47,7 @@ func TestPluginDeploymentBoundaryApprovalAndNoEffectRecovery(t *testing.T) {
 	for _, action := range append([]string{"authorization.check"}, grant.Intent.Actions...) {
 		item.ServiceGrants = append(item.ServiceGrants, plugins.ServiceGrant{Action: action, Permission: permission, Scope: "environment"})
 	}
-	encoded, err := json.Marshal([]plugins.Installation{item})
-	require.NoError(t, err)
-	registry, err := plugins.LoadInstallations(bytes.NewReader(encoded), false)
-	require.NoError(t, err)
+	registry, item := installedRegistry(t, db, item)
 	publicKey, privateKey, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
 	var denyApprover, denyAtCallback, noEffect, temporaryApprover, denyController atomic.Bool
@@ -223,7 +220,7 @@ func pluginDeploymentBoundaryDatabase(t *testing.T, extraActions ...string) (mod
 	_, err = admin.Exec(`CREATE SCHEMA ` + schema)
 	require.NoError(t, err)
 	db, err := model.NewDatabaser(t.Context(), zap.NewNop(), pgtest.WithSearchPath(dsn, schema),
-		model.WithExtensionResourceJournal(func(string) bool { return true }))
+		model.WithExtensionResourceJournal())
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, db.Close())

@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/entitlements"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
 )
 
 const (
@@ -131,5 +132,16 @@ func TestLoadTrustRejectsMaterialWithoutStoppingCaller(t *testing.T) {
 
 func TestImportBundleWithoutTrustOrAdapterIsADiagnostic(t *testing.T) {
 	var unavailable *Adapter
-	require.Equal(t, []Diagnostic{{DiagnosticBundleRejected, "the entitlement adapter is unavailable"}}, unavailable.ImportBundle(context.Background(), "/nonexistent"))
+	result, err := unavailable.ImportBundle(context.Background(), nil, []byte(`{}`), "operator")
+	require.NoError(t, err)
+	require.Equal(t, []Diagnostic{{DiagnosticBundleRejected, "the entitlement adapter is unavailable"}}, result.Diagnostics)
+	untrusted := &Adapter{db: unavailableDatabase{}, mode: entitlements.Production, trust: entitlements.TrustStore{Class: entitlements.Production}}
+	result, err = untrusted.ImportBundle(context.Background(), nil, []byte(`{}`), "operator")
+	require.NoError(t, err)
+	require.Equal(t, []Diagnostic{{DiagnosticBundleRejected, "the bundle was not imported because no issuer trust is configured"}}, result.Diagnostics)
+	require.Zero(t, result.ImportedGrants+result.ImportedRevocations)
 }
+
+// unavailableDatabase is a Databaser that must never be reached: an import
+// without trust stops before any database work.
+type unavailableDatabase struct{ model.Databaser }

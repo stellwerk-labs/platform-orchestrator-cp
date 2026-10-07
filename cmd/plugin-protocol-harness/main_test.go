@@ -51,13 +51,12 @@ func TestProtocolHarnessUsesRealGatewayAndFailsClosed(t *testing.T) {
 	}))
 	defer backend.Close()
 
-	registry, err := plugins.LoadInstallations(strings.NewReader(`[{
+	registry, err := harnessRegistry(testOrg, []byte(`{
 		"id":"dev.example.read-only","display_name":"Read Only","version":"0.1.0",
-		"backend":"`+backend.URL+`","organizations":{"plugin-demo":"available"},
-		"capabilities":["read"],"ui":{"sdk_version":"1","origin":"http://127.0.0.1:18092",
+		"capabilities":["read"],"ui":{"sdk_version":"1",
 		"entrypoint":"/embed/","route_prefix":"/read-only","navigation_label":"Read Only"},
 		"operations":[{"id":"list","method":"GET","path":"/orgs/{orgId}/items","mutating":false}]
-	}]`), true)
+	}`), backend.URL, "http://127.0.0.1:18092")
 	require.NoError(t, err)
 	gateway := &plugins.Gateway{Registry: registry, SigningKey: private, Issuer: "harness", Now: func() time.Time { return now }}
 	handler, err := newHandler(config{ListenAddress: "127.0.0.1:18093", BrowserOrigin: testOrigin, OrgID: testOrg, ActorID: testActor}, gateway)

@@ -106,9 +106,7 @@ func newPluginOperationEntitlementHTTP(t *testing.T) *pluginOperationEntitlement
 			"operation.prepare": {"command": {"prepare", "rollback"}},
 		},
 	}}
-	encoded, err := json.Marshal([]plugins.Installation{h.item})
-	require.NoError(t, err)
-	registry, err := plugins.LoadInstallations(bytes.NewReader(encoded), false)
+	registry, err := plugins.NewInstallationRegistry([]plugins.Installation{h.item}, false)
 	require.NoError(t, err)
 	registry.Entitlements = h.f.adapter
 	_, signingKey, err := ed25519.GenerateKey(nil)
@@ -297,9 +295,7 @@ func (h *pluginOperationEntitlementHTTP) moduleRecovery(t *testing.T, retainRese
 		h.item.ServiceGrants = append(h.item.ServiceGrants, plugins.ServiceGrant{Action: action, RequiredFeature: "feature-a", Permission: "plugin." + h.item.ID + ".modules", Scope: "organization"})
 		h.item.Operations[0].ServiceActions = append(h.item.Operations[0].ServiceActions, action)
 	}
-	encoded, err := json.Marshal([]plugins.Installation{h.item})
-	require.NoError(t, err)
-	registry, err := plugins.LoadInstallations(bytes.NewReader(encoded), false)
+	registry, err := plugins.NewInstallationRegistry([]plugins.Installation{h.item}, false)
 	require.NoError(t, err)
 	registry.Entitlements = h.f.adapter
 	h.f.server.PluginGateway.Registry = registry

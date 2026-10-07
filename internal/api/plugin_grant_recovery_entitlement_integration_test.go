@@ -3,7 +3,6 @@
 package api
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -63,13 +62,11 @@ func newPluginGrantRecoveryHTTP(t *testing.T, secondFeature, freshInstallation b
 		item.ManifestSHA256 = hex.EncodeToString(digest[:])
 		clock := func() time.Time { return time.Unix(f.clock.Load(), 0).UTC() }
 		var diagnostics []pluginentitlements.Diagnostic
-		f.adapter, diagnostics, err = pluginentitlements.New(t.Context(), f.db, []plugins.Installation{item}, entitlements.Development, f.trustPath, "", clock)
+		f.adapter, diagnostics, err = pluginentitlements.New(f.db, entitlements.Development, f.trustPath, clock)
 		require.NoError(t, err)
 		require.Empty(t, diagnostics)
 	}
-	encoded, err := json.Marshal([]plugins.Installation{item})
-	require.NoError(t, err)
-	registry, err := plugins.LoadInstallations(bytes.NewReader(encoded), false)
+	registry, err := plugins.NewInstallationRegistry([]plugins.Installation{item}, false)
 	require.NoError(t, err)
 	registry.Entitlements = f.adapter
 	f.server.Logger = zap.NewNop()

@@ -3,7 +3,6 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -70,9 +69,7 @@ func TestPluginOperationInventoryIsUnattendedButConfinedToTheActiveGrant(t *test
 	require.NoError(t, err)
 	s := &Server{Logger: zap.NewNop(), Database: db, IamClient: iamClient, PluginGateway: &plugins.Gateway{}, PluginJournalRetention: 30 * 24 * time.Hour}
 	install := func(installation plugins.Installation) {
-		encoded, err := json.Marshal([]plugins.Installation{installation})
-		require.NoError(t, err)
-		s.PluginGateway.Registry, err = plugins.LoadInstallations(bytes.NewReader(encoded), false)
+		s.PluginGateway.Registry, err = plugins.NewInstallationRegistry([]plugins.Installation{installation}, false)
 		require.NoError(t, err)
 	}
 	install(item)
@@ -153,12 +150,10 @@ func TestPluginOperationInventoryRequiresTheFrozenDelegation(t *testing.T) {
 	db, grant := pluginDeploymentBoundaryDatabase(t, plugins.ResourceEventsReadAction)
 	service, checker := userid.NewServiceUserTokenId().String(), userid.NewServiceUserTokenId().String()
 	permission := "plugin." + grant.PluginID + ".read"
-	encoded, err := json.Marshal([]plugins.Installation{{ID: grant.PluginID, DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.test", ServiceUserID: service, AdmissionCheckerID: checker,
+	registry, err := plugins.NewInstallationRegistry([]plugins.Installation{{ID: grant.PluginID, DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.test", ServiceUserID: service, AdmissionCheckerID: checker,
 		Organizations: map[string]plugins.AvailabilityState{grant.OrgID: plugins.StateAvailable},
 		Operations:    []plugins.Operation{{ID: "list", Method: "GET", Path: "/orgs/{orgId}/items"}},
-		ServiceGrants: []plugins.ServiceGrant{{Action: plugins.InventoryReadAction, Permission: permission, Scope: "environment"}}}})
-	require.NoError(t, err)
-	registry, err := plugins.LoadInstallations(bytes.NewReader(encoded), false)
+		ServiceGrants: []plugins.ServiceGrant{{Action: plugins.InventoryReadAction, Permission: permission, Scope: "environment"}}}}, false)
 	require.NoError(t, err)
 	s := &Server{Logger: zap.NewNop(), Database: db, PluginGateway: &plugins.Gateway{Registry: registry}}
 	e, err := hecho.DefaultEchoServerWithValidation(&hecho.ValidatedServerConfig{AppName: "plugin-operation-inventory-delegation-test", Logger: zap.NewNop(), OpenAPIRawSchema: MustDecodeOpenApiSpec()})

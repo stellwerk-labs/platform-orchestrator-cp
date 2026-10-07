@@ -49,10 +49,9 @@ func TestPluginEventsRequireScopedServiceAuthority(t *testing.T) {
 	client, err := iamapi.NewClientWithResponses(iam.URL)
 	require.NoError(t, err)
 	s := &Server{Logger: zap.NewNop(), Database: db, IamClient: client, PluginGateway: &plugins.Gateway{}}
+	item = installPlugin(t, db, item)
 	setInstallation := func() {
-		encoded, err := json.Marshal([]plugins.Installation{item})
-		require.NoError(t, err)
-		s.PluginGateway.Registry, err = plugins.LoadInstallations(bytes.NewReader(encoded), false)
+		s.PluginGateway.Registry, err = plugins.NewInstallationRegistry([]plugins.Installation{item}, false)
 		require.NoError(t, err)
 	}
 	setInstallation()

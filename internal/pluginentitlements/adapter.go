@@ -4,6 +4,7 @@ package pluginentitlements
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"slices"
@@ -17,29 +18,21 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
 )
 
-const (
-	operatorImporter = "internal_system"
-	requiredMode     = "required"
-)
+// maxCandidateBindings bounds the installed bindings a bundle is matched against.
+const maxCandidateBindings = 4096
 
 var errInstalledBinding = errors.New("installed entitlement binding is invalid")
 
-type installed struct {
-	id             string
-	installationID string
-	manifestSHA256 string
-	declaration    plugins.EntitlementDeclaration
-	organizations  map[string]plugins.AvailabilityState
-}
-
-// Adapter holds only public pinned trust and installed package declarations.
-// It never retains an issuer private key or sends raw COSE to a plugin.
+// Adapter holds only public pinned trust. Installations and their
+// organizations come from the Plugin Manager: candidate bindings for an import
+// are read in the import transaction, and decisions use the installation the
+// caller's snapshot names. It never retains an issuer private key or sends raw
+// COSE to a plugin.
 type Adapter struct {
-	db            model.Databaser
-	trust         entitlements.TrustStore
-	mode          entitlements.TrustClass
-	now           func() time.Time
-	installations map[string]installed
+	db    model.Databaser
+	trust entitlements.TrustStore
+	mode  entitlements.TrustClass
+	now   func() time.Time
 }
 
 var _ plugins.EntitlementResolver = (*Adapter)(nil)
@@ -58,40 +51,25 @@ const (
 // Diagnostic is an operator-facing reason, safe to log. Detail never holds
 // signed bytes or tenant data beyond what the operator's own files contain.
 type Diagnostic struct {
-	Code   string
-	Detail string
+	Code   string `json:"code"`
+	Detail string `json:"detail"`
 }
 
-// New loads bounded no-symlink operator files. Both paths may be empty, in
-// which case required plugins remain unentitled. Trust-only startup supports
-// revalidation of persisted evidence after a key rotation or removal.
+// New loads the bounded no-symlink operator trust file. An empty path leaves
+// required plugins unentitled; trust-only startup supports revalidation of
+// persisted evidence after a key rotation or removal.
 //
-// The error is reserved for Core configuration: the database handle, the
-// entitlement mode and the installed plugin set. Entitlement material (the
-// trust file, the bundle and every signed document in it) never fails Core;
-// a problem with it is returned as a Diagnostic and only degrades the plugins
-// it would have entitled.
-func New(ctx context.Context, db model.Databaser, items []plugins.Installation, mode entitlements.TrustClass, trustPath, bundlePath string, clock func() time.Time) (*Adapter, []Diagnostic, error) {
-	if db == nil || (mode != entitlements.Production && mode != entitlements.Development) || len(items) > 128 {
+// The error is reserved for Core configuration: the database handle and the
+// entitlement mode. Trust material never fails Core; a problem with it is
+// returned as a Diagnostic and only degrades the plugins it would entitle.
+func New(db model.Databaser, mode entitlements.TrustClass, trustPath string, clock func() time.Time) (*Adapter, []Diagnostic, error) {
+	if db == nil || (mode != entitlements.Production && mode != entitlements.Development) {
 		return nil, nil, errors.New("invalid offline entitlement adapter configuration")
 	}
 	if clock == nil {
 		clock = time.Now
 	}
-	a := &Adapter{db: db, mode: mode, now: clock, trust: entitlements.TrustStore{Class: mode}, installations: make(map[string]installed, len(items))}
-	for _, item := range items {
-		if item.ID == "" || a.installations[item.ID].id != "" {
-			return nil, nil, errors.New("duplicate or empty installed plugin ID")
-		}
-		saved := installed{id: item.ID, installationID: item.InstallationID, manifestSHA256: item.ManifestSHA256, organizations: map[string]plugins.AvailabilityState{}}
-		if item.Entitlement != nil {
-			saved.declaration = plugins.EntitlementDeclaration{Mode: item.Entitlement.Mode, Features: slices.Clone(item.Entitlement.Features), Limits: slices.Clone(item.Entitlement.Limits)}
-		}
-		for org, state := range item.Organizations {
-			saved.organizations[org] = state
-		}
-		a.installations[item.ID] = saved
-	}
+	a := &Adapter{db: db, mode: mode, now: clock, trust: entitlements.TrustStore{Class: mode}}
 	var diagnostics []Diagnostic
 	if trustPath != "" {
 		trust, err := loadTrust(trustPath, mode)
@@ -100,9 +78,6 @@ func New(ctx context.Context, db model.Databaser, items []plugins.Installation, 
 		} else {
 			a.trust = trust
 		}
-	}
-	if bundlePath != "" {
-		diagnostics = append(diagnostics, a.ImportBundle(ctx, bundlePath)...)
 	}
 	return a, diagnostics, nil
 }
@@ -119,48 +94,98 @@ func loadTrust(path string, mode entitlements.TrustClass) (entitlements.TrustSto
 	return trust, nil
 }
 
-// ImportBundle imports every document that verifies on its own signature and,
-// for a grant, matches an exact installed binding. A rejected document is
-// skipped with a Diagnostic and never blocks the others. Skipping is safe:
-// an unverifiable revocation is no revocation, and an unimported grant leaves
-// its binding at its persisted, still independently verified decision. Every
-// individual import is monotonic and atomic in its own model transaction.
-func (a *Adapter) ImportBundle(ctx context.Context, path string) []Diagnostic {
+// BundleImport reports what one bundle import changed and why documents were
+// skipped.
+type BundleImport struct {
+	Digest              [32]byte     `json:"-"`
+	ImportedGrants      int          `json:"imported_grants"`
+	ImportedRevocations int          `json:"imported_revocations"`
+	Diagnostics         []Diagnostic `json:"diagnostics"`
+}
+
+// ImportBundle imports, in tx, every document that verifies on its own
+// signature and, for a grant, matches an exact binding of an installation
+// enabled for an organization. A rejected document is skipped with a
+// Diagnostic and never blocks the others; each document runs in its own
+// savepoint. Skipping is safe: an unverifiable revocation is no revocation,
+// and an unimported grant leaves its binding at its persisted, still
+// independently verified decision. Every import is monotonic. The error is
+// reserved for database failures.
+func (a *Adapter) ImportBundle(ctx context.Context, tx model.Tx, raw []byte, importer string) (BundleImport, error) {
+	result := BundleImport{Digest: sha256.Sum256(raw), Diagnostics: []Diagnostic{}}
 	if a == nil || a.db == nil {
-		return []Diagnostic{{DiagnosticBundleRejected, "the entitlement adapter is unavailable"}}
+		result.Diagnostics = append(result.Diagnostics, Diagnostic{DiagnosticBundleRejected, "the entitlement adapter is unavailable"})
+		return result, nil
 	}
 	if len(a.trust.Issuers) == 0 {
-		return []Diagnostic{{DiagnosticBundleRejected, "the bundle was not imported because no issuer trust is configured"}}
-	}
-	raw, err := readRegularFile(path, MaxBundleBytes)
-	if err != nil {
-		return []Diagnostic{{DiagnosticBundleRejected, fmt.Sprintf("load entitlement bundle: %v", err)}}
+		result.Diagnostics = append(result.Diagnostics, Diagnostic{DiagnosticBundleRejected, "the bundle was not imported because no issuer trust is configured"})
+		return result, nil
 	}
 	bundle, err := ParseBundleJSON(raw)
 	if err != nil {
-		return []Diagnostic{{DiagnosticBundleRejected, err.Error()}}
+		result.Diagnostics = append(result.Diagnostics, Diagnostic{DiagnosticBundleRejected, err.Error()})
+		return result, nil
 	}
 	var candidates []entitlements.Binding
-	var diagnostics []Diagnostic
 	if len(bundle.Grants) > 0 {
-		if candidates, err = a.candidateBindings(ctx); err != nil {
-			diagnostics = append(diagnostics, Diagnostic{DiagnosticBundleRejected, fmt.Sprintf("no grant was imported: %v", err)})
-			bundle.Grants = nil
+		if candidates, err = a.candidateBindings(ctx, tx); err != nil {
+			return result, err
 		}
 	}
 	grants, snapshots, rejected := verifyBundle(bundle, a.trust, a.mode, candidates, a.now().UTC())
-	diagnostics = append(diagnostics, rejected...)
+	result.Diagnostics = append(result.Diagnostics, rejected...)
 	for _, grant := range grants {
-		if _, err := model.ImportPluginEntitlementGrant(ctx, a.db, nil, grant.Grant, operatorImporter, bundle.Digest); err != nil {
-			diagnostics = append(diagnostics, Diagnostic{DiagnosticGrantRejected, fmt.Sprintf("grant %d was not imported: %v", grant.index, err)})
+		imported, err := importDocument(ctx, tx, func() (bool, error) {
+			return model.ImportPluginEntitlementGrant(ctx, a.db, tx, grant.Grant, importer, bundle.Digest)
+		})
+		if err != nil {
+			if !isDocumentRejection(err) {
+				return result, err
+			}
+			result.Diagnostics = append(result.Diagnostics, Diagnostic{DiagnosticGrantRejected, fmt.Sprintf("grant %d was not imported: %v", grant.index, err)})
+		} else if imported {
+			result.ImportedGrants++
 		}
 	}
 	for _, snapshot := range snapshots {
-		if _, err := model.ImportPluginEntitlementRevocations(ctx, a.db, nil, snapshot.Revocations, operatorImporter, bundle.Digest); err != nil {
-			diagnostics = append(diagnostics, Diagnostic{DiagnosticRevocationsRejected, fmt.Sprintf("revocation snapshot %d was not imported: %v", snapshot.index, err)})
+		imported, err := importDocument(ctx, tx, func() (bool, error) {
+			return model.ImportPluginEntitlementRevocations(ctx, a.db, tx, snapshot.Revocations, importer, bundle.Digest)
+		})
+		if err != nil {
+			if !isDocumentRejection(err) {
+				return result, err
+			}
+			result.Diagnostics = append(result.Diagnostics, Diagnostic{DiagnosticRevocationsRejected, fmt.Sprintf("revocation snapshot %d was not imported: %v", snapshot.index, err)})
+		} else if imported {
+			result.ImportedRevocations++
 		}
 	}
-	return diagnostics
+	return result, nil
+}
+
+// importDocument confines one document's writes to a savepoint, so a
+// rejected document leaves the transaction usable for the others.
+func importDocument(ctx context.Context, tx model.Tx, run func() (bool, error)) (bool, error) {
+	if _, err := tx.ExecContext(ctx, `SAVEPOINT entitlement_document`); err != nil {
+		return false, err
+	}
+	imported, err := run()
+	if err != nil {
+		if _, rollbackErr := tx.ExecContext(ctx, `ROLLBACK TO SAVEPOINT entitlement_document`); rollbackErr != nil {
+			return false, rollbackErr
+		}
+		return false, err
+	}
+	_, err = tx.ExecContext(ctx, `RELEASE SAVEPOINT entitlement_document`)
+	return imported, err
+}
+
+// isDocumentRejection reports a refusal of the document itself, as opposed
+// to a database failure.
+func isDocumentRejection(err error) bool {
+	_, conflict := model.IsErrConflict(err)
+	_, badRequest := model.IsErrBadRequest(err)
+	return conflict || badRequest
 }
 
 type indexedGrant struct {
@@ -230,23 +255,36 @@ func matchGrant(encoded []byte, trust entitlements.TrustStore, mode entitlements
 	return entitlements.Grant{}, false
 }
 
-func (a *Adapter) candidateBindings(ctx context.Context) ([]entitlements.Binding, error) {
+// candidateBindings returns the binding of every organization enablement of
+// an installation whose package requires an entitlement.
+func (a *Adapter) candidateBindings(ctx context.Context, tx model.Tx) ([]entitlements.Binding, error) {
+	installations, err := model.ListPluginInstallations(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
 	candidates := []entitlements.Binding{}
-	for _, item := range a.installations {
-		if item.declaration.Mode != requiredMode {
+	for _, installation := range installations {
+		if len(installation.Organizations) == 0 {
 			continue
 		}
-		installationID, err := uuid.Parse(item.installationID)
-		if err != nil || installationID == uuid.Nil || installationID.String() != item.installationID {
-			return nil, errors.New("invalid installed plugin UUID")
+		pkg, err := model.GetPluginPackage(ctx, tx, installation.PackageSHA256)
+		if err != nil {
+			return nil, err
 		}
-		for org := range item.organizations {
-			organization, err := a.db.GetOrg(ctx, nil, org)
+		manifest, err := plugins.DecodeManifest(pkg.Manifest)
+		if err != nil {
+			return nil, fmt.Errorf("decode installed plugin manifest: %w", err)
+		}
+		if manifest.Entitlement == nil || manifest.Entitlement.Mode != plugins.EntitlementRequired {
+			continue
+		}
+		for _, enablement := range installation.Organizations {
+			organization, err := a.db.GetOrg(ctx, tx, enablement.OrgID)
 			if err != nil {
-				return nil, fmt.Errorf("resolve installed organization: %w", err)
+				return nil, fmt.Errorf("resolve enabled organization: %w", err)
 			}
-			candidates = append(candidates, entitlements.Binding{PluginID: item.id, InstallationID: installationID, OrganizationID: organization.Uuid, DeclaredFeatures: slices.Clone(item.declaration.Features)})
-			if len(candidates) > 4096 {
+			candidates = append(candidates, entitlements.Binding{PluginID: installation.PluginID, InstallationID: installation.InstallationID, OrganizationID: organization.Uuid, DeclaredFeatures: slices.Clone(manifest.Entitlement.Features)})
+			if len(candidates) > maxCandidateBindings {
 				return nil, errors.New("too many installed entitlement bindings")
 			}
 		}
@@ -254,28 +292,26 @@ func (a *Adapter) candidateBindings(ctx context.Context) ([]entitlements.Binding
 	return candidates, nil
 }
 
+// binding is the signed-grant binding of the installation the caller's
+// snapshot names for the organization, with its availability state.
 func (a *Adapter) binding(ctx context.Context, db model.Databaser, tx model.Tx, org string, item plugins.Installation) (entitlements.Binding, plugins.AvailabilityState, error) {
 	var binding entitlements.Binding
-	if a == nil || db == nil || item.Entitlement == nil || item.Entitlement.Mode != requiredMode {
+	if a == nil || db == nil || !item.Licensed() {
 		return binding, "", fmt.Errorf("%w: required entitlement installation is unavailable", errInstalledBinding)
 	}
-	configured, ok := a.installations[item.ID]
-	if !ok || configured.declaration.Mode != requiredMode || item.InstallationID != configured.installationID || item.ManifestSHA256 != configured.manifestSHA256 || !slices.Equal(item.Entitlement.Features, configured.declaration.Features) || !slices.Equal(item.Entitlement.Limits, configured.declaration.Limits) {
-		return binding, "", fmt.Errorf("%w: installed entitlement declaration changed", errInstalledBinding)
-	}
-	state, ok := configured.organizations[org]
-	if !ok || item.Organizations[org] != state {
+	state, ok := item.Organizations[org]
+	if !ok {
 		return binding, "", fmt.Errorf("%w: plugin is not installed for organization", errInstalledBinding)
 	}
-	installationID, err := uuid.Parse(configured.installationID)
-	if err != nil || installationID == uuid.Nil || installationID.String() != configured.installationID {
+	installationID, err := uuid.Parse(item.InstallationID)
+	if err != nil || installationID == uuid.Nil || installationID.String() != item.InstallationID {
 		return binding, "", fmt.Errorf("%w: invalid installed plugin UUID", errInstalledBinding)
 	}
 	organization, err := db.GetOrg(ctx, tx, org)
 	if err != nil {
 		return binding, "", err
 	}
-	binding = entitlements.Binding{PluginID: item.ID, InstallationID: installationID, OrganizationID: organization.Uuid, DeclaredFeatures: slices.Clone(configured.declaration.Features)}
+	binding = entitlements.Binding{PluginID: item.ID, InstallationID: installationID, OrganizationID: organization.Uuid, DeclaredFeatures: slices.Clone(item.Entitlement.Features)}
 	return binding, state, nil
 }
 
@@ -299,14 +335,7 @@ func (a *Adapter) ResolveEntitlement(ctx context.Context, org string, item plugi
 	if a == nil || a.db == nil {
 		return status, errors.New("entitlement adapter is unavailable")
 	}
-	configured, ok := a.installations[item.ID]
-	if !ok {
-		return status, errors.New("plugin installation is unknown to entitlement adapter")
-	}
-	if configured.declaration.Mode != requiredMode {
-		if item.Entitlement != nil && item.Entitlement.Mode == requiredMode {
-			return status, errors.New("installed entitlement declaration changed")
-		}
+	if !item.Licensed() {
 		return status, nil
 	}
 	tx, err := a.db.BeginTx(ctx, nil)
@@ -325,7 +354,9 @@ func (a *Adapter) ResolveEntitlement(ctx context.Context, org string, item plugi
 		if err != nil {
 			return status, err
 		}
-		if decision.Forward && !decision.Read {
+		// The first activation is a Core effect: only an installation that is
+		// still active and enabled in the database may cause it.
+		if decision.Forward && !decision.Read && enabled(ctx, tx, org, item) {
 			activate := access
 			activate.Activate = true
 			decision, err = model.DecidePluginEntitlementTx(ctx, a.db, tx, binding, feature, activate, now, a.verifier(binding))
@@ -346,19 +377,13 @@ func (a *Adapter) ResolveEntitlement(ctx context.Context, org string, item plugi
 }
 
 // Guard uses the caller's effect transaction and leaves a denied transaction
-// committable, allowing observed expiry and evaluated-through to persist.
+// committable, allowing observed expiry and evaluated-through to persist. The
+// caller has already re-verified the installation and enablement in tx.
 func (a *Adapter) Guard(ctx context.Context, db model.Databaser, tx model.Tx, org string, item plugins.Installation, feature string, mutating, safety bool) error {
 	if a == nil {
 		return boundaryError("plugin_not_entitled", "The plugin entitlement adapter is unavailable.")
 	}
-	configured, ok := a.installations[item.ID]
-	if !ok {
-		return boundaryError("plugin_not_installed", "The plugin is not installed.")
-	}
-	if configured.declaration.Mode != requiredMode {
-		if item.Entitlement != nil && item.Entitlement.Mode == requiredMode {
-			return boundaryError("plugin_not_entitled", "The installed entitlement declaration changed.")
-		}
+	if !item.Licensed() {
 		return nil
 	}
 	if tx == nil || db == nil {
@@ -410,6 +435,12 @@ func (a *Adapter) Guard(ctx context.Context, db model.Databaser, tx model.Tx, or
 		}
 	}
 	return nil
+}
+
+// enabled re-verifies in tx that the installation is active and enabled for
+// the organization. A stale snapshot or a lookup failure counts as disabled.
+func enabled(ctx context.Context, tx model.Tx, org string, item plugins.Installation) bool {
+	return model.RequirePluginEnablement(ctx, tx, model.PluginUse{OrgID: org, PluginID: item.ID, InstallationID: item.InstallationID, PackageSHA256: item.ManifestSHA256}) == nil
 }
 
 func boundaryError(code, message string) error {

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/url"
 	"slices"
 	"strings"
@@ -388,53 +387,6 @@ func (r *InstallationRegistry) ConfiguredInstallation(orgID, pluginID string) (I
 		return Installation{}, false
 	}
 	return detached(item), true
-}
-
-// LoadInstallations reads the operator installation file.
-func LoadInstallations(reader io.Reader, allowDevelopmentHTTP bool) (*InstallationRegistry, error) {
-	var items []Installation
-	decoder := json.NewDecoder(io.LimitReader(reader, 1<<20))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&items); err != nil {
-		return nil, err
-	}
-	if err := decoder.Decode(new(any)); err != io.EOF {
-		return nil, fmt.Errorf("plugin configuration must contain one JSON document")
-	}
-	return NewInstallationRegistry(items, allowDevelopmentHTTP)
-}
-
-// ResourceEventSubscribers returns, sorted, the installed plugins configured
-// for the organization with a resource event subscription. Core journals an
-// organization's resource events only while this list is non-empty.
-func (r *InstallationRegistry) ResourceEventSubscribers(orgID string) []string {
-	subscribers := []string{}
-	for id, item := range r.current().installations {
-		if _, configured := item.Organizations[orgID]; !configured {
-			continue
-		}
-		if _, subscribed := item.ServiceGrant(ResourceEventsReadAction); subscribed {
-			subscribers = append(subscribers, id)
-		}
-	}
-	slices.Sort(subscribers)
-	return subscribers
-}
-
-// HasResourceEventSubscriber reports whether any installed plugin subscribes
-// to the organization's resource event journal.
-func (r *InstallationRegistry) HasResourceEventSubscriber(orgID string) bool {
-	return len(r.ResourceEventSubscribers(orgID)) > 0
-}
-
-// Installations returns detached copies of every served installation.
-func (r *InstallationRegistry) Installations() []Installation {
-	items := []Installation{}
-	for _, item := range r.current().installations {
-		items = append(items, detached(item))
-	}
-	slices.SortFunc(items, func(a, b Installation) int { return strings.Compare(a.ID, b.ID) })
-	return items
 }
 
 // detached deep-copies an installation. The struct contains only JSON data,

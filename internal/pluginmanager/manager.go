@@ -1,0 +1,149 @@
+// Package pluginmanager is the database-backed Plugin Manager: the only source
+// of plugin installation truth. Operators change it through idempotent,
+// audited commands; every Control Plane replica serves read decisions from a
+// snapshot it refreshes when the revision moves.
+package pluginmanager
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"slices"
+	"sync"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
+	"go.uber.org/zap"
+
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginentitlements"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
+)
+
+// Permission is a platform permission of the Plugin Manager.
+type Permission string
+
+const (
+	PermissionRead  Permission = "plugin_manager_read"
+	PermissionWrite Permission = "plugin_manager_write"
+)
+
+// Config wires a Manager.
+type Config struct {
+	Database     model.Databaser
+	Registry     *plugins.InstallationRegistry
+	Entitlements *pluginentitlements.Adapter
+	// AllowDevelopmentHTTP permits HTTP plugin origins in development only.
+	AllowDevelopmentHTTP bool
+	// Readers and Writers hold plugin_manager_read and plugin_manager_write.
+	// Writers can also read.
+	Readers, Writers []uuid.UUID
+	Logger           *zap.Logger
+}
+
+// Manager executes operator commands and refreshes this replica's snapshot.
+type Manager struct {
+	db                   model.Databaser
+	registry             *plugins.InstallationRegistry
+	entitlements         *pluginentitlements.Adapter
+	allowDevelopmentHTTP bool
+	readers, writers     []uuid.UUID
+	logger               *zap.Logger
+	refresh              sync.Mutex
+}
+
+// New validates the configuration. Permission holders must be users that can
+// never be a plugin workload: plugin workloads authenticate as IAM service
+// users, so service users are refused here and again on every request.
+func New(config Config) (*Manager, error) {
+	if config.Database == nil || config.Registry == nil || config.Entitlements == nil {
+		return nil, errors.New("the Plugin Manager needs a database, a registry and the entitlement adapter")
+	}
+	for _, holder := range slices.Concat(config.Readers, config.Writers) {
+		if !eligibleOperator(holder) {
+			return nil, fmt.Errorf("plugin manager permission holder %s must be a user, never a service user or the internal system identity", holder)
+		}
+	}
+	logger := config.Logger
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+	return &Manager{db: config.Database, registry: config.Registry, entitlements: config.Entitlements, allowDevelopmentHTTP: config.AllowDevelopmentHTTP,
+		readers: slices.Clone(config.Readers), writers: slices.Clone(config.Writers), logger: logger}, nil
+}
+
+func eligibleOperator(id uuid.UUID) bool {
+	return id != uuid.Nil && id != userid.InternalSystemUuid && !userid.IsServiceUser(id)
+}
+
+// Authorize reports whether actor holds permission. Holders are configured
+// platform operators; organization roles are never consulted, and a plugin
+// workload never qualifies even when configured by mistake.
+func (m *Manager) Authorize(actor uuid.UUID, permission Permission) bool {
+	if m == nil || !eligibleOperator(actor) {
+		return false
+	}
+	if slices.Contains(m.writers, actor) {
+		return true
+	}
+	return permission == PermissionRead && slices.Contains(m.readers, actor)
+}
+
+// Refresh publishes the current Plugin Manager state to the registry when its
+// revision moved. An installation that fails validation is not served and is
+// logged; it never stops the others.
+func (m *Manager) Refresh(ctx context.Context) error {
+	m.refresh.Lock()
+	defer m.refresh.Unlock()
+	var revision int64
+	if err := readOnly(ctx, m.db, func(tx model.Tx) (err error) {
+		revision, err = model.PluginManagerRevision(ctx, tx)
+		return err
+	}); err != nil {
+		return err
+	}
+	if revision == m.registry.Revision() {
+		return nil
+	}
+	snapshot, err := model.LoadPluginManagerSnapshot(ctx, m.db)
+	if err != nil {
+		return err
+	}
+	items, rejected := servedInstallations(snapshot)
+	rejected = append(rejected, m.registry.Replace(snapshot.Revision, items, m.allowDevelopmentHTTP)...)
+	for _, err := range rejected {
+		m.logger.Error("Plugin installation is not served", zap.Int64("revision", snapshot.Revision), zap.Error(err))
+	}
+	return nil
+}
+
+// Run refreshes the snapshot every interval until ctx ends.
+func (m *Manager) Run(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := m.Refresh(ctx); err != nil && ctx.Err() == nil {
+				m.logger.Error("Plugin Manager snapshot refresh failed", zap.Error(err))
+			}
+		}
+	}
+}
+
+// readOnly runs read in one repeatable-read snapshot.
+func readOnly(ctx context.Context, db model.Databaser, read func(model.Tx) error) error {
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := read(tx); err != nil {
+		return err
+	}
+	return tx.Commit()
+}

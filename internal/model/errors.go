@@ -18,7 +18,7 @@ func NewErrConflict(message string) ErrConflict {
 
 // NewErrNotFound constructs a not found error. Use this when the subject of the request is not found
 func NewErrNotFound(message string) ErrNotFound {
-	return ErrNotFound{message}
+	return ErrNotFound{Message: message}
 }
 
 type ErrBadRequest struct {
@@ -72,6 +72,7 @@ func IsErrConflict(err error) (ErrConflict, bool) {
 
 type ErrNotFound struct {
 	Message string
+	Code    string
 }
 
 func (e ErrNotFound) Error() string {

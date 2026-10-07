@@ -10,19 +10,14 @@ import (
 	"path/filepath"
 )
 
-// LoadGateway reads operator-owned files. The private key is never part of
-// discovery, manifests, logs or the plugin process environment.
-func LoadGateway(registryPath, signingKeyPath, issuer string, development bool) (*Gateway, error) {
-	file, err := openOperatorFile(registryPath)
-	if err != nil {
-		return nil, fmt.Errorf("open plugin installation configuration: %w", err)
+// LoadSigningKey reads the operator-owned plugin context signing key. The
+// private key is never part of discovery, manifests, logs or the plugin
+// process environment.
+func LoadSigningKey(path string) (ed25519.PrivateKey, error) {
+	if !filepath.IsAbs(path) {
+		return nil, fmt.Errorf("the plugin signing key requires an absolute path")
 	}
-	defer func() { _ = file.Close() }()
-	registry, err := LoadInstallations(file, development)
-	if err != nil {
-		return nil, err
-	}
-	keyFile, err := openOperatorFile(signingKeyPath)
+	keyFile, err := os.OpenInRoot(filepath.Dir(path), filepath.Base(path))
 	if err != nil {
 		return nil, fmt.Errorf("read plugin signing key file: %w", err)
 	}
@@ -43,16 +38,5 @@ func LoadGateway(registryPath, signingKeyPath, issuer string, development bool) 
 	if !ok {
 		return nil, fmt.Errorf("plugin signing key must use Ed25519")
 	}
-	gateway := &Gateway{Registry: registry, SigningKey: key, Issuer: issuer}
-	if err := gateway.Validate(); err != nil {
-		return nil, err
-	}
-	return gateway, nil
-}
-
-func openOperatorFile(path string) (*os.File, error) {
-	if !filepath.IsAbs(path) {
-		return nil, fmt.Errorf("plugin operator files require an absolute path")
-	}
-	return os.OpenInRoot(filepath.Dir(path), filepath.Base(path))
+	return key, nil
 }

@@ -3,7 +3,6 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -40,10 +39,7 @@ func TestPluginPinReceiptRecoveryRequiresCurrentScopedAuthority(t *testing.T) {
 	service, checker := userid.NewServiceUserTokenId().String(), userid.NewServiceUserTokenId().String()
 	permission := "plugin." + grant.PluginID + ".override"
 	item := plugins.Installation{ID: grant.PluginID, DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.test", ServiceUserID: service, AdmissionCheckerID: checker, Organizations: map[string]plugins.AvailabilityState{grant.OrgID: plugins.StateNotEntitled}, ServiceGrants: []plugins.ServiceGrant{{Action: "pin.override.begin", Permission: permission, Scope: "environment"}}}
-	encoded, err := json.Marshal([]plugins.Installation{item})
-	require.NoError(t, err)
-	registry, err := plugins.LoadInstallations(bytes.NewReader(encoded), false)
-	require.NoError(t, err)
+	registry, _ := installedRegistry(t, db, item)
 	var denied atomic.Bool
 	iam := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body iamapi.InternalAuthorizeBody

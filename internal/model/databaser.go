@@ -31,19 +31,19 @@ const UniqueViolationErrorCode string = "unique_violation"
 type databaser struct {
 	*sql.DB
 	logger *zap.Logger
-	// journalScope reports whether an organization has an installed resource
-	// event subscriber. Nil disables the extension resource journal.
-	journalScope func(orgID string) bool
+	// journal enables the extension resource journal. Whether an organization
+	// is journaled is its journal state, maintained with its subscriptions.
+	journal bool
 }
 
 // DatabaserOption configures optional Databaser behaviour.
 type DatabaserOption func(*databaser)
 
 // WithExtensionResourceJournal records the extension resource journal for the
-// organizations accepted by scope. Without this option Core writes no journal
-// entries and keeps the plain transactional outbox path.
-func WithExtensionResourceJournal(scope func(orgID string) bool) DatabaserOption {
-	return func(d *databaser) { d.journalScope = scope }
+// organizations with a resource event subscriber. Without this option Core
+// writes no journal entries and keeps the plain transactional outbox path.
+func WithExtensionResourceJournal() DatabaserOption {
+	return func(d *databaser) { d.journal = true }
 }
 
 type gooseZapLogger struct {
@@ -265,7 +265,7 @@ func (d *databaser) BeginTx(ctx context.Context, opts *sql.TxOptions) (TxWithCom
 	if err != nil {
 		return nil, err
 	}
-	if d.journalScope == nil {
+	if !d.journal {
 		return tx, nil
 	}
 	return &journalTransaction{TxWithCommit: tx, ctx: ctx}, nil
@@ -276,7 +276,7 @@ func (d *databaser) AsReliableOutboxStore() reliableoutbox.Store[*hstandardoutbo
 }
 
 func (d *databaser) InsertPendingEventMessages(ctx context.Context, optionalTx Tx, messages []*hstandardoutbox.PendingEventMessage) ([]*hstandardoutbox.PendingEventMessage, error) {
-	if d.journalScope == nil {
+	if !d.journal {
 		return hstandardoutbox.InsertPendingEventMessages(ctx, d.txOrDb(optionalTx), messages)
 	}
 	if optionalTx == nil {
@@ -291,7 +291,7 @@ func (d *databaser) InsertPendingEventMessages(ctx context.Context, optionalTx T
 		}
 		return result, tx.Commit()
 	}
-	entries, err := extensionJournalEntries(messages, d.journalScope)
+	entries, err := extensionJournalEntries(messages)
 	if err != nil {
 		return nil, err
 	}

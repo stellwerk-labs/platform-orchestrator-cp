@@ -316,10 +316,7 @@ func pluginRecoveryHTTP(t *testing.T, db model.Databaser, grant *model.ExternalO
 	for _, action := range append([]string{"authorization.check"}, grant.Intent.Actions...) {
 		item.ServiceGrants = append(item.ServiceGrants, plugins.ServiceGrant{Action: action, Permission: permission, Scope: "environment"})
 	}
-	encoded, err := json.Marshal([]plugins.Installation{item})
-	require.NoError(t, err)
-	registry, err := plugins.LoadInstallations(bytes.NewReader(encoded), false)
-	require.NoError(t, err)
+	registry, item := installedRegistry(t, db, item)
 	publicKey, privateKey, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
 	iam := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

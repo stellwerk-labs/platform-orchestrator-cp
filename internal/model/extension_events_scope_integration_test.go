@@ -47,10 +47,9 @@ func TestExtensionResourceJournalIsOffWithoutSubscribers(t *testing.T) {
 }
 
 func TestExtensionResourceJournalRecordsOnlySubscribedOrganizations(t *testing.T) {
-	var subscribed string
-	db := externalOperationDatabaseWith(t, WithExtensionResourceJournal(func(org string) bool { return org == subscribed }))
+	db := externalOperationDatabase(t)
 	command := externalGrantFixture(t, db)
-	subscribed = command.OrgID
+	subscribed := command.OrgID
 	resetExtensionEventFixtures(t, db)
 	grant, err := ApplyExternalGrantCommand(t.Context(), db, command)
 	require.NoError(t, err)

@@ -46,6 +46,17 @@ type pluginEntitlementAPIFixture struct {
 
 func newPluginEntitlementAPIFixture(t *testing.T) *pluginEntitlementAPIFixture {
 	t.Helper()
+	f := newUnimportedPluginEntitlementAPIFixture(t)
+	imported := importBundle(t, f.db, f.adapter, f.bundle(t, f.grant.Envelope))
+	require.Empty(t, imported.Diagnostics)
+	require.Equal(t, 1, imported.ImportedGrants)
+	return f
+}
+
+// newUnimportedPluginEntitlementAPIFixture installs a licensed plugin and
+// signs a grant for it without importing the grant.
+func newUnimportedPluginEntitlementAPIFixture(t *testing.T) *pluginEntitlementAPIFixture {
+	t.Helper()
 	db, _ := pluginDeploymentBoundaryDatabase(t)
 	org, err := db.GetOrg(t.Context(), nil, "acme")
 	require.NoError(t, err)
@@ -53,10 +64,9 @@ func newPluginEntitlementAPIFixture(t *testing.T) *pluginEntitlementAPIFixture {
 	require.NoError(t, err)
 	keyDER, err := x509.MarshalPKIXPublicKey(public)
 	require.NoError(t, err)
-	installationID := uuid.New()
 	manifestDigest := sha256.Sum256([]byte("verified package manifest"))
 	item := plugins.Installation{
-		ID: "dev.example.workflow", InstallationID: installationID.String(), ManifestSHA256: hex.EncodeToString(manifestDigest[:]),
+		ID: "dev.example.workflow", ManifestSHA256: hex.EncodeToString(manifestDigest[:]),
 		DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.example.test",
 		Organizations: map[string]plugins.AvailabilityState{"acme": plugins.StateAvailable},
 		Entitlement:   &plugins.EntitlementDeclaration{Mode: "required", Features: []string{"feature-a"}, Limits: []string{}},
@@ -64,11 +74,8 @@ func newPluginEntitlementAPIFixture(t *testing.T) *pluginEntitlementAPIFixture {
 		ServiceGrants: []plugins.ServiceGrant{{Action: "effect.commit", RequiredFeature: "feature-a", Permission: "plugin.dev.example.workflow.control", Scope: "organization"}},
 		Operations:    []plugins.Operation{{ID: "effect", Method: "POST", Path: "/orgs/{orgId}/effects", Mutating: true, RequiredFeature: "feature-a", ServiceActions: []string{"effect.commit"}}},
 	}
-	encodedItem, err := json.Marshal([]plugins.Installation{item})
-	require.NoError(t, err)
-	registry, err := plugins.LoadInstallations(bytes.NewReader(encodedItem), false)
-	require.NoError(t, err)
-	item = registry.Installations()[0]
+	item = installPlugin(t, db, item)
+	installationID := uuid.MustParse(item.InstallationID)
 	binding := entitlements.Binding{PluginID: item.ID, InstallationID: installationID, OrganizationID: org.Uuid, DeclaredFeatures: []string{"feature-a"}}
 	trust := entitlements.TrustStore{Class: entitlements.Development, Issuers: []entitlements.Issuer{{ID: "development.example", PluginIDs: []string{item.ID}, Keys: []entitlements.Key{{ID: []byte("development-key"), PublicKey: public, Purposes: []entitlements.Purpose{entitlements.GrantPurpose, entitlements.RevocationPurpose}}}}}}
 	trustJSON, err := json.Marshal(map[string]any{"schema_version": 1, "trust_class": "development", "issuers": []any{map[string]any{"id": "development.example", "plugin_ids": []string{item.ID}, "keys": []any{map[string]any{"kid": base64.RawURLEncoding.EncodeToString([]byte("development-key")), "public_key_pem": string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: keyDER})), "purposes": []string{"grant", "revocation"}, "valid_from": 0, "valid_until": 0}}}}})
@@ -80,18 +87,14 @@ func newPluginEntitlementAPIFixture(t *testing.T) *pluginEntitlementAPIFixture {
 	f := &pluginEntitlementAPIFixture{db: db, item: item, private: private, trust: trust, binding: binding, base: time.Now().UTC().Truncate(time.Second).Unix(), trustPath: trustPath}
 	f.clock.Store(f.base)
 	clock := func() time.Time { return time.Unix(f.clock.Load(), 0).UTC() }
-	missing, diagnostics, err := pluginentitlements.New(t.Context(), db, []plugins.Installation{item}, entitlements.Development, trustPath, "", clock)
+	missing, diagnostics, err := pluginentitlements.New(db, entitlements.Development, trustPath, clock)
 	require.NoError(t, err)
 	require.Empty(t, diagnostics)
 	f.server = &Server{Database: db, PluginEntitlements: missing}
 	_, err = f.server.pluginEffectDatabase("acme", item, "effect.commit", false).BeginTx(t.Context(), nil)
 	requirePlatformEntitlementCode(t, err, "plugin_not_entitled")
 	f.grant = f.signGrant(t, uuid.New(), 1, f.base+10, f.base+20)
-	bundleJSON, err := json.Marshal(map[string]any{"schema_version": 1, "grants": []string{base64.RawURLEncoding.EncodeToString(f.grant.Envelope)}, "revocations": []string{}})
-	require.NoError(t, err)
-	bundlePath := filepath.Join(tempDir, "development-bundle.json")
-	require.NoError(t, os.WriteFile(bundlePath, bundleJSON, 0o600))
-	f.adapter, diagnostics, err = pluginentitlements.New(t.Context(), db, []plugins.Installation{item}, entitlements.Development, trustPath, bundlePath, clock)
+	f.adapter, diagnostics, err = pluginentitlements.New(db, entitlements.Development, trustPath, clock)
 	require.NoError(t, err)
 	require.Empty(t, diagnostics)
 	tx, err := db.BeginTx(t.Context(), nil)
@@ -119,14 +122,31 @@ func (f *pluginEntitlementAPIFixture) sign(t *testing.T, claims map[uint64]any) 
 
 func (f *pluginEntitlementAPIFixture) signGrant(t *testing.T, issuance uuid.UUID, sequence, expires, grace int64) entitlements.Grant {
 	t.Helper()
-	if sequence < 1 || f.base < 10 || expires < 0 || grace < 0 {
-		t.Fatal("signed grant fixture requires a positive sequence and nonnegative timestamps")
-		return entitlements.Grant{}
-	}
-	raw := f.sign(t, map[uint64]any{1: uint64(1), 2: "grant", 3: "development.example", 4: issuance[:], 5: uint64(sequence), 6: f.item.ID, 7: f.binding.InstallationID[:], 8: f.binding.OrganizationID[:], 9: []string{"feature-a"}, 10: map[string]uint64{}, 11: uint64(f.base - 10), 12: uint64(f.base - 5), 13: uint64(expires), 14: uint64(grace), 15: "development"})
-	grant, err := entitlements.VerifyGrant(raw, f.trust, entitlements.Development, f.binding, time.Unix(f.base, 0))
+	grant, err := entitlements.VerifyGrant(f.signGrantFor(t, f.binding.InstallationID, issuance, sequence, expires, grace), f.trust, entitlements.Development, f.binding, time.Unix(f.base, 0))
 	require.NoError(t, err)
 	return grant
+}
+
+// signGrantFor signs a grant of this plugin and organization bound to installation.
+func (f *pluginEntitlementAPIFixture) signGrantFor(t *testing.T, installation, issuance uuid.UUID, sequence, expires, grace int64) []byte {
+	t.Helper()
+	if sequence < 1 || f.base < 10 || expires < 0 || grace < 0 {
+		t.Fatal("signed grant fixture requires a positive sequence and nonnegative timestamps")
+		return nil
+	}
+	return f.sign(t, map[uint64]any{1: uint64(1), 2: "grant", 3: "development.example", 4: issuance[:], 5: uint64(sequence), 6: f.item.ID, 7: installation[:], 8: f.binding.OrganizationID[:], 9: []string{"feature-a"}, 10: map[string]uint64{}, 11: uint64(f.base - 10), 12: uint64(f.base - 5), 13: uint64(expires), 14: uint64(grace), 15: "development"})
+}
+
+// bundle encodes signed grants as an offline entitlement bundle.
+func (f *pluginEntitlementAPIFixture) bundle(t *testing.T, grants ...[]byte) []byte {
+	t.Helper()
+	encoded := []string{}
+	for _, grant := range grants {
+		encoded = append(encoded, base64.RawURLEncoding.EncodeToString(grant))
+	}
+	raw, err := json.Marshal(map[string]any{"schema_version": 1, "grants": encoded, "revocations": []string{}})
+	require.NoError(t, err)
+	return raw
 }
 
 func (f *pluginEntitlementAPIFixture) signRevocation(t *testing.T, issuance uuid.UUID) entitlements.Revocations {
@@ -205,7 +225,7 @@ func TestPluginEffectDatabaseDenialPersistsMonotonicTimeAndCurrentTrust(t *testi
 	requirePlatformEntitlementCode(t, err, "plugin_not_entitled")
 	// A new adapter with no pinned trust rechecks exact persisted COSE and
 	// denies forward work without erasing prior activation for read/safety.
-	untrusted, diagnostics, err := pluginentitlements.New(t.Context(), f.db, []plugins.Installation{f.item}, entitlements.Development, "", "", func() time.Time { return time.Unix(f.base, 0) })
+	untrusted, diagnostics, err := pluginentitlements.New(f.db, entitlements.Development, "", func() time.Time { return time.Unix(f.base, 0) })
 	require.NoError(t, err)
 	require.Empty(t, diagnostics)
 	f.server.PluginEntitlements = untrusted
@@ -248,28 +268,26 @@ func TestPluginEffectDatabaseSerializesRevocationWithBusinessCommit(t *testing.T
 // running; only this plugin degrades.
 func TestRejectedEntitlementMaterialDegradesOnlyThePlugin(t *testing.T) {
 	f := newPluginEntitlementAPIFixture(t)
-	dir, err := filepath.EvalSymlinks(t.TempDir())
-	require.NoError(t, err)
 	tampered := bytes.Clone(f.grant.Envelope)
 	tampered[len(tampered)-80] ^= 0x01
 	bundleJSON, err := json.Marshal(map[string]any{"schema_version": 1, "grants": []string{base64.RawURLEncoding.EncodeToString(tampered)}, "revocations": []string{base64.RawURLEncoding.EncodeToString([]byte{0xd2, 0x80})}})
 	require.NoError(t, err)
-	bundlePath := filepath.Join(dir, "tampered-bundle.json")
-	require.NoError(t, os.WriteFile(bundlePath, bundleJSON, 0o600))
 	clock := func() time.Time { return time.Unix(f.clock.Load(), 0).UTC() }
 
-	adapter, diagnostics, err := pluginentitlements.New(t.Context(), f.db, []plugins.Installation{f.item}, entitlements.Development, f.trustPath, bundlePath, clock)
+	adapter, diagnostics, err := pluginentitlements.New(f.db, entitlements.Development, f.trustPath, clock)
 	require.NoError(t, err)
-	require.Equal(t, []string{pluginentitlements.DiagnosticGrantRejected, pluginentitlements.DiagnosticRevocationsRejected}, diagnosticCodes(diagnostics))
+	require.Empty(t, diagnostics)
+	require.Equal(t, []string{pluginentitlements.DiagnosticGrantRejected, pluginentitlements.DiagnosticRevocationsRejected}, diagnosticCodes(importBundle(t, f.db, adapter, bundleJSON).Diagnostics))
 	status, err := adapter.ResolveEntitlement(t.Context(), "acme", f.item)
 	require.NoError(t, err)
 	require.Equal(t, "valid", status.Features["feature-a"].State, "a rejected document keeps the persisted decision")
 
 	// Development trust in production mode: Core starts, the persisted grant
 	// no longer verifies, forward work stops and history stays readable.
-	adapter, diagnostics, err = pluginentitlements.New(t.Context(), f.db, []plugins.Installation{f.item}, entitlements.Production, f.trustPath, bundlePath, clock)
+	adapter, diagnostics, err = pluginentitlements.New(f.db, entitlements.Production, f.trustPath, clock)
 	require.NoError(t, err)
-	require.Equal(t, []string{pluginentitlements.DiagnosticTrustRejected, pluginentitlements.DiagnosticBundleRejected}, diagnosticCodes(diagnostics))
+	require.Equal(t, []string{pluginentitlements.DiagnosticTrustRejected}, diagnosticCodes(diagnostics))
+	require.Equal(t, []string{pluginentitlements.DiagnosticBundleRejected}, diagnosticCodes(importBundle(t, f.db, adapter, bundleJSON).Diagnostics))
 	status, err = adapter.ResolveEntitlement(t.Context(), "acme", f.item)
 	require.NoError(t, err)
 	require.Equal(t, "untrusted", status.Features["feature-a"].State)
@@ -278,6 +296,18 @@ func TestRejectedEntitlementMaterialDegradesOnlyThePlugin(t *testing.T) {
 	f.server.PluginEntitlements = adapter
 	_, err = f.server.pluginEffectDatabase("acme", f.item, "effect.commit", false).BeginTx(t.Context(), nil)
 	requirePlatformEntitlementCode(t, err, "plugin_not_entitled")
+}
+
+// importBundle imports raw in its own committed transaction.
+func importBundle(t *testing.T, db model.Databaser, adapter *pluginentitlements.Adapter, raw []byte) pluginentitlements.BundleImport {
+	t.Helper()
+	tx, err := db.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	defer func() { _ = tx.Rollback() }()
+	result, err := adapter.ImportBundle(t.Context(), tx, raw, "internal_system")
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
+	return result
 }
 
 func diagnosticCodes(diagnostics []pluginentitlements.Diagnostic) []string {
