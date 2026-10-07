@@ -1,4 +1,4 @@
-DP_IMAGE ?= ghcr.io/stellwerk-labs/platform-orchestrator-dp:v2.0.0
+DP_IMAGE ?= ghcr.io/stellwerk-labs/platform-orchestrator-dp:v2.0.0@sha256:275947e6176d45df02979d7d600e7ebb096561e46cd577049761e24e0a8ec9c3
 IAM_IMAGE ?= ghcr.io/stellwerk-labs/platform-orchestrator-iam@sha256:0fb4b3645ae2d7ccf366921c8d9490a6862cce111bdcb683ef6afcc852b40331
 # nats:2.12.15-alpine (multi-platform index), the disposable JetStream of test-integration-postgres.
 NATS_IMAGE ?= nats@sha256:b270f5e2428354c0335612694d7dd2fb588148e567a5757fdff325ef9c9332e6
@@ -74,5 +74,5 @@ test-integration-logs:
 .PHONY: connect-to-integ-db
 connect-to-integ-db:
 	@score-compose resources get-outputs 'postgres.default#platform-orchestrator-cp.postgres' \
-		--format 'Command: docker run -it --network integration-tests_default --rm postgres:16-alpine psql -h {{ .host }} -U {{ .username }} --dbname {{ .name }}'
+		--format 'Command: docker run -it --network integration-tests_default --rm postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea psql -h {{ .host }} -U {{ .username }} --dbname {{ .name }}'
 	@score-compose resources get-outputs 'postgres.default#platform-orchestrator-cp.postgres' --format 'Password: {{ .password }}'
