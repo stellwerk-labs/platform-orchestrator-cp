@@ -414,7 +414,7 @@ paths:
       operationId: readPluginOperationInventory
       tags: [Plugin]
       security: [{userIdHeader: []}]
-      description: Read, without a user, the current inventory of exactly the frozen Modules and Environments of an operation, for example to resynchronise after plugin_resource_cursor_expired. Only the configured plugin service may call. The frozen operation must delegate inventory.read, the operator must register that service grant, and the operation's controller must still pass current scoped IAM checks. Active and suspended operations may read, and released ones for one journal retention window after their release, like journal safety reconciliation; prepared operations are rejected. Contains no Module source, provider configuration or secrets.
+      description: Read, without a user, the current inventory of exactly the frozen Modules and Environments of an operation, for example to resynchronise after plugin_resource_cursor_expired. Only the configured plugin service may call. The frozen operation must delegate inventory.read, the operator must register that service grant, and the operation's controller must still pass current scoped IAM checks. Prepared, active and suspended operations may read, matching the resource journal, and released ones for one journal retention window after their release. Contains no Module source, provider configuration or secrets.
       parameters:
         - $ref: '#/components/parameters/orgIdPathParam'
         - {name: pluginId, in: path, required: true, schema: {type: string}}

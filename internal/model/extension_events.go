@@ -426,9 +426,9 @@ func extensionJournalReleaseCutoff(now time.Time, window time.Duration) time.Tim
 }
 
 // ExternalOperationReconciles reports whether an operation may still
-// reconcile from Core without a user: active and suspended operations, and
-// released ones for one journal retention window, during which the journal also
-// keeps their history. Prepared operations have not started.
+// reconcile from Core without a user: prepared, active and suspended
+// operations, matching the resource journal, and released ones for one journal
+// retention window, during which the journal also keeps their history.
 func ExternalOperationReconciles(ctx context.Context, db Databaser, grant ExternalOperationGrant, now time.Time, window time.Duration) (bool, error) {
 	tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
@@ -446,7 +446,7 @@ func ExternalOperationReconciles(ctx context.Context, db Databaser, grant Extern
 
 func externalOperationReconcilesAt(state string, updated, now time.Time, window time.Duration) bool {
 	switch state {
-	case grantStateActive, grantStateSuspended:
+	case grantStatePrepared, grantStateActive, grantStateSuspended:
 		return true
 	case grantStateReleased:
 		return updated.After(extensionJournalReleaseCutoff(now, window))

@@ -121,10 +121,10 @@ The response is the `PluginInventory` snapshot of the user-delegated
 frozen Module and Environment UUIDs, the scope its resource journal exposes. It
 accepts no selector, so it can never widen that scope; an operation without
 Environments sees none. Only the installation's configured service identity may
-call. As with journal safety reconciliation, active and suspended operations may
-read, and released ones for one `PLUGIN_EVENT_JOURNAL_RETENTION` window after
-their release. Prepared operations return 409 `plugin_operation_conflict`, as do
-operations released longer ago; unknown operations return 404
+call. Prepared, active and suspended operations may read, matching the
+resource journal, and released ones for one `PLUGIN_EVENT_JOURNAL_RETENTION`
+window after their release. Operations released longer ago return 409
+`plugin_operation_conflict`; unknown operations return 404
 `plugin_operation_not_found`. The operation's controller must still pass current
 scoped IAM, as for the journal. The user-delegated inventory read is unchanged.
 

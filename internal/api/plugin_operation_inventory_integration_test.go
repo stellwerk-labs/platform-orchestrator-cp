@@ -146,7 +146,7 @@ func TestPluginOperationInventoryIsUnattendedButConfinedToTheActiveGrant(t *test
 		ActorID: grant.ActorID, SourceOperation: "prepare", SourceDigest: strings.Repeat("e", 64), RequestID: "prepare-unstarted", Action: "prepare",
 		Reason: "Prepare", Intent: &intent})
 	require.NoError(t, err)
-	requireCode(read(service, prepared.OperationID), http.StatusConflict, "plugin_operation_conflict")
+	require.Equal(t, http.StatusOK, read(service, prepared.OperationID).Code, "a prepared operation can resynchronise before it starts")
 }
 
 func TestPluginOperationInventoryRequiresTheFrozenDelegation(t *testing.T) {

@@ -37,7 +37,7 @@ func TestExternalOperationReconcilesLikeTheJournalWindow(t *testing.T) {
 		"suspended":                   {grantStateSuspended, now.Add(-365 * 24 * time.Hour), true},
 		"released within the window":  {grantStateReleased, now.Add(-window + time.Hour), true},
 		"released before the window":  {grantStateReleased, now.Add(-window - time.Hour), false},
-		"prepared has not started":    {grantStatePrepared, now, false},
+		"prepared":                    {grantStatePrepared, now, true},
 		"an unknown state is refused": {"archived", now, false},
 	} {
 		t.Run(name, func(t *testing.T) {
