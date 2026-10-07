@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 
 	"github.com/labstack/echo/v4"
 	"github.com/stellwerk-labs/golib/herrors"
@@ -80,7 +81,7 @@ func (s *Server) InvokePluginOperation(ctx context.Context, request InvokePlugin
 		}
 		return nil, err
 	}
-	return InvokePluginOperation200JSONResponse{Status: result.Status, Body: result.Body}, nil
+	return InvokePluginOperation200JSONResponse{Status: result.Status, Body: result.Body, EntitlementWarning: pluginEntitlementWarningToAPI(result.EntitlementWarning)}, nil
 }
 
 func (s *Server) GetPluginCapability(
@@ -123,9 +124,16 @@ func pluginEntitlementToAPI(status *plugins.EntitlementStatus) *PluginEntitlemen
 	if status == nil {
 		return nil
 	}
-	result := &PluginEntitlementStatus{Features: map[string]PluginFeatureAccess{}}
+	result := &PluginEntitlementStatus{Features: map[string]PluginFeatureAccess{}, Warning: pluginEntitlementWarningToAPI(status.Warning)}
 	for feature, access := range status.Features {
 		result.Features[feature] = PluginFeatureAccess{State: access.State, TrustClass: access.TrustClass, Forward: access.Forward, Read: access.Read, Safety: access.Safety, ExpiresAt: access.ExpiresAt, GraceUntil: access.GraceUntil}
 	}
 	return result
+}
+
+func pluginEntitlementWarningToAPI(warning *plugins.EntitlementWarning) *PluginEntitlementWarning {
+	if warning == nil {
+		return nil
+	}
+	return &PluginEntitlementWarning{Code: PluginEntitlementWarningCode(warning.Code), Message: warning.Message, GraceUntil: warning.GraceUntil, Features: slices.Clone(warning.Features)}
 }

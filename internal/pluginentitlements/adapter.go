@@ -44,12 +44,36 @@ type Adapter struct {
 
 var _ plugins.EntitlementResolver = (*Adapter)(nil)
 
+// Diagnostic codes are stable. Each names offline entitlement material that
+// Core did not apply. None of them stops Core: an affected plugin keeps its
+// persisted decision, which is not_entitled without an imported grant and
+// untrusted when a persisted grant no longer verifies against current trust.
+const (
+	DiagnosticTrustRejected       = "plugin_entitlement_trust_rejected"
+	DiagnosticBundleRejected      = "plugin_entitlement_bundle_rejected"
+	DiagnosticGrantRejected       = "plugin_entitlement_grant_rejected"
+	DiagnosticRevocationsRejected = "plugin_entitlement_revocations_rejected"
+)
+
+// Diagnostic is an operator-facing reason, safe to log. Detail never holds
+// signed bytes or tenant data beyond what the operator's own files contain.
+type Diagnostic struct {
+	Code   string
+	Detail string
+}
+
 // New loads bounded no-symlink operator files. Both paths may be empty, in
 // which case required plugins remain unentitled. Trust-only startup supports
 // revalidation of persisted evidence after a key rotation or removal.
-func New(ctx context.Context, db model.Databaser, items []plugins.Installation, mode entitlements.TrustClass, trustPath, bundlePath string, clock func() time.Time) (*Adapter, error) {
-	if db == nil || (mode != entitlements.Production && mode != entitlements.Development) || bundlePath != "" && trustPath == "" || len(items) > 128 {
-		return nil, errors.New("invalid offline entitlement adapter configuration")
+//
+// The error is reserved for Core configuration: the database handle, the
+// entitlement mode and the installed plugin set. Entitlement material (the
+// trust file, the bundle and every signed document in it) never fails Core;
+// a problem with it is returned as a Diagnostic and only degrades the plugins
+// it would have entitled.
+func New(ctx context.Context, db model.Databaser, items []plugins.Installation, mode entitlements.TrustClass, trustPath, bundlePath string, clock func() time.Time) (*Adapter, []Diagnostic, error) {
+	if db == nil || (mode != entitlements.Production && mode != entitlements.Development) || len(items) > 128 {
+		return nil, nil, errors.New("invalid offline entitlement adapter configuration")
 	}
 	if clock == nil {
 		clock = time.Now
@@ -57,7 +81,7 @@ func New(ctx context.Context, db model.Databaser, items []plugins.Installation, 
 	a := &Adapter{db: db, mode: mode, now: clock, trust: entitlements.TrustStore{Class: mode}, installations: make(map[string]installed, len(items))}
 	for _, item := range items {
 		if item.ID == "" || a.installations[item.ID].id != "" {
-			return nil, errors.New("duplicate or empty installed plugin ID")
+			return nil, nil, errors.New("duplicate or empty installed plugin ID")
 		}
 		saved := installed{id: item.ID, installationID: item.InstallationID, manifestSHA256: item.ManifestSHA256, organizations: map[string]plugins.AvailabilityState{}}
 		if item.Entitlement != nil {
@@ -68,83 +92,125 @@ func New(ctx context.Context, db model.Databaser, items []plugins.Installation, 
 		}
 		a.installations[item.ID] = saved
 	}
+	var diagnostics []Diagnostic
 	if trustPath != "" {
-		raw, err := readRegularFile(trustPath, entitlements.MaxTrustJSONBytes)
+		trust, err := loadTrust(trustPath, mode)
 		if err != nil {
-			return nil, fmt.Errorf("load issuer trust: %w", err)
-		}
-		a.trust, err = entitlements.ParseTrustJSON(raw, mode)
-		if err != nil {
-			return nil, fmt.Errorf("parse issuer trust: %w", err)
+			diagnostics = append(diagnostics, Diagnostic{DiagnosticTrustRejected, err.Error()})
+		} else {
+			a.trust = trust
 		}
 	}
 	if bundlePath != "" {
-		if err := a.ImportBundle(ctx, bundlePath); err != nil {
-			return nil, err
-		}
+		diagnostics = append(diagnostics, a.ImportBundle(ctx, bundlePath)...)
 	}
-	return a, nil
+	return a, diagnostics, nil
 }
 
-// ImportBundle verifies every document before writing any of them. Every
-// individual import is then monotonic and atomic in the model transaction.
-func (a *Adapter) ImportBundle(ctx context.Context, path string) error {
-	if a == nil || a.db == nil || len(a.trust.Issuers) == 0 {
-		return errors.New("issuer trust is required to import a bundle")
+func loadTrust(path string, mode entitlements.TrustClass) (entitlements.TrustStore, error) {
+	raw, err := readRegularFile(path, entitlements.MaxTrustJSONBytes)
+	if err != nil {
+		return entitlements.TrustStore{}, fmt.Errorf("load issuer trust: %w", err)
+	}
+	trust, err := entitlements.ParseTrustJSON(raw, mode)
+	if err != nil {
+		return entitlements.TrustStore{}, fmt.Errorf("parse issuer trust: %w", err)
+	}
+	return trust, nil
+}
+
+// ImportBundle imports every document that verifies on its own signature and,
+// for a grant, matches an exact installed binding. A rejected document is
+// skipped with a Diagnostic and never blocks the others. Skipping is safe:
+// an unverifiable revocation is no revocation, and an unimported grant leaves
+// its binding at its persisted, still independently verified decision. Every
+// individual import is monotonic and atomic in its own model transaction.
+func (a *Adapter) ImportBundle(ctx context.Context, path string) []Diagnostic {
+	if a == nil || a.db == nil {
+		return []Diagnostic{{DiagnosticBundleRejected, "the entitlement adapter is unavailable"}}
+	}
+	if len(a.trust.Issuers) == 0 {
+		return []Diagnostic{{DiagnosticBundleRejected, "the bundle was not imported because no issuer trust is configured"}}
 	}
 	raw, err := readRegularFile(path, MaxBundleBytes)
 	if err != nil {
-		return fmt.Errorf("load entitlement bundle: %w", err)
+		return []Diagnostic{{DiagnosticBundleRejected, fmt.Sprintf("load entitlement bundle: %v", err)}}
 	}
 	bundle, err := ParseBundleJSON(raw)
 	if err != nil {
-		return err
+		return []Diagnostic{{DiagnosticBundleRejected, err.Error()}}
 	}
-	now := a.now().UTC()
 	var candidates []entitlements.Binding
+	var diagnostics []Diagnostic
 	if len(bundle.Grants) > 0 {
-		candidates, err = a.candidateBindings(ctx)
-		if err != nil {
-			return err
+		if candidates, err = a.candidateBindings(ctx); err != nil {
+			diagnostics = append(diagnostics, Diagnostic{DiagnosticBundleRejected, fmt.Sprintf("no grant was imported: %v", err)})
+			bundle.Grants = nil
 		}
 	}
-	grants := make([]entitlements.Grant, 0, len(bundle.Grants))
-	for _, encoded := range bundle.Grants {
-		var verified entitlements.Grant
-		matched := false
-		for _, candidate := range candidates {
-			if verified, err = entitlements.VerifyGrant(encoded, a.trust, a.mode, candidate, now); err == nil {
-				matched = true
-				break
-			}
+	grants, snapshots, rejected := verifyBundle(bundle, a.trust, a.mode, candidates, a.now().UTC())
+	diagnostics = append(diagnostics, rejected...)
+	for _, grant := range grants {
+		if _, err := model.ImportPluginEntitlementGrant(ctx, a.db, grant.Grant, operatorImporter, bundle.Digest); err != nil {
+			diagnostics = append(diagnostics, Diagnostic{DiagnosticGrantRejected, fmt.Sprintf("grant %d was not imported: %v", grant.index, err)})
 		}
+	}
+	for _, snapshot := range snapshots {
+		if _, err := model.ImportPluginEntitlementRevocations(ctx, a.db, snapshot.Revocations, operatorImporter, bundle.Digest); err != nil {
+			diagnostics = append(diagnostics, Diagnostic{DiagnosticRevocationsRejected, fmt.Sprintf("revocation snapshot %d was not imported: %v", snapshot.index, err)})
+		}
+	}
+	return diagnostics
+}
+
+type indexedGrant struct {
+	entitlements.Grant
+	index int
+}
+
+type indexedRevocations struct {
+	entitlements.Revocations
+	index int
+}
+
+// verifyBundle checks signatures and bindings without writing anything and
+// returns the accepted documents in import order. The grant reason stays
+// deliberately coarse: it says neither which binding nor which check failed.
+func verifyBundle(bundle Bundle, trust entitlements.TrustStore, mode entitlements.TrustClass, candidates []entitlements.Binding, now time.Time) ([]indexedGrant, []indexedRevocations, []Diagnostic) {
+	var diagnostics []Diagnostic
+	grants := make([]indexedGrant, 0, len(bundle.Grants))
+	for i, encoded := range bundle.Grants {
+		verified, matched := matchGrant(encoded, trust, mode, candidates, now)
 		if !matched {
-			return errors.New("signed grant is invalid or has no exact installed binding")
+			diagnostics = append(diagnostics, Diagnostic{DiagnosticGrantRejected, fmt.Sprintf("grant %d is invalid or has no exact installed binding", i)})
+			continue
 		}
-		grants = append(grants, verified)
+		grants = append(grants, indexedGrant{verified, i})
 	}
-	snapshots := make([]entitlements.Revocations, 0, len(bundle.Revocations))
-	for _, encoded := range bundle.Revocations {
-		snapshot, err := entitlements.VerifyRevocations(encoded, a.trust, a.mode, now)
+	snapshots := make([]indexedRevocations, 0, len(bundle.Revocations))
+	for i, encoded := range bundle.Revocations {
+		snapshot, err := entitlements.VerifyRevocations(encoded, trust, mode, now)
 		if err != nil {
-			return fmt.Errorf("signed revocation snapshot: %w", err)
+			diagnostics = append(diagnostics, Diagnostic{DiagnosticRevocationsRejected, fmt.Sprintf("revocation snapshot %d: %v", i, err)})
+			continue
 		}
-		snapshots = append(snapshots, snapshot)
+		snapshots = append(snapshots, indexedRevocations{snapshot, i})
 	}
 	sort.Slice(grants, func(i, j int) bool {
-		if grants[i].Issuer != grants[j].Issuer {
-			return grants[i].Issuer < grants[j].Issuer
+		left, right := grants[i], grants[j]
+		if left.Issuer != right.Issuer {
+			return left.Issuer < right.Issuer
 		}
-		if grants[i].InstallationID != grants[j].InstallationID {
-			return grants[i].InstallationID.String() < grants[j].InstallationID.String()
+		if left.InstallationID != right.InstallationID {
+			return left.InstallationID.String() < right.InstallationID.String()
 		}
-		if grants[i].PluginID != grants[j].PluginID {
-			return grants[i].PluginID < grants[j].PluginID
+		if left.PluginID != right.PluginID {
+			return left.PluginID < right.PluginID
 		}
-		if grants[i].OrganizationID != grants[j].OrganizationID {
-			return grants[i].OrganizationID.String() < grants[j].OrganizationID.String()
+		if left.OrganizationID != right.OrganizationID {
+			return left.OrganizationID.String() < right.OrganizationID.String()
 		}
-		return grants[i].Sequence < grants[j].Sequence
+		return left.Sequence < right.Sequence
 	})
 	sort.Slice(snapshots, func(i, j int) bool {
 		if snapshots[i].Issuer != snapshots[j].Issuer {
@@ -152,17 +218,16 @@ func (a *Adapter) ImportBundle(ctx context.Context, path string) error {
 		}
 		return snapshots[i].Sequence < snapshots[j].Sequence
 	})
-	for _, grant := range grants {
-		if _, err := model.ImportPluginEntitlementGrant(ctx, a.db, grant, operatorImporter, bundle.Digest); err != nil {
-			return fmt.Errorf("import signed grant: %w", err)
+	return grants, snapshots, diagnostics
+}
+
+func matchGrant(encoded []byte, trust entitlements.TrustStore, mode entitlements.TrustClass, candidates []entitlements.Binding, now time.Time) (entitlements.Grant, bool) {
+	for _, candidate := range candidates {
+		if verified, err := entitlements.VerifyGrant(encoded, trust, mode, candidate, now); err == nil {
+			return verified, true
 		}
 	}
-	for _, snapshot := range snapshots {
-		if _, err := model.ImportPluginEntitlementRevocations(ctx, a.db, snapshot, operatorImporter, bundle.Digest); err != nil {
-			return fmt.Errorf("import signed revocations: %w", err)
-		}
-	}
-	return nil
+	return entitlements.Grant{}, false
 }
 
 func (a *Adapter) candidateBindings(ctx context.Context) ([]entitlements.Binding, error) {
@@ -227,8 +292,8 @@ func baseAccess(state plugins.AvailabilityState) model.PluginEntitlementAccess {
 }
 
 // ResolveEntitlement is a discovery projection. It creates a first durable
-// feature activation only after a current valid forward decision, never for an
-// expired, revoked, untrusted, or absent grant.
+// feature activation only after a current forward decision (valid or grace),
+// never for an expired, revoked, untrusted, or absent grant.
 func (a *Adapter) ResolveEntitlement(ctx context.Context, org string, item plugins.Installation) (plugins.EntitlementStatus, error) {
 	status := plugins.EntitlementStatus{Features: map[string]plugins.FeatureAccess{}}
 	if a == nil || a.db == nil {
@@ -315,7 +380,7 @@ func (a *Adapter) Guard(ctx context.Context, db model.Databaser, tx model.Tx, or
 	if err != nil {
 		return err
 	}
-	if mutating && !safety && !decision.Forward && (decision.State == string(entitlements.Grace) || decision.State == string(entitlements.Expired) || decision.State == "revoked" || decision.State == "untrusted") {
+	if mutating && !safety && !decision.Forward && (decision.State == string(entitlements.Expired) || decision.State == "revoked" || decision.State == "untrusted") {
 		return boundaryError("plugin_not_entitled", "The plugin feature has no current entitlement for this operation.")
 	}
 	if state == plugins.StateIncompatible {
@@ -332,7 +397,7 @@ func (a *Adapter) Guard(ctx context.Context, db model.Databaser, tx model.Tx, or
 		permitted = decision.Forward
 	}
 	if !permitted {
-		if state == plugins.StateNotEnabled && decision.State == string(entitlements.Valid) {
+		if state == plugins.StateNotEnabled && (decision.State == string(entitlements.Valid) || decision.State == string(entitlements.Grace)) {
 			return boundaryError("plugin_not_enabled", "The plugin is not enabled for this organization.")
 		}
 		return boundaryError("plugin_not_entitled", "The plugin feature has no current entitlement for this operation.")

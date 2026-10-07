@@ -29,8 +29,9 @@ type Invocation struct {
 }
 
 type InvocationResult struct {
-	Status int             `json:"status"`
-	Body   json.RawMessage `json:"body"`
+	Status             int                 `json:"status"`
+	Body               json.RawMessage     `json:"body"`
+	EntitlementWarning *EntitlementWarning `json:"entitlement_warning,omitempty"`
 }
 
 type GatewayError struct {
@@ -151,7 +152,7 @@ func (g *Gateway) Invoke(ctx context.Context, org, pluginID, actor string, invoc
 	if !json.Valid(data) {
 		return nil, &GatewayError{pluginResponseInvalid, "The plugin returned a non-JSON response.", 502}
 	}
-	return &InvocationResult{Status: response.StatusCode, Body: data}, nil
+	return &InvocationResult{Status: response.StatusCode, Body: data, EntitlementWarning: descriptor.Entitlement.GraceWarning(operation.RequiredFeature)}, nil
 }
 
 func (g *Gateway) Validate() error {

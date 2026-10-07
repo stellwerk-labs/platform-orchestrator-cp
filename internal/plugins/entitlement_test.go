@@ -2,9 +2,13 @@ package plugins
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -109,4 +113,67 @@ func TestEntitlementAccessSeparatesForwardHistoryAndSafety(t *testing.T) {
 			require.False(t, d.Allows("undeclared", true, false))
 		})
 	}
+}
+
+// fixedEntitlements is the evaluated input Core's adapter would return; the
+// adapter itself is covered against PostgreSQL by integration tests.
+type fixedEntitlements EntitlementStatus
+
+func (f fixedEntitlements) ResolveEntitlement(context.Context, string, Installation) (EntitlementStatus, error) {
+	return EntitlementStatus(f), nil
+}
+
+func TestGraceKeepsForwardWorkAndWarns(t *testing.T) {
+	item := licensedInstallation()
+	item.Entitlement.Features = []string{"audit", "workflow", "zeta"}
+	early, late := time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC), time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+	status := EntitlementStatus{Features: map[string]FeatureAccess{
+		"zeta":     {State: "grace", Forward: true, Read: true, Safety: true, GraceUntil: &late},
+		"workflow": {State: "grace", Forward: true, Read: true, Safety: true, GraceUntil: &early},
+		"audit":    {State: "valid", Forward: true, Read: true, Safety: true},
+	}}
+	d := projectEntitlement(item, Descriptor{State: StateAvailable, Mode: ModeFull}, status)
+	require.Equal(t, StateAvailable, d.State)
+	require.Equal(t, ModeFull, d.Mode)
+	require.True(t, d.Allows("workflow", true, false), "grace must not block forward work")
+	require.Equal(t, &EntitlementWarning{
+		Code: EntitlementGraceWarning, GraceUntil: early, Features: []string{"workflow", "zeta"},
+		Message: "The signed plugin licence is in its grace period until 2026-10-08T12:00:00Z. Forward work continues until then; ask an administrator to renew the licence.",
+	}, d.Entitlement.Warning)
+	require.Equal(t, d.Entitlement.Warning.Message, d.AdminAction)
+	require.Nil(t, d.Entitlement.GraceWarning("audit"), "a valid feature carries no warning")
+	require.Equal(t, late, d.Entitlement.GraceWarning("zeta").GraceUntil)
+
+	valid := projectEntitlement(item, Descriptor{State: StateAvailable, Mode: ModeFull}, EntitlementStatus{Features: map[string]FeatureAccess{"workflow": {State: "valid", Forward: true, Read: true, Safety: true}}})
+	require.Nil(t, valid.Entitlement.Warning)
+	require.Empty(t, valid.AdminAction)
+	var none *EntitlementStatus
+	require.Nil(t, none.GraceWarning("workflow"))
+}
+
+func TestGatewayResultCarriesGraceWarning(t *testing.T) {
+	_, key, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`{"ok":true}`)) }))
+	defer backend.Close()
+	item := licensedInstallation()
+	item.Backend = backend.URL
+	encoded, err := json.Marshal([]Installation{item})
+	require.NoError(t, err)
+	registry, err := LoadInstallations(strings.NewReader(string(encoded)), true)
+	require.NoError(t, err)
+	until := time.Now().UTC().Add(time.Hour).Truncate(time.Second)
+	registry.Entitlements = fixedEntitlements{Features: map[string]FeatureAccess{"workflow": {State: "grace", Forward: true, Read: true, Safety: true, GraceUntil: &until}}}
+	gateway := &Gateway{Registry: registry, SigningKey: key, Issuer: "cp"}
+	result, err := gateway.Invoke(t.Context(), "acme", item.ID, testActor, Invocation{OperationID: "read"})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, result.Status)
+	require.NotNil(t, result.EntitlementWarning)
+	require.Equal(t, EntitlementGraceWarning, result.EntitlementWarning.Code)
+	require.Equal(t, until, result.EntitlementWarning.GraceUntil)
+
+	registry.Entitlements = fixedEntitlements{Features: map[string]FeatureAccess{"workflow": {State: "valid", Forward: true, Read: true, Safety: true}}}
+	result, err = gateway.Invoke(t.Context(), "acme", item.ID, testActor, Invocation{OperationID: "read"})
+	require.NoError(t, err)
+	require.Nil(t, result.EntitlementWarning)
 }

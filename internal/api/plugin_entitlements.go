@@ -50,6 +50,16 @@ func pluginServiceAllowed(item plugins.Installation, descriptor plugins.Descript
 	return pluginFeatureAllowed(descriptor, policy.RequiredFeature, mutating, safety)
 }
 
+// pluginServiceWarning reports a grace-period licence for the feature a
+// service action requires. It is display information, never authorization.
+func pluginServiceWarning(item plugins.Installation, descriptor plugins.Descriptor, action string) *PluginEntitlementWarning {
+	policy, exists := item.ServiceGrant(action)
+	if !exists {
+		return nil
+	}
+	return pluginEntitlementWarningToAPI(descriptor.Entitlement.GraceWarning(policy.RequiredFeature))
+}
+
 // Only explicit plugin-effect calls receive this wrapper. Ordinary Module
 // Management and deployment paths never acquire an entitlement dependency.
 func (s *Server) pluginEffectDatabase(org string, item plugins.Installation, action string, safety bool) model.Databaser {

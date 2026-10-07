@@ -62,8 +62,10 @@ func newPluginGrantRecoveryHTTP(t *testing.T, secondFeature, freshInstallation b
 		digest := sha256.Sum256([]byte("different verified package manifest"))
 		item.ManifestSHA256 = hex.EncodeToString(digest[:])
 		clock := func() time.Time { return time.Unix(f.clock.Load(), 0).UTC() }
-		f.adapter, err = pluginentitlements.New(t.Context(), f.db, []plugins.Installation{item}, entitlements.Development, f.trustPath, "", clock)
+		var diagnostics []pluginentitlements.Diagnostic
+		f.adapter, diagnostics, err = pluginentitlements.New(t.Context(), f.db, []plugins.Installation{item}, entitlements.Development, f.trustPath, "", clock)
 		require.NoError(t, err)
+		require.Empty(t, diagnostics)
 	}
 	encoded, err := json.Marshal([]plugins.Installation{item})
 	require.NoError(t, err)

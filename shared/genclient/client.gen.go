@@ -683,6 +683,21 @@ func (e PluginDispatchCheckAction) Valid() bool {
 	}
 }
 
+// Defines values for PluginEntitlementWarningCode.
+const (
+	PluginEntitlementWarningCodeGrace PluginEntitlementWarningCode = "plugin_entitlement_grace"
+)
+
+// Valid indicates whether the value is a known member of the PluginEntitlementWarningCode enum.
+func (e PluginEntitlementWarningCode) Valid() bool {
+	switch e {
+	case PluginEntitlementWarningCodeGrace:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PluginModuleOperationReceiptState.
 const (
 	PluginModuleOperationReceiptStateActive   PluginModuleOperationReceiptState = "active"
@@ -2917,7 +2932,27 @@ type PluginDispatchCheckAction string
 // PluginEntitlementStatus Non-secret server-derived licence projection. Neither this projection nor a capability grants IAM permissions or authorizes execution.
 type PluginEntitlementStatus struct {
 	Features map[string]PluginFeatureAccess `json:"features"`
+
+	// Warning Machine-readable licence warning that never changes authorization. While a declared feature is in its signed grace period, forward work still succeeds. After grace_until forward work is refused with plugin_not_entitled; read, export, cancel and rollback remain available.
+	Warning *PluginEntitlementWarning `json:"warning,omitempty"`
 }
+
+// PluginEntitlementWarning Machine-readable licence warning that never changes authorization. While a declared feature is in its signed grace period, forward work still succeeds. After grace_until forward work is refused with plugin_not_entitled; read, export, cancel and rollback remain available.
+type PluginEntitlementWarning struct {
+	Code PluginEntitlementWarningCode `json:"code"`
+
+	// Features Declared features in their grace period, sorted.
+	Features []string `json:"features"`
+
+	// GraceUntil Earliest end of the grace period among the listed features.
+	GraceUntil time.Time `json:"grace_until"`
+
+	// Message Human-readable text a client can show as is.
+	Message string `json:"message"`
+}
+
+// PluginEntitlementWarningCode defines model for PluginEntitlementWarning.Code.
+type PluginEntitlementWarningCode string
 
 // PluginFeatureAccess defines model for PluginFeatureAccess.
 type PluginFeatureAccess struct {
@@ -2927,7 +2962,7 @@ type PluginFeatureAccess struct {
 	Read       bool       `json:"read"`
 	Safety     bool       `json:"safety"`
 
-	// State Effective persisted licence state for this declared feature.
+	// State Effective persisted licence state for this declared feature: valid, grace, expired, not_yet_valid, revoked, untrusted, not_entitled or missing. Forward work is allowed in valid and grace.
 	State string `json:"state"`
 
 	// TrustClass Development or production issuer trust. Empty when there is no verified grant.
@@ -2970,8 +3005,11 @@ type PluginInvocation struct {
 
 // PluginInvocationResult defines model for PluginInvocationResult.
 type PluginInvocationResult struct {
-	Body   json.RawMessage `json:"body"`
-	Status int             `json:"status"`
+	Body json.RawMessage `json:"body"`
+
+	// EntitlementWarning Machine-readable licence warning that never changes authorization. While a declared feature is in its signed grace period, forward work still succeeds. After grace_until forward work is refused with plugin_not_entitled; read, export, cancel and rollback remain available.
+	EntitlementWarning *PluginEntitlementWarning `json:"entitlement_warning,omitempty"`
+	Status             int                       `json:"status"`
 }
 
 // PluginModuleOperationReceipt defines model for PluginModuleOperationReceipt.

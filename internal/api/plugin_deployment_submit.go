@@ -44,8 +44,9 @@ func (s *Server) SubmitPluginDeployment(ctx context.Context, request SubmitPlugi
 	if err != nil {
 		return nil, err
 	}
+	warning := pluginServiceWarning(item, descriptor, action)
 	if upstream != nil {
-		return SubmitPluginDeployment200JSONResponse{Status: upstream.Status, Body: upstream.Body}, nil
+		return SubmitPluginDeployment200JSONResponse{Status: upstream.Status, Body: upstream.Body, EntitlementWarning: warning}, nil
 	}
 	if err := s.authorizePluginDispatchApproval(ctx, item, dispatch); err != nil {
 		return nil, err
@@ -57,7 +58,7 @@ func (s *Server) SubmitPluginDeployment(ctx context.Context, request SubmitPlugi
 	if err != nil {
 		return nil, pluginGatewayError(err)
 	}
-	return SubmitPluginDeployment200JSONResponse{Status: result.Status, Body: result.Body}, nil
+	return SubmitPluginDeployment200JSONResponse{Status: result.Status, Body: result.Body, EntitlementWarning: warning}, nil
 }
 
 func pluginDeploymentSubmitAction(body PluginDeploymentSubmitRequest) string {

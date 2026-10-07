@@ -7587,6 +7587,10 @@
           },
           "body": {
             "x-go-type": "json.RawMessage"
+          },
+          "entitlement_warning": {
+            "description": "Set when the operation's required feature is in its signed grace period. The operation was still performed; clients should show the warning.",
+            "$ref": "#/components/schemas/PluginEntitlementWarning"
           }
         }
       },
@@ -7621,6 +7625,46 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/PluginFeatureAccess"
             }
+          },
+          "warning": {
+            "$ref": "#/components/schemas/PluginEntitlementWarning"
+          }
+        }
+      },
+      "PluginEntitlementWarning": {
+        "type": "object",
+        "description": "Machine-readable licence warning that never changes authorization. While a declared feature is in its signed grace period, forward work still succeeds. After grace_until forward work is refused with plugin_not_entitled; read, export, cancel and rollback remain available.",
+        "required": [
+          "code",
+          "message",
+          "grace_until",
+          "features"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "plugin_entitlement_grace"
+            ],
+            "x-enum-varnames": [
+              "PluginEntitlementWarningCodeGrace"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable text a client can show as is."
+          },
+          "grace_until": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Earliest end of the grace period among the listed features."
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Declared features in their grace period, sorted."
           }
         }
       },
@@ -7636,7 +7680,7 @@
         "properties": {
           "state": {
             "type": "string",
-            "description": "Effective persisted licence state for this declared feature."
+            "description": "Effective persisted licence state for this declared feature: valid, grace, expired, not_yet_valid, revoked, untrusted, not_entitled or missing. Forward work is allowed in valid and grace."
           },
           "trust_class": {
             "type": "string",

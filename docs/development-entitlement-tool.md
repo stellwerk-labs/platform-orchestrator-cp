@@ -4,6 +4,8 @@
 the Core server startup path or a production issuer. A fresh invocation creates
 an Ed25519 key and issuer, a strict development trust file, and one signed
 COSE_Sign1 grant bundle. No network or existing key is used for fresh issuance.
+How Core evaluates the result is described in
+[plugin-entitlements.md](plugin-entitlements.md).
 
 Use the exact plugin ID, immutable installation UUID, Core organization UUID,
 and sorted feature IDs from the verified installed package. For example:

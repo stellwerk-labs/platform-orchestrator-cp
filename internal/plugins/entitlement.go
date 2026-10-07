@@ -32,6 +32,48 @@ type FeatureAccess struct {
 
 type EntitlementStatus struct {
 	Features map[string]FeatureAccess `json:"features"`
+	Warning  *EntitlementWarning      `json:"warning,omitempty"`
+}
+
+// EntitlementGraceWarning is the stable code clients key on. The message is
+// display text and may change.
+const EntitlementGraceWarning = "plugin_entitlement_grace"
+
+// EntitlementWarning tells clients that forward work still succeeds while a
+// signed licence is in its grace period. It never changes authorization.
+type EntitlementWarning struct {
+	Code       string    `json:"code"`
+	Message    string    `json:"message"`
+	GraceUntil time.Time `json:"grace_until"`
+	Features   []string  `json:"features"`
+}
+
+// GraceWarning returns the warning for the given features that are in their
+// grace period, or nil when none is. GraceUntil is the earliest end.
+func (s *EntitlementStatus) GraceWarning(features ...string) *EntitlementWarning {
+	if s == nil {
+		return nil
+	}
+	var warning *EntitlementWarning
+	for _, feature := range features {
+		access := s.Features[feature]
+		if access.State != "grace" || access.GraceUntil == nil {
+			continue
+		}
+		if warning == nil {
+			warning = &EntitlementWarning{Code: EntitlementGraceWarning, GraceUntil: access.GraceUntil.UTC()}
+		}
+		if access.GraceUntil.Before(warning.GraceUntil) {
+			warning.GraceUntil = access.GraceUntil.UTC()
+		}
+		warning.Features = append(warning.Features, feature)
+	}
+	if warning != nil {
+		slices.Sort(warning.Features)
+		warning.Features = slices.Compact(warning.Features)
+		warning.Message = "The signed plugin licence is in its grace period until " + warning.GraceUntil.Format(time.RFC3339) + ". Forward work continues until then; ask an administrator to renew the licence."
+	}
+	return warning
 }
 
 // EntitlementResolver evaluates persisted, verified grants against current
@@ -141,12 +183,16 @@ func projectEntitlement(item Installation, descriptor Descriptor, status Entitle
 		forward = forward || access.Forward
 		retained = retained || access.Read || access.Safety
 	}
+	filtered.Warning = filtered.GraceWarning(item.Entitlement.Features...)
 	descriptor.Entitlement = &filtered
 	if descriptor.State == StateIncompatible || descriptor.State == StateUnavailable {
 		return descriptor
 	}
 	if descriptor.State == StateAvailable && forward {
 		descriptor.Mode = ModeFull
+		if filtered.Warning != nil {
+			descriptor.AdminAction = filtered.Warning.Message
+		}
 		return descriptor
 	}
 	if descriptor.State == StateAvailable {

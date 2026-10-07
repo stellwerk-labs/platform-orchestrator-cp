@@ -80,7 +80,9 @@ installation state, workload identity exchange and COSE entitlement validation
 remain separate integration gates. No configuration boolean is represented as
 proof of a licence. Disabled/unentitled states permit registered read and safety
 operations but reject new forward work; unavailable/incompatible states fail
-closed.
+closed. Signed licence states, the grace-period warning and the rule that
+licence material never stops Core are described in
+[plugin-entitlements.md](plugin-entitlements.md).
 
 The existing gateway trust boundary still applies: Core's authenticated `From`
 context is supplied by platform authentication, not an Internet client's raw

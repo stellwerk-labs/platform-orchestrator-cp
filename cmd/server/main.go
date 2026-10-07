@@ -243,9 +243,15 @@ func main() {
 		server.PluginGateway = gateway
 		server.PluginJournalRetention = retention.Window
 		server.Plugins = gateway.Registry
-		entitlementAdapter, err = pluginentitlements.New(ctx, db, gateway.Registry.Installations(), entitlements.TrustClass(cfg.PluginEntitlementMode), cfg.PluginEntitlementTrustFile, cfg.PluginEntitlementBundleFile, time.Now)
+		var diagnostics []pluginentitlements.Diagnostic
+		entitlementAdapter, diagnostics, err = pluginentitlements.New(ctx, db, gateway.Registry.Installations(), entitlements.TrustClass(cfg.PluginEntitlementMode), cfg.PluginEntitlementTrustFile, cfg.PluginEntitlementBundleFile, time.Now)
 		if err != nil {
 			zap.L().Fatal("Failed to initialize offline plugin entitlements", zap.Error(err))
+		}
+		// Licence material never stops Core; a licence problem degrades only
+		// the affected plugins, which report not_entitled or untrusted.
+		for _, diagnostic := range diagnostics {
+			zap.L().Error("Plugin entitlement material was not applied; affected plugins stay unentitled", zap.String("diagnostic", diagnostic.Code), zap.String("detail", diagnostic.Detail))
 		}
 		gateway.Registry.Entitlements = entitlementAdapter
 		server.PluginEntitlements = entitlementAdapter

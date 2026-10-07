@@ -1,7 +1,9 @@
 package api
 
 import (
+	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stellwerk-labs/golib/herrors"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
@@ -59,4 +61,24 @@ func TestPluginEntitlementProjectionHasNoRawEvidence(t *testing.T) {
 	require.False(t, projection.Features["workflow"].Forward)
 	require.True(t, projection.Features["workflow"].Safety)
 	require.Nil(t, pluginEntitlementToAPI(nil))
+}
+
+func TestPluginEntitlementGraceWarningReachesTheWire(t *testing.T) {
+	until := time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
+	status := &plugins.EntitlementStatus{Features: map[string]plugins.FeatureAccess{"workflow": {State: "grace", Forward: true, Read: true, Safety: true, GraceUntil: &until}}}
+	status.Warning = status.GraceWarning("workflow")
+	projection := pluginEntitlementToAPI(status)
+	require.NotNil(t, projection.Warning)
+	require.Equal(t, PluginEntitlementWarningCodeGrace, projection.Warning.Code)
+	require.Equal(t, until, projection.Warning.GraceUntil)
+	require.Equal(t, []string{"workflow"}, projection.Warning.Features)
+	encoded, err := json.Marshal(projection)
+	require.NoError(t, err)
+	require.Contains(t, string(encoded), `"warning":{"code":"plugin_entitlement_grace"`)
+
+	item := plugins.Installation{ServiceGrants: []plugins.ServiceGrant{{Action: "effect.commit", RequiredFeature: "workflow"}}}
+	descriptor := plugins.Descriptor{Entitlement: status}
+	require.Equal(t, projection.Warning, pluginServiceWarning(item, descriptor, "effect.commit"))
+	require.Nil(t, pluginServiceWarning(item, descriptor, "undeclared"))
+	require.Nil(t, pluginServiceWarning(item, plugins.Descriptor{}, "effect.commit"))
 }

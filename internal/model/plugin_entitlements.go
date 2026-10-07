@@ -342,7 +342,10 @@ func DecidePluginEntitlementTx(ctx context.Context, db Databaser, tx Tx, binding
 	activated := err == nil
 	decision.Read = access.Retained && access.Compatible && activated
 	decision.Safety = decision.Read
-	decision.Forward = access.Enabled && access.Compatible && trusted && !revoked && decision.State == string(entitlements.Valid) && slices.Contains(verified.EffectiveFeatures, feature)
+	// Grace is a commercial warning, not a stop: forward work continues until
+	// grace_until and only then falls back to read and safety access.
+	forwardTime := decision.State == string(entitlements.Valid) || decision.State == string(entitlements.Grace)
+	decision.Forward = access.Enabled && access.Compatible && trusted && !revoked && forwardTime && slices.Contains(verified.EffectiveFeatures, feature)
 	if access.Activate && !decision.Forward {
 		return decision, NewErrConflict("feature cannot be activated without a current forward entitlement")
 	}

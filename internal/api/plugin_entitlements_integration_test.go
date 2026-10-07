@@ -80,8 +80,9 @@ func newPluginEntitlementAPIFixture(t *testing.T) *pluginEntitlementAPIFixture {
 	f := &pluginEntitlementAPIFixture{db: db, item: item, private: private, trust: trust, binding: binding, base: time.Now().UTC().Truncate(time.Second).Unix(), trustPath: trustPath}
 	f.clock.Store(f.base)
 	clock := func() time.Time { return time.Unix(f.clock.Load(), 0).UTC() }
-	missing, err := pluginentitlements.New(t.Context(), db, []plugins.Installation{item}, entitlements.Development, trustPath, "", clock)
+	missing, diagnostics, err := pluginentitlements.New(t.Context(), db, []plugins.Installation{item}, entitlements.Development, trustPath, "", clock)
 	require.NoError(t, err)
+	require.Empty(t, diagnostics)
 	f.server = &Server{Database: db, PluginEntitlements: missing}
 	_, err = f.server.pluginEffectDatabase("acme", item, "effect.commit", false).BeginTx(t.Context(), nil)
 	requirePlatformEntitlementCode(t, err, "plugin_not_entitled")
@@ -90,8 +91,9 @@ func newPluginEntitlementAPIFixture(t *testing.T) *pluginEntitlementAPIFixture {
 	require.NoError(t, err)
 	bundlePath := filepath.Join(tempDir, "development-bundle.json")
 	require.NoError(t, os.WriteFile(bundlePath, bundleJSON, 0o600))
-	f.adapter, err = pluginentitlements.New(t.Context(), db, []plugins.Installation{item}, entitlements.Development, trustPath, bundlePath, clock)
+	f.adapter, diagnostics, err = pluginentitlements.New(t.Context(), db, []plugins.Installation{item}, entitlements.Development, trustPath, bundlePath, clock)
 	require.NoError(t, err)
+	require.Empty(t, diagnostics)
 	tx, err := db.BeginTx(t.Context(), nil)
 	require.NoError(t, err)
 	_, err = tx.ExecContext(t.Context(), `CREATE TABLE entitlement_effect_probe(marker TEXT PRIMARY KEY)`)
@@ -182,24 +184,30 @@ func TestPluginEffectDatabaseDenialPersistsMonotonicTimeAndCurrentTrust(t *testi
 	tx, err := f.server.pluginEffectDatabase("acme", f.item, "effect.commit", false).BeginTx(t.Context(), nil)
 	require.NoError(t, err)
 	require.NoError(t, tx.Commit())
+	// Grace still admits forward effects; only the expiry after it denies.
 	f.clock.Store(f.base + 10)
+	tx, err = f.server.pluginEffectDatabase("acme", f.item, "effect.commit", false).BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
+	f.clock.Store(f.base + 20)
 	_, err = f.server.pluginEffectDatabase("acme", f.item, "effect.commit", false).BeginTx(t.Context(), nil)
 	requirePlatformEntitlementCode(t, err, "plugin_not_entitled")
 	rawTx, err := f.db.BeginTx(t.Context(), nil)
 	require.NoError(t, err)
-	var evaluated time.Time
-	var grace time.Time
-	require.NoError(t, rawTx.QueryRowContext(t.Context(), `SELECT evaluated_through,observed_grace_at FROM plugin_entitlement_bindings`).Scan(&evaluated, &grace))
+	var evaluated, grace, expired time.Time
+	require.NoError(t, rawTx.QueryRowContext(t.Context(), `SELECT evaluated_through,observed_grace_at,observed_expired_at FROM plugin_entitlement_bindings`).Scan(&evaluated, &grace, &expired))
 	require.NoError(t, rawTx.Rollback())
-	require.Equal(t, f.base+10, evaluated.Unix())
+	require.Equal(t, f.base+20, evaluated.Unix())
 	require.Equal(t, f.base+10, grace.Unix())
-	f.clock.Store(f.base)
+	require.Equal(t, f.base+20, expired.Unix())
+	f.clock.Store(f.base + 10)
 	_, err = f.server.pluginEffectDatabase("acme", f.item, "effect.commit", false).BeginTx(t.Context(), nil)
 	requirePlatformEntitlementCode(t, err, "plugin_not_entitled")
 	// A new adapter with no pinned trust rechecks exact persisted COSE and
 	// denies forward work without erasing prior activation for read/safety.
-	untrusted, err := pluginentitlements.New(t.Context(), f.db, []plugins.Installation{f.item}, entitlements.Development, "", "", func() time.Time { return time.Unix(f.base, 0) })
+	untrusted, diagnostics, err := pluginentitlements.New(t.Context(), f.db, []plugins.Installation{f.item}, entitlements.Development, "", "", func() time.Time { return time.Unix(f.base, 0) })
 	require.NoError(t, err)
+	require.Empty(t, diagnostics)
 	f.server.PluginEntitlements = untrusted
 	_, err = f.server.pluginEffectDatabase("acme", f.item, "effect.commit", false).BeginTx(t.Context(), nil)
 	requirePlatformEntitlementCode(t, err, "plugin_not_entitled")
@@ -234,6 +242,50 @@ func TestPluginEffectDatabaseSerializesRevocationWithBusinessCommit(t *testing.T
 	require.Equal(t, 1, f.effectCount(t, "before-revocation"))
 	_, err = f.server.pluginEffectDatabase("acme", f.item, "effect.commit", false).BeginTx(t.Context(), nil)
 	requirePlatformEntitlementCode(t, err, "plugin_not_entitled")
+}
+
+// Licence material never stops Core. Rejected trust or documents leave Core
+// running; only this plugin degrades.
+func TestRejectedEntitlementMaterialDegradesOnlyThePlugin(t *testing.T) {
+	f := newPluginEntitlementAPIFixture(t)
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	tampered := bytes.Clone(f.grant.Envelope)
+	tampered[len(tampered)-80] ^= 0x01
+	bundleJSON, err := json.Marshal(map[string]any{"schema_version": 1, "grants": []string{base64.RawURLEncoding.EncodeToString(tampered)}, "revocations": []string{base64.RawURLEncoding.EncodeToString([]byte{0xd2, 0x80})}})
+	require.NoError(t, err)
+	bundlePath := filepath.Join(dir, "tampered-bundle.json")
+	require.NoError(t, os.WriteFile(bundlePath, bundleJSON, 0o600))
+	clock := func() time.Time { return time.Unix(f.clock.Load(), 0).UTC() }
+
+	adapter, diagnostics, err := pluginentitlements.New(t.Context(), f.db, []plugins.Installation{f.item}, entitlements.Development, f.trustPath, bundlePath, clock)
+	require.NoError(t, err)
+	require.Equal(t, []string{pluginentitlements.DiagnosticGrantRejected, pluginentitlements.DiagnosticRevocationsRejected}, diagnosticCodes(diagnostics))
+	status, err := adapter.ResolveEntitlement(t.Context(), "acme", f.item)
+	require.NoError(t, err)
+	require.Equal(t, "valid", status.Features["feature-a"].State, "a rejected document keeps the persisted decision")
+
+	// Development trust in production mode: Core starts, the persisted grant
+	// no longer verifies, forward work stops and history stays readable.
+	adapter, diagnostics, err = pluginentitlements.New(t.Context(), f.db, []plugins.Installation{f.item}, entitlements.Production, f.trustPath, bundlePath, clock)
+	require.NoError(t, err)
+	require.Equal(t, []string{pluginentitlements.DiagnosticTrustRejected, pluginentitlements.DiagnosticBundleRejected}, diagnosticCodes(diagnostics))
+	status, err = adapter.ResolveEntitlement(t.Context(), "acme", f.item)
+	require.NoError(t, err)
+	require.Equal(t, "untrusted", status.Features["feature-a"].State)
+	require.False(t, status.Features["feature-a"].Forward)
+	require.True(t, status.Features["feature-a"].Read)
+	f.server.PluginEntitlements = adapter
+	_, err = f.server.pluginEffectDatabase("acme", f.item, "effect.commit", false).BeginTx(t.Context(), nil)
+	requirePlatformEntitlementCode(t, err, "plugin_not_entitled")
+}
+
+func diagnosticCodes(diagnostics []pluginentitlements.Diagnostic) []string {
+	codes := make([]string, 0, len(diagnostics))
+	for _, diagnostic := range diagnostics {
+		codes = append(codes, diagnostic.Code)
+	}
+	return codes
 }
 
 func requirePlatformEntitlementCode(t *testing.T, err error, code string) {
