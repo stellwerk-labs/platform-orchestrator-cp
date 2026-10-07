@@ -397,3 +397,138 @@ func hexDigest(raw []byte) string {
 	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:])
 }
+
+func TestUninstallKeepsTheInstallationForAReinstall(t *testing.T) {
+	db := testDatabase(t)
+	org := testOrganization(t, db)
+	writer := newReplica(t, db)
+	ops := newSession(t, writer.manager)
+	ctx := t.Context()
+	const plugin = "dev.example.rollouts"
+	installation := ops.install(plugin, org)
+	id := installation.InstallationID
+	_, digest := pluginPackage(t, plugin)
+
+	_, err := writer.manager.Transition(ctx, ops.command(""), id, ActionPurge)
+	requireCode(t, err, "plugin_installation_state", "purge needs a prior uninstall")
+	_, err = writer.manager.Transition(ctx, ops.command(""), id, ActionReinstall)
+	requireCode(t, err, "plugin_installation_state", "only an uninstalled installation is reinstalled")
+
+	uninstalled := ops.installation(writer.manager.Transition(ctx, ops.command(""), id, ActionUninstall))
+	require.Equal(t, model.PluginInstallationUninstalled, uninstalled.State)
+	require.Equal(t, plugins.StateNotInstalled, uninstalled.Availability)
+	require.Empty(t, uninstalled.Organizations, "uninstall removes every enablement")
+	require.Equal(t, installation.PackageSHA256, uninstalled.PackageSHA256)
+	require.Equal(t, installation.ServiceUserID, uninstalled.ServiceUserID, "identities stay for the reinstall")
+	require.Empty(t, registeredPackages(t, db, id), "uninstall removes every registration")
+	require.Equal(t, plugins.StateNotInstalled, availability(writer.registry, org, plugin))
+	requireCode(t, requireEffect(t, db, model.PluginUse{OrgID: org, PluginID: plugin, InstallationID: id.String(), PackageSHA256: digest, Safety: true}), "plugin_not_installed")
+
+	for name, step := range map[string]func() error{
+		"enable": func() error { _, err := writer.manager.Transition(ctx, ops.command(""), id, ActionEnable); return err },
+		"activate": func() error {
+			_, err := writer.manager.Transition(ctx, ops.command(""), id, ActionActivate)
+			return err
+		},
+		"upgrade": func() error { _, err := writer.manager.Upgrade(ctx, ops.command(""), id, digest); return err },
+		"organization": func() error {
+			_, err := writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "", nil)
+			return err
+		},
+	} {
+		requireCode(t, step(), "plugin_installation_state", name)
+	}
+	_, err = writer.manager.CreateInstallation(ctx, ops.command(""), digest, installation.BackendURL, installation.UIOrigin)
+	requireCode(t, err, "plugin_installation_exists", "a retained installation is reinstalled, never shadowed by a new UUID")
+
+	reinstalled := ops.installation(writer.manager.Transition(ctx, ops.command(""), id, ActionReinstall))
+	require.Equal(t, id, reinstalled.InstallationID, "reinstall reuses the installation UUID")
+	require.Equal(t, model.PluginInstallationInstalled, reinstalled.State)
+	ops.installation(writer.manager.Transition(ctx, ops.command(""), id, ActionActivate))
+	ops.installation(writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "", nil))
+	require.Equal(t, plugins.StateAvailable, availability(writer.registry, org, plugin))
+	item, _, found := writer.registry.Installation(ctx, org, plugin)
+	require.True(t, found)
+	require.Equal(t, id.String(), item.InstallationID, "the licence binding of the UUID applies again")
+
+	ops.installation(writer.manager.Transition(ctx, ops.command(""), id, ActionUninstall))
+	purged := ops.installation(writer.manager.Transition(ctx, ops.command(""), id, ActionPurge))
+	require.Equal(t, model.PluginInstallationPurged, purged.State)
+	require.Equal(t, plugins.StateNotInstalled, purged.Availability)
+	_, err = writer.manager.Transition(ctx, ops.command(""), id, ActionReinstall)
+	requireCode(t, err, "plugin_installation_state", "a purged UUID is retired for good")
+	_, err = writer.manager.Transition(ctx, ops.command(""), id, ActionUninstall)
+	requireCode(t, err, "plugin_installation_state")
+	fresh := ops.installation(writer.manager.CreateInstallation(ctx, ops.command(""), digest, installation.BackendURL, installation.UIOrigin))
+	require.NotEqual(t, id, fresh.InstallationID, "after a purge the plugin is installed under a new UUID")
+
+	actions := []string{}
+	for _, event := range auditEvents(t, writer.manager) {
+		if event.InstallationID != nil && *event.InstallationID == id {
+			actions = append(actions, event.Action)
+		}
+	}
+	require.Equal(t, []string{"plugin_installation.create", "plugin_installation.identity", "plugin_installation.activate", "plugin_enablement.put",
+		"plugin_installation.uninstall", "plugin_installation.reinstall", "plugin_installation.activate", "plugin_enablement.put",
+		"plugin_installation.uninstall", "plugin_installation.purge"}, actions, "every lifecycle change is audited exactly once")
+}
+
+func TestInterruptedLifecycleStepsResume(t *testing.T) {
+	db := testDatabase(t)
+	org := testOrganization(t, db)
+	process := startPlugin(t)
+	writer := newReplicaReading(t, db, process.Client())
+	ops := newSession(t, writer.manager)
+	ctx := t.Context()
+	const plugin = "dev.example.rollouts"
+	v1, v1Digest := versionedPackage(t, plugin, "1.0.0", 0)
+	v2, v2Digest := versionedPackage(t, plugin, "2.0.0", 1)
+	id := ops.installed(plugin, process.URL, v1, v1Digest).InstallationID
+	process.reports(id, v1Digest, 0)
+	ops.installation(writer.manager.Transition(ctx, ops.command(""), id, ActionActivate))
+	ops.installation(writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "", nil))
+	pkg, err := writer.manager.PushPackage(ctx, ops.command(""), v2Digest, v2)
+	require.NoError(t, err)
+	ops.revision = pkg.Revision
+
+	for _, step := range []struct {
+		name string
+		run  func(Command) (Installation, error)
+		want func(Installation)
+	}{
+		{"upgrade", func(c Command) (Installation, error) { return writer.manager.Upgrade(ctx, c, id, v2Digest) },
+			func(i Installation) { require.Equal(t, v2Digest, i.TargetPackageSHA256) }},
+		{"switch", func(c Command) (Installation, error) {
+			process.reports(id, v2Digest, 1)
+			return writer.manager.Transition(ctx, c, id, ActionActivate)
+		}, func(i Installation) { require.Equal(t, v2Digest, i.PackageSHA256) }},
+		{"uninstall", func(c Command) (Installation, error) { return writer.manager.Transition(ctx, c, id, ActionUninstall) },
+			func(i Installation) { require.Equal(t, model.PluginInstallationUninstalled, i.State) }},
+		{"reinstall", func(c Command) (Installation, error) { return writer.manager.Transition(ctx, c, id, ActionReinstall) },
+			func(i Installation) { require.Equal(t, model.PluginInstallationInstalled, i.State) }},
+		{"activate", func(c Command) (Installation, error) { return writer.manager.Transition(ctx, c, id, ActionActivate) },
+			func(i Installation) { require.Equal(t, model.PluginInstallationActive, i.State) }},
+		{"uninstall again", func(c Command) (Installation, error) { return writer.manager.Transition(ctx, c, id, ActionUninstall) },
+			func(i Installation) { require.Equal(t, model.PluginInstallationUninstalled, i.State) }},
+		{"purge", func(c Command) (Installation, error) { return writer.manager.Transition(ctx, c, id, ActionPurge) },
+			func(i Installation) { require.Equal(t, model.PluginInstallationPurged, i.State) }},
+	} {
+		// The step commits but its reply is lost: retrying the request
+		// replays the stored result, and resuming from the recorded state
+		// with a new request finds the step done.
+		audited := len(auditEvents(t, writer.manager))
+		inFlight := ops.command("")
+		first, err := step.run(inFlight)
+		require.NoError(t, err, step.name)
+		step.want(first)
+		replayed, err := step.run(inFlight)
+		require.NoError(t, err, step.name)
+		require.Equal(t, first.Revision, replayed.Revision, step.name)
+		ops.revision = first.Revision
+		resumed := ops.installation(step.run(ops.command("")))
+		step.want(resumed)
+		require.Equal(t, first.Revision, resumed.Revision, "%s: a completed step changes nothing", step.name)
+		require.Len(t, auditEvents(t, writer.manager), audited+1, "%s changed state exactly once", step.name)
+		require.Equal(t, id, resumed.InstallationID)
+	}
+}

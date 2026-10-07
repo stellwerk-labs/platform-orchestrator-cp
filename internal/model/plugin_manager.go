@@ -15,13 +15,17 @@ import (
 )
 
 // Plugin Manager states. An installation serves registrations while active or
-// disabled; disabled and organization-disabled plugins are safety-only.
+// disabled; disabled and organization-disabled plugins are safety-only. An
+// uninstalled installation keeps its UUID and data for a reinstall; a purged
+// one is retired for good.
 const (
-	PluginInstallationInstalled = "installed"
-	PluginInstallationActive    = "active"
-	PluginInstallationDisabled  = "disabled"
-	PluginEnablementEnabled     = "enabled"
-	PluginEnablementDisabled    = "disabled"
+	PluginInstallationInstalled   = "installed"
+	PluginInstallationActive      = "active"
+	PluginInstallationDisabled    = "disabled"
+	PluginInstallationUninstalled = "uninstalled"
+	PluginInstallationPurged      = "purged"
+	PluginEnablementEnabled       = "enabled"
+	PluginEnablementDisabled      = "disabled"
 )
 
 // Registration kinds materialised from a package on activation.
@@ -392,7 +396,7 @@ func InsertPluginInstallation(ctx context.Context, tx Tx, item PluginInstallatio
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$7)`, item.InstallationID, item.PluginID, item.PackageSHA256, item.State, item.BackendURL,
 		sql.NullString{String: item.UIOrigin, Valid: item.UIOrigin != ""}, item.CreatedBy)
 	if isUniqueViolation(err, "plugin_installations_one_per_plugin") {
-		return ErrConflict{Code: "plugin_installation_exists", Message: "The plugin already has an installation. Resume or change that installation instead."}
+		return ErrConflict{Code: "plugin_installation_exists", Message: "The plugin already has an installation. Resume, upgrade or reinstall that installation, or purge it first."}
 	}
 	if isUniqueViolation(err, "plugin_installations_pkey") {
 		return ErrConflict{Code: "plugin_installation_exists", Message: "The installation UUID is already assigned."}
@@ -501,6 +505,33 @@ func DeletePluginEnablement(ctx context.Context, tx Tx, pluginID, orgID string) 
 		return false, err
 	}
 	return true, syncExtensionResourceJournal(ctx, tx, orgID)
+}
+
+// PluginWork counts the safety work Core still holds for a plugin: operation
+// grants not released, dispatches not settled and Module reservations still
+// active. Each needs the plugin's cancel, rollback or release path.
+type PluginWork struct {
+	Grants       int `json:"grants"`
+	Dispatches   int `json:"dispatches"`
+	Reservations int `json:"reservations"`
+}
+
+// Settled reports whether no safety work remains.
+func (w PluginWork) Settled() bool {
+	return w == PluginWork{}
+}
+
+// UnsettledPluginWork counts the plugin's unsettled work in every
+// organization. New work needs the installation's rows share-locked by
+// RequirePluginEnablement, so a caller holding the installation row for
+// update sees every piece of work committed before it and blocks the rest.
+func UnsettledPluginWork(ctx context.Context, tx Tx, pluginID string) (PluginWork, error) {
+	var work PluginWork
+	err := tx.QueryRowContext(ctx, `SELECT
+		(SELECT count(*) FROM external_operation_grants WHERE plugin_id=$1 AND state <> 'released'),
+		(SELECT count(*) FROM external_operation_dispatches WHERE plugin_id=$1 AND state <> 'settled'),
+		(SELECT count(*) FROM external_module_operations WHERE plugin_id=$1 AND state = 'active')`, pluginID).Scan(&work.Grants, &work.Dispatches, &work.Reservations)
+	return work, err
 }
 
 // ListPluginManagerAudit pages the audit trail in commit order.

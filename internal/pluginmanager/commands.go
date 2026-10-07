@@ -40,7 +40,8 @@ type Installation struct {
 	model.PluginInstallation
 	// Availability is derived from the state: available while active,
 	// not_enabled (safety-only) while disabled, unavailable while installed
-	// and not yet proven by the running plugin.
+	// and not yet proven by the running plugin, not_installed once
+	// uninstalled or purged.
 	Availability plugins.AvailabilityState `json:"availability"`
 	// Diagnostic explains why the plugin's last status does not prove the
 	// package Core is to serve.
@@ -65,6 +66,15 @@ const (
 	ActionDisable Action = "disable"
 	// ActionEnable returns a disabled installation to active.
 	ActionEnable Action = "enable"
+	// ActionUninstall removes the registrations and organization enablements
+	// and keeps the installation UUID, its licence binding and the plugin's
+	// data. It is refused while Core holds safety work of the plugin.
+	ActionUninstall Action = "uninstall"
+	// ActionReinstall returns an uninstalled installation, with its UUID, to
+	// installed.
+	ActionReinstall Action = "reinstall"
+	// ActionPurge retires an uninstalled installation and its UUID for good.
+	ActionPurge Action = "purge"
 )
 
 var manifestDigest = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -145,6 +155,9 @@ func describe(ctx context.Context, tx model.Tx, installation model.PluginInstall
 		result.Availability = plugins.StateAvailable
 	case model.PluginInstallationDisabled:
 		result.Availability = plugins.StateNotEnabled
+	case model.PluginInstallationUninstalled, model.PluginInstallationPurged:
+		result.Availability = plugins.StateNotInstalled
+		return result, nil
 	}
 	if installation.Observation == nil {
 		return result, nil
@@ -307,6 +320,34 @@ func (m *Manager) Transition(ctx context.Context, command Command, id uuid.UUID,
 					return nil, stateConflict("Activate the installation first.")
 				}
 				after.State = target
+			case ActionUninstall:
+				switch before.State {
+				case model.PluginInstallationUninstalled:
+					return nil, nil
+				case model.PluginInstallationPurged:
+					return nil, stateConflict("The installation is purged.")
+				}
+				if err := uninstall(ctx, tx, &after); err != nil {
+					return nil, err
+				}
+			case ActionReinstall:
+				switch before.State {
+				case model.PluginInstallationInstalled:
+					return nil, nil
+				case model.PluginInstallationUninstalled:
+					after.State = model.PluginInstallationInstalled
+				default:
+					return nil, stateConflict("Only an uninstalled installation is reinstalled.")
+				}
+			case ActionPurge:
+				switch before.State {
+				case model.PluginInstallationPurged:
+					return nil, nil
+				case model.PluginInstallationUninstalled:
+					after.State = model.PluginInstallationPurged
+				default:
+					return nil, stateConflict("Uninstall the installation before purging it.")
+				}
 			default:
 				return nil, invalid("plugin_manager_request_invalid", fmt.Errorf("unknown installation action %q", action))
 			}
@@ -388,6 +429,33 @@ func (m *Manager) activate(ctx context.Context, command Command, id uuid.UUID) (
 			return m.installationChange(ctx, tx, "plugin_installation."+string(ActionActivate), before, "")
 		}, m.respondInstallation(id), &result)
 	return result, err
+}
+
+// uninstall removes the installation's enablements, which pauses their
+// resource journals with a gap, and its registrations, unless Core still
+// holds safety work of the plugin: its cancel, rollback and read paths stay
+// available until no grant, dispatch or Module reservation is left. There is
+// no force option.
+func uninstall(ctx context.Context, tx model.Tx, installation *model.PluginInstallation) error {
+	work, err := model.UnsettledPluginWork(ctx, tx, installation.PluginID)
+	if err != nil {
+		return err
+	}
+	if !work.Settled() {
+		return model.ErrConflict{Code: "plugin_work_unsettled", Message: fmt.Sprintf("Core still holds safety work of the plugin: %d operation grants not released, %d dispatches not settled, %d Module reservations active. Let the plugin finish, cancel or roll them back, then uninstall.",
+			work.Grants, work.Dispatches, work.Reservations)}
+	}
+	for _, enablement := range installation.Organizations {
+		if _, err := model.DeletePluginEnablement(ctx, tx, installation.PluginID, enablement.OrgID); err != nil {
+			return err
+		}
+	}
+	installation.Organizations = []model.PluginEnablement{}
+	if err := model.ReplacePluginRegistrations(ctx, tx, *installation, nil); err != nil {
+		return err
+	}
+	installation.State, installation.TargetPackageSHA256 = model.PluginInstallationUninstalled, ""
+	return nil
 }
 
 // awaitsProof reports whether an activation has to read the running plugin:

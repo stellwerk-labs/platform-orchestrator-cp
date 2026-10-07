@@ -268,3 +268,61 @@ func requireConflictCode(t *testing.T, err error, code string) {
 	require.True(t, ok, "expected conflict %s, got %v", code, err)
 	require.Equal(t, code, conflict.Code)
 }
+
+func unsettledPluginWork(t *testing.T, db Databaser, plugin string) PluginWork {
+	t.Helper()
+	tx, err := db.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	defer func() { _ = tx.Rollback() }()
+	work, err := UnsettledPluginWork(t.Context(), tx, plugin)
+	require.NoError(t, err)
+	return work
+}
+
+func TestUnsettledPluginWorkCountsEverySafetyStepCoreHolds(t *testing.T) {
+	db := externalOperationDatabase(t)
+	ctx := t.Context()
+	prepare := externalGrantFixture(t, db)
+	prepare.Intent.Actions = append(prepare.Intent.Actions, "module.reserve", "module.release")
+	plugin := prepare.PluginID
+	require.True(t, unsettledPluginWork(t, db, plugin).Settled())
+
+	grant, err := ApplyExternalGrantCommand(ctx, db, prepare)
+	require.NoError(t, err)
+	require.Equal(t, PluginWork{Grants: 1}, unsettledPluginWork(t, db, plugin), "a prepared grant is unsettled")
+
+	reserve := ExternalModuleCommand{OrgID: grant.OrgID, PluginID: plugin, OperationID: grant.OperationID, ActorID: grant.ActorID, RequestID: "reserve", Action: "reserve", GrantFence: grant.Revision, Reason: "Freeze the Modules"}
+	for _, moduleID := range grant.Intent.Modules {
+		version, err := db.GetCoreModuleVersion(ctx, nil, grant.OrgID, moduleID.String(), grant.Intent.TargetVersions[moduleID.String()].String(), GetModeDefault)
+		require.NoError(t, err)
+		reserve.Targets = append(reserve.Targets, ExternalModuleTarget{ModuleUUID: moduleID, VersionUUID: version.UUID, ExpectedResourceVersion: version.ResourceVersion, ExpectedDefaultUUID: grant.BaselineDefaults[moduleID.String()]})
+	}
+	reservation, err := ApplyExternalModuleOperation(ctx, db, reserve)
+	require.NoError(t, err)
+	require.Equal(t, PluginWork{Grants: 1, Reservations: 1}, unsettledPluginWork(t, db, plugin))
+
+	control := prepare
+	control.Intent = nil
+	control.Action, control.RequestID, control.ExpectedRevision = "activate", "activate", grant.Revision
+	grant, err = ApplyExternalGrantCommand(ctx, db, control)
+	require.NoError(t, err)
+	environment := prepare.Intent.Environments[0]
+	dispatch := ExternalDispatch{OrgID: grant.OrgID, PluginID: plugin, OperationID: grant.OperationID, ActorID: grant.ActorID, Fence: grant.Revision, Action: "external-deployment.admit",
+		DispatchID: "environment-1", ProjectUUID: environment.ProjectID, EnvironmentUUID: environment.EnvironmentID, RequestDigest: strings.Repeat("b", 64), TargetVersions: grant.Intent.TargetVersions}
+	require.NoError(t, RecordExternalDispatch(ctx, db, dispatch))
+	require.Equal(t, PluginWork{Grants: 1, Dispatches: 1, Reservations: 1}, unsettledPluginWork(t, db, plugin))
+	require.Equal(t, PluginWork{}, unsettledPluginWork(t, db, "dev.example.other"), "work belongs to its plugin")
+
+	require.NoError(t, CompleteExternalDispatch(ctx, db, grant.OrgID, plugin, grant.OperationID, dispatch.DispatchID, ExternalDispatchCompletion{
+		DeploymentID: uuid.New(), Status: "succeeded", EnvironmentUUID: environment.EnvironmentID, ProjectUUID: environment.ProjectID, RequestDigest: dispatch.RequestDigest}))
+	require.Equal(t, PluginWork{Grants: 1, Reservations: 1}, unsettledPluginWork(t, db, plugin), "a settled dispatch is done")
+	release := reserve
+	release.Action, release.RequestID, release.ExpectedFence, release.GrantFence = "release", "release", reservation.Fence, grant.Revision
+	_, err = ApplyExternalModuleOperation(ctx, db, release)
+	require.NoError(t, err)
+	require.Equal(t, PluginWork{Grants: 1}, unsettledPluginWork(t, db, plugin))
+	control.Action, control.RequestID, control.ExpectedRevision = "release", "finish", grant.Revision
+	_, err = ApplyExternalGrantCommand(ctx, db, control)
+	require.NoError(t, err)
+	require.True(t, unsettledPluginWork(t, db, plugin).Settled())
+}
