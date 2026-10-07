@@ -4,15 +4,21 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/plugincontext"
+	"go.uber.org/zap"
 )
 
 const maxPluginBody = 16 << 20
@@ -48,6 +54,8 @@ type Gateway struct {
 	Issuer     string
 	Client     *http.Client
 	Now        func() time.Time
+	// Logger records why a plugin call failed; nil uses the global logger.
+	Logger *zap.Logger
 }
 
 // Invoke never forwards the caller's cookies, bearer token, From header, or an
@@ -110,7 +118,7 @@ func (g *Gateway) Invoke(ctx context.Context, org, pluginID, actor string, invoc
 		RequestID: requestID, IssuedAt: now.Unix(), ExpiresAt: now.Add(plugincontext.MaxLifetime).Unix(),
 	}, now)
 	if err != nil {
-		return nil, &GatewayError{pluginUnavailable, "Plugin delegation is not configured.", 503}
+		return nil, g.callFailed(item, operation, &GatewayError{pluginUnavailable, "Plugin delegation is not configured.", 503}, "delegation", err)
 	}
 	req, err := http.NewRequestWithContext(ctx, operation.Method, strings.TrimSuffix(item.Backend, "/")+requestPath, bytes.NewReader(body))
 	if err != nil {
@@ -136,14 +144,19 @@ func (g *Gateway) Invoke(ctx context.Context, org, pluginID, actor string, invoc
 	bounded.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
 	response, err := bounded.Do(req)
 	if err != nil {
-		return nil, &GatewayError{pluginUnavailable, "The plugin service could not be reached.", 503}
+		class, cause := transportFailure(err)
+		return nil, g.callFailed(item, operation, &GatewayError{pluginUnavailable, "The plugin service could not be reached.", 503}, class, cause)
 	}
 	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode >= 300 && response.StatusCode < 400 {
-		return nil, &GatewayError{pluginUnavailable, "The plugin returned an unsupported redirect.", 502}
+		return nil, g.callFailed(item, operation, &GatewayError{pluginUnavailable, "The plugin returned an unsupported redirect.", 502}, "redirect", fmt.Errorf("status %d", response.StatusCode))
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, maxPluginBody+1))
-	if err != nil || len(data) > maxPluginBody {
+	if err != nil {
+		class, cause := transportFailure(err)
+		return nil, g.callFailed(item, operation, &GatewayError{pluginResponseInvalid, "The plugin response exceeded the permitted limit or was interrupted.", 502}, class, cause)
+	}
+	if len(data) > maxPluginBody {
 		return nil, &GatewayError{pluginResponseInvalid, "The plugin response exceeded the permitted limit or was interrupted.", 502}
 	}
 	if len(data) == 0 {
@@ -153,6 +166,46 @@ func (g *Gateway) Invoke(ctx context.Context, org, pluginID, actor string, invoc
 		return nil, &GatewayError{pluginResponseInvalid, "The plugin returned a non-JSON response.", 502}
 	}
 	return &InvocationResult{Status: response.StatusCode, Body: data, EntitlementWarning: descriptor.Entitlement.GraceWarning(operation.RequiredFeature)}, nil
+}
+
+// callFailed logs why a call to the plugin service failed before the caller
+// gets the stable result. It names the route template, never the concrete
+// path, query, headers or body, which can carry organization data.
+func (g *Gateway) callFailed(item Installation, operation *Operation, result *GatewayError, class string, cause error) *GatewayError {
+	logger := g.Logger
+	if logger == nil {
+		logger = zap.L()
+	}
+	logger.Error("Plugin call failed", zap.String("plugin_id", item.ID), zap.String("installation_id", item.InstallationID),
+		zap.String("operation_id", operation.ID), zap.String("method", operation.Method), zap.String("route", operation.Path),
+		zap.String("code", result.Code), zap.Int("status", result.Status), zap.String("error_class", class), zap.String("cause", cause.Error()))
+	return result
+}
+
+// transportFailure classifies a failed exchange with the plugin service. The
+// cause drops the request URL that net/http wraps around it.
+func transportFailure(err error) (string, error) {
+	if wrapped, ok := errors.AsType[*url.Error](err); ok {
+		err = wrapped.Err
+	}
+	var timeout net.Error
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "canceled", err
+	case errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &timeout) && timeout.Timeout()):
+		return "timeout", err
+	case errors.Is(err, syscall.ECONNREFUSED):
+		return "connection_refused", err
+	case errors.Is(err, syscall.ECONNRESET) || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF):
+		return "connection_reset", err
+	}
+	if _, ok := errors.AsType[*net.DNSError](err); ok {
+		return "dns", err
+	}
+	if _, ok := errors.AsType[*tls.CertificateVerificationError](err); ok {
+		return "tls", err
+	}
+	return "transport", err
 }
 
 func (g *Gateway) Validate() error {

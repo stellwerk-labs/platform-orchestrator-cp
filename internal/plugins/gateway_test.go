@@ -16,6 +16,9 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/plugincontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 const testPluginID = "dev.example.change-manager"
@@ -23,7 +26,7 @@ const testActor = "b6636ae8-e388-4d4a-b5e6-c4f84bfa538c"
 
 func testRegistry(t *testing.T, backend string, state AvailabilityState) *InstallationRegistry {
 	t.Helper()
-	registry, err := NewInstallationRegistry([]Installation{{ID: testPluginID, DisplayName: "Change Manager", Version: "1.0.0", Backend: backend, Organizations: map[string]AvailabilityState{"acme": state}, Operations: []Operation{
+	registry, err := NewInstallationRegistry([]Installation{{InstallationID: "0199a0c1-1d6e-72f1-8000-00000000c0de", ID: testPluginID, DisplayName: "Change Manager", Version: "1.0.0", Backend: backend, Organizations: map[string]AvailabilityState{"acme": state}, Operations: []Operation{
 		{ID: "list", Method: "GET", Path: "/orgs/{orgId}/changes", QueryKeys: []string{"state"}},
 		{ID: "command", Method: "POST", Path: "/orgs/{orgId}/changes/{changeId}/{command}", Mutating: true, PathValues: map[string][]string{"command": {"start", "cancel", "rollback"}}, SafetyPathValues: map[string][]string{"command": {"cancel", "rollback"}}},
 	}}}, true)
@@ -198,6 +201,58 @@ func TestGatewayRefusesRedirectAndInvalidJSON(t *testing.T) {
 	}
 	if redirected.Load() != 0 {
 		t.Fatal("followed a plugin redirect")
+	}
+}
+
+func TestUnreachablePluginLogsTheCauseWithoutRequestData(t *testing.T) {
+	_, key, _ := ed25519.GenerateKey(rand.Reader)
+	stopped := httptest.NewServer(http.NotFoundHandler())
+	stopped.Close()
+	interrupted := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", "64")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"items":`))
+		conn, _, err := http.NewResponseController(w).Hijack()
+		if assert.NoError(t, err) {
+			_ = conn.Close()
+		}
+	}))
+	defer interrupted.Close()
+	for _, tc := range []struct {
+		name, backend, code, class string
+		status                     int
+	}{
+		{"pod gone", stopped.URL, pluginUnavailable, "connection_refused", 503},
+		{"pod stopped while answering", interrupted.URL, pluginResponseInvalid, "connection_reset", 502},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			core, logs := observer.New(zapcore.DebugLevel)
+			registry := testRegistry(t, tc.backend, StateAvailable)
+			item, _ := registry.ConfiguredInstallation("acme", testPluginID)
+			gateway := Gateway{Registry: registry, SigningKey: key, Issuer: "cp", Logger: zap.New(core)}
+			_, err := gateway.Invoke(t.Context(), "acme", testPluginID, testActor, Invocation{OperationID: "list", Query: map[string][]string{"state": {"secret-filter"}}})
+			var gatewayError *GatewayError
+			require.ErrorAs(t, err, &gatewayError)
+			require.Equal(t, tc.code, gatewayError.Code)
+			require.Equal(t, tc.status, gatewayError.Status)
+			entries := logs.All()
+			require.Len(t, entries, 1)
+			require.Equal(t, zapcore.ErrorLevel, entries[0].Level)
+			fields := entries[0].ContextMap()
+			require.Equal(t, testPluginID, fields["plugin_id"])
+			require.Equal(t, item.InstallationID, fields["installation_id"])
+			require.Equal(t, "list", fields["operation_id"])
+			require.Equal(t, "GET", fields["method"])
+			require.Equal(t, "/orgs/{orgId}/changes", fields["route"])
+			require.Equal(t, tc.code, fields["code"])
+			require.EqualValues(t, tc.status, fields["status"])
+			require.Equal(t, tc.class, fields["error_class"])
+			require.NotEmpty(t, fields["cause"])
+			encoded, err := json.Marshal(fields)
+			require.NoError(t, err)
+			require.NotContains(t, string(encoded), "secret-filter", "the query never reaches the log")
+			require.NotContains(t, string(encoded), "/orgs/acme", "the concrete path never reaches the log")
+		})
 	}
 }
 
