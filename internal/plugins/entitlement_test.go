@@ -3,7 +3,6 @@ package plugins
 import (
 	"context"
 	"crypto/ed25519"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -26,15 +25,20 @@ func licensedInstallation() Installation {
 
 func TestInstallationSnapshotCannotMutateEntitlementBoundary(t *testing.T) {
 	item := licensedInstallation()
-	registry := &InstallationRegistry{installations: map[string]Installation{item.ID: item}}
-	snapshot := registry.Installations()
-	require.Len(t, snapshot, 1)
-	snapshot[0].Entitlement.Features[0] = "another-feature"
-	snapshot[0].Organizations["acme"] = StateNotEnabled
-	snapshot[0].Operations[0].RequiredFeature = "another-feature"
-	require.Equal(t, "workflow", registry.Installations()[0].Entitlement.Features[0])
-	require.Equal(t, StateAvailable, registry.Installations()[0].Organizations["acme"])
-	require.Equal(t, "workflow", registry.Installations()[0].Operations[0].RequiredFeature)
+	registry, err := NewInstallationRegistry([]Installation{item}, false)
+	require.NoError(t, err)
+	served := func() Installation {
+		served, _, found := registry.Installation(context.Background(), "acme", item.ID)
+		require.True(t, found)
+		return served
+	}
+	snapshot := served()
+	snapshot.Entitlement.Features[0] = "another-feature"
+	snapshot.Organizations["acme"] = StateNotEnabled
+	snapshot.Operations[0].RequiredFeature = "another-feature"
+	require.Equal(t, "workflow", served().Entitlement.Features[0])
+	require.Equal(t, StateAvailable, served().Organizations["acme"])
+	require.Equal(t, "workflow", served().Operations[0].RequiredFeature)
 }
 
 func TestEntitlementDeclarationClosedRequirements(t *testing.T) {
@@ -69,9 +73,7 @@ func TestEntitlementDeclarationClosedRequirements(t *testing.T) {
 
 func TestRequiredEntitlementFailsClosedWithoutVerifier(t *testing.T) {
 	item := licensedInstallation()
-	encoded, err := json.Marshal([]Installation{item})
-	require.NoError(t, err)
-	registry, err := LoadInstallations(strings.NewReader(string(encoded)), false)
+	registry, err := NewInstallationRegistry([]Installation{item}, false)
 	require.NoError(t, err)
 	descriptor, found := registry.Get(context.Background(), "acme", item.ID)
 	require.True(t, found)
@@ -158,9 +160,7 @@ func TestGatewayResultCarriesGraceWarning(t *testing.T) {
 	defer backend.Close()
 	item := licensedInstallation()
 	item.Backend = backend.URL
-	encoded, err := json.Marshal([]Installation{item})
-	require.NoError(t, err)
-	registry, err := LoadInstallations(strings.NewReader(string(encoded)), true)
+	registry, err := NewInstallationRegistry([]Installation{item}, true)
 	require.NoError(t, err)
 	until := time.Now().UTC().Add(time.Hour).Truncate(time.Second)
 	registry.Entitlements = fixedEntitlements{Features: map[string]FeatureAccess{"workflow": {State: "grace", Forward: true, Read: true, Safety: true, GraceUntil: &until}}}

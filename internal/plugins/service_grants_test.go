@@ -1,7 +1,6 @@
 package plugins
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -14,9 +13,7 @@ func TestInstallationServiceGrantsAreExplicitAndNamespaced(t *testing.T) {
 	item := Installation{ID: "dev.example.workflow", DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.example.test", Organizations: map[string]AvailabilityState{"acme": StateAvailable}, ServiceUserID: userid.NewServiceUserTokenId().String(), AdmissionCheckerID: userid.NewServiceUserTokenId().String(), ServiceGrants: []ServiceGrant{{Action: "external-deployment.admit", Permission: "plugin.dev.example.workflow.control", Scope: "environment"}}, Operations: []Operation{{ID: "prepare", Method: "POST", Path: "/orgs/{orgId}/workflows/{id}/prepare", Mutating: true, ServiceActions: []string{"external-deployment.admit"}}}}
 	load := func(t *testing.T, value Installation) error {
 		t.Helper()
-		encoded, err := json.Marshal([]Installation{value})
-		require.NoError(t, err)
-		_, err = LoadInstallations(strings.NewReader(string(encoded)), false)
+		_, err := NewInstallationRegistry([]Installation{value}, false)
 		return err
 	}
 	require.NoError(t, load(t, item))
@@ -63,9 +60,7 @@ func TestInstallationAuthorizationPoliciesAreClosedAndNamespaced(t *testing.T) {
 	}
 	load := func(t *testing.T, value Installation) error {
 		t.Helper()
-		encoded, err := json.Marshal([]Installation{value})
-		require.NoError(t, err)
-		_, err = LoadInstallations(strings.NewReader(string(encoded)), false)
+		_, err := NewInstallationRegistry([]Installation{value}, false)
 		return err
 	}
 	require.NoError(t, load(t, item))

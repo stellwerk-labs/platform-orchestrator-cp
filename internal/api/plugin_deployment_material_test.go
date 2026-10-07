@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -30,9 +29,7 @@ func TestPluginMaterialUsesIndependentCorePermissionAndNeverServiceIdentity(t *t
 	actor, service, checker := uuid.New(), userid.NewServiceUserTokenId().String(), userid.NewServiceUserTokenId().String()
 	project, environment, deployment := uuid.New(), uuid.New(), uuid.New()
 	item := plugins.Installation{ID: pluginID, DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.test", ServiceUserID: service, AdmissionCheckerID: checker, Organizations: map[string]plugins.AvailabilityState{"acme": plugins.StateNotEntitled}, ServiceGrants: []plugins.ServiceGrant{{Action: "external-deployment.read", Permission: "plugin." + pluginID + ".view", Scope: "environment"}}}
-	encoded, err := json.Marshal([]plugins.Installation{item})
-	require.NoError(t, err)
-	registry, err := plugins.LoadInstallations(strings.NewReader(string(encoded)), false)
+	registry, err := plugins.NewInstallationRegistry([]plugins.Installation{item}, false)
 	require.NoError(t, err)
 	public, private, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)

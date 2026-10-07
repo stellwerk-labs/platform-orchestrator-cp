@@ -3,13 +3,13 @@ package plugins
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
-	"regexp"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -99,172 +99,170 @@ type Installation struct {
 	DeploymentApprovalPolicies map[string]string            `json:"deployment_approval_policies,omitempty"`
 }
 
+// InstallationRegistry serves read decisions (discovery, routing, UI and
+// descriptors) from an immutable snapshot of the Plugin Manager state. A
+// refresh replaces the whole snapshot atomically; readers never see a mix.
+// The snapshot is never authority for a Core effect: effects re-verify the
+// installation and organization enablement in their own transaction.
 type InstallationRegistry struct {
-	installations map[string]Installation
-	Entitlements  EntitlementResolver
+	snapshot     atomic.Pointer[installationSnapshot]
+	Entitlements EntitlementResolver
 }
 
-var identifier = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$`)
-var canonicalVersion = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$`)
-var operationIdentifier = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$`)
-var pathParameter = regexp.MustCompile(`\{([a-zA-Z][a-zA-Z0-9_]*)\}`)
+type installationSnapshot struct {
+	revision      int64
+	installations map[string]Installation
+}
 
-const orgPathParameter = "orgId"
-const environmentScope = "environment"
+var emptySnapshot = &installationSnapshot{installations: map[string]Installation{}}
 
-func LoadInstallations(reader io.Reader, allowDevelopmentHTTP bool) (*InstallationRegistry, error) {
-	var items []Installation
-	decoder := json.NewDecoder(io.LimitReader(reader, 1<<20))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&items); err != nil {
+// NewInstallationRegistry validates every installation and fails if any is
+// invalid.
+func NewInstallationRegistry(items []Installation, allowDevelopmentHTTP bool) (*InstallationRegistry, error) {
+	registry := &InstallationRegistry{}
+	if err := errors.Join(registry.Replace(0, items, allowDevelopmentHTTP)...); err != nil {
 		return nil, err
-	}
-	if err := decoder.Decode(new(any)); err != io.EOF {
-		return nil, fmt.Errorf("plugin configuration must contain one JSON document")
-	}
-	registry := &InstallationRegistry{installations: map[string]Installation{}}
-	for _, item := range items {
-		if err := validateEntitlement(item); err != nil {
-			return nil, err
-		}
-		if !identifier.MatchString(item.ID) || item.DisplayName == "" || !canonicalVersion.MatchString(item.Version) {
-			return nil, fmt.Errorf("invalid plugin identity")
-		}
-		if _, exists := registry.installations[item.ID]; exists {
-			return nil, fmt.Errorf("duplicate plugin %s", item.ID)
-		}
-		if err := validateOrigin(item.Backend, allowDevelopmentHTTP); err != nil {
-			return nil, fmt.Errorf("plugin %s backend: %w", item.ID, err)
-		}
-		if item.UI != nil {
-			if err := validateOrigin(item.UI.Origin, allowDevelopmentHTTP); err != nil {
-				return nil, fmt.Errorf("plugin %s UI: %w", item.ID, err)
-			}
-			if item.UI.SDKVersion != "1" || !safePath(item.UI.Entrypoint) || !safePath(item.UI.RoutePrefix) || item.UI.NavigationLabel == "" {
-				return nil, fmt.Errorf("invalid plugin UI contribution")
-			}
-			hostSeen := map[string]bool{}
-			for _, op := range item.UI.CoreOperations {
-				if !operationIdentifier.MatchString(op.ID) || !reservedHostOperation(op.ID) || hostSeen[op.ID] || (op.Method != http.MethodGet && op.Method != http.MethodPost) || op.Method == http.MethodGet && op.Mutating {
-					return nil, fmt.Errorf("invalid or duplicate Core host operation")
-				}
-				hostSeen[op.ID] = true
-			}
-		}
-		for org, state := range item.Organizations {
-			if org == "" || strings.ContainsAny(org, "/\\") {
-				return nil, fmt.Errorf("invalid plugin organization")
-			}
-			switch state {
-			case StateAvailable, StateNotEnabled, StateNotEntitled, StateIncompatible, StateUnavailable:
-			default:
-				return nil, fmt.Errorf("invalid plugin availability")
-			}
-		}
-		if item.OrganizationTimezones == nil {
-			item.OrganizationTimezones = map[string]string{}
-		}
-		for org := range item.OrganizationTimezones {
-			if _, exists := item.Organizations[org]; !exists {
-				return nil, fmt.Errorf("timezone must name an installed organization")
-			}
-		}
-		for org := range item.Organizations {
-			zone := item.OrganizationTimezones[org]
-			if zone == "" {
-				zone = "UTC"
-			}
-			if zone == "Local" {
-				return nil, fmt.Errorf("organization timezone must be an explicit IANA name")
-			}
-			if _, err := time.LoadLocation(zone); err != nil {
-				return nil, fmt.Errorf("invalid organization timezone: %w", err)
-			}
-			item.OrganizationTimezones[org] = zone
-		}
-		seen := map[string]bool{}
-		if err := validateServiceGrants(item); err != nil {
-			return nil, err
-		}
-		for _, op := range item.Operations {
-			if !operationIdentifier.MatchString(op.ID) || reservedHostOperation(op.ID) || seen[op.ID] || !safePath(op.Path) {
-				return nil, fmt.Errorf("invalid or duplicate plugin operation")
-			}
-			seen[op.ID] = true
-			for _, action := range op.ServiceActions {
-				if _, found := item.ServiceGrant(action); !found {
-					return nil, fmt.Errorf("operation refers to undeclared service action")
-				}
-			}
-			for action, constraints := range op.ServiceActionPathValues {
-				if !slices.Contains(op.ServiceActions, action) || len(constraints) == 0 {
-					return nil, fmt.Errorf("service action constraints need a declared action")
-				}
-				for parameter, values := range constraints {
-					if !strings.Contains(op.Path, "{"+parameter+"}") || parameter == orgPathParameter || len(values) == 0 {
-						return nil, fmt.Errorf("service action constraint must bind a real operation path parameter")
-					}
-				}
-			}
-			switch op.Method {
-			case "GET":
-				if op.Mutating {
-					return nil, fmt.Errorf("GET cannot mutate")
-				}
-			case "POST":
-				// A bounded preview can use a JSON body without changing state.
-			case "PUT", "PATCH", "DELETE":
-				if !op.Mutating {
-					return nil, fmt.Errorf("write operation must be marked mutating")
-				}
-			default:
-				return nil, fmt.Errorf("unsupported plugin method")
-			}
-			if strings.Contains(pathParameter.ReplaceAllString(op.Path, ""), "{") || strings.Contains(pathParameter.ReplaceAllString(op.Path, ""), "}") {
-				return nil, fmt.Errorf("invalid path template")
-			}
-		}
-		if item.UI != nil {
-			if err := validateContextualActions(item.UI.ContextualActions, seen); err != nil {
-				return nil, err
-			}
-		}
-		registry.installations[item.ID] = item
 	}
 	return registry, nil
 }
 
-var contextualRoute = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9/-]*[a-z0-9])?$`)
-var contextualQueryKey = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)
-
-func validateContextualActions(actions []ContextualAction, operations map[string]bool) error {
-	if len(actions) > 100 {
-		return fmt.Errorf("too many contextual actions")
+// Replace publishes the installations of one Plugin Manager revision. An
+// invalid installation is left out and reported; it degrades only that plugin.
+func (r *InstallationRegistry) Replace(revision int64, items []Installation, allowDevelopmentHTTP bool) []error {
+	next := &installationSnapshot{revision: revision, installations: make(map[string]Installation, len(items))}
+	var rejected []error
+	for _, item := range items {
+		item = detached(item)
+		if err := ValidateInstallation(item, allowDevelopmentHTTP); err != nil {
+			rejected = append(rejected, fmt.Errorf("plugin %s: %w", item.ID, err))
+			continue
+		}
+		if _, exists := next.installations[item.ID]; exists {
+			rejected = append(rejected, fmt.Errorf("duplicate plugin %s", item.ID))
+			continue
+		}
+		zones := map[string]string{}
+		for org := range item.Organizations {
+			zones[org], _ = NormalizeTimezone(item.OrganizationTimezones[org])
+		}
+		item.OrganizationTimezones = zones
+		next.installations[item.ID] = item
 	}
-	seen := map[string]bool{}
-	for _, action := range actions {
-		if !operationIdentifier.MatchString(action.ID) || seen[action.ID] || action.ResourceType != "module_version" || strings.TrimSpace(action.Label) == "" || len(action.Label) > 100 || !operations[action.RequiredOperationID] || !contextualRoute.MatchString(action.Route.Path) || strings.Contains(action.Route.Path, "//") || len(action.When.LifecycleStatus) == 0 {
-			return fmt.Errorf("invalid contextual action identity, route, condition or required plugin operation")
+	r.snapshot.Store(next)
+	return rejected
+}
+
+// Revision is the Plugin Manager revision of the served snapshot.
+func (r *InstallationRegistry) Revision() int64 {
+	return r.current().revision
+}
+
+func (r *InstallationRegistry) current() *installationSnapshot {
+	if r == nil {
+		return emptySnapshot
+	}
+	if snapshot := r.snapshot.Load(); snapshot != nil {
+		return snapshot
+	}
+	return emptySnapshot
+}
+
+// ValidateInstallation checks a complete installation: its manifest, operator
+// endpoints and identities, and every organization's enablement.
+func ValidateInstallation(item Installation, allowDevelopmentHTTP bool) error {
+	manifest := item.Manifest()
+	if err := manifest.Validate(); err != nil {
+		return err
+	}
+	if err := validateEntitlementBinding(item); err != nil {
+		return err
+	}
+	uiOrigin := ""
+	if item.UI != nil {
+		uiOrigin = item.UI.Origin
+	}
+	if err := ValidateEndpoints(manifest, item.Backend, uiOrigin, allowDevelopmentHTTP); err != nil {
+		return err
+	}
+	if err := ValidateServiceIdentities(manifest, item.ServiceUserID, item.AdmissionCheckerID); err != nil {
+		return err
+	}
+	if err := manifest.ValidateApprovalPolicies(item.DeploymentApprovalPolicies); err != nil {
+		return err
+	}
+	for org, state := range item.Organizations {
+		if org == "" || strings.ContainsAny(org, "/\\") {
+			return fmt.Errorf("invalid plugin organization")
 		}
-		seen[action.ID] = true
-		statuses := map[string]bool{}
-		for _, status := range action.When.LifecycleStatus {
-			if !slices.Contains([]string{"proposed", "default", "deprecated", "defective"}, status) || statuses[status] {
-				return fmt.Errorf("invalid contextual lifecycle condition")
-			}
-			statuses[status] = true
+		switch state {
+		case StateAvailable, StateNotEnabled, StateNotEntitled, StateIncompatible, StateUnavailable:
+		default:
+			return fmt.Errorf("invalid plugin availability")
 		}
-		for key, value := range action.Route.Query {
-			if !contextualQueryKey.MatchString(key) || !slices.Contains([]string{"$module_id", "$semantic_version", "$version_uuid"}, value) {
-				return fmt.Errorf("invalid contextual query substitution")
-			}
+	}
+	for org, zone := range item.OrganizationTimezones {
+		if _, exists := item.Organizations[org]; !exists {
+			return fmt.Errorf("timezone must name an installed organization")
+		}
+		if _, err := NormalizeTimezone(zone); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-func reservedHostOperation(id string) bool {
-	return strings.HasPrefix(id, "core.") || strings.HasPrefix(id, "iam.")
+// ValidateEndpoints checks the operator-chosen backend and UI origins. A UI
+// origin exists exactly when the package contributes a UI.
+func ValidateEndpoints(manifest Manifest, backend, uiOrigin string, allowDevelopmentHTTP bool) error {
+	if err := validateOrigin(backend, allowDevelopmentHTTP); err != nil {
+		return fmt.Errorf("backend: %w", err)
+	}
+	if manifest.UI == nil {
+		if uiOrigin != "" {
+			return fmt.Errorf("a UI origin requires a package UI contribution")
+		}
+		return nil
+	}
+	if err := validateOrigin(uiOrigin, allowDevelopmentHTTP); err != nil {
+		return fmt.Errorf("UI: %w", err)
+	}
+	return nil
+}
+
+// ValidateServiceIdentities checks the plugin service user and admission
+// checker. They exist exactly when the package declares service grants.
+func ValidateServiceIdentities(manifest Manifest, serviceUser, admissionChecker string) error {
+	if len(manifest.ServiceGrants) == 0 {
+		if serviceUser != "" || admissionChecker != "" {
+			return fmt.Errorf("service identities require explicit service grants")
+		}
+		return nil
+	}
+	for _, identity := range []string{serviceUser, admissionChecker} {
+		id, err := uuid.Parse(identity)
+		if err != nil || identity != id.String() || !userid.IsServiceUser(id) {
+			return fmt.Errorf("plugin service identities must be canonical IAM service-user UUIDs")
+		}
+	}
+	if serviceUser == admissionChecker {
+		return fmt.Errorf("plugin and admission checker must have distinct identities")
+	}
+	return nil
+}
+
+// NormalizeTimezone returns the explicit IANA zone of an organization;
+// omitted means UTC.
+func NormalizeTimezone(zone string) (string, error) {
+	if zone == "" {
+		zone = "UTC"
+	}
+	if zone == "Local" {
+		return "", fmt.Errorf("organization timezone must be an explicit IANA name")
+	}
+	if _, err := time.LoadLocation(zone); err != nil {
+		return "", fmt.Errorf("invalid organization timezone: %w", err)
+	}
+	return zone, nil
 }
 
 // ServiceGrant is operator-owned policy. A plugin cannot choose the permission
@@ -284,65 +282,6 @@ type AuthorizationPolicy struct {
 	Scopes     []string `json:"scopes"`
 }
 
-var localCapability = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
-
-func validateServiceGrants(item Installation) error {
-	if len(item.ServiceGrants) == 0 {
-		if item.ServiceUserID != "" || item.AdmissionCheckerID != "" || len(item.AuthorizationPolicies) != 0 || len(item.DeploymentApprovalPolicies) != 0 {
-			return fmt.Errorf("service identities require explicit service grants")
-		}
-		return nil
-	}
-	for _, identity := range []string{item.ServiceUserID, item.AdmissionCheckerID} {
-		id, err := uuid.Parse(identity)
-		if err != nil || identity != id.String() || !userid.IsServiceUser(id) {
-			return fmt.Errorf("plugin service identities must be canonical IAM service-user UUIDs")
-		}
-	}
-	if item.ServiceUserID == item.AdmissionCheckerID {
-		return fmt.Errorf("plugin and admission checker must have distinct identities")
-	}
-	seen := map[string]bool{}
-	for _, grant := range item.ServiceGrants {
-		prefix := "plugin." + item.ID + "."
-		if !operationIdentifier.MatchString(grant.Action) || seen[grant.Action] || !strings.HasPrefix(grant.Permission, prefix) || !localCapability.MatchString(strings.TrimPrefix(grant.Permission, prefix)) || (grant.Scope != "organization" && grant.Scope != environmentScope) {
-			return fmt.Errorf("service grants require unique actions, owned capabilities and exact scope")
-		}
-		seen[grant.Action] = true
-	}
-	policySeen := map[string]bool{}
-	for _, policy := range item.AuthorizationPolicies {
-		prefix := "plugin." + item.ID + "."
-		if policySeen[policy.Permission] || !strings.HasPrefix(policy.Permission, prefix) || !localCapability.MatchString(strings.TrimPrefix(policy.Permission, prefix)) || len(policy.Scopes) == 0 {
-			return fmt.Errorf("authorization policies require unique owned capabilities and exact scopes")
-		}
-		policySeen[policy.Permission] = true
-		scopeSeen := map[string]bool{}
-		for _, scope := range policy.Scopes {
-			if scopeSeen[scope] || !slices.Contains([]string{"organization", "project", environmentScope}, scope) {
-				return fmt.Errorf("authorization policies require unique owned capabilities and exact scopes")
-			}
-			scopeSeen[scope] = true
-		}
-	}
-	if len(item.AuthorizationPolicies) != 0 {
-		grant, ok := item.ServiceGrant("authorization.check")
-		policy, policyOK := item.AuthorizationPolicy(grant.Permission)
-		if !ok || !policyOK || !slices.Contains(policy.Scopes, grant.Scope) {
-			return fmt.Errorf("authorization policies require an authorization.check grant covered by policy")
-		}
-	} else if _, ok := item.ServiceGrant("authorization.check"); ok {
-		return fmt.Errorf("authorization.check requires explicit authorization policies")
-	}
-	for scope, permission := range item.DeploymentApprovalPolicies {
-		policy, ok := item.AuthorizationPolicy(permission)
-		if !slices.Contains([]string{environmentScope, "project"}, scope) || !ok || !slices.Contains(policy.Scopes, scope) {
-			return fmt.Errorf("deployment approvals require an owned authorization policy for the exact scope")
-		}
-	}
-	return nil
-}
-
 // ResourceEventsReadAction is the service grant that subscribes an installation
 // to an organization's resource event journal.
 const ResourceEventsReadAction = "resource-events.read"
@@ -351,48 +290,26 @@ const ResourceEventsReadAction = "resource-events.read"
 // delegation, or unattended within an operation that delegates it.
 const InventoryReadAction = "inventory.read"
 
-// ResourceEventSubscribers returns, sorted, the installed plugins configured
-// for the organization with a resource event subscription. Core journals an
-// organization's resource events only while this list is non-empty.
-func (r *InstallationRegistry) ResourceEventSubscribers(orgID string) []string {
-	subscribers := []string{}
-	if r == nil {
-		return subscribers
+// Manifest returns the package declarations of the installation.
+func (item Installation) Manifest() Manifest {
+	manifest := Manifest{
+		ID: item.ID, DisplayName: item.DisplayName, Version: item.Version, Capabilities: item.Capabilities,
+		Operations: item.Operations, ServiceGrants: item.ServiceGrants, AuthorizationPolicies: item.AuthorizationPolicies, Entitlement: item.Entitlement,
 	}
-	for id, item := range r.installations {
-		if _, configured := item.Organizations[orgID]; !configured {
-			continue
-		}
-		if _, subscribed := item.ServiceGrant(ResourceEventsReadAction); subscribed {
-			subscribers = append(subscribers, id)
-		}
+	if item.UI != nil {
+		ui := *item.UI
+		ui.Origin = ""
+		manifest.UI = &ui
 	}
-	slices.Sort(subscribers)
-	return subscribers
-}
-
-// HasResourceEventSubscriber reports whether any installed plugin subscribes
-// to the organization's resource event journal.
-func (r *InstallationRegistry) HasResourceEventSubscriber(orgID string) bool {
-	return len(r.ResourceEventSubscribers(orgID)) > 0
+	return manifest
 }
 
 func (item Installation) ServiceGrant(action string) (ServiceGrant, bool) {
-	for _, grant := range item.ServiceGrants {
-		if grant.Action == action {
-			return grant, true
-		}
-	}
-	return ServiceGrant{}, false
+	return item.Manifest().ServiceGrant(action)
 }
 
 func (item Installation) AuthorizationPolicy(permission string) (AuthorizationPolicy, bool) {
-	for _, policy := range item.AuthorizationPolicies {
-		if policy.Permission == permission {
-			return policy, true
-		}
-	}
-	return AuthorizationPolicy{}, false
+	return item.Manifest().AuthorizationPolicy(permission)
 }
 
 func validateOrigin(raw string, development bool) error {
@@ -424,10 +341,11 @@ func accessMode(state AvailabilityState) AccessMode {
 }
 
 func (r *InstallationRegistry) Get(ctx context.Context, orgID, pluginID string) (Descriptor, bool) {
-	if r == nil {
-		return Descriptor{}, false
-	}
-	item, found := r.installations[pluginID]
+	return r.get(ctx, r.current(), orgID, pluginID)
+}
+
+func (r *InstallationRegistry) get(ctx context.Context, snapshot *installationSnapshot, orgID, pluginID string) (Descriptor, bool) {
+	item, found := snapshot.installations[pluginID]
 	if !found {
 		return Descriptor{}, false
 	}
@@ -440,12 +358,10 @@ func (r *InstallationRegistry) Get(ctx context.Context, orgID, pluginID string) 
 }
 
 func (r *InstallationRegistry) List(ctx context.Context, orgID string) []Descriptor {
+	snapshot := r.current()
 	result := []Descriptor{}
-	if r == nil {
-		return result
-	}
-	for id := range r.installations {
-		if d, ok := r.Get(ctx, orgID, id); ok {
+	for id := range snapshot.installations {
+		if d, ok := r.get(ctx, snapshot, orgID, id); ok {
 			result = append(result, d)
 		}
 	}
@@ -453,48 +369,81 @@ func (r *InstallationRegistry) List(ctx context.Context, orgID string) []Descrip
 	return result
 }
 
+// Installation returns the installation and its descriptor from one snapshot.
 func (r *InstallationRegistry) Installation(ctx context.Context, orgID, pluginID string) (Installation, Descriptor, bool) {
-	d, ok := r.Get(ctx, orgID, pluginID)
+	snapshot := r.current()
+	d, ok := r.get(ctx, snapshot, orgID, pluginID)
 	if !ok {
 		return Installation{}, Descriptor{}, false
 	}
-	i, _ := r.ConfiguredInstallation(orgID, pluginID)
-	return i, d, true
+	return detached(snapshot.installations[pluginID]), d, true
 }
 
 // ConfiguredInstallation reads only detached operator metadata. Service
 // identity must be checked before evaluating or activating a licence feature.
 // This method by itself makes no claim about the plugin's usable authority.
 func (r *InstallationRegistry) ConfiguredInstallation(orgID, pluginID string) (Installation, bool) {
-	if r == nil {
-		return Installation{}, false
-	}
-	item, found := r.installations[pluginID]
+	item, found := r.current().installations[pluginID]
 	if _, configured := item.Organizations[orgID]; !found || !configured {
 		return Installation{}, false
 	}
-	// The struct contains only JSON data. Round-tripping detaches nested maps.
-	encoded, _ := json.Marshal(item)
-	var clone Installation
-	_ = json.Unmarshal(encoded, &clone)
-	return clone, true
+	return detached(item), true
 }
 
-// Installations returns detached operator configuration for startup adapters.
-// It neither evaluates an entitlement nor returns credentials or signed grants.
+// LoadInstallations reads the operator installation file.
+func LoadInstallations(reader io.Reader, allowDevelopmentHTTP bool) (*InstallationRegistry, error) {
+	var items []Installation
+	decoder := json.NewDecoder(io.LimitReader(reader, 1<<20))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&items); err != nil {
+		return nil, err
+	}
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		return nil, fmt.Errorf("plugin configuration must contain one JSON document")
+	}
+	return NewInstallationRegistry(items, allowDevelopmentHTTP)
+}
+
+// ResourceEventSubscribers returns, sorted, the installed plugins configured
+// for the organization with a resource event subscription. Core journals an
+// organization's resource events only while this list is non-empty.
+func (r *InstallationRegistry) ResourceEventSubscribers(orgID string) []string {
+	subscribers := []string{}
+	for id, item := range r.current().installations {
+		if _, configured := item.Organizations[orgID]; !configured {
+			continue
+		}
+		if _, subscribed := item.ServiceGrant(ResourceEventsReadAction); subscribed {
+			subscribers = append(subscribers, id)
+		}
+	}
+	slices.Sort(subscribers)
+	return subscribers
+}
+
+// HasResourceEventSubscriber reports whether any installed plugin subscribes
+// to the organization's resource event journal.
+func (r *InstallationRegistry) HasResourceEventSubscriber(orgID string) bool {
+	return len(r.ResourceEventSubscribers(orgID)) > 0
+}
+
+// Installations returns detached copies of every served installation.
 func (r *InstallationRegistry) Installations() []Installation {
 	items := []Installation{}
-	if r == nil {
-		return items
-	}
-	for _, item := range r.installations {
-		encoded, _ := json.Marshal(item)
-		var clone Installation
-		_ = json.Unmarshal(encoded, &clone)
-		items = append(items, clone)
+	for _, item := range r.current().installations {
+		items = append(items, detached(item))
 	}
 	slices.SortFunc(items, func(a, b Installation) int { return strings.Compare(a.ID, b.ID) })
 	return items
+}
+
+// detached deep-copies an installation. The struct contains only JSON data,
+// so a round trip detaches every nested map and slice.
+func detached(item Installation) Installation {
+	encoded, _ := json.Marshal(item)
+	var clone Installation
+	_ = json.Unmarshal(encoded, &clone)
+	return clone
 }
 
 func (op Operation) RequestPath(org string, parameters map[string]string, query map[string][]string) (string, error) {

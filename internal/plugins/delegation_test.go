@@ -3,7 +3,6 @@ package plugins
 import (
 	"crypto/ed25519"
 	"encoding/json"
-	"strings"
 	"testing"
 	"time"
 
@@ -17,9 +16,7 @@ func TestServiceDelegationBindsCallerActionAndExactOriginalRequest(t *testing.T)
 	_, key, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
 	item := Installation{ID: "dev.example.workflow", DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.example.test", ServiceUserID: userid.NewServiceUserTokenId().String(), AdmissionCheckerID: userid.NewServiceUserTokenId().String(), Organizations: map[string]AvailabilityState{"acme": StateAvailable}, ServiceGrants: []ServiceGrant{{Action: "operation.prepare", Permission: "plugin.dev.example.workflow.design", Scope: "organization"}}, Operations: []Operation{{ID: "prepare", Method: "POST", Path: "/orgs/{orgId}/workflows/{id}/prepare", Mutating: true, ServiceActions: []string{"operation.prepare"}}}}
-	encoded, err := json.Marshal([]Installation{item})
-	require.NoError(t, err)
-	registry, err := LoadInstallations(strings.NewReader(string(encoded)), false)
+	registry, err := NewInstallationRegistry([]Installation{item}, false)
 	require.NoError(t, err)
 	now := time.Now().UTC()
 	gateway := &Gateway{Registry: registry, SigningKey: key, Issuer: "core", Now: func() time.Time { return now }}
@@ -30,7 +27,7 @@ func TestServiceDelegationBindsCallerActionAndExactOriginalRequest(t *testing.T)
 	proof.Assertion, err = plugincontext.Sign(key, claims, now)
 	require.NoError(t, err)
 	// A JSON transport round trip must preserve whitespace in signed bytes.
-	encoded, err = json.Marshal(proof)
+	encoded, err := json.Marshal(proof)
 	require.NoError(t, err)
 	var transported DelegationProof
 	require.NoError(t, json.Unmarshal(encoded, &transported))
@@ -65,9 +62,7 @@ func TestServiceDelegationCannotExchangeCancelForActivation(t *testing.T) {
 	}, Operations: []Operation{{ID: "command", Method: "POST", Path: "/orgs/{orgId}/workflows/{id}/{command}", Mutating: true, ServiceActions: []string{"operation.activate", "operation.release"}, SafetyPathValues: map[string][]string{"command": {"cancel"}}, ServiceActionPathValues: map[string]map[string][]string{
 		"operation.activate": {"command": {"start", "resume"}}, "operation.release": {"command": {"cancel"}},
 	}}}}
-	encoded, err := json.Marshal([]Installation{item})
-	require.NoError(t, err)
-	registry, err := LoadInstallations(strings.NewReader(string(encoded)), false)
+	registry, err := NewInstallationRegistry([]Installation{item}, false)
 	require.NoError(t, err)
 	now := time.Now().UTC()
 	gateway := &Gateway{Registry: registry, SigningKey: key, Issuer: "core", Now: func() time.Time { return now }}
@@ -86,9 +81,7 @@ func TestReadDelegationCannotAuthorizeMutation(t *testing.T) {
 	_, key, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
 	item := Installation{ID: "dev.example.workflow", DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.example.test", ServiceUserID: userid.NewServiceUserTokenId().String(), AdmissionCheckerID: userid.NewServiceUserTokenId().String(), Organizations: map[string]AvailabilityState{"acme": StateNotEntitled}, ServiceGrants: []ServiceGrant{{Action: "inventory.read", Permission: "plugin.dev.example.workflow.read", Scope: "organization"}}, Operations: []Operation{{ID: "read", Method: "GET", Path: "/orgs/{orgId}/workflows", ServiceActions: []string{"inventory.read"}}}}
-	encoded, err := json.Marshal([]Installation{item})
-	require.NoError(t, err)
-	registry, err := LoadInstallations(strings.NewReader(string(encoded)), false)
+	registry, err := NewInstallationRegistry([]Installation{item}, false)
 	require.NoError(t, err)
 	now := time.Now().UTC()
 	gateway := &Gateway{Registry: registry, SigningKey: key, Issuer: "core", Now: func() time.Time { return now }}

@@ -1,8 +1,6 @@
 package plugins
 
 import (
-	"bytes"
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -23,9 +21,7 @@ func TestInstallationOrganizationTimezones(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			item := Installation{ID: "dev.example.workflow", DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.test", Organizations: map[string]AvailabilityState{"acme": StateAvailable}, OrganizationTimezones: test.zones}
-			encoded, err := json.Marshal([]Installation{item})
-			require.NoError(t, err)
-			registry, err := LoadInstallations(bytes.NewReader(encoded), false)
+			registry, err := NewInstallationRegistry([]Installation{item}, false)
 			if !test.valid {
 				require.Error(t, err)
 				return

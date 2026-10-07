@@ -2,7 +2,6 @@ package api
 
 import (
 	"crypto/ed25519"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -26,9 +25,7 @@ func TestPluginDeploymentReadRejectsUndelegatedInspection(t *testing.T) {
 		ServiceGrants: []plugins.ServiceGrant{{Action: "external-deployment.readiness", Permission: "plugin." + pluginID + ".view", Scope: "environment"}},
 		Operations:    []plugins.Operation{{ID: "preview", Method: "POST", Path: "/orgs/{orgId}/preview", ServiceActions: []string{"external-deployment.readiness"}}},
 	}
-	encoded, err := json.Marshal([]plugins.Installation{item})
-	require.NoError(t, err)
-	registry, err := plugins.LoadInstallations(strings.NewReader(string(encoded)), false)
+	registry, err := plugins.NewInstallationRegistry([]plugins.Installation{item}, false)
 	require.NoError(t, err)
 	server := &Server{Logger: zap.NewNop(), PluginGateway: &plugins.Gateway{Registry: registry, SigningKey: key, Issuer: "cp"}}
 	e, err := hecho.DefaultEchoServerWithValidation(&hecho.ValidatedServerConfig{AppName: "plugin-test", Logger: zap.NewNop(), OpenAPIRawSchema: MustDecodeOpenApiSpec()})

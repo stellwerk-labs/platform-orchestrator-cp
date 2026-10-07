@@ -38,9 +38,7 @@ func TestPluginAuthorizationFreshProofUsesClaimActorAndClosedPolicy(t *testing.T
 		AuthorizationPolicies: []plugins.AuthorizationPolicy{{Permission: permission, Scopes: []string{pluginOrganizationScope}}},
 		Operations:            []plugins.Operation{{ID: "read", Method: http.MethodGet, Path: "/orgs/{orgId}/workflows", ServiceActions: []string{pluginAuthorizationCheckAction}}},
 	}
-	encoded, err := json.Marshal([]plugins.Installation{item})
-	require.NoError(t, err)
-	registry, err := plugins.LoadInstallations(strings.NewReader(string(encoded)), false)
+	registry, err := plugins.NewInstallationRegistry([]plugins.Installation{item}, false)
 	require.NoError(t, err)
 	_, signingKey, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
@@ -92,9 +90,7 @@ func TestPluginAuthorizationRejectsResourceFromAnotherOrganizationBeforeIAM(t *t
 	// The authorization.check grant itself must be covered by policy. Add the
 	// organization scope without making it valid for the requested permission.
 	item.AuthorizationPolicies[0].Scopes = []string{pluginOrganizationScope, "project"}
-	encoded, err := json.Marshal([]plugins.Installation{item})
-	require.NoError(t, err)
-	registry, err := plugins.LoadInstallations(strings.NewReader(string(encoded)), false)
+	registry, err := plugins.NewInstallationRegistry([]plugins.Installation{item}, false)
 	require.NoError(t, err)
 	ctrl := gomock.NewController(t)
 	db := mockmodel.NewMockDatabaser(ctrl)

@@ -39,7 +39,15 @@ func TestPluginGatewayPublicRoutesDisabledByDefault(t *testing.T) {
 }
 
 func TestPluginDiscoveryDoesNotExposeBackendAndAvailabilityDeniesForwardCall(t *testing.T) {
-	registry, err := plugins.LoadInstallations(strings.NewReader(`[{"id":"dev.example.change-manager","display_name":"Change Manager","version":"1.0.0","backend":"https://internal-plugin.invalid","organizations":{"acme":"not_entitled"},"capabilities":[],"ui":{"sdk_version":"1","origin":"https://plugin.invalid","entrypoint":"/index.html","route_prefix":"/changes","navigation_label":"Changes"},"operations":[{"id":"read","method":"GET","path":"/orgs/{orgId}/changes","mutating":false},{"id":"start","method":"POST","path":"/orgs/{orgId}/changes/start","mutating":true}]}]`), false)
+	registry, err := plugins.NewInstallationRegistry([]plugins.Installation{{
+		ID: "dev.example.change-manager", DisplayName: "Change Manager", Version: "1.0.0", Backend: "https://internal-plugin.invalid",
+		Organizations: map[string]plugins.AvailabilityState{"acme": plugins.StateNotEntitled}, Capabilities: []string{},
+		UI: &plugins.UIContribution{SDKVersion: "1", Origin: "https://plugin.invalid", Entrypoint: "/index.html", RoutePrefix: "/changes", NavigationLabel: "Changes"},
+		Operations: []plugins.Operation{
+			{ID: "read", Method: "GET", Path: "/orgs/{orgId}/changes"},
+			{ID: "start", Method: "POST", Path: "/orgs/{orgId}/changes/start", Mutating: true},
+		},
+	}}, false)
 	require.NoError(t, err)
 	_, key, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)

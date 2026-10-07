@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -20,9 +19,7 @@ func TestPluginDispatchRejectsUnconfiguredServicesBeforeDataAccess(t *testing.T)
 	pluginID := "dev.example.workflow"
 	service, checker := userid.NewServiceUserTokenId().String(), userid.NewServiceUserTokenId().String()
 	item := plugins.Installation{ID: pluginID, DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.example.test", ServiceUserID: service, AdmissionCheckerID: checker, Organizations: map[string]plugins.AvailabilityState{"acme": plugins.StateNotEnabled}, ServiceGrants: []plugins.ServiceGrant{{Action: "external-deployment.admit", Permission: "plugin.dev.example.workflow.control", Scope: "environment"}}}
-	encoded, err := json.Marshal([]plugins.Installation{item})
-	require.NoError(t, err)
-	registry, err := plugins.LoadInstallations(strings.NewReader(string(encoded)), false)
+	registry, err := plugins.NewInstallationRegistry([]plugins.Installation{item}, false)
 	require.NoError(t, err)
 	server := &Server{Logger: zap.NewNop(), PluginGateway: &plugins.Gateway{Registry: registry}}
 	e, err := hecho.DefaultEchoServerWithValidation(&hecho.ValidatedServerConfig{AppName: "plugin-test", Logger: zap.NewNop(), OpenAPIRawSchema: MustDecodeOpenApiSpec()})

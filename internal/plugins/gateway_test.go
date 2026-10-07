@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -24,14 +23,10 @@ const testActor = "b6636ae8-e388-4d4a-b5e6-c4f84bfa538c"
 
 func testRegistry(t *testing.T, backend string, state AvailabilityState) *InstallationRegistry {
 	t.Helper()
-	data, err := json.Marshal([]Installation{{ID: testPluginID, DisplayName: "Change Manager", Version: "1.0.0", Backend: backend, Organizations: map[string]AvailabilityState{"acme": state}, Operations: []Operation{
+	registry, err := NewInstallationRegistry([]Installation{{ID: testPluginID, DisplayName: "Change Manager", Version: "1.0.0", Backend: backend, Organizations: map[string]AvailabilityState{"acme": state}, Operations: []Operation{
 		{ID: "list", Method: "GET", Path: "/orgs/{orgId}/changes", QueryKeys: []string{"state"}},
 		{ID: "command", Method: "POST", Path: "/orgs/{orgId}/changes/{changeId}/{command}", Mutating: true, PathValues: map[string][]string{"command": {"start", "cancel", "rollback"}}, SafetyPathValues: map[string][]string{"command": {"cancel", "rollback"}}},
-	}}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	registry, err := LoadInstallations(strings.NewReader(string(data)), true)
+	}}}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,9 +53,7 @@ func TestGatewayReadOnlyPostPreservesExactSignedRequest(t *testing.T) {
 		_, _ = w.Write([]byte(`{"preview":true}`))
 	}))
 	defer backend.Close()
-	encoded, err := json.Marshal([]Installation{{ID: testPluginID, DisplayName: "Change Manager", Version: "1.0.0", Backend: backend.URL, Organizations: map[string]AvailabilityState{"acme": StateNotEntitled}, Operations: []Operation{{ID: "preview", Method: "POST", Path: "/orgs/{orgId}/preview", Mutating: false}}}})
-	require.NoError(t, err)
-	registry, err := LoadInstallations(strings.NewReader(string(encoded)), true)
+	registry, err := NewInstallationRegistry([]Installation{{ID: testPluginID, DisplayName: "Change Manager", Version: "1.0.0", Backend: backend.URL, Organizations: map[string]AvailabilityState{"acme": StateNotEntitled}, Operations: []Operation{{ID: "preview", Method: "POST", Path: "/orgs/{orgId}/preview", Mutating: false}}}}, true)
 	require.NoError(t, err)
 	gateway := &Gateway{Registry: registry, SigningKey: key, Issuer: "cp", Now: func() time.Time { return now }}
 	result, err := gateway.Invoke(t.Context(), "acme", testPluginID, testActor, Invocation{OperationID: "preview", Body: json.RawMessage(`{"items":[]}`)})
@@ -230,10 +223,10 @@ func TestInstallationValidationAndIsolation(t *testing.T) {
 			t.Errorf("accepted unsafe origin %s", url)
 		}
 	}
-	if _, err := LoadInstallations(strings.NewReader(`[] {}`), false); err == nil {
+	if _, err := DecodeManifest([]byte(`{} {}`)); err == nil {
 		t.Fatal("accepted trailing JSON")
 	}
-	if _, err := LoadInstallations(strings.NewReader(`[{"unknown":true}]`), false); err == nil {
+	if _, err := DecodeManifest([]byte(`{"unknown":true}`)); err == nil {
 		t.Fatal("accepted unknown fields")
 	}
 }

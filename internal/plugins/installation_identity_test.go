@@ -1,8 +1,6 @@
 package plugins
 
 import (
-	"bytes"
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -34,9 +32,7 @@ func TestInstallationRequiresCanonicalVersion(t *testing.T) {
 	} {
 		t.Run(test.version, func(t *testing.T) {
 			item := Installation{ID: "dev.example.workflow", DisplayName: "Workflow", Version: test.version, Backend: "https://workflow.test", Organizations: map[string]AvailabilityState{"acme": StateAvailable}}
-			encoded, err := json.Marshal([]Installation{item})
-			require.NoError(t, err)
-			registry, err := LoadInstallations(bytes.NewReader(encoded), false)
+			registry, err := NewInstallationRegistry([]Installation{item}, false)
 			if !test.valid {
 				require.ErrorContains(t, err, "invalid plugin identity")
 				return

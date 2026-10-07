@@ -41,7 +41,7 @@ func TestDataPlanePortSignsExactRequestWithoutAmbientCredentials(t *testing.T) {
 		_, _ = w.Write([]byte(`{"items":[]}`))
 	}))
 	defer server.Close()
-	registry, err := LoadInstallations(strings.NewReader("[]"), false)
+	registry, err := NewInstallationRegistry(nil, false)
 	require.NoError(t, err)
 	port, err := NewDataPlanePort(server.URL, &Gateway{Registry: registry, SigningKey: private, Issuer: "core", Now: func() time.Time { return now }}, true)
 	require.NoError(t, err)
@@ -70,7 +70,7 @@ func TestDataPlanePortDoesNotFollowRedirects(t *testing.T) {
 		http.Redirect(w, r, target.URL, http.StatusTemporaryRedirect)
 	}))
 	defer server.Close()
-	registry, err := LoadInstallations(strings.NewReader("[]"), false)
+	registry, err := NewInstallationRegistry(nil, false)
 	require.NoError(t, err)
 	port, err := NewDataPlanePort(server.URL, &Gateway{Registry: registry, SigningKey: private, Issuer: "core"}, true)
 	require.NoError(t, err)
@@ -82,7 +82,7 @@ func TestDataPlanePortDoesNotFollowRedirects(t *testing.T) {
 func TestDataPlaneMaterialIsBoundedAndOutsideInvocationEnvelope(t *testing.T) {
 	_, private, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
-	registry, err := LoadInstallations(strings.NewReader("[]"), false)
+	registry, err := NewInstallationRegistry(nil, false)
 	require.NoError(t, err)
 	for _, test := range []struct {
 		name, contentType, body string

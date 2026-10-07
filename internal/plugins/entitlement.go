@@ -12,6 +12,9 @@ import (
 	"github.com/google/uuid"
 )
 
+// EntitlementRequired is the declaration mode of a licensed plugin.
+const EntitlementRequired = "required"
+
 // EntitlementDeclaration is copied from the verified package manifest by the
 // installer. It declares requirements, never grants licence or IAM authority.
 type EntitlementDeclaration struct {
@@ -85,26 +88,64 @@ type EntitlementResolver interface {
 
 var featureSlug = regexp.MustCompile(`^[a-z][a-z0-9-]{0,62}$`)
 
+// validateEntitlement checks the declaration and the binding Core uses for
+// signed grants.
 func validateEntitlement(item Installation) error {
-	declaration := item.Entitlement
+	if err := validateEntitlementDeclaration(item.Manifest()); err != nil {
+		return err
+	}
+	return validateEntitlementBinding(item)
+}
+
+func validateEntitlementDeclaration(m Manifest) error {
+	declaration := m.Entitlement
 	if declaration == nil || declaration.Mode == "none" {
 		if declaration != nil && (len(declaration.Features) != 0 || len(declaration.Limits) != 0) {
 			return fmt.Errorf("unlicensed plugin cannot declare entitlement features or limits")
 		}
-		for _, op := range item.Operations {
+		for _, op := range m.Operations {
 			if op.RequiredFeature != "" {
 				return fmt.Errorf("operation requires an undeclared entitlement feature")
 			}
 		}
-		for _, grant := range item.ServiceGrants {
+		for _, grant := range m.ServiceGrants {
 			if grant.RequiredFeature != "" {
 				return fmt.Errorf("service action requires an undeclared entitlement feature")
 			}
 		}
 		return nil
 	}
-	if declaration.Mode != "required" || len(declaration.Features) == 0 || len(declaration.Features) > 64 || len(declaration.Limits) != 0 {
+	if declaration.Mode != EntitlementRequired || len(declaration.Features) == 0 || len(declaration.Features) > 64 || len(declaration.Limits) != 0 {
 		return fmt.Errorf("entitlement requires bounded declared features and no unsupported limits")
+	}
+	for i, feature := range declaration.Features {
+		if !featureSlug.MatchString(feature) || i > 0 && declaration.Features[i-1] >= feature {
+			return fmt.Errorf("entitlement features must be sorted unique local slugs")
+		}
+	}
+	for _, op := range m.Operations {
+		if !slices.Contains(declaration.Features, op.RequiredFeature) {
+			return fmt.Errorf("every licensed operation requires a declared feature")
+		}
+	}
+	for _, grant := range m.ServiceGrants {
+		if !slices.Contains(declaration.Features, grant.RequiredFeature) {
+			return fmt.Errorf("every licensed service action requires a declared feature")
+		}
+	}
+	return nil
+}
+
+// Licensed reports whether the package requires a signed entitlement.
+func (item Installation) Licensed() bool {
+	return item.Entitlement != nil && item.Entitlement.Mode == EntitlementRequired
+}
+
+// validateEntitlementBinding requires the identifiers a signed grant binds to:
+// the Core-assigned installation UUID and the package manifest digest.
+func validateEntitlementBinding(item Installation) error {
+	if !item.Licensed() {
+		return nil
 	}
 	id, err := uuid.Parse(item.InstallationID)
 	if err != nil || id == uuid.Nil || id.String() != item.InstallationID {
@@ -113,21 +154,6 @@ func validateEntitlement(item Installation) error {
 	digest, err := hex.DecodeString(item.ManifestSHA256)
 	if err != nil || len(digest) != 32 || strings.ToLower(item.ManifestSHA256) != item.ManifestSHA256 {
 		return fmt.Errorf("entitlement requires the verified package manifest SHA-256")
-	}
-	for i, feature := range declaration.Features {
-		if !featureSlug.MatchString(feature) || i > 0 && declaration.Features[i-1] >= feature {
-			return fmt.Errorf("entitlement features must be sorted unique local slugs")
-		}
-	}
-	for _, op := range item.Operations {
-		if !slices.Contains(declaration.Features, op.RequiredFeature) {
-			return fmt.Errorf("every licensed operation requires a declared feature")
-		}
-	}
-	for _, grant := range item.ServiceGrants {
-		if !slices.Contains(declaration.Features, grant.RequiredFeature) {
-			return fmt.Errorf("every licensed service action requires a declared feature")
-		}
 	}
 	return nil
 }
