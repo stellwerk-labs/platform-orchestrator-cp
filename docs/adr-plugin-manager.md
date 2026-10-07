@@ -35,7 +35,7 @@ Platform-scoped routes, outside any organization:
 |---|---|
 | `GET`, `POST /plugin-packages` | List; register a package. The same digest with the same manifest changes nothing. |
 | `GET`, `POST /plugin-installations`, `GET /plugin-installations/{id}` | List and read; install a package. Core assigns the UUID. A plugin has at most one installation. |
-| `PUT /plugin-installations/{id}/identity` | Record the service user and admission checker before activation. |
+| `PUT /plugin-installations/{id}/identity` | Record the service user and admission checker before activation; IAM must bind the service user to the installation. |
 | `POST /plugin-installations/{id}/actions/{activate,disable,enable}` | Serve the package registrations once the running plugin proves the package, or complete a pending upgrade; keep the installation safety-only for every organization; return it to active. |
 | `POST /plugin-installations/{id}/upgrade` | Request the package the installation serves next. |
 | `POST /plugin-installations/{id}/actions/{uninstall,reinstall}` | Remove registrations and enablements and keep the UUID and plugin data; return the retained installation to installed. |
@@ -63,6 +63,14 @@ when a service user is configured as a holder and never lets a plugin workload
 hold a platform permission. Organization roles are never consulted. With the
 plugin host disabled every route returns `404 plugin_host_disabled`; Core-only
 operation is unaffected.
+
+Core records a service user for an installation only when IAM binds a plugin
+workload to exactly that plugin ID, installation UUID and service user
+(`GET /internal/plugin-workload-bindings`); otherwise it answers
+`409 plugin_workload_binding_missing` and changes nothing. The operator
+therefore creates the IAM workload binding for the installation UUID first.
+Core asks IAM before the command's transaction, on every request including a
+replayed idempotency key; the checks inside the transaction are unchanged.
 
 ### Propagation and authority
 
@@ -180,8 +188,8 @@ verification and revisit this decision.
 - Uninstall does not yet ask the plugin whether it is ready to decommission,
   and removing a single organization's enablement does not wait for that
   organization's safety work.
-- Verifying service identities against IAM workload bindings and the service
-  user's organization.
+- Verifying that the plugin's service user belongs to the organization the
+  installation is enabled for.
 - Collision checks beyond the UI route prefix.
 
 ## Consequences

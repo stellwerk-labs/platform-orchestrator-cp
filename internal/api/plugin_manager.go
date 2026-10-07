@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -43,6 +44,31 @@ func (s *Server) pluginManagerCaller(ctx context.Context, permission string) (uu
 	}
 	middleware.SetAuthCheckedCtx(ctx)
 	return actor, nil
+}
+
+// requireWorkloadBinding refuses a service user that IAM does not bind to
+// exactly the plugin ID and UUID of the installation.
+func (s *Server) requireWorkloadBinding(ctx context.Context, installationID, serviceUser uuid.UUID) error {
+	installation, err := s.PluginManager.Installation(ctx, installationID)
+	if err != nil {
+		return pluginManagerError(err)
+	}
+	response, err := s.IamClient.InternalListPluginWorkloadBindingsWithResponse(ctx, &orchestratoriam.InternalListPluginWorkloadBindingsParams{
+		PluginId: installation.PluginID, InstallationId: installationID,
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to look up the plugin workload bindings")
+	}
+	if response.JSON200 == nil {
+		return errors.Errorf("unexpected status code when looking up the plugin workload bindings: %s", response.Status())
+	}
+	for _, binding := range response.JSON200.Items {
+		if binding.PluginId == installation.PluginID && binding.InstallationId == installationID && binding.ServiceUserId == serviceUser {
+			return nil
+		}
+	}
+	return pluginBoundaryError(409, "plugin_workload_binding_missing", fmt.Sprintf(
+		"IAM has no workload binding of service user %s to installation %s of plugin %s; bind the plugin workload first.", serviceUser, installationID, installation.PluginID))
 }
 
 func (s *Server) pluginManagerCommand(ctx context.Context, idempotencyKey string, expectedRevision int64, reason string) (pluginmanager.Command, error) {
@@ -149,6 +175,9 @@ func (s *Server) SetPluginInstallationIdentity(ctx context.Context, request SetP
 	}
 	command, err := s.pluginManagerCommand(ctx, request.Params.IdempotencyKey, request.Body.ExpectedRevision, request.Body.Reason)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.requireWorkloadBinding(ctx, request.InstallationId, request.Body.ServiceUserId); err != nil {
 		return nil, err
 	}
 	return pluginInstallationResult[SetPluginInstallationIdentity200JSONResponse](s.PluginManager.SetIdentity(ctx, command, request.InstallationId, request.Body.ServiceUserId.String(), request.Body.AdmissionCheckerId.String()))

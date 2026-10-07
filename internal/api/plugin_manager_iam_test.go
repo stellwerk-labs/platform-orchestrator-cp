@@ -22,14 +22,17 @@ import (
 )
 
 // iamPeer stands in for IAM behind its internal HTTP contract. It answers
-// platform checks from the operators configured for each permission, and
-// allows every organization check as for an organization administrator and
-// counts them.
+// platform checks from the operators configured for each permission, allows
+// every organization check as for an organization administrator and counts
+// them, and answers workload binding lookups from the bindings it holds.
 type iamPeer struct {
 	mu        sync.Mutex
 	holders   map[string][]uuid.UUID
+	bindings  []iamapi.PluginWorkloadBinding
 	platform  []iamapi.ResourcePermissionCheck
 	orgChecks atomic.Int32
+	// lookupDown makes binding lookups fail as if IAM were unavailable.
+	lookupDown atomic.Bool
 }
 
 func (p *iamPeer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -60,6 +63,18 @@ func (p *iamPeer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusForbidden)
 		_ = json.NewEncoder(w).Encode(map[string]any{"error": "HTTP-403", "message": "denied", "details": map[string]any{"failed_checks": failed}})
+	case r.Method == http.MethodGet && r.URL.Path == "/internal/plugin-workload-bindings" && !p.lookupDown.Load():
+		query := r.URL.Query()
+		items := []iamapi.PluginWorkloadBinding{}
+		p.mu.Lock()
+		for _, binding := range p.bindings {
+			if binding.PluginId == query.Get("plugin_id") && binding.InstallationId.String() == query.Get("installation_id") {
+				items = append(items, binding)
+			}
+		}
+		p.mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(iamapi.PluginWorkloadBindingList{Items: items})
 	default:
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}

@@ -149,7 +149,7 @@ paths:
     put:
       operationId: setPluginInstallationIdentity
       summary: Record the plugin service user and admission checker of an installation.
-      description: Requires plugin_manager_write. Identities are recorded before activation and exist exactly when the package declares service grants. Recording the same identities again changes nothing.
+      description: Requires plugin_manager_write. Identities are recorded before activation and exist exactly when the package declares service grants. IAM must hold a workload binding of exactly the installation's plugin ID, installation UUID and the service user; otherwise Core answers 409 plugin_workload_binding_missing and records nothing. Recording the same identities again changes nothing.
       tags: [Plugin Manager]
       security: [{userIdHeader: []}]
       parameters:

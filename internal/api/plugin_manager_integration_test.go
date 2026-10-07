@@ -19,6 +19,7 @@ import (
 	"github.com/stellwerk-labs/golib/herrors"
 	"github.com/stellwerk-labs/golib/hstandardoutbox"
 	iamauthz "github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
+	iamapi "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -37,6 +38,16 @@ type operatorAPI struct {
 	server *Server
 	e      *echo.Echo
 	iam    *iamPeer
+}
+
+// bind records the workload binding an operator creates in IAM.
+func (p *iamPeer) bind(pluginID string, installation, serviceUser uuid.UUID) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.bindings = append(p.bindings, iamapi.PluginWorkloadBinding{
+		Id: uuid.New(), PluginId: pluginID, InstallationId: installation, ServiceUserId: serviceUser,
+		Namespace: "stellwerk-plugins", ServiceAccount: pluginID + "-runtime", Audience: "stellwerk-iam-plugin-workload", CreatedAt: time.Now(),
+	})
 }
 
 // newOperatorAPI serves s. pluginOperator holds both Plugin Manager
@@ -110,6 +121,7 @@ func (a *operatorAPI) install(item plugins.Installation, org string) PluginInsta
 		PluginInstallationCreate{ExpectedRevision: *pkg.Revision, Reason: "Install the plugin", PackageSha256: digest, BackendUrl: item.Backend}), http.StatusCreated)
 	require.Equal(t, PluginInstallationStateInstalled, installation.State)
 	fleet.serve(t, item.Backend, installation.InstallationId, digest)
+	a.iam.bind(item.ID, installation.InstallationId, uuid.MustParse(item.ServiceUserID))
 	path := "/plugin-installations/" + installation.InstallationId.String()
 	installation = decode[PluginInstallation](t, a.call(pluginOperator, http.MethodPut, path+"/identity", uuid.NewString(),
 		PluginInstallationIdentity{ExpectedRevision: *installation.Revision, Reason: "Bind the service identities", ServiceUserId: uuid.MustParse(item.ServiceUserID), AdmissionCheckerId: uuid.MustParse(item.AdmissionCheckerID)}), http.StatusOK)
@@ -256,6 +268,53 @@ func TestOnlyPlatformOperatorsReachThePluginManager(t *testing.T) {
 	}
 	require.Zero(t, api.iam.orgChecks.Load(), "organization roles are never consulted")
 	require.Len(t, decode[PluginAuditEventPage](t, api.call(pluginOperator, http.MethodGet, "/plugin-audit-events", "", nil), http.StatusOK).Items, audited, "denied calls change nothing")
+}
+
+func TestIdentityRequiresTheExactWorkloadBindingInIAM(t *testing.T) {
+	db, grant := pluginDeploymentBoundaryDatabase(t)
+	api := newOperatorAPI(t, pluginManagerServer(t, db))
+	item := workflowPlugin(grant, "external-deployment.admit")
+	manifest, err := json.Marshal(item.Manifest())
+	require.NoError(t, err)
+	digest := sha256Hex(manifest)
+	pkg := decode[PluginPackage](t, api.call(pluginOperator, http.MethodPost, "/plugin-packages", uuid.NewString(),
+		PluginPackagePush{ExpectedRevision: api.revision(), Reason: "Register the package", ManifestSha256: digest, Manifest: manifest}), http.StatusCreated)
+	installation := decode[PluginInstallation](t, api.call(pluginOperator, http.MethodPost, "/plugin-installations", uuid.NewString(),
+		PluginInstallationCreate{ExpectedRevision: *pkg.Revision, Reason: "Install the plugin", PackageSha256: digest, BackendUrl: item.Backend}), http.StatusCreated)
+	path := "/plugin-installations/" + installation.InstallationId.String()
+	serviceUser, checker := uuid.MustParse(item.ServiceUserID), uuid.MustParse(item.AdmissionCheckerID)
+	recordIdentity := func() *httptest.ResponseRecorder {
+		return api.call(pluginOperator, http.MethodPut, path+"/identity", uuid.NewString(), PluginInstallationIdentity{
+			ExpectedRevision: *installation.Revision, Reason: "Bind the service identities", ServiceUserId: serviceUser, AdmissionCheckerId: checker,
+		})
+	}
+	audited := len(decode[PluginAuditEventPage](t, api.call(pluginOperator, http.MethodGet, "/plugin-audit-events", "", nil), http.StatusOK).Items)
+
+	requireErrorCode(t, recordIdentity(), http.StatusConflict, "plugin_workload_binding_missing")
+	for name, bind := range map[string]func(){
+		"another installation of the plugin":   func() { api.iam.bind(item.ID, uuid.New(), serviceUser) },
+		"another plugin with the same UUID":    func() { api.iam.bind("dev.example.other", installation.InstallationId, serviceUser) },
+		"another service user of the plugin":   func() { api.iam.bind(item.ID, installation.InstallationId, userid.NewServiceUserTokenId()) },
+		"the admission checker's own identity": func() { api.iam.bind(item.ID, installation.InstallationId, checker) },
+	} {
+		bind()
+		response := recordIdentity()
+		requireErrorCode(t, response, http.StatusConflict, "plugin_workload_binding_missing")
+		require.Contains(t, response.Body.String(), serviceUser.String(), name)
+	}
+	api.iam.bind(item.ID, installation.InstallationId, serviceUser)
+	api.iam.lookupDown.Store(true)
+	require.Equal(t, http.StatusInternalServerError, recordIdentity().Code, "an unanswered lookup never records an identity")
+	api.iam.lookupDown.Store(false)
+
+	unchanged := decode[PluginInstallation](t, api.call(pluginOperator, http.MethodGet, path, "", nil), http.StatusOK)
+	require.Nil(t, unchanged.ServiceUserId)
+	require.Equal(t, *installation.Revision, *unchanged.Revision, "refused identities change nothing")
+	require.Len(t, decode[PluginAuditEventPage](t, api.call(pluginOperator, http.MethodGet, "/plugin-audit-events", "", nil), http.StatusOK).Items, audited)
+
+	recorded := decode[PluginInstallation](t, recordIdentity(), http.StatusOK)
+	require.Equal(t, serviceUser, *recorded.ServiceUserId)
+	require.Equal(t, checker, *recorded.AdmissionCheckerId)
 }
 
 func TestPluginHostDisabledHidesOnlyThePluginManager(t *testing.T) {
