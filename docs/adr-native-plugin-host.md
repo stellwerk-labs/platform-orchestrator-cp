@@ -64,23 +64,24 @@ unused coverage. A committed receipt still consumes the approval regardless of
 later IAM changes. No endpoint, permission, request field or generated DTO is
 added, and controller checks plus final admission revalidation remain mandatory.
 
-`PLUGIN_HOST_ENABLED` defaults to false. Enabling it requires absolute
-`PLUGIN_INSTALLATIONS_FILE` and `PLUGIN_SIGNING_KEY_FILE` paths. The key is an
-operator-owned PKCS8 Ed25519 PEM file and must not be committed. Installation
-configuration is strict JSON, per organization, and permits only registered
-operations. The add-on receives only signed assertions, never this key.
+`PLUGIN_HOST_ENABLED` defaults to false. Enabling it requires an absolute
+`PLUGIN_SIGNING_KEY_FILE` path. The key is an operator-owned PKCS8 Ed25519 PEM
+file and must not be committed. The add-on receives only signed assertions,
+never this key. Installations, organization enablements and their registered
+operations are Plugin Manager state in Core's database, changed only through
+the platform-scoped operator API; see
+[adr-plugin-manager.md](adr-plugin-manager.md).
 
 Origins require HTTPS unless the operator explicitly selects
 `PLUGIN_DEVELOPMENT_HTTP=true`. Backend addresses are not returned by discovery.
 The Console must independently reject a UI origin equal to the host origin.
 
-Configured availability states are operator configuration only. They are **not**
-commercial entitlement verification. Signed package verification, durable
-installation state, workload identity exchange and COSE entitlement validation
-remain separate integration gates. No configuration boolean is represented as
-proof of a licence. Disabled/unentitled states permit registered read and safety
-operations but reject new forward work; unavailable/incompatible states fail
-closed. Signed licence states, the grace-period warning and the rule that
+Availability states are derived from the installation, its organization
+enablement and the signed licence; they are never set by hand and are **not**
+commercial entitlement verification by themselves. No enablement is
+represented as proof of a licence. Disabled/unentitled states permit
+registered read and safety operations but reject new forward work;
+unavailable/incompatible states fail closed. Signed licence states, the grace-period warning and the rule that
 licence material never stops Core are described in
 [plugin-entitlements.md](plugin-entitlements.md).
 
@@ -149,7 +150,9 @@ migration rehearsal.
 ## Local browser component harness
 
 `cmd/plugin-protocol-harness` exercises the real registry and Gateway on loopback
-using an explicit synthetic org/actor and exact-origin CORS. It is for inspecting
+using an explicit synthetic org/actor and exact-origin CORS. It serves one
+plugin from its registration manifest (`-manifest`, `-backend`, `-ui-origin`) as
+available to that organization. It is for inspecting
 the separately served UI and delegated protocol without booting the full
 CP/IAM/DP/NATS/Vault stack. It must not be used as a production listener or
 counted as end-to-end IAM verification. It does not supply fake successful Core

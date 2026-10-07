@@ -12,7 +12,14 @@ input can stop Core at start-up. For development licences see
 |---|---|
 | `PLUGIN_ENTITLEMENT_MODE` | `production` (default) or `development`. Selects which trust class Core accepts. |
 | `PLUGIN_ENTITLEMENT_TRUST_FILE` | Pinned issuer public keys (strict JSON, regular file, no symlink). |
-| `PLUGIN_ENTITLEMENT_BUNDLE_FILE` | Signed grants and revocation snapshots to import at start-up. |
+
+Platform operators import signed grants and revocation snapshots with
+`POST /plugin-entitlement-bundles` (platform permission `plugin_manager_write`,
+see [adr-plugin-manager.md](adr-plugin-manager.md)). The request carries the
+exact bundle file bytes, base64-encoded. An import applies without a restart
+and reports how many documents it imported, with one diagnostic per skipped
+document. A grant matches only the binding (installation UUID, plugin,
+organization) of an installation enabled for that organization.
 
 ## Feature states
 
@@ -51,17 +58,16 @@ provider, plugins) should show `message` and `grace_until` wherever they show
 the operation's result. After `grace_until` the feature is `expired` and forward
 work is refused as in the table above.
 
-## Start-up: what can stop Core
+## Start-up and import: what can stop Core
 
 A plugin failure degrades only that plugin, and an expired or missing licence
 never affects Core functionality. Core therefore never refuses to start because
-of entitlement material:
+of entitlement material, and an import never fails because of one document:
 
 - the trust file is missing, unreadable, a symlink, too large, malformed, or of
   the wrong trust class for the mode (for example development trust in
   production mode);
-- the bundle is configured without a trust file, or is missing, unreadable or
-  malformed;
+- a bundle is imported without configured trust, or is malformed;
 - a grant is a development grant in production mode, belongs to another or a
   removed installation or to another organization, is signed by an unpinned
   key, is tampered with, or conflicts with an already imported grant;
@@ -71,14 +77,15 @@ Every signed document stands on its own signature: a rejected one is skipped
 and the others in the bundle are still imported. Skipping is safe because an
 unverifiable revocation revokes nothing, and a binding without a newly
 imported grant keeps its persisted decision, which Core verifies again on every
-use. Each problem is logged at error level as
+use. A trust problem is logged at start-up at error level as
 `Plugin entitlement material was not applied; affected plugins stay unentitled`
-with a stable `diagnostic` field:
+with a stable `diagnostic` field; an import returns its problems in
+`diagnostics[].code`:
 
 | `diagnostic` | Cause |
 |---|---|
 | `plugin_entitlement_trust_rejected` | The trust file could not be loaded or parsed for this mode. |
-| `plugin_entitlement_bundle_rejected` | The bundle could not be read or parsed, no trust is configured, or installed bindings could not be resolved. |
+| `plugin_entitlement_bundle_rejected` | The bundle could not be parsed or no trust is configured. |
 | `plugin_entitlement_grant_rejected` | A grant (by index) failed verification, has no exact installed binding, or was not imported. |
 | `plugin_entitlement_revocations_rejected` | A revocation snapshot (by index) failed verification or import. |
 
@@ -90,11 +97,13 @@ features activated under a grant. Core-only operations are unaffected.
 
 Core configuration that is not entitlement material still fails fast, because
 it describes Core itself and affects every plugin equally: an invalid
-`PLUGIN_ENTITLEMENT_MODE`, the plugin installation registry
-(`PLUGIN_INSTALLATIONS_FILE`, including its entitlement declarations), the
-plugin assertion signing key (`PLUGIN_SIGNING_KEY_FILE`), the plugin CA bundle
-(`PLUGIN_CA_FILE`), the fixed Data Plane plugin port and
-`PLUGIN_EVENT_JOURNAL_RETENTION`.
+`PLUGIN_ENTITLEMENT_MODE`, the Plugin Manager permission holders
+(`PLUGIN_MANAGER_READERS`, `PLUGIN_MANAGER_WRITERS`) and refresh interval, the
+first load of the Plugin Manager state, the plugin assertion signing key
+(`PLUGIN_SIGNING_KEY_FILE`), the plugin CA bundle (`PLUGIN_CA_FILE`), the fixed
+Data Plane plugin port and `PLUGIN_EVENT_JOURNAL_RETENTION`. An installation
+whose stored state no longer validates is not served and is logged; the
+others are.
 
 Uninstalling a plugin or removing an organization therefore no longer requires
 removing its grant from the bundle first; the stale grant is skipped with

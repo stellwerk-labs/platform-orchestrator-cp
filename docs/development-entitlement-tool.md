@@ -70,4 +70,5 @@ These files are disposable protocol fixtures for development and test
 installations. Do not copy, rename, or promote them into production authority.
 This command does not install an entitlement, configure a cluster, start a
 deployment, or establish commercial licensing. The operator separately places only the
-public trust and bundle into Core's development-mode local file configuration.
+public trust into Core's development-mode trust file and imports the bundle with
+`POST /plugin-entitlement-bundles`.
