@@ -39,7 +39,11 @@ var canonicalVersion = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0
 var operationIdentifier = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$`)
 var pathParameter = regexp.MustCompile(`\{([a-zA-Z][a-zA-Z0-9_]*)\}`)
 var localCapability = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
-var contextualRoute = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9/-]*[a-z0-9])?$`)
+
+// consoleRoute is a Console path below an organization in its one spelling:
+// lowercase segments without a leading or trailing slash, as the Console
+// accepts it.
+var consoleRoute = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9/-]*[a-z0-9])?$`)
 var contextualQueryKey = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)
 
 const orgPathParameter = "orgId"
@@ -76,6 +80,9 @@ func (m Manifest) Validate() error {
 	if !identifier.MatchString(m.ID) || m.DisplayName == "" || !canonicalVersion.MatchString(m.Version) {
 		return fmt.Errorf("invalid plugin identity")
 	}
+	if err := validateCapabilities(m); err != nil {
+		return err
+	}
 	if m.MigrationGeneration < 0 {
 		return fmt.Errorf("the migration generation must not be negative")
 	}
@@ -100,8 +107,21 @@ func (m Manifest) Validate() error {
 	return nil
 }
 
+// validConsoleRoute accepts a Console route without empty segments.
+func validConsoleRoute(route string) bool {
+	return consoleRoute.MatchString(route) && !strings.Contains(route, "//")
+}
+
+// validRoutePrefix accepts a UI route prefix only in its one spelling, a
+// slash followed by a Console route. Prefixes the Console serves alike are
+// then equal strings, which only one installation can register.
+func validRoutePrefix(prefix string) bool {
+	route, rooted := strings.CutPrefix(prefix, "/")
+	return rooted && validConsoleRoute(route)
+}
+
 func validateUIContribution(ui UIContribution) error {
-	if ui.SDKVersion != "1" || !safePath(ui.Entrypoint) || !safePath(ui.RoutePrefix) || ui.NavigationLabel == "" {
+	if ui.SDKVersion != "1" || !safePath(ui.Entrypoint) || !validRoutePrefix(ui.RoutePrefix) || ui.NavigationLabel == "" {
 		return fmt.Errorf("invalid plugin UI contribution")
 	}
 	hostSeen := map[string]bool{}
@@ -167,7 +187,7 @@ func validateContextualActions(actions []ContextualAction, operations map[string
 	}
 	seen := map[string]bool{}
 	for _, action := range actions {
-		if !operationIdentifier.MatchString(action.ID) || seen[action.ID] || action.ResourceType != "module_version" || strings.TrimSpace(action.Label) == "" || len(action.Label) > 100 || !operations[action.RequiredOperationID] || !contextualRoute.MatchString(action.Route.Path) || strings.Contains(action.Route.Path, "//") || len(action.When.LifecycleStatus) == 0 {
+		if !operationIdentifier.MatchString(action.ID) || seen[action.ID] || action.ResourceType != "module_version" || strings.TrimSpace(action.Label) == "" || len(action.Label) > 100 || !operations[action.RequiredOperationID] || !validConsoleRoute(action.Route.Path) || len(action.When.LifecycleStatus) == 0 {
 			return fmt.Errorf("invalid contextual action identity, route, condition or required plugin operation")
 		}
 		seen[action.ID] = true
@@ -191,6 +211,29 @@ func reservedHostOperation(id string) bool {
 	return strings.HasPrefix(id, "core.") || strings.HasPrefix(id, "iam.")
 }
 
+// owns reports whether capability is an IAM capability in the plugin's own
+// namespace, plugin.<plugin ID>.<local name>. The local name is one segment,
+// so a plugin never reaches into the namespace of a plugin whose ID extends
+// its own.
+func (m Manifest) owns(capability string) bool {
+	local, found := strings.CutPrefix(capability, "plugin."+m.ID+".")
+	return found && localCapability.MatchString(local)
+}
+
+// validateCapabilities accepts each declared capability once and only in
+// the plugin's own namespace, so no package claims a capability of Core or of
+// another plugin.
+func validateCapabilities(m Manifest) error {
+	seen := map[string]bool{}
+	for _, capability := range m.Capabilities {
+		if seen[capability] || !m.owns(capability) {
+			return fmt.Errorf("capabilities must be unique and in the plugin's own namespace")
+		}
+		seen[capability] = true
+	}
+	return nil
+}
+
 func validateServiceGrants(m Manifest) error {
 	if len(m.ServiceGrants) == 0 {
 		if len(m.AuthorizationPolicies) != 0 {
@@ -198,17 +241,16 @@ func validateServiceGrants(m Manifest) error {
 		}
 		return nil
 	}
-	prefix := "plugin." + m.ID + "."
 	seen := map[string]bool{}
 	for _, grant := range m.ServiceGrants {
-		if !operationIdentifier.MatchString(grant.Action) || seen[grant.Action] || !strings.HasPrefix(grant.Permission, prefix) || !localCapability.MatchString(strings.TrimPrefix(grant.Permission, prefix)) || (grant.Scope != "organization" && grant.Scope != environmentScope) {
+		if !operationIdentifier.MatchString(grant.Action) || seen[grant.Action] || !m.owns(grant.Permission) || (grant.Scope != "organization" && grant.Scope != environmentScope) {
 			return fmt.Errorf("service grants require unique actions, owned capabilities and exact scope")
 		}
 		seen[grant.Action] = true
 	}
 	policySeen := map[string]bool{}
 	for _, policy := range m.AuthorizationPolicies {
-		if policySeen[policy.Permission] || !strings.HasPrefix(policy.Permission, prefix) || !localCapability.MatchString(strings.TrimPrefix(policy.Permission, prefix)) || len(policy.Scopes) == 0 {
+		if policySeen[policy.Permission] || !m.owns(policy.Permission) || len(policy.Scopes) == 0 {
 			return fmt.Errorf("authorization policies require unique owned capabilities and exact scopes")
 		}
 		policySeen[policy.Permission] = true

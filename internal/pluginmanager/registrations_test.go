@@ -17,7 +17,7 @@ import (
 )
 
 const testManifest = `{
-	"id": "dev.example.rollouts", "display_name": "Rollouts", "version": "1.0.0", "capabilities": ["rollouts", "approvals"],
+	"id": "dev.example.rollouts", "display_name": "Rollouts", "version": "1.0.0", "capabilities": ["plugin.dev.example.rollouts.read", "plugin.dev.example.rollouts.approve"],
 	"ui": {"sdk_version": "1", "entrypoint": "/index.html", "route_prefix": "/rollouts", "navigation_label": "Rollouts",
 		"contextual_actions": [{"id": "open", "resource_type": "module_version", "label": "Open", "required_operation_id": "start",
 			"route": {"path": "rollouts/new", "query": {"module": "$module_id"}}, "when": {"lifecycle_status": ["proposed"], "semantic_version_required": true}}]},
@@ -49,7 +49,7 @@ func TestRegistrationsServeExactlyThePackageContributions(t *testing.T) {
 		kinds[row.Kind] = append(kinds[row.Kind], row.Key)
 	}
 	require.Equal(t, map[string][]string{
-		model.PluginRegistrationCapability:          {"rollouts", "approvals"},
+		model.PluginRegistrationCapability:          {"plugin.dev.example.rollouts.read", "plugin.dev.example.rollouts.approve"},
 		model.PluginRegistrationOperation:           {"start", "list"},
 		model.PluginRegistrationServiceGrant:        {"resource-events.read", "authorization.check"},
 		model.PluginRegistrationAuthorizationPolicy: {"plugin.dev.example.rollouts.approve"},
@@ -73,7 +73,7 @@ func TestRegistrationsServeExactlyThePackageContributions(t *testing.T) {
 	require.Equal(t, installation.Organizations[0].ApprovalPolicies, served.DeploymentApprovalPolicies)
 	served.UI.Origin = ""
 	sortedManifest := manifest
-	sortedManifest.Capabilities = []string{"approvals", "rollouts"}
+	sortedManifest.Capabilities = []string{"plugin.dev.example.rollouts.approve", "plugin.dev.example.rollouts.read"}
 	sortedManifest.Operations = []plugins.Operation{manifest.Operations[1], manifest.Operations[0]}
 	sortedManifest.ServiceGrants = []plugins.ServiceGrant{manifest.ServiceGrants[1], manifest.ServiceGrants[0]}
 	require.Equal(t, sortedManifest, served.Manifest(), "registrations round-trip every contribution")

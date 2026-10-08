@@ -3417,7 +3417,7 @@ type PluginPackagePage struct {
 type PluginPackagePush struct {
 	ExpectedRevision int64 `json:"expected_revision"`
 
-	// Manifest The registration manifest of the package (identity, migration generation, operations, UI contribution, service grants, authorization policies, entitlement declaration). Unknown fields are rejected. migration_generation is the plugin-owned schema generation the package runs on, 0 or absent while the plugin owns no schema.
+	// Manifest The registration manifest of the package (identity, migration generation, capabilities, operations, UI contribution, service grants, authorization policies, entitlement declaration). Unknown fields are rejected. migration_generation is the plugin-owned schema generation the package runs on, 0 or absent while the plugin owns no schema. Each capability is declared once and in the plugin's own namespace, plugin.<plugin ID>.<name> with a one-segment name; each operation is declared once and none in Core's host namespace (core., iam.); the UI route_prefix is a slash followed by lowercase segments without a trailing slash, its only spelling.
 	Manifest json.RawMessage `json:"manifest"`
 
 	// ManifestSha256 SHA-256 of the package manifest the plugin runtime verifies.

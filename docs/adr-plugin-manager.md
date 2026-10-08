@@ -24,7 +24,7 @@ and never write it.
 | Installation | Core-assigned immutable installation UUID, served package and the target of a pending upgrade, state (`installed`, `active`, `disabled`, `uninstalled`, `purged`), backend and UI origins, service user and admission checker. |
 | Status observation | What Core last read from the running plugin's status endpoint. A fact the plugin reports, not operator state. |
 | Enablement | One organization of an installation: `enabled` or `disabled`, IANA timezone, deployment approval policies. In `v1alpha` an installation has exactly one, the organization of its service user. |
-| Registration | The contributions an active installation serves, materialised from its package on activation. A UI route prefix belongs to one installation. |
+| Registration | The contributions an active installation serves, materialised from its package on activation. A UI route prefix belongs to one installation; operations and capabilities live in the plugin's own namespace. |
 | Audit event | One per committed change, with actor, reason, request ID, idempotency key digest, state before and after. Never updated or deleted. |
 
 ### Operator API
@@ -135,6 +135,21 @@ the operator retries the same command once the plugin runtime caught up.
 Observations are not audited: they never change what Core serves or
 authorizes, and the activation that acts on one is.
 
+Registrations never collide. Core routes an operation only below its plugin
+ID (`/orgs/{orgId}/plugins/{pluginId}/operations/{operationId}`), and a plugin
+has at most one installation that is not purged, so equal operation IDs of
+different plugins never meet; a package declares each operation once and none
+in Core's host namespace (`core.`, `iam.`). A package declares only
+capabilities in its own namespace, `plugin.<plugin ID>.<name>` with a
+one-segment name, each once. A UI route prefix has one spelling, a slash
+followed by lowercase segments without a trailing slash, as the Console
+matches it, and belongs to one installation: an activation that would serve a
+prefix another installation serves, also the activation that completes an
+upgrade, is refused with `409 plugin_registration_conflict` and changes
+nothing; a pending upgrade leaves the predecessor served. Uninstall releases
+the prefix. Nested prefixes are no collision; the Console routes to the
+longest match.
+
 `upgrade` records the target package: a later version of the same plugin
 that does not lower the migration generation and that Core can serve with the
 installation's origins, identities and approval policies. Core keeps serving
@@ -207,7 +222,6 @@ verification and revisit this decision.
 - A dedicated IAM lookup of a service user's organization. Core pages through
   the service users of the organization being enabled, which IAM lets the
   internal system identity read in every organization.
-- Collision checks beyond the UI route prefix.
 
 ## Consequences
 
