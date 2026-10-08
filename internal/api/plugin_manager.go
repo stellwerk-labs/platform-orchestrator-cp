@@ -47,9 +47,13 @@ func (s *Server) pluginManagerCaller(ctx context.Context, permission string) (uu
 	return actor, nil
 }
 
-// requireWorkloadBinding refuses a service user that IAM does not bind to
-// exactly the plugin ID and UUID of the installation.
-func (s *Server) requireWorkloadBinding(ctx context.Context, installation pluginmanager.Installation, serviceUser uuid.UUID) error {
+// requirePluginIdentities refuses identities IAM does not vouch for. The
+// plugin's service user must be the platform principal IAM binds to exactly
+// the plugin ID and UUID of the installation, and the admission checker a
+// platform principal with a static token. A platform principal belongs to no
+// organization and can hold no role, so one installation serves every
+// organization it is enabled for without the identity of any organization.
+func (s *Server) requirePluginIdentities(ctx context.Context, installation pluginmanager.Installation, serviceUser, checker uuid.UUID) error {
 	response, err := s.IamClient.InternalListPluginWorkloadBindingsWithResponse(ctx, &orchestratoriam.InternalListPluginWorkloadBindingsParams{
 		PluginId: installation.PluginID, InstallationId: installation.InstallationID,
 	})
@@ -59,41 +63,43 @@ func (s *Server) requireWorkloadBinding(ctx context.Context, installation plugin
 	if response.JSON200 == nil {
 		return errors.Errorf("unexpected status code when looking up the plugin workload bindings: %s", response.Status())
 	}
-	for _, binding := range response.JSON200.Items {
-		if binding.PluginId == installation.PluginID && binding.InstallationId == installation.InstallationID && binding.ServiceUserId == serviceUser {
-			return nil
-		}
+	index := slices.IndexFunc(response.JSON200.Items, func(binding orchestratoriam.PluginWorkloadBinding) bool {
+		return binding.PluginId == installation.PluginID && binding.InstallationId == installation.InstallationID && binding.ServiceUserId == serviceUser
+	})
+	if index < 0 {
+		return pluginBoundaryError(409, "plugin_workload_binding_missing", fmt.Sprintf(
+			"IAM has no workload binding of service user %s to installation %s of plugin %s; bind the plugin workload first.", serviceUser, installation.InstallationID, installation.PluginID))
 	}
-	return pluginBoundaryError(409, "plugin_workload_binding_missing", fmt.Sprintf(
-		"IAM has no workload binding of service user %s to installation %s of plugin %s; bind the plugin workload first.", serviceUser, installation.InstallationID, installation.PluginID))
+	if response.JSON200.Items[index].ServiceUserScope != orchestratoriam.ServiceUserScopePlatform {
+		return pluginBoundaryError(409, "plugin_service_user_not_platform_principal", fmt.Sprintf(
+			"Service user %s belongs to an organization. Bind a platform principal to installation %s instead: create the workload binding with platform_principal.", serviceUser, installation.InstallationID))
+	}
+	static, err := s.staticPlatformPrincipal(ctx, checker)
+	if err != nil {
+		return err
+	}
+	if !static {
+		return pluginBoundaryError(409, "plugin_admission_checker_not_platform_principal", fmt.Sprintf(
+			"Admission checker %s is not a platform principal with a static token. Create one in IAM (POST /platform-principals) for the Data Plane.", checker))
+	}
+	return nil
 }
 
-// requireServiceUserOrganization refuses an organization that is not the
-// organization of the service user. IAM keeps every service user in exactly
-// one organization and lists it only there, so the service users IAM lists
-// for org decide.
-func (s *Server) requireServiceUserOrganization(ctx context.Context, serviceUser uuid.UUID, org string) error {
-	params := &orchestratoriam.ListServiceUsersParams{}
-	for {
-		response, err := s.IamClient.ListServiceUsersWithResponse(ctx, org, params)
-		if err != nil {
-			return errors.Wrap(err, "failed to list the service users of the organization")
-		}
-		if response.JSON200 == nil {
-			return errors.Errorf("unexpected status code when listing the service users of the organization: %s", response.Status())
-		}
-		if slices.ContainsFunc(response.JSON200.Items, func(item orchestratoriam.ServiceUserSummary) bool { return item.Id == serviceUser }) {
-			return nil
-		}
-		next := response.JSON200.NextPageToken
-		if next == nil || *next == "" {
-			return pluginBoundaryError(409, "plugin_service_user_organization_mismatch", fmt.Sprintf(
-				"Service user %s does not belong to organization %s. In v1alpha an installation serves only the organization of its service user.", serviceUser, org))
-		}
-		if params.Page != nil && *params.Page == *next {
-			return errors.New("IAM returned the same page of service users again")
-		}
-		params.Page = next
+// staticPlatformPrincipal reports whether IAM knows id as a platform
+// principal that authenticates with a static token and is bound to no plugin
+// workload. Neither its scope nor its credential ever changes.
+func (s *Server) staticPlatformPrincipal(ctx context.Context, id uuid.UUID) (bool, error) {
+	response, err := s.IamClient.GetPlatformPrincipalWithResponse(ctx, id)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to look up the platform principal")
+	}
+	switch {
+	case response.JSON200 != nil:
+		return response.JSON200.Credential == orchestratoriam.PlatformPrincipalCredentialStaticToken && response.JSON200.WorkloadBindingId == nil, nil
+	case response.StatusCode() == http.StatusNotFound:
+		return false, nil
+	default:
+		return false, errors.Errorf("unexpected status code when looking up the platform principal: %s", response.Status())
 	}
 }
 
@@ -207,13 +213,8 @@ func (s *Server) SetPluginInstallationIdentity(ctx context.Context, request SetP
 	if err != nil {
 		return nil, pluginManagerError(err)
 	}
-	if err := s.requireWorkloadBinding(ctx, installation, request.Body.ServiceUserId); err != nil {
+	if err := s.requirePluginIdentities(ctx, installation, request.Body.ServiceUserId, request.Body.AdmissionCheckerId); err != nil {
 		return nil, err
-	}
-	for _, enablement := range installation.Organizations {
-		if err := s.requireServiceUserOrganization(ctx, request.Body.ServiceUserId, enablement.OrgID); err != nil {
-			return nil, err
-		}
 	}
 	return pluginInstallationResult[SetPluginInstallationIdentity200JSONResponse](s.PluginManager.SetIdentity(ctx, command, request.InstallationId, request.Body.ServiceUserId.String(), request.Body.AdmissionCheckerId.String()))
 }
@@ -259,26 +260,8 @@ func (s *Server) PutPluginEnablement(ctx context.Context, request PutPluginEnabl
 	if err != nil {
 		return nil, err
 	}
-	installation, err := s.PluginManager.Installation(ctx, request.InstallationId)
-	if err != nil {
-		return nil, pluginManagerError(err)
-	}
-	// A new enablement needs IAM's word that org is the service user's
-	// organization. An existing one keeps its organization, so disabling it
-	// never waits for IAM.
-	verified := ""
-	if installation.ServiceUserID != "" && !slices.ContainsFunc(installation.Organizations, func(enablement model.PluginEnablement) bool { return enablement.OrgID == request.OrgId }) {
-		serviceUser, err := uuid.Parse(installation.ServiceUserID)
-		if err != nil {
-			return nil, err
-		}
-		if err := s.requireServiceUserOrganization(ctx, serviceUser, request.OrgId); err != nil {
-			return nil, err
-		}
-		verified = installation.ServiceUserID
-	}
 	return pluginInstallationResult[PutPluginEnablement200JSONResponse](s.PluginManager.PutEnablement(ctx, command, request.InstallationId, request.OrgId, string(request.Body.State),
-		ref.DerefOr(request.Body.Timezone, ""), ref.DerefOr(request.Body.ApprovalPolicies, map[string]string{}), verified))
+		ref.DerefOr(request.Body.Timezone, ""), ref.DerefOr(request.Body.ApprovalPolicies, map[string]string{})))
 }
 
 func (s *Server) RemovePluginEnablement(ctx context.Context, request RemovePluginEnablementRequestObject) (RemovePluginEnablementResponseObject, error) {

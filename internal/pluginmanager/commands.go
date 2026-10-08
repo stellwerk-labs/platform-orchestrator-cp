@@ -575,14 +575,9 @@ func (m *Manager) validateServed(installation model.PluginInstallation, manifest
 }
 
 // PutEnablement enables or disables an active installation for one
-// organization. In v1alpha an installation serves exactly one organization,
-// the organization of its service user. IAM knows that organization, so the
-// caller asks IAM before a new enablement and passes the service user it
-// verified to belong to org; the command creates the enablement only while
-// the installation still names exactly that service user. An existing
-// enablement keeps its organization, and an installation whose package
-// declares no service grants has no service user, so neither needs one.
-func (m *Manager) PutEnablement(ctx context.Context, command Command, id uuid.UUID, org, state, timezone string, approvalPolicies map[string]string, verifiedServiceUser string) (Installation, error) {
+// organization. The installation's identities are platform principals that
+// belong to no organization, so enabling an organization never asks IAM.
+func (m *Manager) PutEnablement(ctx context.Context, command Command, id uuid.UUID, org, state, timezone string, approvalPolicies map[string]string) (Installation, error) {
 	if approvalPolicies == nil {
 		approvalPolicies = map[string]string{}
 	}
@@ -612,18 +607,10 @@ func (m *Manager) PutEnablement(ctx context.Context, command Command, id uuid.UU
 				}
 				return nil, err
 			}
-			exists := false
 			for _, existing := range before.Organizations {
-				if existing.OrgID != org {
-					continue
-				}
-				if existing.State == state && existing.Timezone == zone && maps.Equal(existing.ApprovalPolicies, approvalPolicies) {
+				if existing.OrgID == org && existing.State == state && existing.Timezone == zone && maps.Equal(existing.ApprovalPolicies, approvalPolicies) {
 					return nil, nil
 				}
-				exists = true
-			}
-			if !exists && before.ServiceUserID != verifiedServiceUser {
-				return nil, stateConflict("The installation's service user changed while Core asked IAM for its organization. Read the installation and enable again.")
 			}
 			if err := model.PutPluginEnablement(ctx, tx, before, model.PluginEnablement{OrgID: org, State: state, Timezone: zone, ApprovalPolicies: approvalPolicies}, command.Actor); err != nil {
 				return nil, err

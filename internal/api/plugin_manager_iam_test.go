@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -26,25 +25,21 @@ import (
 // iamPeer stands in for IAM behind its HTTP contract. It answers platform
 // checks from the operators configured for each permission, allows every
 // organization check as for an organization administrator and counts them,
-// answers workload binding lookups from the bindings it holds, and lists the
-// service users of an organization, in pages of serviceUserPage, to the
-// internal system identity that Core calls IAM with.
+// and answers workload binding and platform principal lookups from what it
+// holds, to the internal system identity that Core calls IAM with.
 type iamPeer struct {
-	mu        sync.Mutex
-	holders   map[string][]uuid.UUID
-	bindings  []iamapi.PluginWorkloadBinding
-	platform  []iamapi.ResourcePermissionCheck
-	orgChecks atomic.Int32
-	// serviceUsers holds the service users of each organization; IAM keeps
-	// a service user in exactly one.
-	serviceUsers map[string][]uuid.UUID
-	// lookupDown makes binding and service user lookups fail as if IAM were
-	// unavailable.
-	lookupDown atomic.Bool
+	mu         sync.Mutex
+	holders    map[string][]uuid.UUID
+	bindings   []iamapi.PluginWorkloadBinding
+	principals map[uuid.UUID]iamapi.PlatformPrincipal
+	platform   []iamapi.ResourcePermissionCheck
+	orgChecks  atomic.Int32
+	// lookups counts binding and principal lookups, answered or not.
+	lookups atomic.Int32
+	// lookupDown and principalsDown make binding and principal lookups fail
+	// as if IAM were unavailable.
+	lookupDown, principalsDown atomic.Bool
 }
-
-// serviceUserPage is small, so a lookup has to follow IAM's page tokens.
-const serviceUserPage = 2
 
 func (p *iamPeer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
@@ -74,7 +69,14 @@ func (p *iamPeer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusForbidden)
 		_ = json.NewEncoder(w).Encode(map[string]any{"error": "HTTP-403", "message": "denied", "details": map[string]any{"failed_checks": failed}})
-	case r.Method == http.MethodGet && r.URL.Path == "/internal/plugin-workload-bindings" && !p.lookupDown.Load():
+	case r.Header.Get("From") != userid.InternalSystemUuid.String():
+		w.WriteHeader(http.StatusForbidden)
+	case r.Method == http.MethodGet && r.URL.Path == "/internal/plugin-workload-bindings":
+		p.lookups.Add(1)
+		if p.lookupDown.Load() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
 		query := r.URL.Query()
 		items := []iamapi.PluginWorkloadBinding{}
 		p.mu.Lock()
@@ -86,33 +88,27 @@ func (p *iamPeer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		p.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(iamapi.PluginWorkloadBindingList{Items: items})
-	case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/orgs/") && strings.HasSuffix(r.URL.Path, "/service-users") && !p.lookupDown.Load():
-		if r.Header.Get("From") != userid.InternalSystemUuid.String() {
-			w.WriteHeader(http.StatusForbidden)
+	case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/platform-principals/"):
+		p.lookups.Add(1)
+		if p.principalsDown.Load() {
+			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
-		org := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/orgs/"), "/service-users")
-		start := 0
-		if token := r.URL.Query().Get("page"); token != "" {
-			var err error
-			if start, err = strconv.Atoi(token); err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
+		id, err := uuid.Parse(strings.TrimPrefix(r.URL.Path, "/platform-principals/"))
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 		p.mu.Lock()
-		members := p.serviceUsers[org][min(start, len(p.serviceUsers[org])):]
-		page := iamapi.ServiceUserPage{Items: []iamapi.ServiceUserSummary{}}
-		for _, id := range members[:min(serviceUserPage, len(members))] {
-			page.Items = append(page.Items, iamapi.ServiceUserSummary{Id: id, DisplayName: "service user " + id.String()})
-		}
-		if len(members) > serviceUserPage {
-			next := strconv.Itoa(start + serviceUserPage)
-			page.NextPageToken = &next
-		}
+		principal, found := p.principals[id]
 		p.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(page)
+		if !found {
+			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode(map[string]any{"error": "HTTP-404", "message": "platform principal not found"})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(principal)
 	default:
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
@@ -133,7 +129,7 @@ func newIAMPeer(t *testing.T, writers, readers []uuid.UUID) (*iamPeer, iamapi.Cl
 	peer := &iamPeer{holders: map[string][]uuid.UUID{
 		iamauthz.PermissionPluginManagerRead:  readers,
 		iamauthz.PermissionPluginManagerWrite: writers,
-	}}
+	}, principals: map[uuid.UUID]iamapi.PlatformPrincipal{}}
 	iam := httptest.NewServer(peer)
 	t.Cleanup(iam.Close)
 	client, err := iamapi.NewClientWithResponses(iam.URL, iamapi.WithRequestEditorFn(func(_ context.Context, request *http.Request) error {

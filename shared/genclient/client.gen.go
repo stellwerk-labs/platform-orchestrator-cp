@@ -3236,10 +3236,13 @@ type PluginInstallationDiagnosticCode string
 
 // PluginInstallationIdentity defines model for PluginInstallationIdentity.
 type PluginInstallationIdentity struct {
+	// AdmissionCheckerId The Data Plane admission checker, a platform principal with a static token.
 	AdmissionCheckerId openapi_types.UUID `json:"admission_checker_id"`
 	ExpectedRevision   int64              `json:"expected_revision"`
 	Reason             string             `json:"reason"`
-	ServiceUserId      openapi_types.UUID `json:"service_user_id"`
+
+	// ServiceUserId The platform principal IAM binds to the plugin workload of this installation.
+	ServiceUserId openapi_types.UUID `json:"service_user_id"`
 }
 
 // PluginInstallationPage defines model for PluginInstallationPage.
