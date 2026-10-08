@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -48,13 +49,9 @@ func (s *Server) pluginManagerCaller(ctx context.Context, permission string) (uu
 
 // requireWorkloadBinding refuses a service user that IAM does not bind to
 // exactly the plugin ID and UUID of the installation.
-func (s *Server) requireWorkloadBinding(ctx context.Context, installationID, serviceUser uuid.UUID) error {
-	installation, err := s.PluginManager.Installation(ctx, installationID)
-	if err != nil {
-		return pluginManagerError(err)
-	}
+func (s *Server) requireWorkloadBinding(ctx context.Context, installation pluginmanager.Installation, serviceUser uuid.UUID) error {
 	response, err := s.IamClient.InternalListPluginWorkloadBindingsWithResponse(ctx, &orchestratoriam.InternalListPluginWorkloadBindingsParams{
-		PluginId: installation.PluginID, InstallationId: installationID,
+		PluginId: installation.PluginID, InstallationId: installation.InstallationID,
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to look up the plugin workload bindings")
@@ -63,12 +60,41 @@ func (s *Server) requireWorkloadBinding(ctx context.Context, installationID, ser
 		return errors.Errorf("unexpected status code when looking up the plugin workload bindings: %s", response.Status())
 	}
 	for _, binding := range response.JSON200.Items {
-		if binding.PluginId == installation.PluginID && binding.InstallationId == installationID && binding.ServiceUserId == serviceUser {
+		if binding.PluginId == installation.PluginID && binding.InstallationId == installation.InstallationID && binding.ServiceUserId == serviceUser {
 			return nil
 		}
 	}
 	return pluginBoundaryError(409, "plugin_workload_binding_missing", fmt.Sprintf(
-		"IAM has no workload binding of service user %s to installation %s of plugin %s; bind the plugin workload first.", serviceUser, installationID, installation.PluginID))
+		"IAM has no workload binding of service user %s to installation %s of plugin %s; bind the plugin workload first.", serviceUser, installation.InstallationID, installation.PluginID))
+}
+
+// requireServiceUserOrganization refuses an organization that is not the
+// organization of the service user. IAM keeps every service user in exactly
+// one organization and lists it only there, so the service users IAM lists
+// for org decide.
+func (s *Server) requireServiceUserOrganization(ctx context.Context, serviceUser uuid.UUID, org string) error {
+	params := &orchestratoriam.ListServiceUsersParams{}
+	for {
+		response, err := s.IamClient.ListServiceUsersWithResponse(ctx, org, params)
+		if err != nil {
+			return errors.Wrap(err, "failed to list the service users of the organization")
+		}
+		if response.JSON200 == nil {
+			return errors.Errorf("unexpected status code when listing the service users of the organization: %s", response.Status())
+		}
+		if slices.ContainsFunc(response.JSON200.Items, func(item orchestratoriam.ServiceUserSummary) bool { return item.Id == serviceUser }) {
+			return nil
+		}
+		next := response.JSON200.NextPageToken
+		if next == nil || *next == "" {
+			return pluginBoundaryError(409, "plugin_service_user_organization_mismatch", fmt.Sprintf(
+				"Service user %s does not belong to organization %s. In v1alpha an installation serves only the organization of its service user.", serviceUser, org))
+		}
+		if params.Page != nil && *params.Page == *next {
+			return errors.New("IAM returned the same page of service users again")
+		}
+		params.Page = next
+	}
 }
 
 func (s *Server) pluginManagerCommand(ctx context.Context, idempotencyKey string, expectedRevision int64, reason string) (pluginmanager.Command, error) {
@@ -177,8 +203,17 @@ func (s *Server) SetPluginInstallationIdentity(ctx context.Context, request SetP
 	if err != nil {
 		return nil, err
 	}
-	if err := s.requireWorkloadBinding(ctx, request.InstallationId, request.Body.ServiceUserId); err != nil {
+	installation, err := s.PluginManager.Installation(ctx, request.InstallationId)
+	if err != nil {
+		return nil, pluginManagerError(err)
+	}
+	if err := s.requireWorkloadBinding(ctx, installation, request.Body.ServiceUserId); err != nil {
 		return nil, err
+	}
+	for _, enablement := range installation.Organizations {
+		if err := s.requireServiceUserOrganization(ctx, request.Body.ServiceUserId, enablement.OrgID); err != nil {
+			return nil, err
+		}
 	}
 	return pluginInstallationResult[SetPluginInstallationIdentity200JSONResponse](s.PluginManager.SetIdentity(ctx, command, request.InstallationId, request.Body.ServiceUserId.String(), request.Body.AdmissionCheckerId.String()))
 }
@@ -224,8 +259,26 @@ func (s *Server) PutPluginEnablement(ctx context.Context, request PutPluginEnabl
 	if err != nil {
 		return nil, err
 	}
+	installation, err := s.PluginManager.Installation(ctx, request.InstallationId)
+	if err != nil {
+		return nil, pluginManagerError(err)
+	}
+	// A new enablement needs IAM's word that org is the service user's
+	// organization. An existing one keeps its organization, so disabling it
+	// never waits for IAM.
+	verified := ""
+	if installation.ServiceUserID != "" && !slices.ContainsFunc(installation.Organizations, func(enablement model.PluginEnablement) bool { return enablement.OrgID == request.OrgId }) {
+		serviceUser, err := uuid.Parse(installation.ServiceUserID)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.requireServiceUserOrganization(ctx, serviceUser, request.OrgId); err != nil {
+			return nil, err
+		}
+		verified = installation.ServiceUserID
+	}
 	return pluginInstallationResult[PutPluginEnablement200JSONResponse](s.PluginManager.PutEnablement(ctx, command, request.InstallationId, request.OrgId, string(request.Body.State),
-		ref.DerefOr(request.Body.Timezone, ""), ref.DerefOr(request.Body.ApprovalPolicies, map[string]string{})))
+		ref.DerefOr(request.Body.Timezone, ""), ref.DerefOr(request.Body.ApprovalPolicies, map[string]string{}), verified))
 }
 
 func (s *Server) RemovePluginEnablement(ctx context.Context, request RemovePluginEnablementRequestObject) (RemovePluginEnablementResponseObject, error) {

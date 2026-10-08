@@ -172,9 +172,9 @@ func (s *session) install(plugin, org string) Installation {
 	s.revision = pkg.Revision
 	installation := s.installation(s.manager.CreateInstallation(ctx, s.command(""), digest, "https://"+plugin+".example.test", "https://ui."+plugin+".example.test"))
 	fleet.run(s.t, installation)
-	s.installation(s.manager.SetIdentity(ctx, s.command(""), installation.InstallationID, userid.NewServiceUserTokenId().String(), userid.NewServiceUserTokenId().String()))
+	identified := s.installation(s.manager.SetIdentity(ctx, s.command(""), installation.InstallationID, userid.NewServiceUserTokenId().String(), userid.NewServiceUserTokenId().String()))
 	s.installation(s.manager.Transition(ctx, s.command(""), installation.InstallationID, ActionActivate))
-	return s.installation(s.manager.PutEnablement(ctx, s.command(""), installation.InstallationID, org, model.PluginEnablementEnabled, "Europe/Berlin", nil))
+	return s.installation(s.manager.PutEnablement(ctx, s.command(""), installation.InstallationID, org, model.PluginEnablementEnabled, "Europe/Berlin", nil, identified.ServiceUserID))
 }
 
 func availability(registry *plugins.InstallationRegistry, org, plugin string) plugins.AvailabilityState {
@@ -211,9 +211,9 @@ func TestReplicasServeInstallationChangesWithoutRestart(t *testing.T) {
 	require.Equal(t, "Europe/Berlin", item.OrganizationTimezones[org])
 	require.Len(t, item.Operations, 2)
 
-	ops.installation(writer.manager.PutEnablement(t.Context(), ops.command(""), installation.InstallationID, org, model.PluginEnablementDisabled, "Europe/Berlin", nil))
+	ops.installation(writer.manager.PutEnablement(t.Context(), ops.command(""), installation.InstallationID, org, model.PluginEnablementDisabled, "Europe/Berlin", nil, installation.ServiceUserID))
 	served(plugins.StateNotEnabled)
-	ops.installation(writer.manager.PutEnablement(t.Context(), ops.command(""), installation.InstallationID, org, model.PluginEnablementEnabled, "Europe/Berlin", nil))
+	ops.installation(writer.manager.PutEnablement(t.Context(), ops.command(""), installation.InstallationID, org, model.PluginEnablementEnabled, "Europe/Berlin", nil, installation.ServiceUserID))
 	served(plugins.StateAvailable)
 	ops.installation(writer.manager.Transition(t.Context(), ops.command(""), installation.InstallationID, ActionDisable))
 	served(plugins.StateNotEnabled)
@@ -364,7 +364,7 @@ func TestInterruptedInstallationResumesWithoutDuplicates(t *testing.T) {
 				case 3:
 					installation, err = writer.manager.Transition(ctx, command, id, ActionActivate)
 				case 4:
-					installation, err = writer.manager.PutEnablement(ctx, command, id, org, model.PluginEnablementEnabled, "", nil)
+					installation, err = writer.manager.PutEnablement(ctx, command, id, org, model.PluginEnablementEnabled, "", nil, service)
 				}
 				return installation.Revision, err
 			}
@@ -481,7 +481,7 @@ func TestCommandsRejectInvalidAndOutOfOrderSteps(t *testing.T) {
 	id := installation.InstallationID
 	fleet.run(t, installation)
 
-	_, err = writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "", nil)
+	_, err = writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "", nil, "")
 	requireCode(t, err, "plugin_installation_state", "enablement needs an active installation")
 	_, err = writer.manager.Transition(ctx, ops.command(""), id, ActionEnable)
 	requireCode(t, err, "plugin_installation_state")
@@ -499,24 +499,28 @@ func TestCommandsRejectInvalidAndOutOfOrderSteps(t *testing.T) {
 
 	for name, call := range map[string]func() error{
 		"state": func() error {
-			_, err := writer.manager.PutEnablement(ctx, ops.command(""), id, org, "available", "", nil)
+			_, err := writer.manager.PutEnablement(ctx, ops.command(""), id, org, "available", "", nil, service)
 			return err
 		},
 		"timezone": func() error {
-			_, err := writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "Local", nil)
+			_, err := writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "Local", nil, service)
 			return err
 		},
 		"approval": func() error {
-			_, err := writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "", map[string]string{"organization": "plugin.dev.example.rollouts.approve"})
+			_, err := writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "", map[string]string{"organization": "plugin.dev.example.rollouts.approve"}, service)
 			return err
 		},
 	} {
 		requireCode(t, call(), "plugin_enablement_invalid", name)
 	}
-	_, err = writer.manager.PutEnablement(ctx, ops.command(""), id, "missing-org", model.PluginEnablementEnabled, "", nil)
+	_, err = writer.manager.PutEnablement(ctx, ops.command(""), id, "missing-org", model.PluginEnablementEnabled, "", nil, service)
 	requireCode(t, err, "organization_not_found")
-	ops.installation(writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "", map[string]string{"project": "plugin.dev.example.rollouts.approve"}))
-	_, err = writer.manager.PutEnablement(ctx, ops.command(""), id, second, model.PluginEnablementEnabled, "", nil)
+	for name, verified := range map[string]string{"nothing verified": "", "another service user verified": userid.NewServiceUserTokenId().String()} {
+		_, err = writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "", nil, verified)
+		requireCode(t, err, "plugin_installation_state", "a new enablement needs IAM's word on the recorded service user: %s", name)
+	}
+	ops.installation(writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "", map[string]string{"project": "plugin.dev.example.rollouts.approve"}, service))
+	_, err = writer.manager.PutEnablement(ctx, ops.command(""), id, second, model.PluginEnablementEnabled, "", nil, service)
 	requireCode(t, err, "plugin_enablement_limit", "v1alpha enables an installation for exactly one organization")
 	_, err = writer.manager.Transition(ctx, ops.command(""), uuid.New(), ActionActivate)
 	requireCode(t, err, "plugin_installation_not_found")

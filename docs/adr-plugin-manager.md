@@ -23,7 +23,7 @@ and never write it.
 | Package | Immutable registration manifest of one plugin version (identity, migration generation, operations, UI contribution, service grants, authorization policies, entitlement declaration), keyed by the SHA-256 of the package manifest. |
 | Installation | Core-assigned immutable installation UUID, served package and the target of a pending upgrade, state (`installed`, `active`, `disabled`, `uninstalled`, `purged`), backend and UI origins, service user and admission checker. |
 | Status observation | What Core last read from the running plugin's status endpoint. A fact the plugin reports, not operator state. |
-| Enablement | One organization of an installation: `enabled` or `disabled`, IANA timezone, deployment approval policies. In `v1alpha` an installation has exactly one. |
+| Enablement | One organization of an installation: `enabled` or `disabled`, IANA timezone, deployment approval policies. In `v1alpha` an installation has exactly one, the organization of its service user. |
 | Registration | The contributions an active installation serves, materialised from its package on activation. A UI route prefix belongs to one installation. |
 | Audit event | One per committed change, with actor, reason, request ID, idempotency key digest, state before and after. Never updated or deleted. |
 
@@ -35,12 +35,12 @@ Platform-scoped routes, outside any organization:
 |---|---|
 | `GET`, `POST /plugin-packages` | List; register a package. The same digest with the same manifest changes nothing. |
 | `GET`, `POST /plugin-installations`, `GET /plugin-installations/{id}` | List and read; install a package. Core assigns the UUID. A plugin has at most one installation. |
-| `PUT /plugin-installations/{id}/identity` | Record the service user and admission checker before activation; IAM must bind the service user to the installation. |
+| `PUT /plugin-installations/{id}/identity` | Record the service user and admission checker before activation; IAM must bind the service user to the installation and keep it in every organization the installation is enabled for. |
 | `POST /plugin-installations/{id}/actions/{activate,disable,enable}` | Serve the package registrations once the running plugin proves the package, or complete a pending upgrade; keep the installation safety-only for every organization; return it to active. |
 | `POST /plugin-installations/{id}/upgrade` | Request the package the installation serves next. |
 | `POST /plugin-installations/{id}/actions/{uninstall,reinstall}` | Remove registrations and enablements and keep the UUID and plugin data; return the retained installation to installed. |
 | `DELETE /plugin-installations/{id}` | Purge an uninstalled installation and retire its UUID. |
-| `PUT`, `DELETE /plugin-installations/{id}/organizations/{orgId}` | Enable or disable for the organization (disabled is safety-only); remove the enablement. |
+| `PUT`, `DELETE /plugin-installations/{id}/organizations/{orgId}` | Enable or disable for the organization of the installation's service user (disabled is safety-only); remove the enablement. |
 | `POST /plugin-entitlement-bundles` | Import signed grants and revocations ([plugin-entitlements.md](plugin-entitlements.md)). |
 | `GET /plugin-audit-events` | Page the audit trail. |
 
@@ -71,6 +71,22 @@ workload to exactly that plugin ID, installation UUID and service user
 therefore creates the IAM workload binding for the installation UUID first.
 Core asks IAM before the command's transaction, on every request including a
 replayed idempotency key; the checks inside the transaction are unchanged.
+
+In `v1alpha` an installation serves exactly one organization, the
+organization of its service user. IAM keeps every service user in exactly one
+organization, so Core creates an enablement only for an organization in which
+IAM lists the installation's service user (`GET /orgs/{orgId}/service-users`,
+asked as the internal system identity) and otherwise answers
+`409 plugin_service_user_organization_mismatch`; a second organization is
+refused with `409 plugin_enablement_limit`. Identities are refused the same way
+while the installation is enabled for an organization that is not the service
+user's. Core asks IAM before the command's transaction; the command creates the
+enablement only if the installation still names the service user IAM was asked
+about, and otherwise answers `409 plugin_installation_state`. Changing an
+existing enablement keeps its organization and never asks IAM, so disabling an
+organization does not depend on IAM. An installation whose package declares no
+service grants has no service user; it serves the one organization the operator
+enables.
 
 ### Propagation and authority
 
@@ -188,8 +204,9 @@ verification and revisit this decision.
 - Uninstall does not yet ask the plugin whether it is ready to decommission,
   and removing a single organization's enablement does not wait for that
   organization's safety work.
-- Verifying that the plugin's service user belongs to the organization the
-  installation is enabled for.
+- A dedicated IAM lookup of a service user's organization. Core pages through
+  the service users of the organization being enabled, which IAM lets the
+  internal system identity read in every organization.
 - Collision checks beyond the UI route prefix.
 
 ## Consequences

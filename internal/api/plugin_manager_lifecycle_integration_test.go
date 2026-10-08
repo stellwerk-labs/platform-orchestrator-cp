@@ -77,7 +77,7 @@ func TestUninstallWaitsUntilCoreHoldsNoSafetyWork(t *testing.T) {
 	reinstalled := steps.installation(s.PluginManager.Transition(ctx, steps.command("Reinstall the plugin"), id, pluginmanager.ActionReinstall))
 	require.Equal(t, id, reinstalled.InstallationID, "reinstall reuses the UUID the licence binds to")
 	steps.installation(s.PluginManager.Transition(ctx, steps.command("Serve it again"), id, pluginmanager.ActionActivate))
-	steps.installation(s.PluginManager.PutEnablement(ctx, steps.command("Enable the organization again"), id, grant.OrgID, model.PluginEnablementEnabled, "", nil))
+	steps.installation(s.PluginManager.PutEnablement(ctx, steps.command("Enable the organization again"), id, grant.OrgID, model.PluginEnablementEnabled, "", nil, item.ServiceUserID))
 	again, descriptor, found := s.PluginGateway.Registry.Installation(ctx, grant.OrgID, grant.PluginID)
 	require.True(t, found)
 	require.Equal(t, plugins.StateAvailable, descriptor.State)
@@ -92,6 +92,7 @@ func TestOperatorAPIUpgradesAndReinstallsWithoutLosingTheLicence(t *testing.T) {
 	require.NoError(t, manager.Refresh(ctx))
 	f.server.PluginManager, f.server.PluginEntitlements, f.server.PluginGateway = manager, f.adapter, &plugins.Gateway{Registry: registry}
 	api := newOperatorAPI(t, f.server)
+	api.iam.createServiceUser("acme", uuid.MustParse(f.item.ServiceUserID))
 	id := uuid.MustParse(f.item.InstallationID)
 	path := "/plugin-installations/" + id.String()
 	licensed := func(why string) plugins.Installation {

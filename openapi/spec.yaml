@@ -149,7 +149,7 @@ paths:
     put:
       operationId: setPluginInstallationIdentity
       summary: Record the plugin service user and admission checker of an installation.
-      description: Requires plugin_manager_write. Identities are recorded before activation and exist exactly when the package declares service grants. IAM must hold a workload binding of exactly the installation's plugin ID, installation UUID and the service user; otherwise Core answers 409 plugin_workload_binding_missing and records nothing. Recording the same identities again changes nothing.
+      description: Requires plugin_manager_write. Identities are recorded before activation and exist exactly when the package declares service grants. IAM must hold a workload binding of exactly the installation's plugin ID, installation UUID and the service user; otherwise Core answers 409 plugin_workload_binding_missing and records nothing. While the installation is enabled for an organization in which IAM does not list the service user, Core answers 409 plugin_service_user_organization_mismatch. Recording the same identities again changes nothing.
       tags: [Plugin Manager]
       security: [{userIdHeader: []}]
       parameters:
@@ -206,7 +206,7 @@ paths:
     put:
       operationId: putPluginEnablement
       summary: Enable or disable an active installation for an organization.
-      description: Requires plugin_manager_write. In v1alpha an installation is enabled for exactly one organization. A disabled enablement keeps the plugin safety-only. Enabling a resource event subscriber starts the organization's resource event journal in the same transaction. Every Core effect re-verifies the enablement in its own transaction.
+      description: Requires plugin_manager_write. In v1alpha an installation is enabled for exactly one organization, the organization of its service user. Core creates an enablement only for an organization in which IAM lists the installation's service user and otherwise answers 409 plugin_service_user_organization_mismatch; a second organization is refused with 409 plugin_enablement_limit. Changing an existing enablement keeps its organization and does not ask IAM. An installation whose package declares no service grants has no service user and serves the one organization the operator enables. A disabled enablement keeps the plugin safety-only. Enabling a resource event subscriber starts the organization's resource event journal in the same transaction. Every Core effect re-verifies the enablement in its own transaction.
       tags: [Plugin Manager]
       security: [{userIdHeader: []}]
       parameters:

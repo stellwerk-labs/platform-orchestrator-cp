@@ -135,7 +135,7 @@ func TestActivationServesOnlyThePackageTheRunningPluginProves(t *testing.T) {
 	require.Equal(t, id, *active.Observation.InstallationID)
 	require.Equal(t, digest, active.Observation.PackageSHA256)
 	require.EqualValues(t, 2, *active.Observation.MigrationGeneration)
-	ops.installation(writer.manager.PutEnablement(t.Context(), ops.command(""), id, org, model.PluginEnablementEnabled, "", nil))
+	ops.installation(writer.manager.PutEnablement(t.Context(), ops.command(""), id, org, model.PluginEnablementEnabled, "", nil, installation.ServiceUserID))
 	item, descriptor, found := writer.registry.Installation(t.Context(), org, plugin)
 	require.True(t, found)
 	require.Equal(t, plugins.StateAvailable, descriptor.State)
@@ -218,7 +218,7 @@ func TestUpgradeSwitchesRegistrationsAtomicallyOnceTheSuccessorReports(t *testin
 	id := installation.InstallationID
 	process.reports(id, v1Digest, 1)
 	ops.installation(writer.manager.Transition(ctx, ops.command(""), id, ActionActivate))
-	ops.installation(writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "", nil))
+	ops.installation(writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "", nil, installation.ServiceUserID))
 	pkg, err := writer.manager.PushPackage(ctx, ops.command(""), v2Digest, v2)
 	require.NoError(t, err)
 	ops.revision = pkg.Revision
@@ -432,7 +432,7 @@ func TestUninstallKeepsTheInstallationForAReinstall(t *testing.T) {
 		},
 		"upgrade": func() error { _, err := writer.manager.Upgrade(ctx, ops.command(""), id, digest); return err },
 		"organization": func() error {
-			_, err := writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "", nil)
+			_, err := writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "", nil, installation.ServiceUserID)
 			return err
 		},
 	} {
@@ -445,7 +445,7 @@ func TestUninstallKeepsTheInstallationForAReinstall(t *testing.T) {
 	require.Equal(t, id, reinstalled.InstallationID, "reinstall reuses the installation UUID")
 	require.Equal(t, model.PluginInstallationInstalled, reinstalled.State)
 	ops.installation(writer.manager.Transition(ctx, ops.command(""), id, ActionActivate))
-	ops.installation(writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "", nil))
+	ops.installation(writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "", nil, installation.ServiceUserID))
 	require.Equal(t, plugins.StateAvailable, availability(writer.registry, org, plugin))
 	item, _, found := writer.registry.Installation(ctx, org, plugin)
 	require.True(t, found)
@@ -483,10 +483,11 @@ func TestInterruptedLifecycleStepsResume(t *testing.T) {
 	const plugin = "dev.example.rollouts"
 	v1, v1Digest := versionedPackage(t, plugin, "1.0.0", 0)
 	v2, v2Digest := versionedPackage(t, plugin, "2.0.0", 1)
-	id := ops.installed(plugin, process.URL, v1, v1Digest).InstallationID
+	installation := ops.installed(plugin, process.URL, v1, v1Digest)
+	id := installation.InstallationID
 	process.reports(id, v1Digest, 0)
 	ops.installation(writer.manager.Transition(ctx, ops.command(""), id, ActionActivate))
-	ops.installation(writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "", nil))
+	ops.installation(writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "", nil, installation.ServiceUserID))
 	pkg, err := writer.manager.PushPackage(ctx, ops.command(""), v2Digest, v2)
 	require.NoError(t, err)
 	ops.revision = pkg.Revision

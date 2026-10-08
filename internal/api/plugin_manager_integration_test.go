@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/api/middleware"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginmanager"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genevents"
@@ -48,6 +50,28 @@ func (p *iamPeer) bind(pluginID string, installation, serviceUser uuid.UUID) {
 		Id: uuid.New(), PluginId: pluginID, InstallationId: installation, ServiceUserId: serviceUser,
 		Namespace: "stellwerk-plugins", ServiceAccount: pluginID + "-runtime", Audience: "stellwerk-iam-plugin-workload", CreatedAt: time.Now(),
 	})
+}
+
+// createServiceUser records a service user an organization administrator
+// created in org.
+func (p *iamPeer) createServiceUser(org string, id uuid.UUID) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.serviceUsers == nil {
+		p.serviceUsers = map[string][]uuid.UUID{}
+	}
+	p.serviceUsers[org] = append(p.serviceUsers[org], id)
+}
+
+// deleteServiceUser removes a service user and, as IAM does, its workload
+// binding.
+func (p *iamPeer) deleteServiceUser(id uuid.UUID) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for org, members := range p.serviceUsers {
+		p.serviceUsers[org] = slices.DeleteFunc(members, func(member uuid.UUID) bool { return member == id })
+	}
+	p.bindings = slices.DeleteFunc(p.bindings, func(binding iamapi.PluginWorkloadBinding) bool { return binding.ServiceUserId == id })
 }
 
 // newOperatorAPI serves s. pluginOperator holds both Plugin Manager
@@ -110,6 +134,16 @@ func command(revision int64, reason string) PluginManagerCommand {
 // install runs every installation step of item for org over HTTP.
 func (a *operatorAPI) install(item plugins.Installation, org string) PluginInstallation {
 	a.t.Helper()
+	installation := a.activate(item, org)
+	timezone := "Europe/Berlin"
+	return decode[PluginInstallation](a.t, a.call(pluginOperator, http.MethodPut, "/plugin-installations/"+installation.InstallationId.String()+"/organizations/"+org, uuid.NewString(),
+		PluginEnablementPut{ExpectedRevision: *installation.Revision, Reason: "Enable the organization", State: PluginEnablementPutStateEnabled, Timezone: &timezone}), http.StatusOK)
+}
+
+// activate runs the installation steps of item over HTTP up to its
+// activation. The plugin's service user is created in org.
+func (a *operatorAPI) activate(item plugins.Installation, org string) PluginInstallation {
+	a.t.Helper()
 	t := a.t
 	manifest, err := json.Marshal(item.Manifest())
 	require.NoError(t, err)
@@ -121,15 +155,14 @@ func (a *operatorAPI) install(item plugins.Installation, org string) PluginInsta
 		PluginInstallationCreate{ExpectedRevision: *pkg.Revision, Reason: "Install the plugin", PackageSha256: digest, BackendUrl: item.Backend}), http.StatusCreated)
 	require.Equal(t, PluginInstallationStateInstalled, installation.State)
 	fleet.serve(t, item.Backend, installation.InstallationId, digest)
+	a.iam.createServiceUser(org, uuid.MustParse(item.ServiceUserID))
 	a.iam.bind(item.ID, installation.InstallationId, uuid.MustParse(item.ServiceUserID))
 	path := "/plugin-installations/" + installation.InstallationId.String()
 	installation = decode[PluginInstallation](t, a.call(pluginOperator, http.MethodPut, path+"/identity", uuid.NewString(),
 		PluginInstallationIdentity{ExpectedRevision: *installation.Revision, Reason: "Bind the service identities", ServiceUserId: uuid.MustParse(item.ServiceUserID), AdmissionCheckerId: uuid.MustParse(item.AdmissionCheckerID)}), http.StatusOK)
 	installation = decode[PluginInstallation](t, a.call(pluginOperator, http.MethodPost, path+"/actions/activate", uuid.NewString(), command(*installation.Revision, "Activate the plugin")), http.StatusOK)
 	require.Equal(t, PluginInstallationStateActive, installation.State)
-	timezone := "Europe/Berlin"
-	return decode[PluginInstallation](t, a.call(pluginOperator, http.MethodPut, path+"/organizations/"+org, uuid.NewString(),
-		PluginEnablementPut{ExpectedRevision: *installation.Revision, Reason: "Enable the organization", State: PluginEnablementPutStateEnabled, Timezone: &timezone}), http.StatusOK)
+	return installation
 }
 
 func sha256Hex(raw []byte) string {
@@ -315,6 +348,112 @@ func TestIdentityRequiresTheExactWorkloadBindingInIAM(t *testing.T) {
 	recorded := decode[PluginInstallation](t, recordIdentity(), http.StatusOK)
 	require.Equal(t, serviceUser, *recorded.ServiceUserId)
 	require.Equal(t, checker, *recorded.AdmissionCheckerId)
+}
+
+func TestAnInstallationServesOnlyTheOrganizationOfItsServiceUser(t *testing.T) {
+	db, grant := pluginDeploymentBoundaryDatabase(t)
+	s := pluginManagerServer(t, db)
+	api := newOperatorAPI(t, s)
+	ctx := t.Context()
+	const other = "beta"
+	_, err := db.CreateOrg(ctx, nil, &model.Org{Id: other, CreatedBy: pluginOperator, CreatedAt: time.Now().UTC(), Source: model.OrgSourceInternal, Plan: model.OrgPlanCustom})
+	require.NoError(t, err)
+	// Both organizations have more service users than IAM returns on one
+	// page, so Core has to follow IAM's page tokens.
+	for _, org := range []string{grant.OrgID, other} {
+		for range serviceUserPage + 1 {
+			api.iam.createServiceUser(org, userid.NewServiceUserTokenId())
+		}
+	}
+	item := workflowPlugin(grant, "external-deployment.admit")
+	serviceUser, checker := uuid.MustParse(item.ServiceUserID), uuid.MustParse(item.AdmissionCheckerID)
+	api.iam.createServiceUser(grant.OrgID, serviceUser)
+	manifest, err := json.Marshal(item.Manifest())
+	require.NoError(t, err)
+	digest := sha256Hex(manifest)
+	decode[PluginPackage](t, api.call(pluginOperator, http.MethodPost, "/plugin-packages", uuid.NewString(),
+		PluginPackagePush{ExpectedRevision: api.revision(), Reason: "Register the package", ManifestSha256: digest, Manifest: manifest}), http.StatusCreated)
+	installation := decode[PluginInstallation](t, api.call(pluginOperator, http.MethodPost, "/plugin-installations", uuid.NewString(),
+		PluginInstallationCreate{ExpectedRevision: api.revision(), Reason: "Install the plugin", PackageSha256: digest, BackendUrl: item.Backend}), http.StatusCreated)
+	fleet.serve(t, item.Backend, installation.InstallationId, digest)
+	path := "/plugin-installations/" + installation.InstallationId.String()
+	timezone := "UTC"
+	enablement := func(org string, state PluginEnablementPutState) func() *httptest.ResponseRecorder {
+		return func() *httptest.ResponseRecorder {
+			return api.call(pluginOperator, http.MethodPut, path+"/organizations/"+org, uuid.NewString(),
+				PluginEnablementPut{ExpectedRevision: api.revision(), Reason: "Enable " + org, State: state, Timezone: &timezone})
+		}
+	}
+	removal := func(org string) func() *httptest.ResponseRecorder {
+		return func() *httptest.ResponseRecorder {
+			return api.call(pluginOperator, http.MethodDelete, path+"/organizations/"+org, uuid.NewString(), command(api.revision(), "Remove "+org))
+		}
+	}
+	identity := func() *httptest.ResponseRecorder {
+		return api.call(pluginOperator, http.MethodPut, path+"/identity", uuid.NewString(), PluginInstallationIdentity{
+			ExpectedRevision: api.revision(), Reason: "Record the service identities", ServiceUserId: serviceUser, AdmissionCheckerId: checker})
+	}
+	audited := func() int {
+		return len(decode[PluginAuditEventPage](t, api.call(pluginOperator, http.MethodGet, "/plugin-audit-events?limit=200", "", nil), http.StatusOK).Items)
+	}
+	refused := func(why string, status int, code string, call func() *httptest.ResponseRecorder) string {
+		t.Helper()
+		revision, events := api.revision(), audited()
+		response := call()
+		require.Equal(t, status, response.Code, "%s: %s", why, response.Body.String())
+		require.Contains(t, response.Body.String(), code, why)
+		require.Equal(t, revision, api.revision(), "%s changes nothing", why)
+		require.Equal(t, events, audited(), "%s writes no audit event", why)
+		return response.Body.String()
+	}
+	succeeds := func(call func() *httptest.ResponseRecorder) PluginInstallation {
+		t.Helper()
+		return decode[PluginInstallation](t, call(), http.StatusOK)
+	}
+	const mismatch = `"error":"plugin_service_user_organization_mismatch"`
+
+	refused("enabling before the identities", http.StatusConflict, `"error":"plugin_installation_state"`, enablement(grant.OrgID, PluginEnablementPutStateEnabled))
+	api.iam.bind(item.ID, installation.InstallationId, serviceUser)
+	succeeds(identity)
+	message := refused("enabling another organization", http.StatusConflict, mismatch, enablement(other, PluginEnablementPutStateEnabled))
+	require.Contains(t, message, serviceUser.String())
+	require.Contains(t, message, other)
+	refused("enabling the service user's organization before activation", http.StatusConflict, `"error":"plugin_installation_state"`, enablement(grant.OrgID, PluginEnablementPutStateEnabled))
+	succeeds(func() *httptest.ResponseRecorder {
+		return api.call(pluginOperator, http.MethodPost, path+"/actions/activate", uuid.NewString(), command(api.revision(), "Activate the plugin"))
+	})
+	refused("enabling another organization of an active installation", http.StatusConflict, mismatch, enablement(other, PluginEnablementPutStateDisabled))
+	api.iam.lookupDown.Store(true)
+	refused("an unanswered IAM lookup", http.StatusInternalServerError, "", enablement(grant.OrgID, PluginEnablementPutStateEnabled))
+	api.iam.lookupDown.Store(false)
+
+	enabled := succeeds(enablement(grant.OrgID, PluginEnablementPutStateEnabled))
+	require.Len(t, enabled.Organizations, 1)
+	require.Equal(t, grant.OrgID, enabled.Organizations[0].OrgId)
+	refused("a second organization", http.StatusConflict, mismatch, enablement(other, PluginEnablementPutStateEnabled))
+	replayed := succeeds(identity)
+	require.Equal(t, *enabled.Revision, *replayed.Revision, "recording the same identities of an enabled installation changes nothing")
+
+	// An older Core that did not ask IAM enabled another organization: the
+	// identities of that installation are refused until the enablement is
+	// removed, which never asks IAM.
+	succeeds(removal(grant.OrgID))
+	_, err = s.PluginManager.PutEnablement(ctx, pluginmanager.Command{Actor: pluginOperator, IdempotencyKey: uuid.NewString(), ExpectedRevision: api.revision(), Reason: "Enable without asking IAM"},
+		installation.InstallationId, other, model.PluginEnablementEnabled, "UTC", nil, item.ServiceUserID)
+	require.NoError(t, err)
+	message = refused("identities of an installation enabled for another organization", http.StatusConflict, mismatch, identity)
+	require.Contains(t, message, other)
+	require.Empty(t, succeeds(removal(other)).Organizations)
+
+	// Changing an existing enablement keeps its organization, so the safety
+	// lever works even after IAM deleted the service user; a new enablement
+	// needs IAM again.
+	succeeds(enablement(grant.OrgID, PluginEnablementPutStateEnabled))
+	api.iam.deleteServiceUser(serviceUser)
+	disabled := succeeds(enablement(grant.OrgID, PluginEnablementPutStateDisabled))
+	require.Equal(t, PluginEnablementStateDisabled, disabled.Organizations[0].State)
+	require.Empty(t, succeeds(removal(grant.OrgID)).Organizations)
+	refused("enabling an organization IAM no longer lists the service user in", http.StatusConflict, mismatch, enablement(grant.OrgID, PluginEnablementPutStateEnabled))
 }
 
 func TestPluginHostDisabledHidesOnlyThePluginManager(t *testing.T) {

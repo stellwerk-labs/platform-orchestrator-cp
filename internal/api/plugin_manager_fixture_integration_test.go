@@ -136,7 +136,7 @@ func installPlugin(t *testing.T, db model.Databaser, item plugins.Installation) 
 		if state == plugins.StateNotEnabled {
 			enablement = model.PluginEnablementDisabled
 		}
-		steps.installation(steps.manager.PutEnablement(ctx, steps.command("Enable the fixture organization"), id, org, enablement, item.OrganizationTimezones[org], item.DeploymentApprovalPolicies))
+		steps.installation(steps.manager.PutEnablement(ctx, steps.command("Enable the fixture organization"), id, org, enablement, item.OrganizationTimezones[org], item.DeploymentApprovalPolicies, item.ServiceUserID))
 	}
 	item.InstallationID, item.ManifestSHA256 = id.String(), digest
 	return item

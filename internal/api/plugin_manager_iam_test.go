@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -21,19 +23,28 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginmanager"
 )
 
-// iamPeer stands in for IAM behind its internal HTTP contract. It answers
-// platform checks from the operators configured for each permission, allows
-// every organization check as for an organization administrator and counts
-// them, and answers workload binding lookups from the bindings it holds.
+// iamPeer stands in for IAM behind its HTTP contract. It answers platform
+// checks from the operators configured for each permission, allows every
+// organization check as for an organization administrator and counts them,
+// answers workload binding lookups from the bindings it holds, and lists the
+// service users of an organization, in pages of serviceUserPage, to the
+// internal system identity that Core calls IAM with.
 type iamPeer struct {
 	mu        sync.Mutex
 	holders   map[string][]uuid.UUID
 	bindings  []iamapi.PluginWorkloadBinding
 	platform  []iamapi.ResourcePermissionCheck
 	orgChecks atomic.Int32
-	// lookupDown makes binding lookups fail as if IAM were unavailable.
+	// serviceUsers holds the service users of each organization; IAM keeps
+	// a service user in exactly one.
+	serviceUsers map[string][]uuid.UUID
+	// lookupDown makes binding and service user lookups fail as if IAM were
+	// unavailable.
 	lookupDown atomic.Bool
 }
+
+// serviceUserPage is small, so a lookup has to follow IAM's page tokens.
+const serviceUserPage = 2
 
 func (p *iamPeer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
@@ -75,6 +86,33 @@ func (p *iamPeer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		p.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(iamapi.PluginWorkloadBindingList{Items: items})
+	case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/orgs/") && strings.HasSuffix(r.URL.Path, "/service-users") && !p.lookupDown.Load():
+		if r.Header.Get("From") != userid.InternalSystemUuid.String() {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		org := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/orgs/"), "/service-users")
+		start := 0
+		if token := r.URL.Query().Get("page"); token != "" {
+			var err error
+			if start, err = strconv.Atoi(token); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+		}
+		p.mu.Lock()
+		members := p.serviceUsers[org][min(start, len(p.serviceUsers[org])):]
+		page := iamapi.ServiceUserPage{Items: []iamapi.ServiceUserSummary{}}
+		for _, id := range members[:min(serviceUserPage, len(members))] {
+			page.Items = append(page.Items, iamapi.ServiceUserSummary{Id: id, DisplayName: "service user " + id.String()})
+		}
+		if len(members) > serviceUserPage {
+			next := strconv.Itoa(start + serviceUserPage)
+			page.NextPageToken = &next
+		}
+		p.mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(page)
 	default:
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
@@ -88,7 +126,8 @@ func (p *iamPeer) platformChecks() []iamapi.ResourcePermissionCheck {
 }
 
 // newIAMPeer serves an iamPeer in which writers hold plugin_manager_write
-// and readers plugin_manager_read, and returns a client for it.
+// and readers plugin_manager_read, and returns a client for it that calls as
+// the internal system identity, like Core's.
 func newIAMPeer(t *testing.T, writers, readers []uuid.UUID) (*iamPeer, iamapi.ClientWithResponsesInterface) {
 	t.Helper()
 	peer := &iamPeer{holders: map[string][]uuid.UUID{
@@ -97,7 +136,10 @@ func newIAMPeer(t *testing.T, writers, readers []uuid.UUID) (*iamPeer, iamapi.Cl
 	}}
 	iam := httptest.NewServer(peer)
 	t.Cleanup(iam.Close)
-	client, err := iamapi.NewClientWithResponses(iam.URL)
+	client, err := iamapi.NewClientWithResponses(iam.URL, iamapi.WithRequestEditorFn(func(_ context.Context, request *http.Request) error {
+		request.Header.Set("From", userid.InternalSystemUuid.String())
+		return nil
+	}))
 	require.NoError(t, err)
 	return peer, client
 }
