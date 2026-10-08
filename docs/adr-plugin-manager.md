@@ -267,26 +267,17 @@ currently subscribed plugins as consumers. A server started with the plugin
 host disabled pauses every journal; a server with the host enabled
 re-establishes the journal state from the subscriptions before it serves.
 
-### Package trust in `v1alpha`
+### Package trust
 
-Core does not verify package signatures. The plugin runtime verifies the signed
-package against the operator's publisher trust before it starts the plugin
-process. Core records the package manifest digest with the registration
-manifest, binds the installation, its entitlement grants and every effect check
-to that digest, and serves a package only after the running plugin reports
-that digest. An operator holding `plugin_manager_write` is therefore trusted
-to register the manifest that belongs to a digest.
-
-Verifying in Core as well would duplicate the runtime's verifier and its trust
-distribution without adding a check the runtime and the reported digest do not
-already provide for first-party plugins. Partner publishers need Core-side
-verification and revisit this decision.
+Core verifies no package signature. The plugin runtime verifies the signed
+package against the operator's publisher trust, and Core binds activation,
+upgrade, every effect and the licence binding to the package digest the
+running plugin reports; an operator holding `plugin_manager_write` is trusted
+to register the registration manifest that belongs to a digest. The decision
+and its limits are in [adr-plugin-package-trust.md](adr-plugin-package-trust.md).
 
 ## Not yet implemented
 
-- The plugin runtime does not yet pass the installation UUID and verified
-  package digest to the plugin process, and plugins do not yet serve the
-  status endpoint.
 - Core reads plugin status only on activation; it does not observe the health
   of an active installation, and per-organization `unavailable` and
   `incompatible` still come only from the licence.
