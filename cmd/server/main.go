@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/pkg/errors"
@@ -207,17 +208,8 @@ func main() {
 		Publisher: publisher,
 		DpClient:  dpClient,
 		IamClient: iamClient,
-	}
-	if cfg.DeploymentAdmissionIdentitiesFile != "" {
-		file, err := os.Open(cfg.DeploymentAdmissionIdentitiesFile)
-		if err != nil {
-			zap.L().Fatal("Failed to read Deployment admission service identities", zap.Error(err))
-		}
-		server.DeploymentAdmissionIdentities, err = config.LoadDeploymentAdmissionIdentities(file)
-		_ = file.Close()
-		if err != nil {
-			zap.L().Fatal("Invalid Deployment admission service identities", zap.Error(err))
-		}
+
+		DeploymentAdmissionIdentity: uuid.UUID(cfg.DeploymentAdmissionIdentity),
 	}
 	var gateway *plugins.Gateway
 	var entitlementAdapter *pluginentitlements.Adapter

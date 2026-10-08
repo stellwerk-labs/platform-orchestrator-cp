@@ -9,26 +9,25 @@ import (
 
 	"github.com/google/uuid"
 	iamapi "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
-	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/api/middleware"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
 )
 
-// deploymentAdmissionCaller accepts only the Data Plane identity the operator
-// bound to org. That identity must be an IAM platform principal with a static
-// token: the Data Plane holds one token for every organization, and a
-// service user of one organization would carry that organization's roles
+// deploymentAdmissionCaller accepts only the Data Plane's admission identity,
+// one for every organization, so an organization created later is admitted
+// at once. IAM must vouch on every call that it is a platform principal with
+// a static token: the Data Plane holds one token for every organization, and
+// a service user of one organization would carry that organization's roles
 // and stop serving every organization when that one is removed.
 func (s *Server) deploymentAdmissionCaller(ctx context.Context, org string) error {
 	actor, err := GetAuthenticatedUserIdOr401(ctx)
 	if err != nil {
 		return err
 	}
-	expected := s.DeploymentAdmissionIdentities[org]
-	if expected == uuid.Nil || expected != actor || !userid.IsServiceUser(actor) {
-		return pluginBoundaryError(403, "deployment_admission_service_forbidden", "The operator-bound Data Plane service identity is required.")
+	if s.DeploymentAdmissionIdentity == uuid.Nil || actor != s.DeploymentAdmissionIdentity {
+		return pluginBoundaryError(403, "deployment_admission_service_forbidden", "The Data Plane's admission identity is required.")
 	}
 	if s.PluginGateway != nil && s.PluginGateway.Registry != nil {
 		for _, descriptor := range s.PluginGateway.Registry.List(ctx, org) {

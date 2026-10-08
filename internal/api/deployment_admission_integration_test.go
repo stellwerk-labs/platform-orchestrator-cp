@@ -65,7 +65,7 @@ func TestDeploymentAdmissionRequiresDataPlaneAndIndependentUserScope(t *testing.
 	t.Cleanup(iam.Close)
 	client, err := iamapi.NewClientWithResponses(iam.URL)
 	require.NoError(t, err)
-	s := &Server{Logger: zap.NewNop(), Database: db, IamClient: client, DeploymentAdmissionIdentities: map[string]uuid.UUID{grant.OrgID: service}}
+	s := &Server{Logger: zap.NewNop(), Database: db, IamClient: client, DeploymentAdmissionIdentity: service}
 	e, err := hecho.DefaultEchoServerWithValidation(&hecho.ValidatedServerConfig{AppName: "ordinary-admission-test", Logger: zap.NewNop(), OpenAPIRawSchema: MustDecodeOpenApiSpec()})
 	require.NoError(t, err)
 	e.Use(middleware.EchoCtxMiddleware)
@@ -262,59 +262,116 @@ func TestPinCreationRejectsDeploymentCompletedDuringRemoteEvidence(t *testing.T)
 	require.Empty(t, pins)
 }
 
-func TestDeploymentAdmissionAcceptsOnlyAStaticPlatformPrincipal(t *testing.T) {
-	db, grant := pluginDeploymentBoundaryDatabase(t)
-	env := grant.Intent.Environments[0]
-	iam := operatorIAM(t)
-	static, workload, organizationUser := userid.NewServiceUserTokenId(), userid.NewServiceUserTokenId(), userid.NewServiceUserTokenId()
-	iam.createStaticPrincipal(static)
-	iam.bind("dev.example.other", uuid.New(), workload)
-	identities := map[string]uuid.UUID{}
-	s := &Server{Logger: zap.NewNop(), Database: db, IamClient: iam.client, DeploymentAdmissionIdentities: identities}
+// admissionCalls serves s and returns a call that asks Core, as caller, to
+// admit a Deployment of grant's Environment under grant's organization.
+func admissionCalls(t *testing.T, s *Server) func(grant *model.ExternalOperationGrant, caller uuid.UUID) *httptest.ResponseRecorder {
+	t.Helper()
 	e, err := hecho.DefaultEchoServerWithValidation(&hecho.ValidatedServerConfig{AppName: "admission-identity-test", Logger: zap.NewNop(), OpenAPIRawSchema: MustDecodeOpenApiSpec()})
 	require.NoError(t, err)
 	e.Use(middleware.EchoCtxMiddleware)
 	s.MapRoutes(e)
-	body := DeploymentAdmissionRequest{ActorId: grant.ActorID, ProjectUuid: env.ProjectID, EnvironmentUuid: env.EnvironmentID, RequestDigest: strings.Repeat("c", 64),
-		Mode: AdmissionModeDeploy, ModuleVersions: grant.Intent.TargetVersions}
-	admit := func(actor uuid.UUID) *httptest.ResponseRecorder {
-		payload, err := json.Marshal(body)
+	return func(grant *model.ExternalOperationGrant, caller uuid.UUID) *httptest.ResponseRecorder {
+		t.Helper()
+		env := grant.Intent.Environments[0]
+		payload, err := json.Marshal(DeploymentAdmissionRequest{ActorId: grant.ActorID, ProjectUuid: env.ProjectID, EnvironmentUuid: env.EnvironmentID,
+			RequestDigest: strings.Repeat("c", 64), Mode: AdmissionModeDeploy, ModuleVersions: grant.Intent.TargetVersions})
 		require.NoError(t, err)
 		request := httptest.NewRequest(http.MethodPost, "/orgs/"+grant.OrgID+"/deployment-admissions/"+uuid.NewString(), bytes.NewReader(payload))
 		request.Header.Set("Content-Type", "application/json")
-		request.Header.Set("From", actor.String())
+		request.Header.Set("From", caller.String())
 		response := httptest.NewRecorder()
 		e.ServeHTTP(response, request)
 		return response
 	}
-	admissions := func() int {
-		tx, err := db.BeginTx(t.Context(), nil)
-		require.NoError(t, err)
-		defer func() { _ = tx.Rollback() }()
-		var count int
-		require.NoError(t, tx.QueryRowContext(t.Context(), `SELECT count(*) FROM deployment_admission_guards WHERE org_id = $1`, grant.OrgID).Scan(&count))
-		return count
+}
+
+// admissionGuards counts the admission guards Core holds for org.
+func admissionGuards(t *testing.T, db model.Databaser, org string) int {
+	t.Helper()
+	tx, err := db.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	defer func() { _ = tx.Rollback() }()
+	var count int
+	require.NoError(t, tx.QueryRowContext(t.Context(), `SELECT count(*) FROM deployment_admission_guards WHERE org_id = $1`, org).Scan(&count))
+	return count
+}
+
+func TestDeploymentAdmissionAcceptsOnlyAStaticPlatformPrincipal(t *testing.T) {
+	db, grant := pluginDeploymentBoundaryDatabase(t)
+	iam := operatorIAM(t)
+	static, workload, organizationUser := userid.NewServiceUserTokenId(), userid.NewServiceUserTokenId(), userid.NewServiceUserTokenId()
+	iam.createStaticPrincipal(static)
+	iam.bind("dev.example.other", uuid.New(), workload)
+	s := &Server{Logger: zap.NewNop(), Database: db, IamClient: iam.client}
+	admit := admissionCalls(t, s)
+
+	// Unset, Core admits for nobody and asks IAM about nobody.
+	for _, caller := range []uuid.UUID{uuid.Nil, static} {
+		response := admit(grant, caller)
+		require.Equal(t, http.StatusForbidden, response.Code, "%s: %s", caller, response.Body.String())
+		require.Contains(t, response.Body.String(), "The Data Plane's admission identity is required.", caller)
 	}
+	require.Zero(t, iam.lookups.Load())
 
 	// The Data Plane holds one token for every organization: a service user
 	// of one organization, or a plugin workload, is never the admission
-	// authority, even when the operator bound it.
+	// authority, even when the operator configured it.
 	for name, identity := range map[string]uuid.UUID{"a service user of an organization": organizationUser, "the platform principal of a plugin workload": workload} {
-		identities[grant.OrgID] = identity
-		response := admit(identity)
+		s.DeploymentAdmissionIdentity = identity
+		response := admit(grant, identity)
 		require.Equal(t, http.StatusForbidden, response.Code, "%s: %s", name, response.Body.String())
 		require.Contains(t, response.Body.String(), `"error":"deployment_admission_service_forbidden"`, name)
 		require.Contains(t, response.Body.String(), "platform principal with a static token", name)
 	}
-	identities[grant.OrgID] = static
+	s.DeploymentAdmissionIdentity = static
 	iam.principalsDown.Store(true)
-	response := admit(static)
+	response := admit(grant, static)
 	require.Equal(t, http.StatusServiceUnavailable, response.Code, response.Body.String())
 	require.Contains(t, response.Body.String(), `"error":"authorization_unavailable"`)
 	iam.principalsDown.Store(false)
-	require.Zero(t, admissions(), "a refused identity admits nothing")
+	require.Zero(t, admissionGuards(t, db, grant.OrgID), "a refused identity admits nothing")
 
-	response = admit(static)
+	response = admit(grant, static)
 	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
-	require.Equal(t, 1, admissions())
+	require.Equal(t, 1, admissionGuards(t, db, grant.OrgID))
+}
+
+// Core names one admission identity for every organization, so an
+// organization created while Core runs is admitted at once, without a
+// configuration change or a restart. IAM vouches for the identity on every
+// callback, so revoking it stops the next admission in every organization.
+func TestOneAdmissionIdentityServesEveryOrganization(t *testing.T) {
+	db, acme := pluginDeploymentBoundaryDatabase(t)
+	iam := operatorIAM(t)
+	dataPlane, otherStatic := userid.NewServiceUserTokenId(), userid.NewServiceUserTokenId()
+	iam.createStaticPrincipal(dataPlane)
+	iam.createStaticPrincipal(otherStatic)
+	s := &Server{Logger: zap.NewNop(), Database: db, IamClient: iam.client, DeploymentAdmissionIdentity: dataPlane}
+	admit := admissionCalls(t, s)
+
+	response := admit(acme, dataPlane)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	beta := seedPluginOperation(t, db, "beta")
+	lookups := iam.lookups.Load()
+	response = admit(beta, dataPlane)
+	require.Equal(t, http.StatusOK, response.Code, "an organization created after start-up: %s", response.Body.String())
+	require.Equal(t, lookups+1, iam.lookups.Load(), "Core asks IAM about the identity on every callback")
+
+	// IAM vouching for a static principal is not enough: Core admits only
+	// as the identity it names, and refuses any other without asking IAM.
+	response = admit(beta, otherStatic)
+	require.Equal(t, http.StatusForbidden, response.Code, response.Body.String())
+	require.Contains(t, response.Body.String(), `"error":"deployment_admission_service_forbidden"`)
+	require.Contains(t, response.Body.String(), "The Data Plane's admission identity is required.")
+	require.Equal(t, lookups+1, iam.lookups.Load())
+
+	iam.deletePrincipal(dataPlane)
+	for _, grant := range []*model.ExternalOperationGrant{acme, beta} {
+		response := admit(grant, dataPlane)
+		require.Equal(t, http.StatusForbidden, response.Code, "%s: %s", grant.OrgID, response.Body.String())
+		require.Contains(t, response.Body.String(), "platform principal with a static token", grant.OrgID)
+	}
+	require.Equal(t, lookups+3, iam.lookups.Load())
+	require.Equal(t, 1, admissionGuards(t, db, acme.OrgID))
+	require.Equal(t, 1, admissionGuards(t, db, beta.OrgID))
 }

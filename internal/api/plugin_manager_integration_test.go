@@ -81,6 +81,14 @@ func (p *iamPeer) createStaticPrincipal(id uuid.UUID) {
 		CurrentTokenExpiresAt: &expires, GeneratedAt: time.Now(), GeneratedBy: identityOperator}
 }
 
+// deletePrincipal deletes a platform principal, as an operator does in IAM
+// to revoke it; IAM then answers 404 for it.
+func (p *iamPeer) deletePrincipal(id uuid.UUID) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.principals, id)
+}
+
 // operatorIAM is the IAM of a Plugin Manager test, which every replica of
 // the test calls: pluginOperator holds both Plugin Manager permissions,
 // readers hold plugin_manager_read.

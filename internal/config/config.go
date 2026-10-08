@@ -51,8 +51,12 @@ type Configuration struct {
 	// PluginDataPlaneInternalHTTP permits only the fixed Core-to-DP origin in
 	// an operator-declared trusted cluster network. It never permits HTTP
 	// plugin backends or service-user bearer credentials over HTTP.
-	PluginDataPlaneInternalHTTP       bool   `env:"PLUGIN_DATA_PLANE_INTERNAL_HTTP, default=false"`
-	DeploymentAdmissionIdentitiesFile string `env:"DEPLOYMENT_ADMISSION_IDENTITIES_FILE"`
+	PluginDataPlaneInternalHTTP bool `env:"PLUGIN_DATA_PLANE_INTERNAL_HTTP, default=false"`
+	// DeploymentAdmissionIdentity is the IAM platform principal the Data
+	// Plane authenticates as when it asks Core to admit an ordinary
+	// Deployment, one for every organization. Unset, Core refuses every
+	// admission callback.
+	DeploymentAdmissionIdentity ServiceIdentity `env:"DEPLOYMENT_ADMISSION_IDENTITY"`
 
 	VaultURL  string `env:"VAULT_URL" validate:"url"`
 	VaultAuth string `env:"VAULT_AUTH" validate:"required"`

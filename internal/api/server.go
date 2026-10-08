@@ -38,8 +38,10 @@ type Server struct {
 	// PluginManager is nil while the plugin host is disabled.
 	PluginManager *pluginmanager.Manager
 	// PluginJournalRetention is how long released operations still reconcile.
-	PluginJournalRetention        time.Duration
-	DeploymentAdmissionIdentities map[string]uuid.UUID
+	PluginJournalRetention time.Duration
+	// DeploymentAdmissionIdentity is the Data Plane's admission identity for
+	// every organization; uuid.Nil refuses every admission callback.
+	DeploymentAdmissionIdentity uuid.UUID
 }
 
 func (s *Server) MapRoutes(e *echo.Echo) {
