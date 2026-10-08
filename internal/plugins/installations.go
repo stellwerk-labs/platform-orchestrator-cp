@@ -88,7 +88,7 @@ type Installation struct {
 	Version               string                       `json:"version"`
 	Backend               string                       `json:"backend"`
 	Organizations         map[string]AvailabilityState `json:"organizations"`
-	Capabilities          []string                     `json:"capabilities"`
+	Capabilities          []Capability                 `json:"capabilities"`
 	UI                    *UIContribution              `json:"ui,omitempty"`
 	Operations            []Operation                  `json:"operations"`
 	ServiceUserID         string                       `json:"service_user_id,omitempty"`
@@ -360,7 +360,7 @@ func (r *InstallationRegistry) get(ctx context.Context, snapshot *installationSn
 	if !enabled {
 		return Descriptor{}, false
 	}
-	descriptor := Descriptor{ID: item.ID, DisplayName: item.DisplayName, Version: item.Version, Capabilities: slices.Clone(item.Capabilities), State: state, Mode: accessMode(state)}
+	descriptor := Descriptor{ID: item.ID, DisplayName: item.DisplayName, Version: item.Version, Capabilities: CapabilityIDs(item.Capabilities), State: state, Mode: accessMode(state)}
 	return r.applyEntitlement(ctx, orgID, item, descriptor), true
 }
 

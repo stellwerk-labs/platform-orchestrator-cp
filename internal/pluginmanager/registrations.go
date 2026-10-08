@@ -21,7 +21,7 @@ func registrations(manifest plugins.Manifest) ([]model.PluginRegistration, error
 		return nil
 	}
 	for _, capability := range manifest.Capabilities {
-		if err := add(model.PluginRegistrationCapability, capability, capability); err != nil {
+		if err := add(model.PluginRegistrationCapability, capability.ID, capability); err != nil {
 			return nil, err
 		}
 	}
@@ -110,7 +110,7 @@ func view(installation model.PluginInstallation, manifest plugins.Manifest) plug
 func applyRegistration(item *plugins.Installation, registration model.PluginRegistration) error {
 	switch registration.Kind {
 	case model.PluginRegistrationCapability:
-		var capability string
+		var capability plugins.Capability
 		if err := json.Unmarshal(registration.Definition, &capability); err != nil {
 			return err
 		}

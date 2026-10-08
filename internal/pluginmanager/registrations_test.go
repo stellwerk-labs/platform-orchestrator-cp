@@ -17,7 +17,10 @@ import (
 )
 
 const testManifest = `{
-	"id": "dev.example.rollouts", "display_name": "Rollouts", "version": "1.0.0", "capabilities": ["plugin.dev.example.rollouts.read", "plugin.dev.example.rollouts.approve"],
+	"id": "dev.example.rollouts", "display_name": "Rollouts", "version": "1.0.0", "capabilities": [
+		{"id": "plugin.dev.example.rollouts.read", "display_name": "Read rollouts", "description": "View rollouts.", "category": "Rollouts", "level": "read", "scopes": ["organization", "environment"]},
+		{"id": "plugin.dev.example.rollouts.approve", "display_name": "Approve rollouts", "description": "Approve a frozen scope.", "category": "Rollouts", "level": "write", "scopes": ["environment", "project"]}
+	],
 	"ui": {"sdk_version": "1", "entrypoint": "/index.html", "route_prefix": "/rollouts", "navigation_label": "Rollouts",
 		"contextual_actions": [{"id": "open", "resource_type": "module_version", "label": "Open", "required_operation_id": "start",
 			"route": {"path": "rollouts/new", "query": {"module": "$module_id"}}, "when": {"lifecycle_status": ["proposed"], "semantic_version_required": true}}]},
@@ -79,7 +82,7 @@ func TestRegistrationsServeExactlyThePackageContributions(t *testing.T) {
 		served.OrganizationApprovalPolicies, "approval policies stay with their organization")
 	served.UI.Origin = ""
 	sortedManifest := manifest
-	sortedManifest.Capabilities = []string{"plugin.dev.example.rollouts.approve", "plugin.dev.example.rollouts.read"}
+	sortedManifest.Capabilities = []plugins.Capability{manifest.Capabilities[1], manifest.Capabilities[0]}
 	sortedManifest.Operations = []plugins.Operation{manifest.Operations[1], manifest.Operations[0]}
 	sortedManifest.ServiceGrants = []plugins.ServiceGrant{manifest.ServiceGrants[1], manifest.ServiceGrants[0]}
 	require.Equal(t, sortedManifest, served.Manifest(), "registrations round-trip every contribution")

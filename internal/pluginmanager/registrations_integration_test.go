@@ -108,7 +108,7 @@ func TestRegistrationsNeverCollideAcrossInstallations(t *testing.T) {
 	third, _ := pluginPackage(t, "dev.example.third")
 	for name, edit := range map[string]func(map[string]any){
 		"another plugin's capability": func(manifest map[string]any) {
-			manifest["capabilities"] = []string{"plugin.dev.example.rollouts.read"}
+			manifest["capabilities"].([]any)[0].(map[string]any)["id"] = "plugin.dev.example.rollouts.read"
 		},
 		"the served prefix with a trailing slash": routePrefix("/rollouts/"),
 		"the served prefix in capitals":           routePrefix("/Rollouts"),

@@ -26,7 +26,7 @@ type Manifest struct {
 	// runs on; 0 while the plugin owns no schema. Core serves the package only
 	// once the running plugin reports its database at exactly this generation.
 	MigrationGeneration   int64                   `json:"migration_generation,omitempty"`
-	Capabilities          []string                `json:"capabilities,omitempty"`
+	Capabilities          []Capability            `json:"capabilities,omitempty"`
 	UI                    *UIContribution         `json:"ui,omitempty"`
 	Operations            []Operation             `json:"operations,omitempty"`
 	ServiceGrants         []ServiceGrant          `json:"service_grants,omitempty"`
@@ -34,11 +34,44 @@ type Manifest struct {
 	Entitlement           *EntitlementDeclaration `json:"entitlement,omitempty"`
 }
 
+// Capability is an IAM capability a package declares in its own namespace.
+// People receive it through the roles of an organization; Core registers the
+// declaration in IAM for every organization the installation is enabled for.
+type Capability struct {
+	// ID is plugin.<plugin ID>.<name> with a one-segment name.
+	ID          string `json:"id"`
+	DisplayName string `json:"display_name"`
+	Description string `json:"description"`
+	Category    string `json:"category"`
+	// Level is the risk level: read, write or manage.
+	Level string `json:"level"`
+	// Scopes are the resource types a role may grant the capability on:
+	// organization, project, environment.
+	Scopes []string `json:"scopes"`
+}
+
+// CapabilityIDs returns the IDs of capabilities in their order.
+func CapabilityIDs(capabilities []Capability) []string {
+	ids := make([]string, 0, len(capabilities))
+	for _, capability := range capabilities {
+		ids = append(ids, capability.ID)
+	}
+	return ids
+}
+
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$`)
 var canonicalVersion = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$`)
 var operationIdentifier = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$`)
 var pathParameter = regexp.MustCompile(`\{([a-zA-Z][a-zA-Z0-9_]*)\}`)
-var localCapability = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+
+// localCapability is the one-segment name of a capability below its plugin's
+// namespace, spelled as IAM accepts it.
+var localCapability = regexp.MustCompile(`^[a-z](?:[a-z0-9-]*[a-z0-9])?$`)
+
+// maxCapabilityID bounds a complete capability ID, as IAM does.
+const maxCapabilityID = 255
+
+var capabilityLevels = []string{"read", "write", "manage"}
 
 // consoleRoute is a Console path below an organization in its one spelling:
 // lowercase segments without a leading or trailing slash, as the Console
@@ -222,16 +255,38 @@ func (m Manifest) owns(capability string) bool {
 
 // validateCapabilities accepts each declared capability once and only in
 // the plugin's own namespace, so no package claims a capability of Core or of
-// another plugin.
+// another plugin, and only as complete as IAM registers it.
 func validateCapabilities(m Manifest) error {
 	seen := map[string]bool{}
 	for _, capability := range m.Capabilities {
-		if seen[capability] || !m.owns(capability) {
+		if seen[capability.ID] || !m.owns(capability.ID) || len(capability.ID) > maxCapabilityID {
 			return fmt.Errorf("capabilities must be unique and in the plugin's own namespace")
 		}
-		seen[capability] = true
+		seen[capability.ID] = true
+		if strings.TrimSpace(capability.DisplayName) == "" || strings.TrimSpace(capability.Description) == "" || strings.TrimSpace(capability.Category) == "" {
+			return fmt.Errorf("capability %s needs a display name, a description and a category", capability.ID)
+		}
+		if !slices.Contains(capabilityLevels, capability.Level) {
+			return fmt.Errorf("capability %s needs the level read, write or manage", capability.ID)
+		}
+		if !validScopes(capability.Scopes) {
+			return fmt.Errorf("capability %s needs unique scopes of organization, project and environment", capability.ID)
+		}
 	}
 	return nil
+}
+
+// validScopes accepts a non-empty set of the resource types a permission
+// applies to.
+func validScopes(scopes []string) bool {
+	seen := map[string]bool{}
+	for _, scope := range scopes {
+		if seen[scope] || !slices.Contains([]string{"organization", "project", environmentScope}, scope) {
+			return false
+		}
+		seen[scope] = true
+	}
+	return len(scopes) > 0
 }
 
 func validateServiceGrants(m Manifest) error {
@@ -250,17 +305,10 @@ func validateServiceGrants(m Manifest) error {
 	}
 	policySeen := map[string]bool{}
 	for _, policy := range m.AuthorizationPolicies {
-		if policySeen[policy.Permission] || !m.owns(policy.Permission) || len(policy.Scopes) == 0 {
+		if policySeen[policy.Permission] || !m.owns(policy.Permission) || !validScopes(policy.Scopes) {
 			return fmt.Errorf("authorization policies require unique owned capabilities and exact scopes")
 		}
 		policySeen[policy.Permission] = true
-		scopeSeen := map[string]bool{}
-		for _, scope := range policy.Scopes {
-			if scopeSeen[scope] || !slices.Contains([]string{"organization", "project", environmentScope}, scope) {
-				return fmt.Errorf("authorization policies require unique owned capabilities and exact scopes")
-			}
-			scopeSeen[scope] = true
-		}
 	}
 	if len(m.AuthorizationPolicies) != 0 {
 		grant, ok := m.ServiceGrant("authorization.check")

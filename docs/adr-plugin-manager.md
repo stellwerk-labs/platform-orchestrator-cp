@@ -20,7 +20,7 @@ and never write it.
 
 | Resource | Content |
 |---|---|
-| Package | Immutable registration manifest of one plugin version (identity, migration generation, operations, UI contribution, service grants, authorization policies, entitlement declaration), keyed by the SHA-256 of the package manifest. |
+| Package | Immutable registration manifest of one plugin version (identity, migration generation, capability declarations, operations, UI contribution, service grants, authorization policies, entitlement declaration), keyed by the SHA-256 of the package manifest. |
 | Installation | Core-assigned immutable installation UUID, served package and the target of a pending upgrade, state (`installed`, `active`, `disabled`, `uninstalled`, `purged`), backend and UI origins, and two IAM platform principals: the plugin's service user and the admission checker. |
 | Status observation | What Core last read from the running plugin's status endpoint. A fact the plugin reports, not operator state. |
 | Enablement | One organization of an installation: `enabled` or `disabled`, IANA timezone, deployment approval policies. An installation has one per organization it serves. |
@@ -171,7 +171,10 @@ has at most one installation that is not purged, so equal operation IDs of
 different plugins never meet; a package declares each operation once and none
 in Core's host namespace (`core.`, `iam.`). A package declares only
 capabilities in its own namespace, `plugin.<plugin ID>.<name>` with a
-one-segment name, each once. A UI route prefix has one spelling, a slash
+one-segment name, each once, and declares each completely, as IAM keeps it:
+display name, description, category, risk level (`read`, `write`,
+`manage`) and the scopes a role may grant it on (`organization`, `project`,
+`environment`). A UI route prefix has one spelling, a slash
 followed by lowercase segments without a trailing slash, as the Console
 matches it, and belongs to one installation: an activation that would serve a
 prefix another installation serves, also the activation that completes an

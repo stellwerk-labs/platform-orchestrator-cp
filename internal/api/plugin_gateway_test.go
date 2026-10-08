@@ -41,7 +41,7 @@ func TestPluginGatewayPublicRoutesDisabledByDefault(t *testing.T) {
 func TestPluginDiscoveryDoesNotExposeBackendAndAvailabilityDeniesForwardCall(t *testing.T) {
 	registry, err := plugins.NewInstallationRegistry([]plugins.Installation{{
 		ID: "dev.example.change-manager", DisplayName: "Change Manager", Version: "1.0.0", Backend: "https://internal-plugin.invalid",
-		Organizations: map[string]plugins.AvailabilityState{"acme": plugins.StateNotEntitled}, Capabilities: []string{},
+		Organizations: map[string]plugins.AvailabilityState{"acme": plugins.StateNotEntitled}, Capabilities: []plugins.Capability{},
 		UI: &plugins.UIContribution{SDKVersion: "1", Origin: "https://plugin.invalid", Entrypoint: "/index.html", RoutePrefix: "/changes", NavigationLabel: "Changes"},
 		Operations: []plugins.Operation{
 			{ID: "read", Method: "GET", Path: "/orgs/{orgId}/changes"},

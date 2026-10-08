@@ -53,7 +53,7 @@ func TestProtocolHarnessUsesRealGatewayAndFailsClosed(t *testing.T) {
 
 	registry, err := harnessRegistry(testOrg, []byte(`{
 		"id":"dev.example.read-only","display_name":"Read Only","version":"0.1.0",
-		"capabilities":["plugin.dev.example.read-only.read"],"ui":{"sdk_version":"1",
+		"capabilities":[{"id":"plugin.dev.example.read-only.read","display_name":"Read","description":"View items.","category":"Read Only","level":"read","scopes":["organization"]}],"ui":{"sdk_version":"1",
 		"entrypoint":"/embed/","route_prefix":"/read-only","navigation_label":"Read Only"},
 		"operations":[{"id":"list","method":"GET","path":"/orgs/{orgId}/items","mutating":false}]
 	}`), backend.URL, "http://127.0.0.1:18092")
