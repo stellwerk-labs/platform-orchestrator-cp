@@ -86,8 +86,8 @@ func TestFinalApprovalRecheckReturnsOnlyAuthoritativeApproverDenial(t *testing.T
 			defer server.Close()
 			client, err := iam.NewClientWithResponses(server.URL)
 			require.NoError(t, err)
-			dispatch := model.ExternalDispatch{EnvironmentUUID: environment, Approval: &model.ExternalDispatchApproval{ActorID: approver, Scope: "environment"}, ApprovedPins: map[string]uuid.UUID{"module": uuid.Nil}, TargetVersions: map[string]uuid.UUID{"module": uuid.New()}}
-			err = (&Server{IamClient: client}).authorizePluginDispatchApproval(t.Context(), plugins.Installation{DeploymentApprovalPolicies: map[string]string{"environment": "plugin.dev.example.workflow.approve"}}, dispatch)
+			dispatch := model.ExternalDispatch{OrgID: "acme", EnvironmentUUID: environment, Approval: &model.ExternalDispatchApproval{ActorID: approver, Scope: "environment"}, ApprovedPins: map[string]uuid.UUID{"module": uuid.Nil}, TargetVersions: map[string]uuid.UUID{"module": uuid.New()}}
+			err = (&Server{IamClient: client}).authorizePluginDispatchApproval(t.Context(), plugins.Installation{OrganizationApprovalPolicies: map[string]map[string]string{"acme": {"environment": "plugin.dev.example.workflow.approve"}}}, dispatch)
 			if status == 204 {
 				require.NoError(t, err)
 			} else {
@@ -101,4 +101,43 @@ func TestFinalApprovalRecheckReturnsOnlyAuthoritativeApproverDenial(t *testing.T
 			}
 		})
 	}
+}
+
+func TestApprovalPoliciesApplyPerOrganization(t *testing.T) {
+	approver, project, environment := uuid.New(), uuid.New(), uuid.New()
+	asked := []iam.ResourcePermissionCheck{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body iam.InternalAuthorizeBody
+		if !assert.NoError(t, json.NewDecoder(r.Body).Decode(&body)) {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		assert.Equal(t, approver, body.UserId)
+		asked = append(asked, body.Checks...)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+	client, err := iam.NewClientWithResponses(server.URL)
+	require.NoError(t, err)
+	const environmentApproval, projectApproval = "plugin.dev.example.workflow.approve-environment", "plugin.dev.example.workflow.approve-project"
+	item := plugins.Installation{OrganizationApprovalPolicies: map[string]map[string]string{
+		"acme": {"environment": environmentApproval},
+		"beta": {"project": projectApproval},
+	}}
+	approve := func(org, scope string) error {
+		dispatch := model.ExternalDispatch{OrgID: org, ProjectUUID: project, EnvironmentUUID: environment, Approval: &model.ExternalDispatchApproval{ActorID: approver, Scope: scope},
+			ApprovedPins: map[string]uuid.UUID{"module": uuid.Nil}, TargetVersions: map[string]uuid.UUID{"module": uuid.New()}}
+		return (&Server{IamClient: client}).authorizePluginDispatchApproval(t.Context(), item, dispatch)
+	}
+
+	require.NoError(t, approve("acme", "environment"))
+	require.NoError(t, approve("beta", "project"))
+	require.Equal(t, []iam.ResourcePermissionCheck{environmentCheck(environment, environmentApproval), projectCheck(project, projectApproval)}, asked,
+		"each organization's approval asks IAM for that organization's policy")
+	for _, refused := range []struct{ org, scope string }{{"beta", "environment"}, {"acme", "project"}, {"gamma", "environment"}} {
+		var failure *herrors.PlatformOrchestratorError
+		require.ErrorAs(t, approve(refused.org, refused.scope), &failure, "%s %s", refused.org, refused.scope)
+		require.Equal(t, "plugin_approval_invalid", failure.Code, "another organization's approval policy never applies in %s", refused.org)
+	}
+	require.Len(t, asked, 2, "a scope the organization does not declare never reaches IAM")
 }

@@ -177,6 +177,17 @@ func (s *session) install(plugin, org string) Installation {
 	return s.installation(s.manager.PutEnablement(ctx, s.command(""), installation.InstallationID, org, model.PluginEnablementEnabled, "Europe/Berlin", nil))
 }
 
+// servedOrganizations returns the availability registry serves for plugin
+// in each of orgs.
+func servedOrganizations(t *testing.T, registry *plugins.InstallationRegistry, plugin string, orgs ...string) map[string]plugins.AvailabilityState {
+	t.Helper()
+	served := map[string]plugins.AvailabilityState{}
+	for _, org := range orgs {
+		served[org] = availability(registry, org, plugin)
+	}
+	return served
+}
+
 func availability(registry *plugins.InstallationRegistry, org, plugin string) plugins.AvailabilityState {
 	descriptor, found := registry.Get(context.Background(), org, plugin)
 	if !found {
@@ -516,8 +527,21 @@ func TestCommandsRejectInvalidAndOutOfOrderSteps(t *testing.T) {
 	_, err = writer.manager.PutEnablement(ctx, ops.command(""), id, "missing-org", model.PluginEnablementEnabled, "", nil)
 	requireCode(t, err, "organization_not_found")
 	ops.installation(writer.manager.PutEnablement(ctx, ops.command(""), id, org, model.PluginEnablementEnabled, "", map[string]string{"project": "plugin.dev.example.rollouts.approve"}))
-	_, err = writer.manager.PutEnablement(ctx, ops.command(""), id, second, model.PluginEnablementEnabled, "", nil)
-	requireCode(t, err, "plugin_enablement_limit", "v1alpha enables an installation for exactly one organization")
+	both := ops.installation(writer.manager.PutEnablement(ctx, ops.command(""), id, second, model.PluginEnablementDisabled, "America/New_York", map[string]string{"environment": "plugin.dev.example.rollouts.approve"}))
+	require.Len(t, both.Organizations, 2, "an installation serves several organizations")
+	for _, enablement := range both.Organizations {
+		switch enablement.OrgID {
+		case org:
+			require.Equal(t, model.PluginEnablement{OrgID: org, State: model.PluginEnablementEnabled, Timezone: "UTC", ApprovalPolicies: map[string]string{"project": "plugin.dev.example.rollouts.approve"}},
+				model.PluginEnablement{OrgID: enablement.OrgID, State: enablement.State, Timezone: enablement.Timezone, ApprovalPolicies: enablement.ApprovalPolicies}, "enabling another organization leaves this one unchanged")
+		case second:
+			require.Equal(t, model.PluginEnablementDisabled, enablement.State)
+			require.Equal(t, "America/New_York", enablement.Timezone)
+		default:
+			t.Fatalf("unexpected organization %s", enablement.OrgID)
+		}
+	}
+	require.Equal(t, map[string]plugins.AvailabilityState{org: plugins.StateAvailable, second: plugins.StateNotEnabled}, servedOrganizations(t, writer.registry, "dev.example.rollouts", org, second))
 	_, err = writer.manager.Transition(ctx, ops.command(""), uuid.New(), ActionActivate)
 	requireCode(t, err, "plugin_installation_not_found")
 

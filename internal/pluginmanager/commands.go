@@ -558,10 +558,7 @@ func (m *Manager) packageManifest(ctx context.Context, tx model.Tx, digest strin
 // validateServed checks that Core can serve the complete installation with
 // the package manifest.
 func (m *Manager) validateServed(installation model.PluginInstallation, manifest plugins.Manifest) error {
-	item, err := view(installation, manifest)
-	if err != nil {
-		return err
-	}
+	item := view(installation, manifest)
 	item.Capabilities, item.Operations, item.ServiceGrants, item.AuthorizationPolicies = manifest.Capabilities, manifest.Operations, manifest.ServiceGrants, manifest.AuthorizationPolicies
 	if manifest.UI != nil {
 		ui := *manifest.UI

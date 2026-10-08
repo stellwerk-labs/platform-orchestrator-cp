@@ -43,7 +43,7 @@ func TestPluginDeploymentBoundaryApprovalAndNoEffectRecovery(t *testing.T) {
 	service, checker, approver := userid.NewServiceUserTokenId().String(), userid.NewServiceUserTokenId().String(), uuid.New()
 	permission := "plugin." + grant.PluginID + ".control"
 	approvalPermission := "plugin." + grant.PluginID + ".approve"
-	item := plugins.Installation{ID: grant.PluginID, DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.test", ServiceUserID: service, AdmissionCheckerID: checker, Organizations: map[string]plugins.AvailabilityState{grant.OrgID: plugins.StateAvailable}, AuthorizationPolicies: []plugins.AuthorizationPolicy{{Permission: permission, Scopes: []string{"environment"}}, {Permission: approvalPermission, Scopes: []string{"environment", "project"}}}, DeploymentApprovalPolicies: map[string]string{"environment": approvalPermission, "project": approvalPermission}}
+	item := plugins.Installation{ID: grant.PluginID, DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.test", ServiceUserID: service, AdmissionCheckerID: checker, Organizations: map[string]plugins.AvailabilityState{grant.OrgID: plugins.StateAvailable}, AuthorizationPolicies: []plugins.AuthorizationPolicy{{Permission: permission, Scopes: []string{"environment"}}, {Permission: approvalPermission, Scopes: []string{"environment", "project"}}}, OrganizationApprovalPolicies: map[string]map[string]string{grant.OrgID: {"environment": approvalPermission, "project": approvalPermission}}}
 	for _, action := range append([]string{"authorization.check"}, grant.Intent.Actions...) {
 		item.ServiceGrants = append(item.ServiceGrants, plugins.ServiceGrant{Action: action, Permission: permission, Scope: "environment"})
 	}
@@ -212,6 +212,13 @@ func TestPluginDeploymentBoundaryApprovalAndNoEffectRecovery(t *testing.T) {
 
 func pluginDeploymentBoundaryDatabase(t *testing.T, extraActions ...string) (model.Databaser, *model.ExternalOperationGrant) {
 	t.Helper()
+	db := pluginTestDatabase(t)
+	return db, seedPluginOperation(t, db, "acme", extraActions...)
+}
+
+// pluginTestDatabase is a migrated Core database in a schema of its own.
+func pluginTestDatabase(t *testing.T) model.Databaser {
+	t.Helper()
 	dsn := os.Getenv("PLUGIN_TEST_DATABASE_URL")
 	require.NotEmpty(t, dsn)
 	admin, err := sql.Open("postgres", dsn)
@@ -228,8 +235,16 @@ func pluginDeploymentBoundaryDatabase(t *testing.T, extraActions ...string) (mod
 		require.NoError(t, err)
 		require.NoError(t, admin.Close())
 	})
+	return db
+}
+
+// seedPluginOperation creates organization orgID with a project, an
+// Environment and a Module whose baseline and target Versions are published,
+// and an active operation grant of dev.example.workflow there.
+func seedPluginOperation(t *testing.T, db model.Databaser, orgID string, extraActions ...string) *model.ExternalOperationGrant {
+	t.Helper()
 	ctx, actor, now := t.Context(), uuid.New(), time.Now().UTC()
-	org, err := db.CreateOrg(ctx, nil, &model.Org{Id: "acme", CreatedBy: actor, CreatedAt: now, Source: model.OrgSourceInternal, Plan: model.OrgPlanCustom})
+	org, err := db.CreateOrg(ctx, nil, &model.Org{Id: orgID, CreatedBy: actor, CreatedAt: now, Source: model.OrgSourceInternal, Plan: model.OrgPlanCustom})
 	require.NoError(t, err)
 	project, err := db.CreateProject(ctx, nil, &model.Project{OrgId: org.Id, OrgUuid: org.Uuid, Id: "project", DisplayName: "Project", CreatedAt: now, UpdatedAt: now, Status: model.ProjectStatusActive})
 	require.NoError(t, err)
@@ -262,5 +277,5 @@ func pluginDeploymentBoundaryDatabase(t *testing.T, extraActions ...string) (mod
 	command.Intent, command.Action, command.RequestID, command.ExpectedRevision = nil, "activate", "start", grant.Revision
 	grant, err = model.ApplyExternalGrantCommand(ctx, db, command)
 	require.NoError(t, err)
-	return db, grant
+	return grant
 }

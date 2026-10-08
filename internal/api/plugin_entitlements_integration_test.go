@@ -130,11 +130,18 @@ func (f *pluginEntitlementAPIFixture) signGrant(t *testing.T, issuance uuid.UUID
 // signGrantFor signs a grant of this plugin and organization bound to installation.
 func (f *pluginEntitlementAPIFixture) signGrantFor(t *testing.T, installation, issuance uuid.UUID, sequence, expires, grace int64) []byte {
 	t.Helper()
+	return f.signGrantForOrganization(t, installation, f.binding.OrganizationID, issuance, sequence, expires, grace)
+}
+
+// signGrantForOrganization signs a grant of this plugin bound to installation
+// and the organization with UUID organization.
+func (f *pluginEntitlementAPIFixture) signGrantForOrganization(t *testing.T, installation, organization, issuance uuid.UUID, sequence, expires, grace int64) []byte {
+	t.Helper()
 	if sequence < 1 || f.base < 10 || expires < 0 || grace < 0 {
 		t.Fatal("signed grant fixture requires a positive sequence and nonnegative timestamps")
 		return nil
 	}
-	return f.sign(t, map[uint64]any{1: uint64(1), 2: "grant", 3: "development.example", 4: issuance[:], 5: uint64(sequence), 6: f.item.ID, 7: installation[:], 8: f.binding.OrganizationID[:], 9: []string{"feature-a"}, 10: map[string]uint64{}, 11: uint64(f.base - 10), 12: uint64(f.base - 5), 13: uint64(expires), 14: uint64(grace), 15: "development"})
+	return f.sign(t, map[uint64]any{1: uint64(1), 2: "grant", 3: "development.example", 4: issuance[:], 5: uint64(sequence), 6: f.item.ID, 7: installation[:], 8: organization[:], 9: []string{"feature-a"}, 10: map[string]uint64{}, 11: uint64(f.base - 10), 12: uint64(f.base - 5), 13: uint64(expires), 14: uint64(grace), 15: "development"})
 }
 
 // bundle encodes signed grants as an offline entitlement bundle.

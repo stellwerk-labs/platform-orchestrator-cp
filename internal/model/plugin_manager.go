@@ -484,9 +484,6 @@ func PutPluginEnablement(ctx context.Context, tx Tx, installation PluginInstalla
 		ON CONFLICT (plugin_id, org_id) DO UPDATE SET installation_uuid=EXCLUDED.installation_uuid, state=EXCLUDED.state, timezone=EXCLUDED.timezone,
 			approval_policies=EXCLUDED.approval_policies, updated_at=now(), updated_by=EXCLUDED.updated_by`,
 		installation.PluginID, enablement.OrgID, installation.InstallationID, enablement.State, enablement.Timezone, string(policies), actor)
-	if isUniqueViolation(err, "plugin_enablements_installation_uuid_key") {
-		return ErrConflict{Code: "plugin_enablement_limit", Message: "In v1alpha an installation is enabled for exactly one organization."}
-	}
 	if err != nil {
 		return err
 	}

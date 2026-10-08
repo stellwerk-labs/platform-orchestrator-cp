@@ -6,7 +6,7 @@ Date: 2026-10-07.
 ## Context
 
 Plugin installation state decides which plugin backend Core routes to, which
-service identity may act for a plugin, which organization a plugin serves and
+service identity may act for a plugin, which organizations a plugin serves and
 which organization's resource events Core journals. That state needs one
 authority that changes without restarting Core, records who changed what and
 why, and stays correct when several operators and several Core replicas act at
@@ -23,7 +23,7 @@ and never write it.
 | Package | Immutable registration manifest of one plugin version (identity, migration generation, operations, UI contribution, service grants, authorization policies, entitlement declaration), keyed by the SHA-256 of the package manifest. |
 | Installation | Core-assigned immutable installation UUID, served package and the target of a pending upgrade, state (`installed`, `active`, `disabled`, `uninstalled`, `purged`), backend and UI origins, and two IAM platform principals: the plugin's service user and the admission checker. |
 | Status observation | What Core last read from the running plugin's status endpoint. A fact the plugin reports, not operator state. |
-| Enablement | One organization of an installation: `enabled` or `disabled`, IANA timezone, deployment approval policies. In `v1alpha` an installation has exactly one. |
+| Enablement | One organization of an installation: `enabled` or `disabled`, IANA timezone, deployment approval policies. An installation has one per organization it serves. |
 | Registration | The contributions an active installation serves, materialised from its package on activation. A UI route prefix belongs to one installation; operations and capabilities live in the plugin's own namespace. |
 | Audit event | One per committed change, with actor, reason, request ID, idempotency key digest, state before and after. Never updated or deleted. |
 
@@ -88,9 +88,35 @@ At request time Core recognises both identities by equality with the
 installation record: IAM authenticates a platform principal like any service
 user and adds no organization. Enabling, changing and removing an
 organization's enablement never ask IAM about the identities, so the safety
-lever does not depend on IAM. In `v1alpha` an installation is enabled for
-exactly one organization; a second one is refused with
-`409 plugin_enablement_limit`.
+lever does not depend on IAM.
+
+### Several organizations per installation
+
+One installation, with one plugin runtime, one workload binding and one
+platform principal, serves every organization it is enabled for. Each
+enablement keeps its own state, timezone and deployment approval policies;
+an approval in one organization is checked only against that organization's
+policies. Changing or removing one organization's enablement leaves the
+others as they are.
+
+Core keeps the organizations apart where it decides. Every plugin route is
+below `/orgs/{orgId}`, every Core effect re-verifies the enablement of that
+organization in its own transaction, and all Core-side plugin state
+(operation grants, dispatches, Module reservations and receipts, published
+events, journal consumers, entitlement bindings) is keyed by organization and
+plugin. A grant, cursor, Pin receipt or event of one organization is
+therefore not found in another, and a gateway delegation names the
+organization of its request. A licence grant names one organization of the
+installation.
+
+The security statement for `v1alpha`: a compromised plugin reaches every
+organization its installation is enabled for, within the plugin boundary
+(manifest service grants, reads within active operations, dispatch within a
+frozen operation scope, event publication; new operations still need a fresh
+user delegation), and all tenants share the plugin's own database. The
+principal holds no IAM authority in any organization. Disabling one
+organization is the per-organization kill switch; revoking the workload
+binding or disabling the installation stops all of them.
 
 ### Propagation and authority
 
@@ -233,5 +259,9 @@ verification and revisit this decision.
   high-rate path.
 - Plugin releases must keep serving their predecessor's registrations during
   a rolling update, and the operator activates once the runtime rolled out.
-- A downgrade below this schema is refused once an audit event exists, and
-  below the purged state once an installation is purged.
+- A downgrade below this schema is refused once an audit event exists, below
+  the purged state once an installation is purged, and below several
+  organizations per installation while one is enabled for more than one.
+- A plugin that serves several organizations keeps every tenant's rows in its
+  own database apart; Core refuses every effect across organizations, but it
+  cannot see inside the plugin's database.

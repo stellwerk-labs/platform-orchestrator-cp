@@ -79,23 +79,26 @@ type Operation struct {
 // Installation is operator-controlled configuration, not a signed
 // commercial entitlement. Entitlement verification belongs to a separate gate.
 type Installation struct {
-	InstallationID             string                       `json:"installation_id,omitempty"`
-	ManifestSHA256             string                       `json:"manifest_sha256,omitempty"`
-	Entitlement                *EntitlementDeclaration      `json:"entitlement,omitempty"`
-	OrganizationTimezones      map[string]string            `json:"organization_timezones,omitempty"`
-	ID                         string                       `json:"id"`
-	DisplayName                string                       `json:"display_name"`
-	Version                    string                       `json:"version"`
-	Backend                    string                       `json:"backend"`
-	Organizations              map[string]AvailabilityState `json:"organizations"`
-	Capabilities               []string                     `json:"capabilities"`
-	UI                         *UIContribution              `json:"ui,omitempty"`
-	Operations                 []Operation                  `json:"operations"`
-	ServiceUserID              string                       `json:"service_user_id,omitempty"`
-	AdmissionCheckerID         string                       `json:"admission_checker_id,omitempty"`
-	ServiceGrants              []ServiceGrant               `json:"service_grants,omitempty"`
-	AuthorizationPolicies      []AuthorizationPolicy        `json:"authorization_policies,omitempty"`
-	DeploymentApprovalPolicies map[string]string            `json:"deployment_approval_policies,omitempty"`
+	InstallationID        string                       `json:"installation_id,omitempty"`
+	ManifestSHA256        string                       `json:"manifest_sha256,omitempty"`
+	Entitlement           *EntitlementDeclaration      `json:"entitlement,omitempty"`
+	OrganizationTimezones map[string]string            `json:"organization_timezones,omitempty"`
+	ID                    string                       `json:"id"`
+	DisplayName           string                       `json:"display_name"`
+	Version               string                       `json:"version"`
+	Backend               string                       `json:"backend"`
+	Organizations         map[string]AvailabilityState `json:"organizations"`
+	Capabilities          []string                     `json:"capabilities"`
+	UI                    *UIContribution              `json:"ui,omitempty"`
+	Operations            []Operation                  `json:"operations"`
+	ServiceUserID         string                       `json:"service_user_id,omitempty"`
+	AdmissionCheckerID    string                       `json:"admission_checker_id,omitempty"`
+	ServiceGrants         []ServiceGrant               `json:"service_grants,omitempty"`
+	AuthorizationPolicies []AuthorizationPolicy        `json:"authorization_policies,omitempty"`
+	// OrganizationApprovalPolicies maps an organization to its deployment
+	// approval scopes (environment, project) and the owned authorization
+	// policy each requires.
+	OrganizationApprovalPolicies map[string]map[string]string `json:"organization_approval_policies,omitempty"`
 }
 
 // InstallationRegistry serves read decisions (discovery, routing, UI and
@@ -186,8 +189,13 @@ func ValidateInstallation(item Installation, allowDevelopmentHTTP bool) error {
 	if err := ValidateServiceIdentities(manifest, item.ServiceUserID, item.AdmissionCheckerID); err != nil {
 		return err
 	}
-	if err := manifest.ValidateApprovalPolicies(item.DeploymentApprovalPolicies); err != nil {
-		return err
+	for org, policies := range item.OrganizationApprovalPolicies {
+		if _, exists := item.Organizations[org]; !exists {
+			return fmt.Errorf("approval policies must name an installed organization")
+		}
+		if err := manifest.ValidateApprovalPolicies(policies); err != nil {
+			return err
+		}
 	}
 	for org, state := range item.Organizations {
 		if org == "" || strings.ContainsAny(org, "/\\") {

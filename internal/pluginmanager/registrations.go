@@ -71,10 +71,7 @@ func servedInstallation(served model.PluginSnapshotInstallation) (plugins.Instal
 	if err != nil {
 		return plugins.Installation{}, err
 	}
-	item, err := view(served.Installation, manifest)
-	if err != nil {
-		return plugins.Installation{}, err
-	}
+	item := view(served.Installation, manifest)
 	for _, registration := range served.Registrations {
 		if err := applyRegistration(&item, registration); err != nil {
 			return plugins.Installation{}, fmt.Errorf("registration %s %s: %w", registration.Kind, registration.Key, err)
@@ -87,15 +84,14 @@ func servedInstallation(served model.PluginSnapshotInstallation) (plugins.Instal
 }
 
 // view is the registry view of an installation without its contributions.
-func view(installation model.PluginInstallation, manifest plugins.Manifest) (plugins.Installation, error) {
+// Every enablement keeps its own state, timezone and approval policies.
+func view(installation model.PluginInstallation, manifest plugins.Manifest) plugins.Installation {
 	item := plugins.Installation{
 		InstallationID: installation.InstallationID.String(), ManifestSHA256: installation.PackageSHA256, Entitlement: manifest.Entitlement,
 		ID: installation.PluginID, DisplayName: manifest.DisplayName, Version: manifest.Version, Backend: installation.BackendURL,
 		ServiceUserID: installation.ServiceUserID, AdmissionCheckerID: installation.AdmissionCheckerID,
 		Organizations: map[string]plugins.AvailabilityState{}, OrganizationTimezones: map[string]string{},
-	}
-	if len(installation.Organizations) > 1 {
-		return plugins.Installation{}, fmt.Errorf("v1alpha serves exactly one organization per installation")
+		OrganizationApprovalPolicies: map[string]map[string]string{},
 	}
 	for _, enablement := range installation.Organizations {
 		state := plugins.StateNotEnabled
@@ -105,10 +101,10 @@ func view(installation model.PluginInstallation, manifest plugins.Manifest) (plu
 		item.Organizations[enablement.OrgID] = state
 		item.OrganizationTimezones[enablement.OrgID] = enablement.Timezone
 		if len(enablement.ApprovalPolicies) > 0 {
-			item.DeploymentApprovalPolicies = enablement.ApprovalPolicies
+			item.OrganizationApprovalPolicies[enablement.OrgID] = enablement.ApprovalPolicies
 		}
 	}
-	return item, nil
+	return item
 }
 
 func applyRegistration(item *plugins.Installation, registration model.PluginRegistration) error {

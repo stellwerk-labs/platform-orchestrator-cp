@@ -3106,7 +3106,7 @@ type PluginEnablementState string
 
 // PluginEnablementPut defines model for PluginEnablementPut.
 type PluginEnablementPut struct {
-	// ApprovalPolicies Deployment approval scope (environment or project) to an authorization policy the package owns.
+	// ApprovalPolicies Deployment approval scope (environment or project) to an authorization policy the package owns. They apply to approvals in this organization only.
 	ApprovalPolicies *map[string]string       `json:"approval_policies,omitempty"`
 	ExpectedRevision int64                    `json:"expected_revision"`
 	Reason           string                   `json:"reason"`
@@ -3191,8 +3191,10 @@ type PluginInstallation struct {
 	InstallationId openapi_types.UUID            `json:"installation_id"`
 
 	// Observation What Core last read from the running plugin's status endpoint, on activation. Either the report or a failure with its detail.
-	Observation   *PluginStatusObservation `json:"observation,omitempty"`
-	Organizations []PluginEnablement       `json:"organizations"`
+	Observation *PluginStatusObservation `json:"observation,omitempty"`
+
+	// Organizations Every organization the installation is enabled for, ordered by organization ID.
+	Organizations []PluginEnablement `json:"organizations"`
 
 	// PackageSha256 The package Core serves.
 	PackageSha256 string `json:"package_sha256"`

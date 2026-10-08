@@ -59,7 +59,11 @@ func TestRegistrationsServeExactlyThePackageContributions(t *testing.T) {
 	installation := model.PluginInstallation{InstallationID: uuid.New(), PluginID: manifest.ID, PackageSHA256: strings.Repeat("a", 64), State: model.PluginInstallationActive,
 		BackendURL: "https://rollouts.example.test", UIOrigin: "https://rollouts-ui.example.test",
 		ServiceUserID: userid.NewServiceUserTokenId().String(), AdmissionCheckerID: userid.NewServiceUserTokenId().String(),
-		Organizations: []model.PluginEnablement{{OrgID: "acme", State: model.PluginEnablementEnabled, Timezone: "Europe/Berlin", ApprovalPolicies: map[string]string{"environment": "plugin.dev.example.rollouts.approve"}}}}
+		Organizations: []model.PluginEnablement{
+			{OrgID: "acme", State: model.PluginEnablementEnabled, Timezone: "Europe/Berlin", ApprovalPolicies: map[string]string{"environment": "plugin.dev.example.rollouts.approve"}},
+			{OrgID: "beta", State: model.PluginEnablementDisabled, Timezone: "America/New_York", ApprovalPolicies: map[string]string{"project": "plugin.dev.example.rollouts.approve"}},
+			{OrgID: "gamma", State: model.PluginEnablementEnabled, Timezone: "UTC", ApprovalPolicies: map[string]string{}},
+		}}
 	// The database returns registrations ordered by kind and key.
 	slices.SortFunc(rows, func(a, b model.PluginRegistration) int { return strings.Compare(a.Kind+"/"+a.Key, b.Kind+"/"+b.Key) })
 	served, err := servedInstallation(model.PluginSnapshotInstallation{Installation: installation, Package: model.PluginPackage{Manifest: raw}, Registrations: rows})
@@ -68,9 +72,11 @@ func TestRegistrationsServeExactlyThePackageContributions(t *testing.T) {
 	require.Equal(t, installation.InstallationID.String(), served.InstallationID)
 	require.Equal(t, installation.PackageSHA256, served.ManifestSHA256)
 	require.Equal(t, "https://rollouts-ui.example.test", served.UI.Origin, "the UI origin is operator data")
-	require.Equal(t, map[string]plugins.AvailabilityState{"acme": plugins.StateAvailable}, served.Organizations)
-	require.Equal(t, map[string]string{"acme": "Europe/Berlin"}, served.OrganizationTimezones)
-	require.Equal(t, installation.Organizations[0].ApprovalPolicies, served.DeploymentApprovalPolicies)
+	require.Equal(t, map[string]plugins.AvailabilityState{"acme": plugins.StateAvailable, "beta": plugins.StateNotEnabled, "gamma": plugins.StateAvailable}, served.Organizations,
+		"one installation serves every organization it is enabled for, each in its own state")
+	require.Equal(t, map[string]string{"acme": "Europe/Berlin", "beta": "America/New_York", "gamma": "UTC"}, served.OrganizationTimezones)
+	require.Equal(t, map[string]map[string]string{"acme": installation.Organizations[0].ApprovalPolicies, "beta": installation.Organizations[1].ApprovalPolicies},
+		served.OrganizationApprovalPolicies, "approval policies stay with their organization")
 	served.UI.Origin = ""
 	sortedManifest := manifest
 	sortedManifest.Capabilities = []string{"plugin.dev.example.rollouts.approve", "plugin.dev.example.rollouts.read"}
@@ -99,9 +105,11 @@ func TestAvailabilityIsDerivedFromInstallationAndEnablement(t *testing.T) {
 		require.Equal(t, test.want, served.Organizations["acme"], "%s installation, %s enablement", test.installation, test.enablement)
 	}
 	twoOrganizations := model.PluginInstallation{InstallationID: uuid.New(), PluginID: manifest.ID, State: model.PluginInstallationActive,
-		Organizations: []model.PluginEnablement{{OrgID: "acme"}, {OrgID: "beta"}}}
-	_, err = servedInstallation(model.PluginSnapshotInstallation{Installation: twoOrganizations, Package: model.PluginPackage{Manifest: raw}, Registrations: rows})
-	require.ErrorContains(t, err, "exactly one organization", "v1alpha never serves a second organization")
+		Organizations: []model.PluginEnablement{{OrgID: "acme", State: model.PluginEnablementEnabled}, {OrgID: "beta", State: model.PluginEnablementDisabled}}}
+	served, err := servedInstallation(model.PluginSnapshotInstallation{Installation: twoOrganizations, Package: model.PluginPackage{Manifest: raw}, Registrations: rows})
+	require.NoError(t, err)
+	require.Equal(t, map[string]plugins.AvailabilityState{"acme": plugins.StateAvailable, "beta": plugins.StateNotEnabled}, served.Organizations,
+		"disabling one organization leaves the other available")
 	_, err = servedInstallation(model.PluginSnapshotInstallation{Installation: twoOrganizations, Package: model.PluginPackage{Manifest: raw}, Registrations: []model.PluginRegistration{{Kind: "hook", Key: "x", Definition: json.RawMessage(`{}`)}}})
 	require.Error(t, err, "an unknown registration kind is never served")
 }

@@ -248,9 +248,9 @@ func (s *Server) authorizePluginDispatchApproval(ctx context.Context, item plugi
 	if dispatch.Approval == nil || dispatch.ApprovedPins == nil || len(dispatch.ApprovedPins) != len(dispatch.TargetVersions) {
 		return pluginBoundaryError(403, "plugin_approval_invalid", "Approval must cover every exact Module target and Pin activation boundary.")
 	}
-	permission, exists := item.DeploymentApprovalPolicies[dispatch.Approval.Scope]
+	permission, exists := item.OrganizationApprovalPolicies[dispatch.OrgID][dispatch.Approval.Scope]
 	if !exists {
-		return pluginBoundaryError(403, "plugin_approval_invalid", "The installation does not declare this approval scope.")
+		return pluginBoundaryError(403, "plugin_approval_invalid", "The installation's enablement for this organization does not declare this approval scope.")
 	}
 	check := environmentCheck(dispatch.EnvironmentUUID, permission)
 	if dispatch.Approval.Scope == "project" {

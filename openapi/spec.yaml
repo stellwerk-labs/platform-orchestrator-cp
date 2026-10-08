@@ -206,7 +206,7 @@ paths:
     put:
       operationId: putPluginEnablement
       summary: Enable or disable an active installation for an organization.
-      description: Requires plugin_manager_write. In v1alpha an installation is enabled for exactly one organization; a second organization is refused with 409 plugin_enablement_limit. The installation's identities belong to no organization, so enabling, changing and removing an enablement never ask IAM about them. A disabled enablement keeps the plugin safety-only. Enabling a resource event subscriber starts the organization's resource event journal in the same transaction. Every Core effect re-verifies the enablement in its own transaction.
+      description: Requires plugin_manager_write. One installation serves every organization it is enabled for, each with its own state, timezone and deployment approval policies; changing one organization's enablement leaves the others as they are. The installation's identities belong to no organization, so enabling, changing and removing an enablement never ask IAM about them. A disabled enablement keeps the plugin safety-only in that organization. Enabling a resource event subscriber starts the organization's resource event journal in the same transaction. Every Core effect re-verifies the enablement in its own transaction.
       tags: [Plugin Manager]
       security: [{userIdHeader: []}]
       parameters:
@@ -3585,7 +3585,7 @@ components:
         timezone: {type: string, description: IANA timezone of the organization for calendar policies. Omitted means UTC.}
         approval_policies:
           type: object
-          description: Deployment approval scope (environment or project) to an authorization policy the package owns.
+          description: Deployment approval scope (environment or project) to an authorization policy the package owns. They apply to approvals in this organization only.
           additionalProperties: {type: string}
     PluginInstallation:
       type: object
@@ -3611,6 +3611,7 @@ components:
         admission_checker_id: {type: string, format: uuid}
         organizations:
           type: array
+          description: Every organization the installation is enabled for, ordered by organization ID.
           items: {$ref: '#/components/schemas/PluginEnablement'}
         created_at: {type: string, format: date-time}
         created_by: {type: string, format: uuid}
