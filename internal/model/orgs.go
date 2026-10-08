@@ -118,13 +118,23 @@ func (d *databaser) CreateOrg(ctx context.Context, optionalTx Tx, request *Org) 
 	return &ret, nil
 }
 
+// DeleteOrg deletes an organization nothing refers to. The journal state of
+// an organization without journal history refers to nothing else and goes
+// with it; journal history blocks the deletion.
 func (d *databaser) DeleteOrg(ctx context.Context, optionalTx Tx, id string) error {
-	if res, err := d.txOrDb(optionalTx).ExecContext(ctx, `DELETE FROM orgs WHERE id = $1`, id); err != nil {
-		return errors.Wrap(err, "failed to delete organization")
-	} else if rowsAffected, _ := res.RowsAffected(); rowsAffected == 0 {
-		return NewErrNotFound("organization not found")
-	}
-	return nil
+	_, err := inTransaction(ctx, d, optionalTx, func(tx Tx) (struct{}, error) {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM extension_resource_event_journal_state s WHERE s.org_id = $1
+			AND NOT EXISTS (SELECT 1 FROM extension_resource_event_heads h WHERE h.org_id = s.org_id)`, id); err != nil {
+			return struct{}{}, errors.Wrap(err, "failed to delete the organization's empty journal state")
+		}
+		if res, err := tx.ExecContext(ctx, `DELETE FROM orgs WHERE id = $1`, id); err != nil {
+			return struct{}{}, errors.Wrap(err, "failed to delete organization")
+		} else if rowsAffected, _ := res.RowsAffected(); rowsAffected == 0 {
+			return struct{}{}, NewErrNotFound("organization not found")
+		}
+		return struct{}{}, nil
+	})
+	return err
 }
 
 type UpdateOrgRequest struct {

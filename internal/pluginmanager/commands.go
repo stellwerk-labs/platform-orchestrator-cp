@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"maps"
 	"regexp"
+	"slices"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -46,7 +47,12 @@ type Installation struct {
 	// Diagnostic explains why the plugin's last status does not prove the
 	// package Core is to serve.
 	Diagnostic *Diagnostic `json:"diagnostic,omitempty"`
-	Revision   int64       `json:"revision"`
+	// PendingOrganizations are the active organizations without an
+	// enablement while the installation serves all organizations: Core could
+	// not enable them when they were created. Setting mode all again enables
+	// them.
+	PendingOrganizations []string `json:"pending_organizations,omitempty"`
+	Revision             int64    `json:"revision"`
 }
 
 // BundleImport reports an entitlement bundle import.
@@ -159,6 +165,11 @@ func describe(ctx context.Context, tx model.Tx, installation model.PluginInstall
 		result.Availability = plugins.StateNotInstalled
 		return result, nil
 	}
+	pending, err := pendingOrganizations(ctx, tx, installation)
+	if err != nil {
+		return result, err
+	}
+	result.PendingOrganizations = pending
 	if installation.Observation == nil {
 		return result, nil
 	}
@@ -456,6 +467,9 @@ func uninstall(ctx context.Context, tx model.Tx, installation *model.PluginInsta
 		}
 	}
 	installation.Organizations = []model.PluginEnablement{}
+	// Opt-outs go with the enablements: a reinstalled installation starts
+	// with the operator choosing again.
+	installation.OrganizationMode = model.PluginOrganizationsSelected
 	if err := model.ReplacePluginRegistrations(ctx, tx, *installation, nil); err != nil {
 		return err
 	}
@@ -573,6 +587,11 @@ func (m *Manager) validateServed(installation model.PluginInstallation, manifest
 	if err := plugins.ValidateInstallation(item, m.allowDevelopmentHTTP); err != nil {
 		return model.ErrConflict{Code: "plugin_installation_incomplete", Message: "The installation cannot be activated: " + err.Error()}
 	}
+	// Core creates enablements with the defaults on its own later; they
+	// must hold for the served package too.
+	if err := manifest.ValidateApprovalPolicies(installation.OrganizationDefaults.ApprovalPolicies); err != nil {
+		return model.ErrConflict{Code: "plugin_installation_incomplete", Message: "The installation cannot be activated: default approval policies: " + err.Error()}
+	}
 	return nil
 }
 
@@ -629,7 +648,9 @@ func (m *Manager) PutEnablement(ctx context.Context, command Command, id uuid.UU
 
 // RemoveEnablement removes an organization's enablement. Its resource event
 // journal pauses in the same transaction and later resumes with a gap.
-// Removing an absent enablement changes nothing.
+// Removing an absent enablement changes nothing. An installation that serves
+// all organizations keeps an enablement for every organization; the
+// organization opts out by a disabled one.
 func (m *Manager) RemoveEnablement(ctx context.Context, command Command, id uuid.UUID, org string) (Installation, error) {
 	var result Installation
 	err := m.execute(ctx, command, "plugin_enablement.remove", enablementPayload{InstallationID: id, OrgID: org},
@@ -637,6 +658,9 @@ func (m *Manager) RemoveEnablement(ctx context.Context, command Command, id uuid
 			before, _, err := m.lockInstallation(ctx, tx, id)
 			if err != nil {
 				return nil, err
+			}
+			if before.OrganizationMode == model.PluginOrganizationsAll && slices.ContainsFunc(before.Organizations, func(e model.PluginEnablement) bool { return e.OrgID == org }) {
+				return nil, model.ErrConflict{Code: "plugin_serves_all_organizations", Message: "The installation serves all organizations. Disable the organization's enablement to opt it out, or set the organization mode to selected first."}
 			}
 			deleted, err := model.DeletePluginEnablement(ctx, tx, before.PluginID, org)
 			if err != nil || !deleted {

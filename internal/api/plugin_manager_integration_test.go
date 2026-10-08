@@ -17,6 +17,7 @@ import (
 	echomiddleware "github.com/labstack/echo/v4/middleware"
 	"github.com/stellwerk-labs/golib/hecho"
 	"github.com/stellwerk-labs/golib/herrors"
+	"github.com/stellwerk-labs/golib/hmessaging"
 	"github.com/stellwerk-labs/golib/hstandardoutbox"
 	iamauthz "github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
 	iamapi "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
@@ -199,7 +200,8 @@ func pluginManagerServer(t *testing.T, db model.Databaser, iam *iamPeer) *Server
 	registry := &plugins.InstallationRegistry{}
 	manager := testPluginManager(t, db, registry, nil, iam)
 	require.NoError(t, manager.Refresh(t.Context()))
-	return &Server{Database: db, IamClient: iam.client, Plugins: registry, PluginGateway: &plugins.Gateway{Registry: registry}, PluginManager: manager}
+	return &Server{Database: db, IamClient: iam.client, Plugins: registry, PluginGateway: &plugins.Gateway{Registry: registry}, PluginManager: manager,
+		Publisher: new(hmessaging.RecordingPublisher)}
 }
 
 func workflowPlugin(grant *model.ExternalOperationGrant, actions ...string) plugins.Installation {
@@ -238,6 +240,7 @@ func operatorRoutes(installation uuid.UUID, org string) []operatorRoute {
 		{http.MethodPost, path + "/actions/reinstall", true, command(0, "r")},
 		{http.MethodPost, path + "/upgrade", true, PluginInstallationUpgrade{Reason: "r", PackageSha256: sha256Hex([]byte("m"))}},
 		{http.MethodDelete, path, true, command(0, "r")},
+		{http.MethodPut, path + "/organization-mode", true, PluginOrganizationModePut{Reason: "r", Mode: PluginOrganizationModeAll}},
 		{http.MethodPut, path + "/organizations/" + org, true, PluginEnablementPut{Reason: "r", State: PluginEnablementPutStateDisabled}},
 		{http.MethodDelete, path + "/organizations/" + org, true, command(0, "r")},
 		{http.MethodPost, "/plugin-entitlement-bundles", true, PluginEntitlementBundleImportRequest{Reason: "r", Bundle: bundle}},

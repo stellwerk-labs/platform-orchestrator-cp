@@ -255,6 +255,18 @@ func (s *Server) PurgePluginInstallation(ctx context.Context, request PurgePlugi
 	return pluginInstallationResult[PurgePluginInstallation200JSONResponse](s.PluginManager.Transition(ctx, command, request.InstallationId, pluginmanager.ActionPurge))
 }
 
+func (s *Server) SetPluginOrganizationMode(ctx context.Context, request SetPluginOrganizationModeRequestObject) (SetPluginOrganizationModeResponseObject, error) {
+	if request.Body == nil {
+		return nil, pluginBoundaryError(400, "plugin_manager_request_invalid", "An organization mode is required.")
+	}
+	command, err := s.pluginManagerCommand(ctx, request.Params.IdempotencyKey, request.Body.ExpectedRevision, request.Body.Reason)
+	if err != nil {
+		return nil, err
+	}
+	return pluginInstallationResult[SetPluginOrganizationMode200JSONResponse](s.PluginManager.SetOrganizationMode(ctx, command, request.InstallationId, string(request.Body.Mode),
+		ref.DerefOr(request.Body.DefaultTimezone, ""), ref.DerefOr(request.Body.DefaultApprovalPolicies, map[string]string{})))
+}
+
 func (s *Server) PutPluginEnablement(ctx context.Context, request PutPluginEnablementRequestObject) (PutPluginEnablementResponseObject, error) {
 	if request.Body == nil {
 		return nil, pluginBoundaryError(400, "plugin_manager_request_invalid", "An enablement is required.")

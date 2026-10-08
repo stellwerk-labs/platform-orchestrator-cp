@@ -47,9 +47,13 @@ type iamPeer struct {
 	// catalogueReads counts reads of organizations' permissions.
 	catalogueReads atomic.Int32
 	// lookupDown, principalsDown and catalogueDown make binding, principal
-	// and capability requests fail as if IAM were unavailable.
-	lookupDown, principalsDown, catalogueDown atomic.Bool
+	// and capability requests fail as if IAM were unavailable;
+	// membershipsDown does so for adding an organization's founder.
+	lookupDown, principalsDown, catalogueDown, membershipsDown atomic.Bool
 }
+
+// founderRole is the Admin role IAM creates in every new organization.
+var founderRole = iamapi.Role{Id: uuid.MustParse("0199a0c1-1d6e-72f1-8000-0000000000ad"), DisplayName: "Admin"}
 
 // iamPermission is one permission of IAM's own catalogue, which every
 // organization lists before the plugin capabilities.
@@ -179,6 +183,20 @@ func (p *iamPeer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		p.replacements[org]++
 		p.mu.Unlock()
 		w.WriteHeader(http.StatusNoContent)
+	case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/users/") && strings.HasSuffix(r.URL.Path, "/memberships"):
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(iamapi.UserMembershipPage{Items: []iamapi.UserMembership{}})
+	case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/orgs/") && strings.HasSuffix(r.URL.Path, "/roles"):
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(iamapi.RolePage{Items: []iamapi.Role{founderRole}})
+	case r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/internal/orgs/") && strings.HasSuffix(r.URL.Path, "/memberships"):
+		if p.membershipsDown.Load() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{}`))
 	default:
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}

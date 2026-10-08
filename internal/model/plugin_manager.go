@@ -28,6 +28,14 @@ const (
 	PluginEnablementDisabled      = "disabled"
 )
 
+// Organization modes of an installation. With selected the operator enables
+// each organization; with all Core enables every organization, existing and
+// created later, unless the operator disabled it.
+const (
+	PluginOrganizationsSelected = "selected"
+	PluginOrganizationsAll      = "all"
+)
+
 // Registration kinds materialised from a package on activation.
 const (
 	PluginRegistrationCapability          = "capability"
@@ -54,17 +62,22 @@ type PluginInstallation struct {
 	PackageSHA256  string    `json:"package_sha256"`
 	// TargetPackageSHA256 is the package of a pending upgrade. Core serves
 	// PackageSHA256 until an activation reads the target from the plugin.
-	TargetPackageSHA256 string             `json:"target_package_sha256,omitempty"`
-	State               string             `json:"state"`
-	BackendURL          string             `json:"backend_url"`
-	UIOrigin            string             `json:"ui_origin,omitempty"`
-	ServiceUserID       string             `json:"service_user_id,omitempty"`
-	AdmissionCheckerID  string             `json:"admission_checker_id,omitempty"`
-	Organizations       []PluginEnablement `json:"organizations"`
-	CreatedAt           time.Time          `json:"created_at"`
-	CreatedBy           uuid.UUID          `json:"created_by"`
-	UpdatedAt           time.Time          `json:"updated_at"`
-	UpdatedBy           uuid.UUID          `json:"updated_by"`
+	TargetPackageSHA256 string `json:"target_package_sha256,omitempty"`
+	State               string `json:"state"`
+	BackendURL          string `json:"backend_url"`
+	UIOrigin            string `json:"ui_origin,omitempty"`
+	ServiceUserID       string `json:"service_user_id,omitempty"`
+	AdmissionCheckerID  string `json:"admission_checker_id,omitempty"`
+	// OrganizationMode is selected or all.
+	OrganizationMode string `json:"organization_mode"`
+	// OrganizationDefaults are the timezone and approval policies of every
+	// enablement Core creates on its own in mode all.
+	OrganizationDefaults PluginOrganizationDefaults `json:"organization_defaults"`
+	Organizations        []PluginEnablement         `json:"organizations"`
+	CreatedAt            time.Time                  `json:"created_at"`
+	CreatedBy            uuid.UUID                  `json:"created_by"`
+	UpdatedAt            time.Time                  `json:"updated_at"`
+	UpdatedBy            uuid.UUID                  `json:"updated_by"`
 	// Observation is what Core last read from the running plugin's status.
 	Observation *PluginStatusObservation `json:"observation,omitempty"`
 }
@@ -78,6 +91,13 @@ type PluginStatusObservation struct {
 	InstallationID      *uuid.UUID `json:"installation_id,omitempty"`
 	PackageSHA256       string     `json:"package_sha256,omitempty"`
 	MigrationGeneration *int64     `json:"migration_generation,omitempty"`
+}
+
+// PluginOrganizationDefaults configure the enablements Core creates on its
+// own. Changing them changes no existing enablement.
+type PluginOrganizationDefaults struct {
+	Timezone         string            `json:"timezone"`
+	ApprovalPolicies map[string]string `json:"approval_policies"`
 }
 
 // PluginEnablement enables an installation for one organization.
@@ -192,8 +212,8 @@ func ExecutePluginManagerCommand(ctx context.Context, db Databaser, command Plug
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	var revision int64
-	if err := tx.QueryRowContext(ctx, `SELECT revision FROM plugin_manager_state FOR UPDATE`).Scan(&revision); err != nil {
+	revision, err := LockPluginManager(ctx, tx)
+	if err != nil {
 		return nil, err
 	}
 	var fingerprint string
@@ -264,6 +284,24 @@ func auditJSON(value any) (sql.NullString, error) {
 	return sql.NullString{String: string(encoded), Valid: err == nil}, err
 }
 
+// LockPluginManager serialises a change Core makes on its own with every
+// operator command until the transaction ends, and returns the revision.
+func LockPluginManager(ctx context.Context, tx Tx) (int64, error) {
+	var revision int64
+	err := tx.QueryRowContext(ctx, `SELECT revision FROM plugin_manager_state FOR UPDATE`).Scan(&revision)
+	return revision, err
+}
+
+// RecordPluginManagerSystemChange records a change Core made on its own, in
+// a transaction that holds LockPluginManager at revision: the next revision
+// and one audit row. Where an operator command's audit shows the digest of
+// its idempotency key, this one shows the digest of cause, which names the
+// event that made Core act. It returns the new revision.
+func RecordPluginManagerSystemChange(ctx context.Context, tx Tx, revision int64, actor uuid.UUID, cause, reason string, change PluginManagerChange) (int64, error) {
+	revision++
+	return revision, recordPluginManagerChange(ctx, tx, revision, PluginManagerCommand{Actor: actor}, reason, sha256.Sum256([]byte(cause)), change)
+}
+
 // PluginManagerRevision returns the revision the transaction observes.
 func PluginManagerRevision(ctx context.Context, tx Tx) (int64, error) {
 	var revision int64
@@ -319,7 +357,8 @@ func InsertPluginPackage(ctx context.Context, tx Tx, item PluginPackage) error {
 }
 
 const pluginInstallationColumns = `i.installation_uuid, i.plugin_id, i.package_sha256, COALESCE(i.target_package_sha256,''), i.state, i.backend_url, COALESCE(i.ui_origin,''),
-	COALESCE(i.service_user_id::text,''), COALESCE(i.admission_checker_id::text,''), i.created_at, i.created_by, i.updated_at, i.updated_by,
+	COALESCE(i.service_user_id::text,''), COALESCE(i.admission_checker_id::text,''), i.organization_mode, i.default_timezone, i.default_approval_policies,
+	i.created_at, i.created_by, i.updated_at, i.updated_by,
 	o.observed_at, COALESCE(o.failure,''), COALESCE(o.detail,''), o.reported_installation_uuid, COALESCE(o.reported_package_sha256,''),
 	o.reported_migration_generation
 	FROM plugin_installations i LEFT JOIN plugin_status_observations o ON o.installation_uuid=i.installation_uuid`
@@ -330,11 +369,19 @@ func scanPluginInstallation(row interface{ Scan(...any) error }) (PluginInstalla
 	var observation PluginStatusObservation
 	var reportedInstallation uuid.NullUUID
 	var reportedGeneration sql.NullInt64
+	var defaultPolicies []byte
 	err := row.Scan(&item.InstallationID, &item.PluginID, &item.PackageSHA256, &item.TargetPackageSHA256, &item.State, &item.BackendURL, &item.UIOrigin,
-		&item.ServiceUserID, &item.AdmissionCheckerID, &item.CreatedAt, &item.CreatedBy, &item.UpdatedAt, &item.UpdatedBy,
+		&item.ServiceUserID, &item.AdmissionCheckerID, &item.OrganizationMode, &item.OrganizationDefaults.Timezone, &defaultPolicies,
+		&item.CreatedAt, &item.CreatedBy, &item.UpdatedAt, &item.UpdatedBy,
 		&observedAt, &observation.Failure, &observation.Detail, &reportedInstallation, &observation.PackageSHA256, &reportedGeneration)
-	if err != nil || !observedAt.Valid {
+	if err != nil {
 		return item, err
+	}
+	if err := json.Unmarshal(defaultPolicies, &item.OrganizationDefaults.ApprovalPolicies); err != nil {
+		return item, err
+	}
+	if !observedAt.Valid {
+		return item, nil
 	}
 	observation.ObservedAt = observedAt.Time
 	if reportedInstallation.Valid {
@@ -479,16 +526,70 @@ func InsertPluginInstallation(ctx context.Context, tx Tx, item PluginInstallatio
 	return err
 }
 
-// UpdatePluginInstallation stores the state, packages and identities of a
-// locked installation.
+// UpdatePluginInstallation stores the state, packages, identities and
+// organization mode of a locked installation.
 func UpdatePluginInstallation(ctx context.Context, tx Tx, item PluginInstallation, actor uuid.UUID) error {
-	_, err := tx.ExecContext(ctx, `UPDATE plugin_installations SET state=$2, package_sha256=$3, target_package_sha256=$4, service_user_id=$5,
-		admission_checker_id=$6, updated_at=now(), updated_by=$7
+	policies, err := json.Marshal(item.OrganizationDefaults.ApprovalPolicies)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `UPDATE plugin_installations SET state=$2, package_sha256=$3, target_package_sha256=$4, service_user_id=$5,
+		admission_checker_id=$6, organization_mode=$7, default_timezone=$8, default_approval_policies=$9, updated_at=now(), updated_by=$10
 		WHERE installation_uuid=$1`, item.InstallationID, item.State, item.PackageSHA256,
 		sql.NullString{String: item.TargetPackageSHA256, Valid: item.TargetPackageSHA256 != ""},
 		sql.NullString{String: item.ServiceUserID, Valid: item.ServiceUserID != ""},
-		sql.NullString{String: item.AdmissionCheckerID, Valid: item.AdmissionCheckerID != ""}, actor)
+		sql.NullString{String: item.AdmissionCheckerID, Valid: item.AdmissionCheckerID != ""},
+		item.OrganizationMode, item.OrganizationDefaults.Timezone, string(policies), actor)
 	return err
+}
+
+// PluginInstallationsServingAllOrganizations returns the installations in
+// organization mode all, in a stable order.
+func PluginInstallationsServingAllOrganizations(ctx context.Context, tx Tx) ([]uuid.UUID, error) {
+	return pluginInstallationIDs(ctx, tx, `SELECT installation_uuid FROM plugin_installations WHERE organization_mode=$1 ORDER BY installation_uuid`, PluginOrganizationsAll)
+}
+
+// PluginInstallationsEnabledFor returns the installations with an
+// enablement, in any state, for the organization, in a stable order.
+func PluginInstallationsEnabledFor(ctx context.Context, tx Tx, org string) ([]uuid.UUID, error) {
+	return pluginInstallationIDs(ctx, tx, `SELECT installation_uuid FROM plugin_enablements WHERE org_id=$1 ORDER BY installation_uuid`, org)
+}
+
+func pluginInstallationIDs(ctx context.Context, tx Tx, query string, args ...any) ([]uuid.UUID, error) {
+	rows, err := tx.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	ids := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// PluginOrganizationsWithoutEnablement returns the active organizations that
+// have no enablement of the plugin, ordered by ID.
+func PluginOrganizationsWithoutEnablement(ctx context.Context, tx Tx, pluginID string) ([]string, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT o.id FROM orgs o WHERE o.status=$2
+		AND NOT EXISTS (SELECT 1 FROM plugin_enablements e WHERE e.plugin_id=$1 AND e.org_id=o.id) ORDER BY o.id`, pluginID, OrgStatusActive)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	orgs := []string{}
+	for rows.Next() {
+		var org string
+		if err := rows.Scan(&org); err != nil {
+			return nil, err
+		}
+		orgs = append(orgs, org)
+	}
+	return orgs, rows.Err()
 }
 
 // RecordPluginStatusObservation keeps what Core read from the installation's

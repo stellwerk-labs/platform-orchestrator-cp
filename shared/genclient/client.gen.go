@@ -899,6 +899,24 @@ func (e PluginOperationGrantState) Valid() bool {
 	}
 }
 
+// Defines values for PluginOrganizationMode.
+const (
+	PluginOrganizationModeAll      PluginOrganizationMode = "all"
+	PluginOrganizationModeSelected PluginOrganizationMode = "selected"
+)
+
+// Valid indicates whether the value is a known member of the PluginOrganizationMode enum.
+func (e PluginOrganizationMode) Valid() bool {
+	switch e {
+	case PluginOrganizationModeAll:
+		return true
+	case PluginOrganizationModeSelected:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PluginPinOperationReceiptAction.
 const (
 	Begin     PluginPinOperationReceiptAction = "begin"
@@ -3235,12 +3253,21 @@ type PluginInstallation struct {
 	// Observation What Core last read from the running plugin's status endpoint, on activation. Either the report or a failure with its detail.
 	Observation *PluginStatusObservation `json:"observation,omitempty"`
 
+	// OrganizationDefaults The timezone and approval policies of every enablement Core creates on its own. Changing them changes no existing enablement.
+	OrganizationDefaults PluginOrganizationDefaults `json:"organization_defaults"`
+
+	// OrganizationMode selected while the operator enables each organization; all while Core enables every organization, existing and created later, except those whose enablement is disabled.
+	OrganizationMode PluginOrganizationMode `json:"organization_mode"`
+
 	// Organizations Every organization the installation is enabled for, ordered by organization ID.
 	Organizations []PluginEnablement `json:"organizations"`
 
 	// PackageSha256 The package Core serves.
 	PackageSha256 string `json:"package_sha256"`
-	PluginId      string `json:"plugin_id"`
+
+	// PendingOrganizations Only in organization mode all, absent when empty. The active organizations without an enablement, ordered by ID, which Core could not enable when they were created because the plugin host was off. Setting mode all again enables them.
+	PendingOrganizations *[]string `json:"pending_organizations,omitempty"`
+	PluginId             string    `json:"plugin_id"`
 
 	// Revision The Plugin Manager revision this response reflects.
 	Revision      *int64                  `json:"revision,omitempty"`
@@ -3439,6 +3466,29 @@ type PluginOperationIntent struct {
 
 	// TargetVersions Exact Module UUID to immutable target Version UUID binding, with exactly one entry for every frozen Module.
 	TargetVersions map[string]openapi_types.UUID `json:"target_versions"`
+}
+
+// PluginOrganizationDefaults The timezone and approval policies of every enablement Core creates on its own. Changing them changes no existing enablement.
+type PluginOrganizationDefaults struct {
+	ApprovalPolicies map[string]string `json:"approval_policies"`
+	Timezone         string            `json:"timezone"`
+}
+
+// PluginOrganizationMode selected while the operator enables each organization; all while Core enables every organization, existing and created later, except those whose enablement is disabled.
+type PluginOrganizationMode string
+
+// PluginOrganizationModePut defines model for PluginOrganizationModePut.
+type PluginOrganizationModePut struct {
+	// DefaultApprovalPolicies Deployment approval scope (environment or project) to an authorization policy the package owns, for every enablement Core creates. Omitted means none.
+	DefaultApprovalPolicies *map[string]string `json:"default_approval_policies,omitempty"`
+
+	// DefaultTimezone IANA timezone of every enablement Core creates. Omitted means UTC.
+	DefaultTimezone  *string `json:"default_timezone,omitempty"`
+	ExpectedRevision int64   `json:"expected_revision"`
+
+	// Mode selected while the operator enables each organization; all while Core enables every organization, existing and created later, except those whose enablement is disabled.
+	Mode   PluginOrganizationMode `json:"mode"`
+	Reason string                 `json:"reason"`
 }
 
 // PluginPackage defines model for PluginPackage.
@@ -4543,6 +4593,12 @@ type SetPluginInstallationIdentityParams struct {
 	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
 }
 
+// SetPluginOrganizationModeParams defines parameters for SetPluginOrganizationMode.
+type SetPluginOrganizationModeParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
 // RemovePluginEnablementParams defines parameters for RemovePluginEnablement.
 type RemovePluginEnablementParams struct {
 	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
@@ -4749,6 +4805,9 @@ type TransitionPluginInstallationJSONRequestBody = PluginManagerCommand
 
 // SetPluginInstallationIdentityJSONRequestBody defines body for SetPluginInstallationIdentity for application/json ContentType.
 type SetPluginInstallationIdentityJSONRequestBody = PluginInstallationIdentity
+
+// SetPluginOrganizationModeJSONRequestBody defines body for SetPluginOrganizationMode for application/json ContentType.
+type SetPluginOrganizationModeJSONRequestBody = PluginOrganizationModePut
 
 // RemovePluginEnablementJSONRequestBody defines body for RemovePluginEnablement for application/json ContentType.
 type RemovePluginEnablementJSONRequestBody = PluginManagerCommand
@@ -5844,6 +5903,11 @@ type ClientInterface interface {
 	SetPluginInstallationIdentityWithBody(ctx context.Context, installationId InstallationIdPathParam, params *SetPluginInstallationIdentityParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	SetPluginInstallationIdentity(ctx context.Context, installationId InstallationIdPathParam, params *SetPluginInstallationIdentityParams, body SetPluginInstallationIdentityJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetPluginOrganizationModeWithBody request with any body
+	SetPluginOrganizationModeWithBody(ctx context.Context, installationId InstallationIdPathParam, params *SetPluginOrganizationModeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	SetPluginOrganizationMode(ctx context.Context, installationId InstallationIdPathParam, params *SetPluginOrganizationModeParams, body SetPluginOrganizationModeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RemovePluginEnablementWithBody request with any body
 	RemovePluginEnablementWithBody(ctx context.Context, installationId InstallationIdPathParam, orgId OrgIdPathParam, params *RemovePluginEnablementParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -8115,6 +8179,30 @@ func (c *Client) SetPluginInstallationIdentityWithBody(ctx context.Context, inst
 
 func (c *Client) SetPluginInstallationIdentity(ctx context.Context, installationId InstallationIdPathParam, params *SetPluginInstallationIdentityParams, body SetPluginInstallationIdentityJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSetPluginInstallationIdentityRequest(c.Server, installationId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SetPluginOrganizationModeWithBody(ctx context.Context, installationId InstallationIdPathParam, params *SetPluginOrganizationModeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetPluginOrganizationModeRequestWithBody(c.Server, installationId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SetPluginOrganizationMode(ctx context.Context, installationId InstallationIdPathParam, params *SetPluginOrganizationModeParams, body SetPluginOrganizationModeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetPluginOrganizationModeRequest(c.Server, installationId, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -15689,6 +15777,66 @@ func NewSetPluginInstallationIdentityRequestWithBody(server string, installation
 	return req, nil
 }
 
+// NewSetPluginOrganizationModeRequest calls the generic SetPluginOrganizationMode builder with application/json body
+func NewSetPluginOrganizationModeRequest(server string, installationId InstallationIdPathParam, params *SetPluginOrganizationModeParams, body SetPluginOrganizationModeJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetPluginOrganizationModeRequestWithBody(server, installationId, params, "application/json", bodyReader)
+}
+
+// NewSetPluginOrganizationModeRequestWithBody generates requests for SetPluginOrganizationMode with any type of body
+func NewSetPluginOrganizationModeRequestWithBody(server string, installationId InstallationIdPathParam, params *SetPluginOrganizationModeParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "installationId", installationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/plugin-installations/%s/organization-mode", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Idempotency-Key", headerParam0)
+
+	}
+
+	return req, nil
+}
+
 // NewRemovePluginEnablementRequest calls the generic RemovePluginEnablement builder with application/json body
 func NewRemovePluginEnablementRequest(server string, installationId InstallationIdPathParam, orgId OrgIdPathParam, params *RemovePluginEnablementParams, body RemovePluginEnablementJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -16508,6 +16656,11 @@ type ClientWithResponsesInterface interface {
 	SetPluginInstallationIdentityWithBodyWithResponse(ctx context.Context, installationId InstallationIdPathParam, params *SetPluginInstallationIdentityParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetPluginInstallationIdentityResponse, error)
 
 	SetPluginInstallationIdentityWithResponse(ctx context.Context, installationId InstallationIdPathParam, params *SetPluginInstallationIdentityParams, body SetPluginInstallationIdentityJSONRequestBody, reqEditors ...RequestEditorFn) (*SetPluginInstallationIdentityResponse, error)
+
+	// SetPluginOrganizationModeWithBodyWithResponse request with any body
+	SetPluginOrganizationModeWithBodyWithResponse(ctx context.Context, installationId InstallationIdPathParam, params *SetPluginOrganizationModeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetPluginOrganizationModeResponse, error)
+
+	SetPluginOrganizationModeWithResponse(ctx context.Context, installationId InstallationIdPathParam, params *SetPluginOrganizationModeParams, body SetPluginOrganizationModeJSONRequestBody, reqEditors ...RequestEditorFn) (*SetPluginOrganizationModeResponse, error)
 
 	// RemovePluginEnablementWithBodyWithResponse request with any body
 	RemovePluginEnablementWithBodyWithResponse(ctx context.Context, installationId InstallationIdPathParam, orgId OrgIdPathParam, params *RemovePluginEnablementParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RemovePluginEnablementResponse, error)
@@ -19643,6 +19796,32 @@ func (r SetPluginInstallationIdentityResponse) StatusCode() int {
 	return 0
 }
 
+type SetPluginOrganizationModeResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *PluginInstallation
+	JSON400      *N400BadRequest
+	JSON403      *N403Forbidden
+	JSON404      *N404NotFound
+	JSON409      *N409Conflict
+}
+
+// Status returns HTTPResponse.Status
+func (r SetPluginOrganizationModeResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetPluginOrganizationModeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type RemovePluginEnablementResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -21400,6 +21579,23 @@ func (c *ClientWithResponses) SetPluginInstallationIdentityWithResponse(ctx cont
 		return nil, err
 	}
 	return ParseSetPluginInstallationIdentityResponse(rsp)
+}
+
+// SetPluginOrganizationModeWithBodyWithResponse request with arbitrary body returning *SetPluginOrganizationModeResponse
+func (c *ClientWithResponses) SetPluginOrganizationModeWithBodyWithResponse(ctx context.Context, installationId InstallationIdPathParam, params *SetPluginOrganizationModeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetPluginOrganizationModeResponse, error) {
+	rsp, err := c.SetPluginOrganizationModeWithBody(ctx, installationId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetPluginOrganizationModeResponse(rsp)
+}
+
+func (c *ClientWithResponses) SetPluginOrganizationModeWithResponse(ctx context.Context, installationId InstallationIdPathParam, params *SetPluginOrganizationModeParams, body SetPluginOrganizationModeJSONRequestBody, reqEditors ...RequestEditorFn) (*SetPluginOrganizationModeResponse, error) {
+	rsp, err := c.SetPluginOrganizationMode(ctx, installationId, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetPluginOrganizationModeResponse(rsp)
 }
 
 // RemovePluginEnablementWithBodyWithResponse request with arbitrary body returning *RemovePluginEnablementResponse
@@ -26924,6 +27120,60 @@ func ParseSetPluginInstallationIdentityResponse(rsp *http.Response) (*SetPluginI
 	}
 
 	response := &SetPluginInstallationIdentityResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PluginInstallation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest N400BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest N403Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest N404NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest N409Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetPluginOrganizationModeResponse parses an HTTP response from a SetPluginOrganizationModeWithResponse call
+func ParseSetPluginOrganizationModeResponse(rsp *http.Response) (*SetPluginOrganizationModeResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetPluginOrganizationModeResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}

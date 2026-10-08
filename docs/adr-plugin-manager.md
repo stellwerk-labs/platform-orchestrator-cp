@@ -21,7 +21,7 @@ and never write it.
 | Resource | Content |
 |---|---|
 | Package | Immutable registration manifest of one plugin version (identity, migration generation, capability declarations, operations, UI contribution, service grants, authorization policies, entitlement declaration), keyed by the SHA-256 of the package manifest. |
-| Installation | Core-assigned immutable installation UUID, served package and the target of a pending upgrade, state (`installed`, `active`, `disabled`, `uninstalled`, `purged`), backend and UI origins, and two IAM platform principals: the plugin's service user and the admission checker. |
+| Installation | Core-assigned immutable installation UUID, served package and the target of a pending upgrade, state (`installed`, `active`, `disabled`, `uninstalled`, `purged`), backend and UI origins, two IAM platform principals (the plugin's service user and the admission checker), and the organization mode (`selected` or `all`) with the default timezone and approval policies of the enablements Core creates. |
 | Status observation | What Core last read from the running plugin's status endpoint. A fact the plugin reports, not operator state. |
 | Enablement | One organization of an installation: `enabled` or `disabled`, IANA timezone, deployment approval policies. An installation has one per organization it serves. |
 | Registration | The contributions an active installation serves, materialised from its package on activation. A UI route prefix belongs to one installation; operations and capabilities live in the plugin's own namespace. |
@@ -40,6 +40,7 @@ Platform-scoped routes, outside any organization:
 | `POST /plugin-installations/{id}/upgrade` | Request the package the installation serves next. |
 | `POST /plugin-installations/{id}/actions/{uninstall,reinstall}` | Remove registrations and enablements and keep the UUID and plugin data; return the retained installation to installed. |
 | `DELETE /plugin-installations/{id}` | Purge an uninstalled installation and retire its UUID. |
+| `PUT /plugin-installations/{id}/organization-mode` | Serve selected organizations or all of them, with the defaults of the enablements Core creates. |
 | `PUT`, `DELETE /plugin-installations/{id}/organizations/{orgId}` | Enable or disable for the organization (disabled is safety-only); remove the enablement. |
 | `POST /plugin-entitlement-bundles` | Import signed grants and revocations ([plugin-entitlements.md](plugin-entitlements.md)). |
 | `GET /plugin-audit-events` | Page the audit trail. |
@@ -118,6 +119,42 @@ principal holds no IAM authority in any organization. Disabling one
 organization is the per-organization kill switch; revoking the workload
 binding or disabling the installation stops all of them.
 
+### Serving all organizations
+
+An installation's organization mode is `selected` (the operator enables
+each organization) or `all`. Setting `all` enables, in that command, every
+active organization that has no enablement of the plugin; afterwards Core
+creates the enablement of every new organization inside the organization's
+creation transaction (`createOrganizationCore`), with the journal of a
+resource event subscriber starting there too. Both use the installation's
+default timezone and approval policies, which apply only to enablements Core
+creates from then on. An automatic enablement is one Plugin Manager change by
+Core's internal system identity: it advances the revision and writes an audit
+event whose reason names the organization and whose idempotency key digest is
+the digest of `organization-created:<organization UUID>`. Right after the
+organization exists for good (after its founder was added), Core registers
+the capabilities of each such installation there, as after an enablement.
+
+Core never changes an existing enablement on its own. A disabled enablement is
+the organization's opt-out and stays disabled across mode switches,
+default changes, new organizations and restarts; only the operator enables it
+again. Switching back to `selected` keeps every enablement as it is, and
+organizations created afterwards are no longer enabled. While the mode is
+`all` every active organization keeps an enablement, so removing one is
+refused with `409 plugin_serves_all_organizations`. Only an active or disabled
+installation can serve all organizations; uninstall removes every enablement,
+opt-outs included, and returns the installation to `selected`. An
+organization created while the plugin host was off gets no enablement; the
+installation lists it in `pending_organizations` until the operator sets
+`all` again, which enables it.
+
+A creation and a switch to `all` serialise on the Plugin Manager lock, so
+whichever commits second sees the other: every organization is enabled by
+exactly one of them. If the creation fails after its commit (IAM cannot add
+the founder), Core removes the organization's enablements, again as audited
+changes by its internal identity, and deletes the organization and its empty
+journal state in one transaction.
+
 ### Capabilities in IAM
 
 IAM keeps a catalogue of plugin capabilities per organization and plugin and
@@ -129,7 +166,7 @@ internal system identity (`PUT /orgs/{orgId}/plugins/{pluginId}/capabilities`):
 
 | When | Organizations |
 |---|---|
-| Right after an organization is enabled | That organization |
+| Right after an organization is enabled, also by Core when it is created | That organization |
 | Right after an activation, also one that completes an upgrade | Every enabled organization |
 | At start-up and every minute, on every replica | Every enabled organization of every installation |
 
@@ -226,7 +263,8 @@ longest match.
 
 `upgrade` records the target package: a later version of the same plugin
 that does not lower the migration generation and that Core can serve with the
-installation's origins, identities and approval policies. Core keeps serving
+installation's origins, identities, approval policies and default approval
+policies. Core keeps serving
 the current package, its registrations and every effect bound to its digest
 while the plugin runtime rolls. The next `activate` that reads the target
 digest and generation switches package and registrations in one
@@ -245,8 +283,9 @@ is no force option. Until it succeeds the plugin's cancel, rollback and read
 paths stay available; disabling first stops forward work. New work
 share-locks the installation row that uninstall locks for update, so the
 check cannot race it. Uninstall removes the registrations and organization
-enablements (their journals pause with a gap) and keeps the UUID, package,
-identities and the plugin's own data. `reinstall` returns that installation,
+enablements (their journals pause with a gap), returns the organization mode
+to `selected` and keeps the UUID, package, identities and the plugin's own
+data. `reinstall` returns that installation,
 with its UUID, to `installed`; it is activated and enabled again like a new
 one, and its licence grants match again. A plugin keeps at most one
 installation that is not purged, so a new installation never shadows a
