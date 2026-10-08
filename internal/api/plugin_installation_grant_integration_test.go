@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stellwerk-labs/golib/hmessaging"
+	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
@@ -177,4 +178,65 @@ func TestAnInstallationWideGrantCoversNewOrganizationsAndAnOrganizationGrantWins
 		PluginEntitlementBundleImportRequest{ExpectedRevision: l.api.revision(), Reason: "Renew while uninstalled", Bundle: l.bundle(t, l.signInstallationGrant(t, l.id, uuid.New(), 2, l.base+10, l.base+20, 0))}), http.StatusOK)
 	require.Zero(t, rejected.ImportedGrants)
 	require.Equal(t, []string{"plugin_entitlement_grant_rejected"}, []string{rejected.Diagnostics[0].Code})
+}
+
+func TestTheOrganizationLimitRefusesEnablementsBeyondIt(t *testing.T) {
+	l := newLicensedOrganizations(t)
+	l.importGrants("Import the installation's licence for two organizations", l.signInstallationGrant(t, l.id, uuid.New(), 1, l.base+10, l.base+20, 2))
+	licensed := l.read()
+	require.Equal(t, int64(2), *licensed.Entitlement.InstallationGrant.OrganizationLimit)
+	require.Equal(t, 1, licensed.Entitlement.EnabledOrganizations)
+	l.api.createOrganization("beta")
+	all := l.api.setOrganizationMode(l.id, PluginOrganizationModeAll, "UTC")
+	require.Equal(t, 2, all.Entitlement.EnabledOrganizations)
+
+	// The limit is reached: a new organization is still created, without an
+	// enablement, and waits as pending.
+	revision := l.api.revision()
+	l.api.createOrganization("gamma")
+	limited := l.read()
+	require.Equal(t, revision, *limited.Revision, "Core changed nothing for gamma")
+	require.Equal(t, []string{"gamma"}, *limited.PendingOrganizations)
+	require.Len(t, limited.Organizations, 2)
+	requireErrorCode(t, l.enable("gamma", PluginEnablementPutStateEnabled), http.StatusConflict, "plugin_organization_limit")
+	requireErrorCode(t, l.api.call(pluginOperator, http.MethodPut, l.path+"/organization-mode", uuid.NewString(),
+		PluginOrganizationModePut{ExpectedRevision: l.api.revision(), Reason: "Serve every organization", Mode: PluginOrganizationModeAll}), http.StatusConflict, "plugin_organization_limit")
+	require.Equal(t, revision, l.api.revision(), "the refusals change nothing")
+
+	// A disabled organization does not count.
+	decode[PluginInstallation](t, l.enable("beta", PluginEnablementPutStateDisabled), http.StatusOK)
+	swapped := decode[PluginInstallation](t, l.enable("gamma", PluginEnablementPutStateEnabled), http.StatusOK)
+	require.Equal(t, 2, swapped.Entitlement.EnabledOrganizations)
+	require.Nil(t, swapped.PendingOrganizations)
+	requireErrorCode(t, l.enable("beta", PluginEnablementPutStateEnabled), http.StatusConflict, "plugin_organization_limit")
+	// Changing an enabled organization's settings enables nobody new.
+	zone := "Europe/Paris"
+	decode[PluginInstallation](t, l.api.call(pluginOperator, http.MethodPut, l.path+"/organizations/acme", uuid.NewString(),
+		PluginEnablementPut{ExpectedRevision: l.api.revision(), Reason: "Move acme", State: PluginEnablementPutStateEnabled, Timezone: &zone}), http.StatusOK)
+
+	// A renewal with a higher sequence replaces the grant and its limit.
+	l.importGrants("Raise the limit", l.signInstallationGrant(t, l.id, uuid.New(), 2, l.base+10, l.base+20, 3))
+	raised := decode[PluginInstallation](t, l.enable("beta", PluginEnablementPutStateEnabled), http.StatusOK)
+	require.Equal(t, 3, raised.Entitlement.EnabledOrganizations)
+	require.Equal(t, int64(2), raised.Entitlement.InstallationGrant.Sequence)
+	require.Equal(t, int64(3), *raised.Entitlement.InstallationGrant.OrganizationLimit)
+
+	// Room for one more: of two organizations created at the same time,
+	// exactly one is enabled, because creations take turns on the Plugin
+	// Manager lock.
+	l.importGrants("Room for one more", l.signInstallationGrant(t, l.id, uuid.New(), 3, l.base+10, l.base+20, 4))
+	codes := make(chan int, 2)
+	for _, org := range []string{"delta", "epsilon"} {
+		go func() {
+			codes <- l.api.call(userid.InternalSystemUuid, http.MethodPost, "/internal/orgs", "", InternalOrganizationCreateBody{Id: &org}).Code
+		}()
+	}
+	require.Equal(t, []int{http.StatusCreated, http.StatusCreated}, []int{<-codes, <-codes})
+	raced := l.read()
+	require.Equal(t, 4, raced.Entitlement.EnabledOrganizations)
+	require.Len(t, *raced.PendingOrganizations, 1)
+	require.Contains(t, []string{"delta", "epsilon"}, (*raced.PendingOrganizations)[0])
+	for _, org := range []string{"acme", "beta", "gamma"} {
+		require.NoError(t, l.effect(org), "every enabled organization is covered: %s", org)
+	}
 }

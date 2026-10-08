@@ -27,9 +27,10 @@ import (
 // opt-out and stays disabled across mode switches and restarts. Switching
 // back to selected keeps every enablement as it is; only new organizations are
 // no longer enabled. In mode all every active organization has an
-// enablement, so removing one is refused; an organization created while the
-// plugin host was off is listed as pending until the operator sets mode all
-// again.
+// enablement, so removing one is refused. An organization created while the
+// plugin host was off, or while the installation-wide grant's organization
+// limit was reached, is created without an enablement and listed as pending
+// until the operator sets mode all again.
 
 type organizationModePayload struct {
 	InstallationID   uuid.UUID         `json:"installation_id"`
@@ -41,8 +42,10 @@ type organizationModePayload struct {
 // SetOrganizationMode sets which organizations the installation serves and
 // the defaults of the enablements Core creates. Setting mode all enables
 // every active organization without an enablement in the same transaction,
-// so it also enables organizations that are pending. Setting the mode and
-// defaults that already hold, with nothing pending, changes nothing.
+// so it also enables organizations that are pending, or refuses as a whole
+// when the installation-wide grant's organization limit does not allow them
+// all. Setting the mode and defaults that already hold, with nothing
+// pending, changes nothing.
 func (m *Manager) SetOrganizationMode(ctx context.Context, command Command, id uuid.UUID, mode, timezone string, approvalPolicies map[string]string) (Installation, error) {
 	if approvalPolicies == nil {
 		approvalPolicies = map[string]string{}
@@ -81,6 +84,11 @@ func (m *Manager) SetOrganizationMode(ctx context.Context, command Command, id u
 			if before.OrganizationMode == mode && before.OrganizationDefaults.Timezone == zone && maps.Equal(before.OrganizationDefaults.ApprovalPolicies, approvalPolicies) && len(pending) == 0 {
 				return nil, nil
 			}
+			// All or nothing: a licence that cannot serve every organization
+			// refuses the switch.
+			if err := checkOrganizationLimit(ctx, tx, before, len(pending)); err != nil {
+				return nil, err
+			}
 			if err := model.UpdatePluginInstallation(ctx, tx, after, command.Actor); err != nil {
 				return nil, err
 			}
@@ -107,7 +115,9 @@ func defaultEnablement(installation model.PluginInstallation, org string) model.
 // every installation that serves all organizations, with the installation's
 // defaults. Each enablement is one Plugin Manager change by Core's internal
 // identity. The Plugin Manager lock orders it against a concurrent switch to
-// mode all: whichever commits second sees the other. It returns the
+// mode all: whichever commits second sees the other. An installation whose
+// installation-wide grant allows no further organization skips org and lists
+// it as pending; the organization is created all the same. It returns the
 // installations it enabled; the caller reconciles their capabilities in org
 // once the organization exists for good. tx is the caller's to commit.
 func (m *Manager) EnableNewOrganization(ctx context.Context, tx model.Tx, org model.Org) ([]uuid.UUID, error) {
@@ -124,6 +134,16 @@ func (m *Manager) EnableNewOrganization(ctx context.Context, tx model.Tx, org mo
 		before, err := model.GetPluginInstallation(ctx, tx, id, true)
 		if err != nil {
 			return nil, err
+		}
+		// The organization is created in any case; an installation whose
+		// licence allows no further organization lists it as pending.
+		if err := checkOrganizationLimit(ctx, tx, before, 1); err != nil {
+			if _, limited := model.IsErrConflict(err); !limited {
+				return nil, err
+			}
+			m.logger.Warn("A new organization is not enabled for a plugin installation that serves all organizations", zap.String("org_id", org.Id),
+				zap.String("plugin_id", before.PluginID), zap.Stringer("installation_id", id), zap.Error(err))
+			continue
 		}
 		if err := model.PutPluginEnablement(ctx, tx, before, defaultEnablement(before, org.Id), userid.InternalSystemUuid); err != nil {
 			return nil, err

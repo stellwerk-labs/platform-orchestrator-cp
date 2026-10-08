@@ -110,6 +110,9 @@ therefore not found in another, and a gateway delegation names the
 organization of its request. A licence grant names one organization of the
 installation, or none: an installation-wide grant covers every organization
 that has no grant of its own ([plugin-entitlements.md](plugin-entitlements.md)).
+Its optional organization limit caps the enabled organizations of the
+installation: an enablement beyond it is refused with
+`409 plugin_organization_limit`.
 
 The security statement for `v1alpha`: a compromised plugin reaches every
 organization its installation is enabled for, within the plugin boundary
@@ -145,9 +148,12 @@ organizations created afterwards are no longer enabled. While the mode is
 refused with `409 plugin_serves_all_organizations`. Only an active or disabled
 installation can serve all organizations; uninstall removes every enablement,
 opt-outs included, and returns the installation to `selected`. An
-organization created while the plugin host was off gets no enablement; the
-installation lists it in `pending_organizations` until the operator sets
-`all` again, which enables it.
+organization created while the plugin host was off, or while the
+installation-wide grant's organization limit is reached, is still created but
+gets no enablement; the installation lists it in `pending_organizations` until
+the operator sets `all` again, which enables it. A switch to `all` that would
+enable more organizations than the limit allows is refused as a whole with
+`409 plugin_organization_limit`.
 
 A creation and a switch to `all` serialise on the Plugin Manager lock, so
 whichever commits second sees the other: every organization is enabled by

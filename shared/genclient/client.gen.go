@@ -3370,7 +3370,7 @@ type PluginInstallation struct {
 	// PackageSha256 The package Core serves.
 	PackageSha256 string `json:"package_sha256"`
 
-	// PendingOrganizations Only in organization mode all, absent when empty. The active organizations without an enablement, ordered by ID, which Core could not enable when they were created because the plugin host was off. Setting mode all again enables them.
+	// PendingOrganizations Only in organization mode all, absent when empty. The active organizations without an enablement, ordered by ID, which Core could not enable when they were created because the plugin host was off or the installation-wide grant's organization limit was reached. Setting mode all again enables them.
 	PendingOrganizations *[]string `json:"pending_organizations,omitempty"`
 	PluginId             string    `json:"plugin_id"`
 

@@ -49,7 +49,8 @@ type Installation struct {
 	Diagnostic *Diagnostic `json:"diagnostic,omitempty"`
 	// PendingOrganizations are the active organizations without an
 	// enablement while the installation serves all organizations: Core could
-	// not enable them when they were created. Setting mode all again enables
+	// not enable them when they were created, because the plugin host was off
+	// or the organization limit was reached. Setting mode all again enables
 	// them.
 	PendingOrganizations []string `json:"pending_organizations,omitempty"`
 	// Entitlement is the licence of an installation whose served package
@@ -249,6 +250,27 @@ func enabledOrganizations(enablements []model.PluginEnablement) int {
 		}
 	}
 	return count
+}
+
+// checkOrganizationLimit refuses a change that enables added more
+// organizations of the installation than its installation-wide grant allows.
+// A disabled enablement does not count; an organization with a grant of its
+// own counts like every other, because the limit caps the organizations the
+// installation serves.
+func checkOrganizationLimit(ctx context.Context, tx model.Tx, installation model.PluginInstallation, added int) error {
+	if added == 0 {
+		return nil
+	}
+	limit, err := model.PluginOrganizationLimit(ctx, tx, installation.InstallationID, installation.PluginID)
+	if err != nil || limit == 0 {
+		return err
+	}
+	enabled := enabledOrganizations(installation.Organizations)
+	if int64(enabled)+int64(added) <= limit {
+		return nil
+	}
+	return model.ErrConflict{Code: "plugin_organization_limit", Message: fmt.Sprintf(
+		"The installation-wide licence allows %d enabled organizations; %d are enabled and the change would enable %d more. Import a grant with a higher limit or disable an organization first.", limit, enabled, added)}
 }
 
 // PushPackage registers an immutable package. Pushing the same digest and
@@ -666,6 +688,8 @@ func (m *Manager) validateServed(installation model.PluginInstallation, manifest
 // belong to no organization, so the command never asks IAM about them. Once
 // it committed, Core registers the served package's capabilities in IAM for
 // the organization; the response shows the registration as of the command.
+// Enabling an organization beyond the installation-wide grant's organization
+// limit is refused.
 func (m *Manager) PutEnablement(ctx context.Context, command Command, id uuid.UUID, org, state, timezone string, approvalPolicies map[string]string) (Installation, error) {
 	if approvalPolicies == nil {
 		approvalPolicies = map[string]string{}
@@ -696,10 +720,23 @@ func (m *Manager) PutEnablement(ctx context.Context, command Command, id uuid.UU
 				}
 				return nil, err
 			}
+			added := 0
+			if state == model.PluginEnablementEnabled {
+				added = 1
+			}
 			for _, existing := range before.Organizations {
-				if existing.OrgID == org && existing.State == state && existing.Timezone == zone && maps.Equal(existing.ApprovalPolicies, approvalPolicies) {
+				if existing.OrgID != org {
+					continue
+				}
+				if existing.State == state && existing.Timezone == zone && maps.Equal(existing.ApprovalPolicies, approvalPolicies) {
 					return nil, nil
 				}
+				if existing.State == model.PluginEnablementEnabled {
+					added = 0
+				}
+			}
+			if err := checkOrganizationLimit(ctx, tx, before, added); err != nil {
+				return nil, err
 			}
 			if err := model.PutPluginEnablement(ctx, tx, before, model.PluginEnablement{OrgID: org, State: state, Timezone: zone, ApprovalPolicies: approvalPolicies}, command.Actor); err != nil {
 				return nil, err

@@ -41,7 +41,16 @@ organization for an organization grant, plugin and installation for an
 installation-wide grant.
 
 An installation-wide grant may carry the limit `organizations` (claim 10, 1 to
-2^63-1), the number of organizations the installation may enable.
+2^63-1). Core then refuses to enable an organization beyond it, with
+`409 plugin_organization_limit`: an explicit enablement, a switch to
+organization mode `all` (refused as a whole) and the automatic enablement of a
+new organization, which is still created but listed as pending. Disabled
+enablements do not count, and an organization with a grant of its own counts
+like every other: the limit caps the organizations the installation serves.
+The limit of the current installation-wide grant applies whatever its state.
+An import never removes an enablement; if the installation already has more
+enabled organizations than a newly imported limit, they stay, and further
+enablements are refused until the number is below it.
 
 Reads show which grant covers an organization. Discovery and the plugin's own
 preflight carry `entitlement.grant_scope` (`organization` or `installation`,
