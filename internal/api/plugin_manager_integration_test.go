@@ -80,18 +80,25 @@ func (p *iamPeer) createStaticPrincipal(id uuid.UUID) {
 		CurrentTokenExpiresAt: &expires, GeneratedAt: time.Now(), GeneratedBy: identityOperator}
 }
 
-// newOperatorAPI serves s. pluginOperator holds both Plugin Manager
-// permissions in IAM; readers hold plugin_manager_read.
-func newOperatorAPI(t *testing.T, s *Server, readers ...uuid.UUID) *operatorAPI {
+// operatorIAM is the IAM of a Plugin Manager test, which every replica of
+// the test calls: pluginOperator holds both Plugin Manager permissions,
+// readers hold plugin_manager_read.
+func operatorIAM(t *testing.T, readers ...uuid.UUID) *iamPeer {
 	t.Helper()
-	peer, client := newIAMPeer(t, []uuid.UUID{pluginOperator}, append([]uuid.UUID{pluginOperator}, readers...))
-	s.IamClient, s.Logger = client, zap.NewNop()
+	peer, _ := newIAMPeer(t, []uuid.UUID{pluginOperator}, append([]uuid.UUID{pluginOperator}, readers...))
+	return peer
+}
+
+// newOperatorAPI serves s with iam.
+func newOperatorAPI(t *testing.T, s *Server, iam *iamPeer) *operatorAPI {
+	t.Helper()
+	s.IamClient, s.Logger = iam.client, zap.NewNop()
 	e, err := hecho.DefaultEchoServerWithValidation(&hecho.ValidatedServerConfig{AppName: "plugin-manager-test", Logger: zap.NewNop(), OpenAPIRawSchema: MustDecodeOpenApiSpec()})
 	require.NoError(t, err)
 	e.Use(middleware.EchoCtxMiddleware)
 	e.Use(echomiddleware.RequestID())
 	s.MapRoutes(e)
-	return &operatorAPI{t: t, server: s, e: e, iam: peer}
+	return &operatorAPI{t: t, server: s, e: e, iam: iam}
 }
 
 func (a *operatorAPI) call(actor uuid.UUID, method, path, key string, body any) *httptest.ResponseRecorder {
@@ -186,18 +193,20 @@ func sha256Hex(raw []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// pluginManagerServer is a plugin host replica over db.
-func pluginManagerServer(t *testing.T, db model.Databaser) *Server {
+// pluginManagerServer is a plugin host replica over db that calls iam.
+func pluginManagerServer(t *testing.T, db model.Databaser, iam *iamPeer) *Server {
 	t.Helper()
 	registry := &plugins.InstallationRegistry{}
-	manager := testPluginManager(t, db, registry, nil)
+	manager := testPluginManager(t, db, registry, nil, iam)
 	require.NoError(t, manager.Refresh(t.Context()))
-	return &Server{Database: db, Plugins: registry, PluginGateway: &plugins.Gateway{Registry: registry}, PluginManager: manager}
+	return &Server{Database: db, IamClient: iam.client, Plugins: registry, PluginGateway: &plugins.Gateway{Registry: registry}, PluginManager: manager}
 }
 
 func workflowPlugin(grant *model.ExternalOperationGrant, actions ...string) plugins.Installation {
 	item := plugins.Installation{ID: grant.PluginID, DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.test",
 		ServiceUserID: userid.NewServiceUserTokenId().String(), AdmissionCheckerID: userid.NewServiceUserTokenId().String(),
+		Capabilities: []plugins.Capability{{ID: "plugin." + grant.PluginID + ".read", DisplayName: "Read workflows", Description: "View workflows and their history.",
+			Category: "Workflow", Level: "read", Scopes: []string{"organization", "environment"}}},
 		Operations: []plugins.Operation{{ID: "list", Method: "GET", Path: "/orgs/{orgId}/items"}}}
 	for _, action := range actions {
 		item.ServiceGrants = append(item.ServiceGrants, plugins.ServiceGrant{Action: action, Permission: "plugin." + grant.PluginID + ".read", Scope: "environment"})
@@ -238,8 +247,9 @@ func operatorRoutes(installation uuid.UUID, org string) []operatorRoute {
 
 func TestPluginManagerOperatorAPIInstallsWithoutRestart(t *testing.T) {
 	db, grant := pluginDeploymentBoundaryDatabase(t)
-	writer, other := pluginManagerServer(t, db), pluginManagerServer(t, db)
-	api := newOperatorAPI(t, writer)
+	iam := operatorIAM(t)
+	writer, other := pluginManagerServer(t, db, iam), pluginManagerServer(t, db, iam)
+	api := newOperatorAPI(t, writer, iam)
 	go other.PluginManager.Run(t.Context(), 50*time.Millisecond)
 	installation := api.install(workflowPlugin(grant, "external-deployment.admit"), grant.OrgID)
 	require.Len(t, installation.Organizations, 1)
@@ -283,7 +293,8 @@ func TestPluginManagerOperatorAPIInstallsWithoutRestart(t *testing.T) {
 func TestOnlyPlatformOperatorsReachThePluginManager(t *testing.T) {
 	db, grant := pluginDeploymentBoundaryDatabase(t)
 	reader := userid.NewHumanUserId()
-	api := newOperatorAPI(t, pluginManagerServer(t, db), reader)
+	iam := operatorIAM(t, reader)
+	api := newOperatorAPI(t, pluginManagerServer(t, db, iam), iam)
 	item := workflowPlugin(grant, "external-deployment.admit")
 	installation := api.install(item, grant.OrgID)
 	audited := len(decode[PluginAuditEventPage](t, api.call(pluginOperator, http.MethodGet, "/plugin-audit-events", "", nil), http.StatusOK).Items)
@@ -321,7 +332,8 @@ func TestOnlyPlatformOperatorsReachThePluginManager(t *testing.T) {
 
 func TestIdentityRequiresTheExactWorkloadBindingInIAM(t *testing.T) {
 	db, grant := pluginDeploymentBoundaryDatabase(t)
-	api := newOperatorAPI(t, pluginManagerServer(t, db))
+	iam := operatorIAM(t)
+	api := newOperatorAPI(t, pluginManagerServer(t, db, iam), iam)
 	item := workflowPlugin(grant, "external-deployment.admit")
 	installation := api.installPackage(item)
 	path := "/plugin-installations/" + installation.InstallationId.String()
@@ -419,7 +431,8 @@ func (c identityCalls) succeeds(call func() *httptest.ResponseRecorder) PluginIn
 
 func TestIdentitiesMustBePlatformPrincipals(t *testing.T) {
 	db, grant := pluginDeploymentBoundaryDatabase(t)
-	api := newOperatorAPI(t, pluginManagerServer(t, db))
+	iam := operatorIAM(t)
+	api := newOperatorAPI(t, pluginManagerServer(t, db, iam), iam)
 	item := workflowPlugin(grant, "external-deployment.admit")
 	installation := api.installPackage(item)
 	calls := identityCalls{t: t, api: api, path: "/plugin-installations/" + installation.InstallationId.String()}
@@ -466,7 +479,8 @@ func TestIdentitiesMustBePlatformPrincipals(t *testing.T) {
 
 func TestEnablementsDoNotDependOnIAM(t *testing.T) {
 	db, grant := pluginDeploymentBoundaryDatabase(t)
-	api := newOperatorAPI(t, pluginManagerServer(t, db))
+	iam := operatorIAM(t)
+	api := newOperatorAPI(t, pluginManagerServer(t, db, iam), iam)
 	item := workflowPlugin(grant, "external-deployment.admit")
 	installation := api.installPackage(item)
 	calls := identityCalls{t: t, api: api, path: "/plugin-installations/" + installation.InstallationId.String()}
@@ -481,13 +495,17 @@ func TestEnablementsDoNotDependOnIAM(t *testing.T) {
 
 	// The identities are platform principals that belong to no organization,
 	// so neither enabling an organization nor the safety lever asks IAM about
-	// them: every step works while IAM answers no lookup.
+	// them, and registering the capabilities follows the command: every step
+	// works while IAM answers nothing.
 	api.iam.lookupDown.Store(true)
 	api.iam.principalsDown.Store(true)
+	api.iam.catalogueDown.Store(true)
 	asked := api.iam.lookups.Load()
 	enabled := calls.succeeds(calls.enable(grant.OrgID, PluginEnablementPutStateEnabled))
 	require.Len(t, enabled.Organizations, 1)
 	require.Equal(t, PluginEnablementStateEnabled, enabled.Organizations[0].State)
+	require.Equal(t, PluginCapabilityRegistrationStateFailed, api.capabilityStates(installation.InstallationId)[grant.OrgID].State,
+		"the enablement stands; its capability registration waits for IAM")
 	disabled := calls.succeeds(calls.enable(grant.OrgID, PluginEnablementPutStateDisabled))
 	require.Equal(t, PluginEnablementStateDisabled, disabled.Organizations[0].State)
 	require.Empty(t, calls.succeeds(calls.remove(grant.OrgID)).Organizations)
@@ -497,6 +515,7 @@ func TestEnablementsDoNotDependOnIAM(t *testing.T) {
 	// first time, and changes nothing.
 	api.iam.lookupDown.Store(false)
 	api.iam.principalsDown.Store(false)
+	api.iam.catalogueDown.Store(false)
 	revision := api.revision()
 	replayed := calls.succeeds(calls.record(principal, checker))
 	require.Equal(t, revision, *replayed.Revision, "recording the same identities changes nothing")
@@ -504,7 +523,7 @@ func TestEnablementsDoNotDependOnIAM(t *testing.T) {
 
 func TestPluginHostDisabledHidesOnlyThePluginManager(t *testing.T) {
 	db, grant := pluginDeploymentBoundaryDatabase(t)
-	api := newOperatorAPI(t, &Server{Database: db})
+	api := newOperatorAPI(t, &Server{Database: db}, operatorIAM(t))
 	require.NoError(t, model.ReconcileExtensionResourceJournal(t.Context(), db, false))
 	for _, route := range operatorRoutes(uuid.New(), grant.OrgID) {
 		for _, actor := range []uuid.UUID{pluginOperator, userid.NewHumanUserId()} {
@@ -522,8 +541,9 @@ func TestPluginHostDisabledHidesOnlyThePluginManager(t *testing.T) {
 
 func TestDisablingAnOrganizationStopsEffectsOnEveryReplicaAtOnce(t *testing.T) {
 	db, grant := pluginDeploymentBoundaryDatabase(t)
-	writer, other := pluginManagerServer(t, db), pluginManagerServer(t, db)
-	api := newOperatorAPI(t, writer)
+	iam := operatorIAM(t)
+	writer, other := pluginManagerServer(t, db, iam), pluginManagerServer(t, db, iam)
+	api := newOperatorAPI(t, writer, iam)
 	installation := api.install(workflowPlugin(grant, "external-deployment.admit"), grant.OrgID)
 	require.NoError(t, other.PluginManager.Refresh(t.Context()))
 	item, descriptor, found := other.PluginGateway.Registry.Installation(t.Context(), grant.OrgID, grant.PluginID)
@@ -576,8 +596,9 @@ func journalEnvironmentEvent(t *testing.T, db model.Databaser, org string, envir
 
 func TestEnablementStartsTheResourceJournalAndRemovalLeavesAGap(t *testing.T) {
 	db, grant := pluginDeploymentBoundaryDatabase(t, "resource-events.read")
-	s := pluginManagerServer(t, db)
-	api := newOperatorAPI(t, s)
+	iam := operatorIAM(t)
+	s := pluginManagerServer(t, db, iam)
+	api := newOperatorAPI(t, s, iam)
 	environment := grant.Intent.Environments[0].EnvironmentID
 	item := workflowPlugin(grant, "resource-events.read")
 	journalEnvironmentEvent(t, db, grant.OrgID, environment)
@@ -623,10 +644,11 @@ func TestEnablementStartsTheResourceJournalAndRemovalLeavesAGap(t *testing.T) {
 func TestEntitlementBundleImportTakesEffectWithoutRestart(t *testing.T) {
 	f := newUnimportedPluginEntitlementAPIFixture(t)
 	registry := &plugins.InstallationRegistry{Entitlements: f.adapter}
-	manager := testPluginManager(t, f.db, registry, f.adapter)
+	iam := operatorIAM(t)
+	manager := testPluginManager(t, f.db, registry, f.adapter, iam)
 	require.NoError(t, manager.Refresh(t.Context()))
 	f.server.PluginManager, f.server.PluginEntitlements, f.server.PluginGateway = manager, f.adapter, &plugins.Gateway{Registry: registry}
-	api := newOperatorAPI(t, f.server)
+	api := newOperatorAPI(t, f.server, iam)
 	descriptor, found := registry.Get(t.Context(), "acme", f.item.ID)
 	require.True(t, found)
 	require.Equal(t, plugins.StateNotEntitled, descriptor.State)

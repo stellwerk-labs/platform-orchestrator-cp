@@ -62,15 +62,16 @@ func (p *runningPlugins) serve(t *testing.T, backend string, installation uuid.U
 	p.reports[parsed.Host] = pluginstatus.Report{InstallationID: installation.String(), PackageSHA256: digest}
 }
 
-// testPluginManager is a Plugin Manager over db that serves registry.
-func testPluginManager(t *testing.T, db model.Databaser, registry *plugins.InstallationRegistry, adapter *pluginentitlements.Adapter) *pluginmanager.Manager {
+// testPluginManager is a Plugin Manager over db that serves registry and
+// registers capabilities in iam.
+func testPluginManager(t *testing.T, db model.Databaser, registry *plugins.InstallationRegistry, adapter *pluginentitlements.Adapter, iam *iamPeer) *pluginmanager.Manager {
 	t.Helper()
 	if adapter == nil {
 		var err error
 		adapter, _, err = pluginentitlements.New(db, entitlements.Development, "", nil)
 		require.NoError(t, err)
 	}
-	manager, err := pluginmanager.New(pluginmanager.Config{Database: db, Registry: registry, Entitlements: adapter, StatusClient: &http.Client{Transport: fleet}})
+	manager, err := pluginmanager.New(pluginmanager.Config{Database: db, Registry: registry, Entitlements: adapter, StatusClient: &http.Client{Transport: fleet}, IAM: iam.client})
 	require.NoError(t, err)
 	return manager
 }
@@ -109,7 +110,7 @@ func (o *operatorSteps) installation(installation pluginmanager.Installation, er
 func installPlugin(t *testing.T, db model.Databaser, item plugins.Installation) plugins.Installation {
 	t.Helper()
 	ctx := t.Context()
-	steps := newOperatorSteps(t, testPluginManager(t, db, &plugins.InstallationRegistry{}, nil))
+	steps := newOperatorSteps(t, testPluginManager(t, db, &plugins.InstallationRegistry{}, nil, operatorIAM(t)))
 	raw, err := json.Marshal(item.Manifest())
 	require.NoError(t, err)
 	digest := item.ManifestSHA256

@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -118,10 +119,20 @@ func newReplicaReading(t *testing.T, db model.Databaser, client *http.Client) re
 	adapter, _, err := pluginentitlements.New(db, entitlements.Development, "", nil)
 	require.NoError(t, err)
 	registry := &plugins.InstallationRegistry{Entitlements: adapter}
-	manager, err := New(Config{Database: db, Registry: registry, Entitlements: adapter, StatusClient: client})
+	manager, err := New(Config{Database: db, Registry: registry, Entitlements: adapter, StatusClient: client, IAM: unreachableIAM(t)})
 	require.NoError(t, err)
 	require.NoError(t, manager.Refresh(t.Context()))
 	return replica{manager: manager, registry: registry}
+}
+
+// unreachableIAM is a client of an IAM that answers nothing. These tests do
+// not look at capability registration; it fails after every command and the
+// command stands.
+func unreachableIAM(t *testing.T) orchestratoriam.ClientWithResponsesInterface {
+	t.Helper()
+	client, err := orchestratoriam.NewClientWithResponses("http://127.0.0.1:1")
+	require.NoError(t, err)
+	return client
 }
 
 // session issues commands at the revision the previous one returned, as a

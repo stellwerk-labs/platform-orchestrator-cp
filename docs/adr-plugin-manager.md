@@ -118,6 +118,47 @@ principal holds no IAM authority in any organization. Disabling one
 organization is the per-organization kill switch; revoking the workload
 binding or disabling the installation stops all of them.
 
+### Capabilities in IAM
+
+IAM keeps a catalogue of plugin capabilities per organization and plugin and
+denies every check of a plugin capability it does not hold for the
+organization at the checked scope. Core registers the capability
+declarations of the package an installation serves for every organization
+the installation is enabled for, through IAM's internal listener as its
+internal system identity (`PUT /orgs/{orgId}/plugins/{pluginId}/capabilities`):
+
+| When | Organizations |
+|---|---|
+| Right after an organization is enabled | That organization |
+| Right after an activation, also one that completes an upgrade | Every enabled organization |
+| At start-up and every minute, on every replica | Every enabled organization of every installation |
+
+A reconciliation first reads the organization's permissions
+(`GET /orgs/{orgId}/permissions`) and replaces the plugin's catalogue only
+when it differs, so repeating it costs IAM one read and no policy reload.
+Reconciliations of one plugin take turns under a PostgreSQL advisory lock
+and read what to register after taking it, so an older package never
+overwrites a newer one. A command never waits for IAM: the enablement or
+activation stands whatever IAM answers, and a failure is recorded and
+retried by the next reconciliation.
+
+Every enablement shows its `capability_registration`: `registered` once Core
+registered or confirmed the served package's declarations, `pending` until
+Core reconciled the served package for that organization (for example right
+after an upgrade switched it), and `failed`, with the reason, when the last
+attempt for the served package failed. The response of the enabling command
+shows the state as of the command; a read right after it shows the result.
+Like a status observation, the record is a fact about IAM and is kept outside
+the revision and the audit.
+
+Disabling an organization keeps its catalogue: the plugin's safety work there
+(cancel, rollback, reconciliation) still needs IAM to check the original
+actor's capabilities. Removing an enablement or uninstalling keeps it as
+well: without an enablement Core refuses every effect of the plugin in that
+organization, so the catalogue grants nothing, the roles that name the
+capabilities stay readable, and enabling the organization again needs no
+round trip to IAM. Core never unregisters a plugin's capabilities.
+
 ### Propagation and authority
 
 Each replica serves read decisions (discovery, routing, UI, descriptors) from

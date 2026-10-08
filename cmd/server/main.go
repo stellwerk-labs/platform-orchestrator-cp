@@ -258,7 +258,7 @@ func main() {
 		registry.Entitlements = entitlementAdapter
 		server.PluginEntitlements = entitlementAdapter
 		server.PluginManager, err = pluginmanager.New(pluginmanager.Config{
-			Database: db, Registry: registry, Entitlements: entitlementAdapter, StatusClient: gateway.Client, AllowDevelopmentHTTP: cfg.PluginDevelopmentHTTP,
+			Database: db, Registry: registry, Entitlements: entitlementAdapter, StatusClient: gateway.Client, IAM: iamClient, AllowDevelopmentHTTP: cfg.PluginDevelopmentHTTP,
 			Logger: zap.L(),
 		})
 		if err != nil {
@@ -300,6 +300,7 @@ func main() {
 	defer bgCancel()
 	if gateway != nil {
 		go server.PluginManager.Run(bgCtx, cfg.PluginManagerRefreshInterval)
+		go runEvery(bgCtx, capabilityReconcileInterval, capabilityReconcileTimeout, server.Logger, "plugin capability reconciliation", server.PluginManager.ReconcileCapabilities)
 		go runEvery(bgCtx, entitlementSweepInterval, entitlementSweepTimeout, server.Logger, "entitlement boundary sweep", sweepPluginEntitlements(entitlementAdapter))
 		go runEvery(bgCtx, journalRetentionInterval, journalRetentionTimeout, server.Logger, "extension journal retention", pruneExtensionJournal(db, retention, server.Logger))
 	}

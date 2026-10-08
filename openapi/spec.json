@@ -346,7 +346,7 @@
       "post": {
         "operationId": "transitionPluginInstallation",
         "summary": "Activate, disable, enable, uninstall or reinstall an installation.",
-        "description": "Requires plugin_manager_write. activate reads the running plugin's status at /.well-known/stellwerk/plugin-status on the backend origin and serves the package registrations of an installed installation, or switches to the package of a pending upgrade, only when the plugin reports exactly the installation UUID, package digest and migration generation Core recorded; otherwise it changes nothing and answers 409 with the diagnostic plugin_status_unreachable, plugin_status_invalid, plugin_installation_mismatch, plugin_package_digest_mismatch or plugin_migration_generation_mismatch, which the installation also shows until a later read succeeds. disable keeps an active installation safety-only for every organization; enable returns it to active. uninstall removes the registrations and organization enablements and keeps the UUID, its licence binding and the plugin data; it is refused with 409 plugin_work_unsettled while Core holds operation grants, dispatches or Module reservations of the plugin, and has no force option. reinstall returns an uninstalled installation, with its UUID, to installed. An activation that would serve a UI route prefix another installation serves, also when it completes an upgrade, is refused with 409 plugin_registration_conflict and changes nothing. A step whose target state already holds changes nothing. Every Control Plane replica serves the change within its refresh interval, without a restart.",
+        "description": "Requires plugin_manager_write. activate reads the running plugin's status at /.well-known/stellwerk/plugin-status on the backend origin and serves the package registrations of an installed installation, or switches to the package of a pending upgrade, only when the plugin reports exactly the installation UUID, package digest and migration generation Core recorded; otherwise it changes nothing and answers 409 with the diagnostic plugin_status_unreachable, plugin_status_invalid, plugin_installation_mismatch, plugin_package_digest_mismatch or plugin_migration_generation_mismatch, which the installation also shows until a later read succeeds. disable keeps an active installation safety-only for every organization; enable returns it to active. uninstall removes the registrations and organization enablements and keeps the UUID, its licence binding and the plugin data; it is refused with 409 plugin_work_unsettled while Core holds operation grants, dispatches or Module reservations of the plugin, and has no force option. reinstall returns an uninstalled installation, with its UUID, to installed. An activation that would serve a UI route prefix another installation serves, also when it completes an upgrade, is refused with 409 plugin_registration_conflict and changes nothing. After an activation Core registers the capability declarations of the served package in IAM for every enabled organization. A step whose target state already holds changes nothing. Every Control Plane replica serves the change within its refresh interval, without a restart.",
         "tags": [
           "Plugin Manager"
         ],
@@ -420,7 +420,7 @@
       "put": {
         "operationId": "putPluginEnablement",
         "summary": "Enable or disable an active installation for an organization.",
-        "description": "Requires plugin_manager_write. One installation serves every organization it is enabled for, each with its own state, timezone and deployment approval policies; changing one organization's enablement leaves the others as they are. The installation's identities belong to no organization, so enabling, changing and removing an enablement never ask IAM about them. A disabled enablement keeps the plugin safety-only in that organization. Enabling a resource event subscriber starts the organization's resource event journal in the same transaction. Every Core effect re-verifies the enablement in its own transaction.",
+        "description": "Requires plugin_manager_write. One installation serves every organization it is enabled for, each with its own state, timezone and deployment approval policies; changing one organization's enablement leaves the others as they are. The installation's identities belong to no organization, so enabling, changing and removing an enablement never ask IAM about them. Right after the command Core registers the capability declarations of the served package in IAM for the organization; the response shows that registration as of the command, a later read shows its result, and the enablement stands whatever IAM answers. A disabled enablement keeps the plugin safety-only in that organization and keeps its capabilities in IAM. Enabling a resource event subscriber starts the organization's resource event journal in the same transaction. Every Core effect re-verifies the enablement in its own transaction.",
         "tags": [
           "Plugin Manager"
         ],
@@ -7113,6 +7113,42 @@
           }
         }
       },
+      "PluginCapabilityRegistration": {
+        "type": "object",
+        "description": "Whether IAM holds the capability declarations of the served package for the organization. Core registers them right after the organization is enabled and after every activation, and at start-up and every minute compares every enabled organization's catalogue in IAM with the served package and replaces only what drifted. Disabling or removing an enablement keeps the catalogue in IAM.",
+        "required": [
+          "state"
+        ],
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "registered",
+              "pending",
+              "failed"
+            ],
+            "x-enum-varnames": [
+              "PluginCapabilityRegistrationStateRegistered",
+              "PluginCapabilityRegistrationStatePending",
+              "PluginCapabilityRegistrationStateFailed"
+            ],
+            "description": "registered once Core registered or confirmed the served package's declarations; pending until Core reconciled the served package for the organization, for example right after an upgrade switched it; failed when Core's last attempt for the served package failed, which Core retries."
+          },
+          "package_sha256": {
+            "type": "string",
+            "description": "The package Core last reconciled for the organization."
+          },
+          "reconciled_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When Core last reconciled the organization."
+          },
+          "detail": {
+            "type": "string",
+            "description": "Why the last attempt failed."
+          }
+        }
+      },
       "PluginEnablement": {
         "type": "object",
         "required": [
@@ -7123,7 +7159,8 @@
           "created_at",
           "created_by",
           "updated_at",
-          "updated_by"
+          "updated_by",
+          "capability_registration"
         ],
         "properties": {
           "org_id": {
@@ -7164,6 +7201,9 @@
           "updated_by": {
             "type": "string",
             "format": "uuid"
+          },
+          "capability_registration": {
+            "$ref": "#/components/schemas/PluginCapabilityRegistration"
           }
         }
       },

@@ -497,6 +497,27 @@ func (e PluginAvailabilityState) Valid() bool {
 	}
 }
 
+// Defines values for PluginCapabilityRegistrationState.
+const (
+	PluginCapabilityRegistrationStateFailed     PluginCapabilityRegistrationState = "failed"
+	PluginCapabilityRegistrationStatePending    PluginCapabilityRegistrationState = "pending"
+	PluginCapabilityRegistrationStateRegistered PluginCapabilityRegistrationState = "registered"
+)
+
+// Valid indicates whether the value is a known member of the PluginCapabilityRegistrationState enum.
+func (e PluginCapabilityRegistrationState) Valid() bool {
+	switch e {
+	case PluginCapabilityRegistrationStateFailed:
+		return true
+	case PluginCapabilityRegistrationStatePending:
+		return true
+	case PluginCapabilityRegistrationStateRegistered:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PluginContractLevel.
 const (
 	PluginContractLevelV1alpha PluginContractLevel = "v1alpha"
@@ -2912,6 +2933,24 @@ type PluginCapability struct {
 	Version *string `json:"version,omitempty"`
 }
 
+// PluginCapabilityRegistration Whether IAM holds the capability declarations of the served package for the organization. Core registers them right after the organization is enabled and after every activation, and at start-up and every minute compares every enabled organization's catalogue in IAM with the served package and replaces only what drifted. Disabling or removing an enablement keeps the catalogue in IAM.
+type PluginCapabilityRegistration struct {
+	// Detail Why the last attempt failed.
+	Detail *string `json:"detail,omitempty"`
+
+	// PackageSha256 The package Core last reconciled for the organization.
+	PackageSha256 *string `json:"package_sha256,omitempty"`
+
+	// ReconciledAt When Core last reconciled the organization.
+	ReconciledAt *time.Time `json:"reconciled_at,omitempty"`
+
+	// State registered once Core registered or confirmed the served package's declarations; pending until Core reconciled the served package for the organization, for example right after an upgrade switched it; failed when Core's last attempt for the served package failed, which Core retries.
+	State PluginCapabilityRegistrationState `json:"state"`
+}
+
+// PluginCapabilityRegistrationState registered once Core registered or confirmed the served package's declarations; pending until Core reconciled the served package for the organization, for example right after an upgrade switched it; failed when Core's last attempt for the served package failed, which Core retries.
+type PluginCapabilityRegistrationState string
+
 // PluginContractLevel Level of the plugin contracts this Control Plane implements. v1alpha supports first-party Stellwerk plugins only and is not a stable partner contract.
 type PluginContractLevel string
 
@@ -3091,14 +3130,17 @@ type PluginDispatchCheckAction string
 
 // PluginEnablement defines model for PluginEnablement.
 type PluginEnablement struct {
-	ApprovalPolicies map[string]string     `json:"approval_policies"`
-	CreatedAt        time.Time             `json:"created_at"`
-	CreatedBy        openapi_types.UUID    `json:"created_by"`
-	OrgId            string                `json:"org_id"`
-	State            PluginEnablementState `json:"state"`
-	Timezone         string                `json:"timezone"`
-	UpdatedAt        time.Time             `json:"updated_at"`
-	UpdatedBy        openapi_types.UUID    `json:"updated_by"`
+	ApprovalPolicies map[string]string `json:"approval_policies"`
+
+	// CapabilityRegistration Whether IAM holds the capability declarations of the served package for the organization. Core registers them right after the organization is enabled and after every activation, and at start-up and every minute compares every enabled organization's catalogue in IAM with the served package and replaces only what drifted. Disabling or removing an enablement keeps the catalogue in IAM.
+	CapabilityRegistration PluginCapabilityRegistration `json:"capability_registration"`
+	CreatedAt              time.Time                    `json:"created_at"`
+	CreatedBy              openapi_types.UUID           `json:"created_by"`
+	OrgId                  string                       `json:"org_id"`
+	State                  PluginEnablementState        `json:"state"`
+	Timezone               string                       `json:"timezone"`
+	UpdatedAt              time.Time                    `json:"updated_at"`
+	UpdatedBy              openapi_types.UUID           `json:"updated_by"`
 }
 
 // PluginEnablementState defines model for PluginEnablement.State.

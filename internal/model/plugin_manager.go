@@ -90,6 +90,44 @@ type PluginEnablement struct {
 	CreatedBy        uuid.UUID         `json:"created_by"`
 	UpdatedAt        time.Time         `json:"updated_at"`
 	UpdatedBy        uuid.UUID         `json:"updated_by"`
+	// CapabilityRegistration tells whether IAM holds the capability
+	// declarations of the served package for this organization.
+	CapabilityRegistration PluginCapabilityRegistration `json:"capability_registration"`
+}
+
+// Capability registration states of an enablement.
+const (
+	// PluginCapabilitiesRegistered: Core registered or confirmed the served
+	// package's declarations in IAM.
+	PluginCapabilitiesRegistered = "registered"
+	// PluginCapabilitiesPending: Core has not reconciled the served package
+	// for this organization yet.
+	PluginCapabilitiesPending = "pending"
+	// PluginCapabilitiesFailed: Core's last attempt for the served package
+	// failed; it tries again.
+	PluginCapabilitiesFailed = "failed"
+)
+
+// PluginCapabilityRegistration is the state of an organization's capability
+// registration, derived from Core's last reconciliation.
+type PluginCapabilityRegistration struct {
+	State string `json:"state"`
+	// PackageSHA256 is the package Core last reconciled for the
+	// organization, which may precede the served one.
+	PackageSHA256 string     `json:"package_sha256,omitempty"`
+	ReconciledAt  *time.Time `json:"reconciled_at,omitempty"`
+	Detail        string     `json:"detail,omitempty"`
+}
+
+// PluginCapabilityReconciliation is what Core did to bring IAM's capability
+// catalogue of a plugin in one organization in line with a package.
+type PluginCapabilityReconciliation struct {
+	PluginID      string
+	OrgID         string
+	PackageSHA256 string
+	ReconciledAt  time.Time
+	// Failure says why IAM does not provably hold the declarations.
+	Failure string
 }
 
 // PluginRegistration is one contribution an installation serves.
@@ -367,8 +405,11 @@ func ListPluginInstallations(ctx context.Context, tx Tx) ([]PluginInstallation, 
 }
 
 func listPluginEnablements(ctx context.Context, tx Tx, installation uuid.NullUUID) (map[uuid.UUID][]PluginEnablement, error) {
-	rows, err := tx.QueryContext(ctx, `SELECT installation_uuid, org_id, state, timezone, approval_policies, created_at, created_by, updated_at, updated_by
-		FROM plugin_enablements WHERE $1::uuid IS NULL OR installation_uuid=$1 ORDER BY org_id`, installation)
+	rows, err := tx.QueryContext(ctx, `SELECT e.installation_uuid, e.org_id, e.state, e.timezone, e.approval_policies, e.created_at, e.created_by, e.updated_at, e.updated_by,
+			i.package_sha256, COALESCE(r.package_sha256,''), r.reconciled_at, COALESCE(r.failure,'')
+		FROM plugin_enablements e JOIN plugin_installations i ON i.installation_uuid=e.installation_uuid
+		LEFT JOIN plugin_capability_registrations r ON r.plugin_id=e.plugin_id AND r.org_id=e.org_id
+		WHERE $1::uuid IS NULL OR e.installation_uuid=$1 ORDER BY e.org_id`, installation)
 	if err != nil {
 		return nil, err
 	}
@@ -378,15 +419,49 @@ func listPluginEnablements(ctx context.Context, tx Tx, installation uuid.NullUUI
 		var id uuid.UUID
 		var item PluginEnablement
 		var policies []byte
-		if err := rows.Scan(&id, &item.OrgID, &item.State, &item.Timezone, &policies, &item.CreatedAt, &item.CreatedBy, &item.UpdatedAt, &item.UpdatedBy); err != nil {
+		var served, failure string
+		var reconciledAt sql.NullTime
+		registration := &item.CapabilityRegistration
+		if err := rows.Scan(&id, &item.OrgID, &item.State, &item.Timezone, &policies, &item.CreatedAt, &item.CreatedBy, &item.UpdatedAt, &item.UpdatedBy,
+			&served, &registration.PackageSHA256, &reconciledAt, &failure); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal(policies, &item.ApprovalPolicies); err != nil {
 			return nil, err
 		}
+		if reconciledAt.Valid {
+			registration.ReconciledAt = &reconciledAt.Time
+		}
+		switch {
+		case registration.PackageSHA256 != served:
+			registration.State = PluginCapabilitiesPending
+		case failure != "":
+			registration.State, registration.Detail = PluginCapabilitiesFailed, failure
+		default:
+			registration.State = PluginCapabilitiesRegistered
+		}
 		result[id] = append(result[id], item)
 	}
 	return result, rows.Err()
+}
+
+// LockPluginCapabilities lets one reconciliation of the plugin's IAM
+// capabilities at a time proceed until the transaction ends. A reconciler
+// that reads what to register after taking the lock never overwrites a newer
+// reconciliation with an older package.
+func LockPluginCapabilities(ctx context.Context, tx Tx, pluginID string) error {
+	_, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 640))`, "plugin-capabilities:"+pluginID)
+	return err
+}
+
+// RecordPluginCapabilityReconciliation keeps what Core last did for the
+// plugin's capabilities in the organization.
+func RecordPluginCapabilityReconciliation(ctx context.Context, tx Tx, reconciliation PluginCapabilityReconciliation) error {
+	_, err := tx.ExecContext(ctx, `INSERT INTO plugin_capability_registrations (plugin_id, org_id, package_sha256, reconciled_at, failure) VALUES ($1,$2,$3,$4,$5)
+		ON CONFLICT (plugin_id, org_id) DO UPDATE SET package_sha256=EXCLUDED.package_sha256, reconciled_at=EXCLUDED.reconciled_at, failure=EXCLUDED.failure`,
+		reconciliation.PluginID, reconciliation.OrgID, reconciliation.PackageSHA256, reconciliation.ReconciledAt,
+		sql.NullString{String: reconciliation.Failure, Valid: reconciliation.Failure != ""})
+	return err
 }
 
 // InsertPluginInstallation stores a new installation. Only one installation

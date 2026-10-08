@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -25,21 +26,38 @@ import (
 // iamPeer stands in for IAM behind its HTTP contract. It answers platform
 // checks from the operators configured for each permission, allows every
 // organization check as for an organization administrator and counts them,
-// and answers workload binding and platform principal lookups from what it
-// holds, to the internal system identity that Core calls IAM with.
+// answers workload binding and platform principal lookups from what it
+// holds, and keeps each organization's catalogue of plugin capabilities as
+// IAM does, all to the internal system identity that Core calls IAM with.
 type iamPeer struct {
 	mu         sync.Mutex
 	holders    map[string][]uuid.UUID
 	bindings   []iamapi.PluginWorkloadBinding
 	principals map[uuid.UUID]iamapi.PlatformPrincipal
-	platform   []iamapi.ResourcePermissionCheck
-	orgChecks  atomic.Int32
+	// catalogue holds the capabilities of each organization and plugin.
+	catalogue map[string]map[string][]iamapi.PluginCapabilityRegistration
+	// replacements counts the catalogue replacements of each organization.
+	replacements map[string]int
+	platform     []iamapi.ResourcePermissionCheck
+	// client calls the peer as Core's internal system identity.
+	client    iamapi.ClientWithResponsesInterface
+	orgChecks atomic.Int32
 	// lookups counts binding and principal lookups, answered or not.
 	lookups atomic.Int32
-	// lookupDown and principalsDown make binding and principal lookups fail
-	// as if IAM were unavailable.
-	lookupDown, principalsDown atomic.Bool
+	// catalogueReads counts reads of organizations' permissions.
+	catalogueReads atomic.Int32
+	// lookupDown, principalsDown and catalogueDown make binding, principal
+	// and capability requests fail as if IAM were unavailable.
+	lookupDown, principalsDown, catalogueDown atomic.Bool
 }
+
+// iamPermission is one permission of IAM's own catalogue, which every
+// organization lists before the plugin capabilities.
+var iamPermission = iamapi.PermissionDefinition{Id: "module_read", DisplayName: "Read modules", Description: "View modules.", Category: "Modules",
+	Level: iamapi.Read, Scopes: []iamapi.PermissionDefinitionScopes{iamapi.Organization}}
+
+// capabilitySlug is IAM's rule for the one-segment name of a capability.
+var capabilitySlug = regexp.MustCompile(`^[a-z](?:[a-z0-9-]*[a-z0-9])?$`)
 
 func (p *iamPeer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
@@ -109,9 +127,79 @@ func (p *iamPeer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_ = json.NewEncoder(w).Encode(principal)
+	case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/orgs/") && strings.HasSuffix(r.URL.Path, "/permissions"):
+		p.catalogueReads.Add(1)
+		if p.catalogueDown.Load() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		org := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/orgs/"), "/permissions")
+		page := iamapi.PermissionDefinitionPage{Items: []iamapi.PermissionDefinition{iamPermission}}
+		p.mu.Lock()
+		for plugin, capabilities := range p.catalogue[org] {
+			for _, capability := range capabilities {
+				scopes := []iamapi.PermissionDefinitionScopes{}
+				for _, scope := range capability.Scopes {
+					scopes = append(scopes, iamapi.PermissionDefinitionScopes(scope))
+				}
+				page.Items = append(page.Items, iamapi.PermissionDefinition{Id: "plugin." + plugin + "." + capability.Name, DisplayName: capability.DisplayName,
+					Description: capability.Description, Category: capability.Category, Level: iamapi.PermissionDefinitionLevel(capability.Level), Scopes: scopes})
+			}
+		}
+		p.mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(page)
+	case r.Method == http.MethodPut && strings.HasPrefix(r.URL.Path, "/orgs/") && strings.HasSuffix(r.URL.Path, "/capabilities"):
+		if p.catalogueDown.Load() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/orgs/"), "/")
+		if len(parts) != 4 || parts[1] != "plugins" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		org, plugin := parts[0], parts[2]
+		var body iamapi.PluginCapabilityRegistrationBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || !validCapabilities(body.Capabilities) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]any{"error": "HTTP-400", "message": "invalid plugin capability definition"})
+			return
+		}
+		p.mu.Lock()
+		if p.catalogue[org] == nil {
+			p.catalogue[org] = map[string][]iamapi.PluginCapabilityRegistration{}
+		}
+		if len(body.Capabilities) == 0 {
+			delete(p.catalogue[org], plugin)
+		} else {
+			p.catalogue[org][plugin] = body.Capabilities
+		}
+		p.replacements[org]++
+		p.mu.Unlock()
+		w.WriteHeader(http.StatusNoContent)
 	default:
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
+}
+
+// validCapabilities applies IAM's rules for a capability catalogue.
+func validCapabilities(capabilities []iamapi.PluginCapabilityRegistration) bool {
+	seen := map[string]bool{}
+	for _, capability := range capabilities {
+		if !capabilitySlug.MatchString(capability.Name) || seen[capability.Name] || capability.DisplayName == "" || capability.Description == "" ||
+			capability.Category == "" || len(capability.Scopes) == 0 || !capability.Level.Valid() {
+			return false
+		}
+		seen[capability.Name] = true
+		for _, scope := range capability.Scopes {
+			if !scope.Valid() {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // platformChecks returns the platform checks asked so far.
@@ -129,7 +217,7 @@ func newIAMPeer(t *testing.T, writers, readers []uuid.UUID) (*iamPeer, iamapi.Cl
 	peer := &iamPeer{holders: map[string][]uuid.UUID{
 		iamauthz.PermissionPluginManagerRead:  readers,
 		iamauthz.PermissionPluginManagerWrite: writers,
-	}, principals: map[uuid.UUID]iamapi.PlatformPrincipal{}}
+	}, principals: map[uuid.UUID]iamapi.PlatformPrincipal{}, catalogue: map[string]map[string][]iamapi.PluginCapabilityRegistration{}, replacements: map[string]int{}}
 	iam := httptest.NewServer(peer)
 	t.Cleanup(iam.Close)
 	client, err := iamapi.NewClientWithResponses(iam.URL, iamapi.WithRequestEditorFn(func(_ context.Context, request *http.Request) error {
@@ -137,6 +225,7 @@ func newIAMPeer(t *testing.T, writers, readers []uuid.UUID) (*iamPeer, iamapi.Cl
 		return nil
 	}))
 	require.NoError(t, err)
+	peer.client = client
 	return peer, client
 }
 

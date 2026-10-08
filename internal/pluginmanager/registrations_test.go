@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/require"
 
@@ -120,12 +121,16 @@ func TestAvailabilityIsDerivedFromInstallationAndEnablement(t *testing.T) {
 func TestPluginManagerRequiresItsDependencies(t *testing.T) {
 	adapter, _, err := pluginentitlements.New(unusedDatabase{}, "development", "", nil)
 	require.NoError(t, err)
-	_, err = New(Config{Database: unusedDatabase{}, Registry: &plugins.InstallationRegistry{}, Entitlements: adapter, StatusClient: http.DefaultClient})
+	iam, err := orchestratoriam.NewClientWithResponses("http://iam.example.test")
 	require.NoError(t, err)
-	_, err = New(Config{Registry: &plugins.InstallationRegistry{}, Entitlements: adapter, StatusClient: http.DefaultClient})
+	_, err = New(Config{Database: unusedDatabase{}, Registry: &plugins.InstallationRegistry{}, Entitlements: adapter, StatusClient: http.DefaultClient, IAM: iam})
+	require.NoError(t, err)
+	_, err = New(Config{Registry: &plugins.InstallationRegistry{}, Entitlements: adapter, StatusClient: http.DefaultClient, IAM: iam})
 	require.Error(t, err)
-	_, err = New(Config{Database: unusedDatabase{}, Registry: &plugins.InstallationRegistry{}, Entitlements: adapter})
+	_, err = New(Config{Database: unusedDatabase{}, Registry: &plugins.InstallationRegistry{}, Entitlements: adapter, IAM: iam})
 	require.Error(t, err, "activation cannot read plugin status without a client")
+	_, err = New(Config{Database: unusedDatabase{}, Registry: &plugins.InstallationRegistry{}, Entitlements: adapter, StatusClient: http.DefaultClient})
+	require.Error(t, err, "capabilities cannot be registered without IAM")
 }
 
 // unusedDatabase satisfies the configuration; these tests never reach it.

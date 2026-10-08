@@ -26,9 +26,10 @@ func requirePluginManagerConflict(t *testing.T, err error, code string) {
 
 func TestUninstallWaitsUntilCoreHoldsNoSafetyWork(t *testing.T) {
 	db, grant := pluginDeploymentBoundaryDatabase(t)
-	s := pluginManagerServer(t, db)
+	iam := operatorIAM(t)
+	s := pluginManagerServer(t, db, iam)
 	ctx := t.Context()
-	id := newOperatorAPI(t, s).install(workflowPlugin(grant, "external-deployment.admit"), grant.OrgID).InstallationId
+	id := newOperatorAPI(t, s, iam).install(workflowPlugin(grant, "external-deployment.admit"), grant.OrgID).InstallationId
 	item, _, found := s.PluginGateway.Registry.Installation(ctx, grant.OrgID, grant.PluginID)
 	require.True(t, found)
 	effect := func(safety bool) error {
@@ -88,10 +89,11 @@ func TestOperatorAPIUpgradesAndReinstallsWithoutLosingTheLicence(t *testing.T) {
 	f := newPluginEntitlementAPIFixture(t)
 	ctx := t.Context()
 	registry := &plugins.InstallationRegistry{Entitlements: f.adapter}
-	manager := testPluginManager(t, f.db, registry, f.adapter)
+	iam := operatorIAM(t)
+	manager := testPluginManager(t, f.db, registry, f.adapter, iam)
 	require.NoError(t, manager.Refresh(ctx))
 	f.server.PluginManager, f.server.PluginEntitlements, f.server.PluginGateway = manager, f.adapter, &plugins.Gateway{Registry: registry}
-	api := newOperatorAPI(t, f.server)
+	api := newOperatorAPI(t, f.server, iam)
 	id := uuid.MustParse(f.item.InstallationID)
 	path := "/plugin-installations/" + id.String()
 	licensed := func(why string) plugins.Installation {

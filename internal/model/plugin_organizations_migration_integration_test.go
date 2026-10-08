@@ -41,9 +41,14 @@ func TestSeveralOrganizationsPerInstallationBlockTheDowngrade(t *testing.T) {
 	require.NoError(t, enable(db, "beta"), "one installation is enabled for several organizations")
 	applied := appliedMigrations(t, db)
 
+	// Later migrations step down first; the one that allows several
+	// organizations refuses.
+	require.NoError(t, goose.DownToContext(ctx, db, "migrations", 45))
+	atSeveral := appliedMigrations(t, db)
+	require.Equal(t, int64(45), atSeveral[len(atSeveral)-1])
 	err = goose.DownToContext(ctx, db, "migrations", 44)
 	require.ErrorContains(t, err, "cannot downgrade while an installation is enabled for several organizations")
-	require.Equal(t, applied, appliedMigrations(t, db), "the refused downgrade changes no migration")
+	require.Equal(t, atSeveral, appliedMigrations(t, db), "the refused downgrade changes no migration")
 
 	_, err = db.ExecContext(ctx, `DELETE FROM plugin_enablements WHERE org_id = 'beta'`)
 	require.NoError(t, err)

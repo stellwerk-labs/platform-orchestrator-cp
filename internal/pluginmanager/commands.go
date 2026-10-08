@@ -428,6 +428,11 @@ func (m *Manager) activate(ctx context.Context, command Command, id uuid.UUID) (
 			}
 			return m.installationChange(ctx, tx, "plugin_installation."+string(ActionActivate), before, "")
 		}, m.respondInstallation(id), &result)
+	if err == nil {
+		// An upgrade may declare other capabilities; every enabled
+		// organization gets the served package's declarations.
+		m.reconcileAfterCommand(ctx, id, "")
+	}
 	return result, err
 }
 
@@ -573,7 +578,9 @@ func (m *Manager) validateServed(installation model.PluginInstallation, manifest
 
 // PutEnablement enables or disables an active installation for one
 // organization. The installation's identities are platform principals that
-// belong to no organization, so enabling an organization never asks IAM.
+// belong to no organization, so the command never asks IAM about them. Once
+// it committed, Core registers the served package's capabilities in IAM for
+// the organization; the response shows the registration as of the command.
 func (m *Manager) PutEnablement(ctx context.Context, command Command, id uuid.UUID, org, state, timezone string, approvalPolicies map[string]string) (Installation, error) {
 	if approvalPolicies == nil {
 		approvalPolicies = map[string]string{}
@@ -614,6 +621,9 @@ func (m *Manager) PutEnablement(ctx context.Context, command Command, id uuid.UU
 			}
 			return m.installationChange(ctx, tx, "plugin_enablement.put", before, org)
 		}, m.respondInstallation(id), &result)
+	if err == nil {
+		m.reconcileAfterCommand(ctx, id, org)
+	}
 	return result, err
 }
 

@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"go.uber.org/zap"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
@@ -27,6 +28,9 @@ type Config struct {
 	// StatusClient reads plugin status endpoints. It carries the operator's
 	// plugin CA, like the client that calls plugin operations.
 	StatusClient *http.Client
+	// IAM registers the capabilities of served packages. It calls IAM as
+	// Core's internal system identity.
+	IAM orchestratoriam.ClientWithResponsesInterface
 	// AllowDevelopmentHTTP permits HTTP plugin origins in development only.
 	AllowDevelopmentHTTP bool
 	Logger               *zap.Logger
@@ -38,6 +42,7 @@ type Manager struct {
 	registry             *plugins.InstallationRegistry
 	entitlements         *pluginentitlements.Adapter
 	statusClient         *http.Client
+	iam                  orchestratoriam.ClientWithResponsesInterface
 	allowDevelopmentHTTP bool
 	logger               *zap.Logger
 	refresh              sync.Mutex
@@ -45,14 +50,15 @@ type Manager struct {
 
 // New validates the configuration.
 func New(config Config) (*Manager, error) {
-	if config.Database == nil || config.Registry == nil || config.Entitlements == nil || config.StatusClient == nil {
-		return nil, errors.New("the Plugin Manager needs a database, a registry, the entitlement adapter and a plugin status client")
+	if config.Database == nil || config.Registry == nil || config.Entitlements == nil || config.StatusClient == nil || config.IAM == nil {
+		return nil, errors.New("the Plugin Manager needs a database, a registry, the entitlement adapter, a plugin status client and IAM")
 	}
 	logger := config.Logger
 	if logger == nil {
 		logger = zap.NewNop()
 	}
-	return &Manager{db: config.Database, registry: config.Registry, entitlements: config.Entitlements, statusClient: config.StatusClient, allowDevelopmentHTTP: config.AllowDevelopmentHTTP, logger: logger}, nil
+	return &Manager{db: config.Database, registry: config.Registry, entitlements: config.Entitlements, statusClient: config.StatusClient, iam: config.IAM,
+		allowDevelopmentHTTP: config.AllowDevelopmentHTTP, logger: logger}, nil
 }
 
 // Refresh publishes the current Plugin Manager state to the registry when its

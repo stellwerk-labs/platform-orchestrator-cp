@@ -75,12 +75,13 @@ func newOrganizations(t *testing.T, actions ...string) *organizations {
 		"acme": seedPluginOperation(t, db, "acme", actions...),
 		"beta": seedPluginOperation(t, db, "beta", actions...),
 	}
-	s := pluginManagerServer(t, db)
+	iam := operatorIAM(t)
+	s := pluginManagerServer(t, db, iam)
 	public, private, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
 	backends := &recordedBackends{}
 	s.PluginGateway.SigningKey, s.PluginGateway.Issuer, s.PluginGateway.Client = private, "core", &http.Client{Transport: backends}
-	api := newOperatorAPI(t, s)
+	api := newOperatorAPI(t, s, iam)
 	item := workflowPlugin(grants["acme"], append([]string{"external-deployment.admit"}, actions...)...)
 	installation := api.install(item, "acme")
 	o := &organizations{t: t, db: db, server: s, api: api, item: item, installation: installation.InstallationId, grants: grants, backends: backends, assertions: public}
@@ -187,10 +188,11 @@ func TestEntitlementsBindEachOrganizationOfOneInstallation(t *testing.T) {
 	beta, err := f.db.CreateOrg(ctx, nil, &model.Org{Id: "beta", CreatedBy: pluginOperator, CreatedAt: time.Now().UTC(), Source: model.OrgSourceInternal, Plan: model.OrgPlanCustom})
 	require.NoError(t, err)
 	registry := &plugins.InstallationRegistry{Entitlements: f.adapter}
-	manager := testPluginManager(t, f.db, registry, f.adapter)
+	iam := operatorIAM(t)
+	manager := testPluginManager(t, f.db, registry, f.adapter, iam)
 	require.NoError(t, manager.Refresh(ctx))
 	f.server.PluginManager, f.server.PluginEntitlements, f.server.PluginGateway = manager, f.adapter, &plugins.Gateway{Registry: registry}
-	api := newOperatorAPI(t, f.server)
+	api := newOperatorAPI(t, f.server, iam)
 	enabled := "UTC"
 	decode[PluginInstallation](t, api.call(pluginOperator, http.MethodPut, "/plugin-installations/"+f.item.InstallationID+"/organizations/beta", uuid.NewString(),
 		PluginEnablementPut{ExpectedRevision: api.revision(), Reason: "Enable beta", State: PluginEnablementPutStateEnabled, Timezone: &enabled}), http.StatusOK)
@@ -353,7 +355,7 @@ func TestOrganizationStateNeverCrossesIntoAnotherOrganization(t *testing.T) {
 func TestDisablingOneOrganizationLeavesTheOtherServed(t *testing.T) {
 	o := newOrganizations(t)
 	ctx := t.Context()
-	other := pluginManagerServer(t, o.db)
+	other := pluginManagerServer(t, o.db, o.api.iam)
 	replicas := map[string]*Server{"writer": o.server, "other": other}
 	// Each replica authorizes an effect from its snapshot; the effect then
 	// re-verifies the enablement in its own transaction.

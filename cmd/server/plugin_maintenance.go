@@ -18,6 +18,11 @@ const (
 	journalRetentionInterval = 10 * time.Minute
 	journalRetentionTimeout  = 5 * time.Minute
 	journalRetentionBatch    = 10000
+	// Capability reconciliation reads IAM's catalogue of every enabled
+	// organization and writes only what drifted, so a short interval costs
+	// IAM one read per organization and plugin.
+	capabilityReconcileInterval = time.Minute
+	capabilityReconcileTimeout  = 50 * time.Second
 )
 
 // runEvery calls run immediately and then once per interval until ctx ends.
