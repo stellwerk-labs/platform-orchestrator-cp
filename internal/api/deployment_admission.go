@@ -16,6 +16,11 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
 )
 
+// deploymentAdmissionCaller accepts only the Data Plane identity the operator
+// bound to org. That identity must be an IAM platform principal with a static
+// token: the Data Plane holds one token for every organization, and a
+// service user of one organization would carry that organization's roles
+// and stop serving every organization when that one is removed.
 func (s *Server) deploymentAdmissionCaller(ctx context.Context, org string) error {
 	actor, err := GetAuthenticatedUserIdOr401(ctx)
 	if err != nil {
@@ -32,6 +37,13 @@ func (s *Server) deploymentAdmissionCaller(ctx context.Context, org string) erro
 				return pluginBoundaryError(403, "deployment_admission_service_forbidden", "A plugin service cannot act as the Data Plane admission authority.")
 			}
 		}
+	}
+	static, err := s.staticPlatformPrincipal(ctx, actor)
+	if err != nil {
+		return pluginBoundaryError(503, "authorization_unavailable", "The Data Plane identity could not be verified. Retry after IAM recovers.")
+	}
+	if !static {
+		return pluginBoundaryError(403, "deployment_admission_service_forbidden", "The Data Plane admission identity must be an IAM platform principal with a static token.")
 	}
 	middleware.SetAuthCheckedCtx(ctx)
 	return nil

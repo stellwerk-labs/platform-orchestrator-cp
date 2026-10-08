@@ -89,6 +89,9 @@ func (s *Server) requirePluginIdentities(ctx context.Context, installation plugi
 // principal that authenticates with a static token and is bound to no plugin
 // workload. Neither its scope nor its credential ever changes.
 func (s *Server) staticPlatformPrincipal(ctx context.Context, id uuid.UUID) (bool, error) {
+	if s.IamClient == nil {
+		return false, errors.New("IAM is not configured")
+	}
 	response, err := s.IamClient.GetPlatformPrincipalWithResponse(ctx, id)
 	if err != nil {
 		return false, errors.Wrap(err, "failed to look up the platform principal")

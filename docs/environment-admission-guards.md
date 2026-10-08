@@ -75,7 +75,14 @@ timeouts never release them.
 ## Configuration and limitations
 
 Core uses `DEPLOYMENT_ADMISSION_IDENTITIES_FILE` to bind each organization to
-one typed DP service-user UUID. DP requires both
+the UUID of the Data Plane's identity. That identity must be an IAM platform
+principal with a static token (`POST /platform-principals` in IAM): it belongs
+to no organization and holds no role. The Data Plane holds one token for every
+organization, so an operator binds the same principal to each organization it
+admits for. Core looks the caller up in IAM on every callback and refuses any
+other identity, such as a service user of an organization or a plugin
+workload, with `403 deployment_admission_service_forbidden`; when IAM cannot
+answer, the callback fails with `503 authorization_unavailable`. DP requires both
 `DEPLOYMENT_ADMISSION_CORE_GATEWAY_URL` and
 `DEPLOYMENT_ADMISSION_CORE_BEARER_TOKEN_FILE`; configuring only one is a startup
 error. With neither configured, the released ordinary path remains unchanged

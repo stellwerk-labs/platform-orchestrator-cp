@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stellwerk-labs/golib/hecho"
@@ -32,6 +33,12 @@ func TestDeploymentAdmissionRequiresDataPlaneAndIndependentUserScope(t *testing.
 	var denied, denyProposed atomic.Bool
 	var proposedChecks atomic.Int64
 	iam := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/platform-principals/"+service.String() {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(iamapi.PlatformPrincipal{Id: service, DisplayName: "Data Plane", Credential: iamapi.PlatformPrincipalCredentialStaticToken,
+				GeneratedAt: time.Now(), GeneratedBy: uuid.New()})
+			return
+		}
 		var body iamapi.InternalAuthorizeBody
 		if !assert.NoError(t, json.NewDecoder(r.Body).Decode(&body)) {
 			w.WriteHeader(500)
@@ -253,4 +260,61 @@ func TestPinCreationRejectsDeploymentCompletedDuringRemoteEvidence(t *testing.T)
 	pins, err := db.ListEnvironmentModuleVersionPins(t.Context(), nil, grant.OrgID, &env.EnvironmentID, nil, true)
 	require.NoError(t, err)
 	require.Empty(t, pins)
+}
+
+func TestDeploymentAdmissionAcceptsOnlyAStaticPlatformPrincipal(t *testing.T) {
+	db, grant := pluginDeploymentBoundaryDatabase(t)
+	env := grant.Intent.Environments[0]
+	iam := operatorIAM(t)
+	static, workload, organizationUser := userid.NewServiceUserTokenId(), userid.NewServiceUserTokenId(), userid.NewServiceUserTokenId()
+	iam.createStaticPrincipal(static)
+	iam.bind("dev.example.other", uuid.New(), workload)
+	identities := map[string]uuid.UUID{}
+	s := &Server{Logger: zap.NewNop(), Database: db, IamClient: iam.client, DeploymentAdmissionIdentities: identities}
+	e, err := hecho.DefaultEchoServerWithValidation(&hecho.ValidatedServerConfig{AppName: "admission-identity-test", Logger: zap.NewNop(), OpenAPIRawSchema: MustDecodeOpenApiSpec()})
+	require.NoError(t, err)
+	e.Use(middleware.EchoCtxMiddleware)
+	s.MapRoutes(e)
+	body := DeploymentAdmissionRequest{ActorId: grant.ActorID, ProjectUuid: env.ProjectID, EnvironmentUuid: env.EnvironmentID, RequestDigest: strings.Repeat("c", 64),
+		Mode: AdmissionModeDeploy, ModuleVersions: grant.Intent.TargetVersions}
+	admit := func(actor uuid.UUID) *httptest.ResponseRecorder {
+		payload, err := json.Marshal(body)
+		require.NoError(t, err)
+		request := httptest.NewRequest(http.MethodPost, "/orgs/"+grant.OrgID+"/deployment-admissions/"+uuid.NewString(), bytes.NewReader(payload))
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("From", actor.String())
+		response := httptest.NewRecorder()
+		e.ServeHTTP(response, request)
+		return response
+	}
+	admissions := func() int {
+		tx, err := db.BeginTx(t.Context(), nil)
+		require.NoError(t, err)
+		defer func() { _ = tx.Rollback() }()
+		var count int
+		require.NoError(t, tx.QueryRowContext(t.Context(), `SELECT count(*) FROM deployment_admission_guards WHERE org_id = $1`, grant.OrgID).Scan(&count))
+		return count
+	}
+
+	// The Data Plane holds one token for every organization: a service user
+	// of one organization, or a plugin workload, is never the admission
+	// authority, even when the operator bound it.
+	for name, identity := range map[string]uuid.UUID{"a service user of an organization": organizationUser, "the platform principal of a plugin workload": workload} {
+		identities[grant.OrgID] = identity
+		response := admit(identity)
+		require.Equal(t, http.StatusForbidden, response.Code, "%s: %s", name, response.Body.String())
+		require.Contains(t, response.Body.String(), `"error":"deployment_admission_service_forbidden"`, name)
+		require.Contains(t, response.Body.String(), "platform principal with a static token", name)
+	}
+	identities[grant.OrgID] = static
+	iam.principalsDown.Store(true)
+	response := admit(static)
+	require.Equal(t, http.StatusServiceUnavailable, response.Code, response.Body.String())
+	require.Contains(t, response.Body.String(), `"error":"authorization_unavailable"`)
+	iam.principalsDown.Store(false)
+	require.Zero(t, admissions(), "a refused identity admits nothing")
+
+	response = admit(static)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	require.Equal(t, 1, admissions())
 }

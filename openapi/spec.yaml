@@ -324,7 +324,7 @@ paths:
     post:
       operationId: authorizeDeploymentAdmission
       summary: Protect one ordinary Data Plane admission against concurrent Pin changes.
-      description: Restricted to the operator-bound authenticated Data Plane service. Rechecks the original actor's deployment permission and exact immutable scope. Persists a guard before DP commits a Deployment. No plugin capability grants access. A settled identity can never authorize another Deployment.
+      description: Restricted to the operator-bound authenticated Data Plane service, an IAM platform principal with a static token that Core looks up in IAM on every call; another identity is refused with 403 deployment_admission_service_forbidden, and 503 authorization_unavailable means IAM could not answer. Rechecks the original actor's deployment permission and exact immutable scope. Persists a guard before DP commits a Deployment. No plugin capability grants access. A settled identity can never authorize another Deployment.
       tags: [Deployment admissions]
       security: [{userIdHeader: []}]
       parameters:
