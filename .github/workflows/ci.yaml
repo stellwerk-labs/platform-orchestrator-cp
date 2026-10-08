@@ -188,7 +188,7 @@ jobs:
       - name: Lint
         uses: golangci/golangci-lint-action@db9de0fc1a667e1a49d2291a1a042dff081d78f6 # v9
         with:
-          version: v2.11.4
+          version: v2.14.0
 
       - name: Upload coverage
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
