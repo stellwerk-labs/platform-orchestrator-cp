@@ -25,6 +25,16 @@ func externalOperationDatabase(t *testing.T) Databaser {
 
 func externalOperationDatabaseWith(t *testing.T, options ...DatabaserOption) Databaser {
 	t.Helper()
+	db, err := NewDatabaser(t.Context(), zap.NewNop(), isolatedSchema(t), options...)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	return db
+}
+
+// isolatedSchema creates an empty schema that is dropped after the test and
+// returns a DSN whose search_path is that schema.
+func isolatedSchema(t *testing.T) string {
+	t.Helper()
 	dsn := os.Getenv("PLUGIN_TEST_DATABASE_URL")
 	require.NotEmpty(t, dsn, "PLUGIN_TEST_DATABASE_URL must identify a disposable PostgreSQL instance")
 	admin, err := sql.Open("postgres", dsn)
@@ -37,10 +47,7 @@ func externalOperationDatabaseWith(t *testing.T, options ...DatabaserOption) Dat
 		require.NoError(t, err)
 		require.NoError(t, admin.Close())
 	})
-	db, err := NewDatabaser(t.Context(), zap.NewNop(), pgtest.WithSearchPath(dsn, schema), options...)
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	return db
+	return pgtest.WithSearchPath(dsn, schema)
 }
 
 func externalOperationModules(t *testing.T, db Databaser, actor uuid.UUID) (string, []ExternalModuleTarget, []CoreModuleVersion) {

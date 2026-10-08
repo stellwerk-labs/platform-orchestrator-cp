@@ -6,6 +6,7 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/google/uuid"
@@ -63,20 +64,46 @@ func NewDatabaser(ctx context.Context, logger *zap.Logger, connStr string, optio
 		goose.AddNamedMigrationContext("000011_pending_event_messages.go", hstandardoutbox.MigrateUp01, hstandardoutbox.MigrateDown01)
 	})
 
-	if inner, err := hpostgresconnect.InitDatabase(ctx, &hpostgresconnect.Config{
+	inner, err := hpostgresconnect.InitDatabase(ctx, &hpostgresconnect.Config{
 		Logger:  logger,
 		ConnStr: connStr,
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, err
-	} else if err := goose.Up(inner.DB, "migrations"); err != nil {
-		return nil, err
-	} else {
-		d := &databaser{DB: inner.DB, logger: logger}
-		for _, option := range options {
-			option(d)
-		}
-		return d, nil
 	}
+	if err := migrate(ctx, inner.DB); err != nil {
+		_ = inner.Close()
+		return nil, err
+	}
+	d := &databaser{DB: inner.DB, logger: logger}
+	for _, option := range options {
+		option(d)
+	}
+	return d, nil
+}
+
+// migrate applies the embedded migrations, but first refuses a database that
+// a newer release has migrated further. goose only applies versions above the
+// database's, so it would apply nothing and report success, and this binary
+// would then serve a schema it does not know. Version numbers have gaps, so
+// the bound is the highest embedded version, never the number of migrations.
+func migrate(ctx context.Context, db *sql.DB) error {
+	embedded, err := goose.CollectMigrations("migrations", 0, goose.MaxVersion)
+	if err != nil {
+		return err
+	}
+	latest, err := embedded.Last()
+	if err != nil {
+		return err
+	}
+	current, err := goose.GetDBVersionContext(ctx, db)
+	if err != nil {
+		return fmt.Errorf("failed to read database migration version: %w", err)
+	}
+	if current > latest.Version {
+		return fmt.Errorf("database schema version %d is newer than this binary's latest migration %d", current, latest.Version)
+	}
+	return goose.UpContext(ctx, db, "migrations")
 }
 
 // Databaser provides an interface which can be used to mock the model
