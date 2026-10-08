@@ -18,11 +18,27 @@ import (
 
 const entitlementEventSubject = "io.platform-orchestrator.plugin-entitlement.changed"
 
+// Scopes of the grant that covers an organization. An organization grant
+// wins for its organization; an installation-wide grant covers every other
+// organization of its installation.
+const (
+	PluginGrantScopeOrganization = "organization"
+	PluginGrantScopeInstallation = "installation"
+)
+
+// organizationScope is the stored organization of a binding: NULL for the
+// installation scope.
+func organizationScope(organization uuid.UUID) uuid.NullUUID {
+	return uuid.NullUUID{UUID: organization, Valid: organization != uuid.Nil}
+}
+
 // PluginEntitlementDecision is a bounded projection; signed bytes and issuance
 // identifiers are intentionally absent from plugin-facing decisions.
 type PluginEntitlementDecision struct {
-	Feature    string                  `json:"feature"`
-	State      string                  `json:"state"`
+	Feature string `json:"feature"`
+	State   string `json:"state"`
+	// Scope names the grant that covers the organization, empty without one.
+	Scope      string                  `json:"scope,omitempty"`
 	TrustClass entitlements.TrustClass `json:"trust_class,omitempty"`
 	Forward    bool                    `json:"forward"`
 	Read       bool                    `json:"read"`
@@ -61,10 +77,10 @@ func entitlementBindingLock(ctx context.Context, tx Tx, binding entitlements.Bin
 }
 
 func entitlementAudit(ctx context.Context, db Databaser, tx Tx, issuer string, binding *entitlements.Binding, kind string, sequence int64, trustClass entitlements.TrustClass, importer string, sourceDigest [32]byte) error {
-	var installation, organization any
-	var plugin any
+	var installation, plugin any
+	var organization uuid.NullUUID
 	if binding != nil {
-		installation, organization, plugin = binding.InstallationID, binding.OrganizationID, binding.PluginID
+		installation, organization, plugin = binding.InstallationID, organizationScope(binding.OrganizationID), binding.PluginID
 	}
 	eventID := uuid.New()
 	if _, err := tx.ExecContext(ctx, `INSERT INTO plugin_entitlement_audit_events(event_id,issuer,installation_uuid,plugin_id,organization_uuid,kind,sequence,trust_class,importer,source_digest)
@@ -107,16 +123,19 @@ func validEntitlementImport(envelope []byte, digest [32]byte, issuer, importer s
 
 // ImportPluginEntitlementGrant accepts only the result of the strict local
 // verifier. The caller must exact-match its binding to the installed package.
-// Exact replay is idempotent; changed or lower sequences conflict. It runs in
-// optionalTx, or in its own transaction when that is nil.
+// The binding is the plugin, installation and organization of an
+// organization grant, or the plugin and installation of an installation-wide
+// grant. Exact replay is idempotent; changed or lower sequences conflict. It
+// runs in optionalTx, or in its own transaction when that is nil.
 func ImportPluginEntitlementGrant(ctx context.Context, db Databaser, optionalTx Tx, grant entitlements.Grant, importer string, sourceDigest [32]byte) (bool, error) {
 	if err := validEntitlementImport(grant.Envelope, grant.Digest, grant.Issuer, importer, sourceDigest, grant.TrustClass); err != nil {
 		return false, err
 	}
-	if grant.InstallationID == uuid.Nil || grant.OrganizationID == uuid.Nil || grant.IssuanceID == uuid.Nil || grant.PluginID == "" || grant.Sequence <= 0 || len(grant.Features) == 0 || len(grant.KeyID) == 0 || len(grant.KeyID) > 64 || len(grant.Limits) != 0 || grant.IssuedAt > grant.NotBefore || grant.NotBefore >= grant.ExpiresAt || grant.ExpiresAt > grant.GraceUntil {
+	if grant.InstallationID == uuid.Nil || grant.IssuanceID == uuid.Nil || grant.PluginID == "" || grant.Sequence <= 0 || len(grant.Features) == 0 || len(grant.KeyID) == 0 || len(grant.KeyID) > 64 || grant.OrganizationLimit < 0 || (grant.OrganizationLimit != 0 && !grant.InstallationWide()) || grant.IssuedAt > grant.NotBefore || grant.NotBefore >= grant.ExpiresAt || grant.ExpiresAt > grant.GraceUntil {
 		return false, NewErrBadRequest("invalid verified grant projection")
 	}
 	binding := entitlements.Binding{InstallationID: grant.InstallationID, PluginID: grant.PluginID, OrganizationID: grant.OrganizationID}
+	scope := organizationScope(grant.OrganizationID)
 	return inTransaction(ctx, db, optionalTx, func(tx Tx) (bool, error) {
 		var err error
 		if err := entitlementIssuerLock(ctx, tx, grant.Issuer, false); err != nil {
@@ -128,7 +147,7 @@ func ImportPluginEntitlementGrant(ctx context.Context, db Databaser, optionalTx 
 		var oldIssuer string
 		var oldIssuance uuid.UUID
 		var oldSequence int64
-		err = tx.QueryRowContext(ctx, `SELECT issuer,issuance_id,grant_sequence FROM plugin_entitlement_bindings WHERE installation_uuid=$1 AND plugin_id=$2 AND organization_uuid=$3 FOR UPDATE`, binding.InstallationID, binding.PluginID, binding.OrganizationID).Scan(&oldIssuer, &oldIssuance, &oldSequence)
+		err = tx.QueryRowContext(ctx, `SELECT issuer,issuance_id,grant_sequence FROM plugin_entitlement_bindings WHERE installation_uuid=$1 AND plugin_id=$2 AND organization_uuid IS NOT DISTINCT FROM $3 FOR UPDATE`, binding.InstallationID, binding.PluginID, scope).Scan(&oldIssuer, &oldIssuance, &oldSequence)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return false, err
 		}
@@ -154,18 +173,22 @@ func ImportPluginEntitlementGrant(ctx context.Context, db Databaser, optionalTx 
 				return false, NewErrConflict("issuance ID cannot be reused at a higher sequence")
 			}
 		}
-		limits, err := json.Marshal(grant.Limits)
+		limits := map[string]int64{}
+		if grant.OrganizationLimit != 0 {
+			limits[entitlements.LimitOrganizations] = grant.OrganizationLimit
+		}
+		encodedLimits, err := json.Marshal(limits)
 		if err != nil {
 			return false, err
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO plugin_entitlement_grants(issuer,issuance_id,grant_sequence,installation_uuid,plugin_id,organization_uuid,cose,digest,key_id,features,limits,issued_at,not_before,expires_at,grace_until,trust_class,importer,source_digest)
-		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`, grant.Issuer, grant.IssuanceID, grant.Sequence, grant.InstallationID, grant.PluginID, grant.OrganizationID, grant.Envelope, grant.Digest[:], grant.KeyID, pq.Array(grant.Features), string(limits), time.Unix(grant.IssuedAt, 0).UTC(), time.Unix(grant.NotBefore, 0).UTC(), time.Unix(grant.ExpiresAt, 0).UTC(), time.Unix(grant.GraceUntil, 0).UTC(), grant.TrustClass, importer, sourceDigest[:]); err != nil {
+		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`, grant.Issuer, grant.IssuanceID, grant.Sequence, grant.InstallationID, grant.PluginID, scope, grant.Envelope, grant.Digest[:], grant.KeyID, pq.Array(grant.Features), string(encodedLimits), time.Unix(grant.IssuedAt, 0).UTC(), time.Unix(grant.NotBefore, 0).UTC(), time.Unix(grant.ExpiresAt, 0).UTC(), time.Unix(grant.GraceUntil, 0).UTC(), grant.TrustClass, importer, sourceDigest[:]); err != nil {
 			return false, err
 		}
 		if newBinding {
-			_, err = tx.ExecContext(ctx, `INSERT INTO plugin_entitlement_bindings(installation_uuid,plugin_id,organization_uuid,issuer,issuance_id,grant_sequence,revision) VALUES($1,$2,$3,$4,$5,$6,1)`, binding.InstallationID, binding.PluginID, binding.OrganizationID, grant.Issuer, grant.IssuanceID, grant.Sequence)
+			_, err = tx.ExecContext(ctx, `INSERT INTO plugin_entitlement_bindings(installation_uuid,plugin_id,organization_uuid,issuer,issuance_id,grant_sequence,revision) VALUES($1,$2,$3,$4,$5,$6,1)`, binding.InstallationID, binding.PluginID, scope, grant.Issuer, grant.IssuanceID, grant.Sequence)
 		} else {
-			_, err = tx.ExecContext(ctx, `UPDATE plugin_entitlement_bindings SET issuance_id=$4,grant_sequence=$5,observed_grace_at=NULL,observed_expired_at=NULL,revision=revision+1 WHERE installation_uuid=$1 AND plugin_id=$2 AND organization_uuid=$3`, binding.InstallationID, binding.PluginID, binding.OrganizationID, grant.IssuanceID, grant.Sequence)
+			_, err = tx.ExecContext(ctx, `UPDATE plugin_entitlement_bindings SET issuance_id=$4,grant_sequence=$5,observed_grace_at=NULL,observed_expired_at=NULL,revision=revision+1 WHERE installation_uuid=$1 AND plugin_id=$2 AND organization_uuid IS NOT DISTINCT FROM $3`, binding.InstallationID, binding.PluginID, scope, grant.IssuanceID, grant.Sequence)
 		}
 		if err != nil {
 			return false, err
@@ -259,10 +282,12 @@ func ImportPluginEntitlementRevocations(ctx context.Context, db Databaser, optio
 			bindings := []entitlements.Binding{}
 			for rows.Next() {
 				var binding entitlements.Binding
-				if err := rows.Scan(&binding.InstallationID, &binding.PluginID, &binding.OrganizationID); err != nil {
+				var organization uuid.NullUUID
+				if err := rows.Scan(&binding.InstallationID, &binding.PluginID, &organization); err != nil {
 					_ = rows.Close()
 					return false, err
 				}
+				binding.OrganizationID = organization.UUID
 				bindings = append(bindings, binding)
 			}
 			err = rows.Err()
@@ -274,7 +299,7 @@ func ImportPluginEntitlementRevocations(ctx context.Context, db Databaser, optio
 				if err := entitlementBindingLock(ctx, tx, binding); err != nil {
 					return false, err
 				}
-				if _, err := tx.ExecContext(ctx, `UPDATE plugin_entitlement_bindings SET revision=revision+1 WHERE installation_uuid=$1 AND plugin_id=$2 AND organization_uuid=$3`, binding.InstallationID, binding.PluginID, binding.OrganizationID); err != nil {
+				if _, err := tx.ExecContext(ctx, `UPDATE plugin_entitlement_bindings SET revision=revision+1 WHERE installation_uuid=$1 AND plugin_id=$2 AND organization_uuid IS NOT DISTINCT FROM $3`, binding.InstallationID, binding.PluginID, organizationScope(binding.OrganizationID)); err != nil {
 					return false, err
 				}
 			}
@@ -286,34 +311,50 @@ func ImportPluginEntitlementRevocations(ctx context.Context, db Databaser, optio
 	})
 }
 
-// DecidePluginEntitlementTx is the authoritative admission point. The caller
-// owns tx and must commit its effect in this same transaction. The verifier
-// reads only in-memory local trust and signed package metadata while locks are
-// held. A failed trust check still permits historical read/safety activation.
+// DecidePluginEntitlementTx is the authoritative admission point for the
+// organization of binding. The organization's own grant decides when it has
+// one, in feature set, validity and revocation alike; otherwise the
+// installation-wide grant does. Feature activations stay per organization.
+// The caller owns tx and must commit its effect in this same transaction. The
+// verifier reads only in-memory local trust and signed package metadata while
+// locks are held. A failed trust check still permits historical read/safety
+// activation.
+//
+// An organization grant imported while this decision locks the
+// installation-wide binding takes effect from the next decision: this one
+// orders before that import, which never changes the installation-wide
+// binding.
 func DecidePluginEntitlementTx(ctx context.Context, db Databaser, tx Tx, binding entitlements.Binding, feature string, access PluginEntitlementAccess, now time.Time, verify PluginGrantVerifier) (PluginEntitlementDecision, error) {
 	decision := PluginEntitlementDecision{Feature: feature, State: "not_entitled"}
 	if tx == nil || verify == nil || binding.InstallationID == uuid.Nil || binding.OrganizationID == uuid.Nil || binding.PluginID == "" || feature == "" || now.IsZero() {
 		return decision, NewErrBadRequest("exact entitlement decision inputs and caller transaction are required")
 	}
 	var issuer string
-	err := tx.QueryRowContext(ctx, `SELECT issuer FROM plugin_entitlement_bindings WHERE installation_uuid=$1 AND plugin_id=$2 AND organization_uuid=$3`, binding.InstallationID, binding.PluginID, binding.OrganizationID).Scan(&issuer)
+	var scope uuid.NullUUID
+	err := tx.QueryRowContext(ctx, `SELECT issuer,organization_uuid FROM plugin_entitlement_bindings WHERE installation_uuid=$1 AND plugin_id=$2
+		AND (organization_uuid=$3 OR organization_uuid IS NULL) ORDER BY organization_uuid NULLS LAST LIMIT 1`, binding.InstallationID, binding.PluginID, binding.OrganizationID).Scan(&issuer, &scope)
 	if errors.Is(err, sql.ErrNoRows) {
 		return decision, nil
 	}
 	if err != nil {
 		return decision, err
 	}
+	covering := entitlements.Binding{InstallationID: binding.InstallationID, PluginID: binding.PluginID, OrganizationID: scope.UUID}
+	decision.Scope = PluginGrantScopeInstallation
+	if scope.Valid {
+		decision.Scope = PluginGrantScopeOrganization
+	}
 	if err := entitlementIssuerLock(ctx, tx, issuer, false); err != nil {
 		return decision, err
 	}
-	if err := entitlementBindingLock(ctx, tx, binding); err != nil {
+	if err := entitlementBindingLock(ctx, tx, covering); err != nil {
 		return decision, err
 	}
 	issuerHint := issuer
 	var issuanceID uuid.UUID
 	var sequence, revision int64
 	var evaluated, observedGrace, observedExpired sql.NullTime
-	err = tx.QueryRowContext(ctx, `SELECT issuer,issuance_id,grant_sequence,evaluated_through,observed_grace_at,observed_expired_at,revision FROM plugin_entitlement_bindings WHERE installation_uuid=$1 AND plugin_id=$2 AND organization_uuid=$3 FOR UPDATE`, binding.InstallationID, binding.PluginID, binding.OrganizationID).Scan(&issuer, &issuanceID, &sequence, &evaluated, &observedGrace, &observedExpired, &revision)
+	err = tx.QueryRowContext(ctx, `SELECT issuer,issuance_id,grant_sequence,evaluated_through,observed_grace_at,observed_expired_at,revision FROM plugin_entitlement_bindings WHERE installation_uuid=$1 AND plugin_id=$2 AND organization_uuid IS NOT DISTINCT FROM $3 FOR UPDATE`, binding.InstallationID, binding.PluginID, scope).Scan(&issuer, &issuanceID, &sequence, &evaluated, &observedGrace, &observedExpired, &revision)
 	if err != nil {
 		return decision, err
 	}
@@ -336,19 +377,15 @@ func DecidePluginEntitlementTx(ctx context.Context, db Databaser, tx Tx, binding
 	if evaluated.Valid && evaluated.Time.After(effectiveNow) {
 		effectiveNow = evaluated.Time
 	}
+	stored := storedGrant{covering: covering, issuer: issuer, issuanceID: issuanceID, sequence: sequence, envelope: raw, digest: digest, trustClass: storedClass,
+		expiresAt: expiresAt, graceUntil: graceUntil}
 	verified, trustErr := verify(raw, effectiveNow)
-	trusted := trustErr == nil && verified.Issuer == issuer && verified.IssuanceID == issuanceID && verified.Sequence == sequence && verified.InstallationID == binding.InstallationID && verified.OrganizationID == binding.OrganizationID && verified.PluginID == binding.PluginID && string(verified.TrustClass) == storedClass && bytes.Equal(verified.Digest[:], digest) && bytes.Equal(verified.Envelope, raw) && verified.ExpiresAt == expiresAt.Unix() && verified.GraceUntil == graceUntil.Unix()
+	trusted := stored.trusts(verified, trustErr)
 	var revoked bool
 	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM plugin_entitlement_revocations WHERE issuer=$1 AND issuance_id=$2)`, issuer, issuanceID).Scan(&revoked); err != nil {
 		return decision, err
 	}
-	if !trusted {
-		decision.State = "untrusted"
-	} else if revoked {
-		decision.State = "revoked"
-	} else {
-		decision.State = string(entitlements.EvaluateTime(verified, effectiveNow.Unix()))
-	}
+	decision.State = grantState(verified, trusted, revoked, effectiveNow)
 	var lastIssuer string
 	var lastIssuance uuid.UUID
 	err = tx.QueryRowContext(ctx, `SELECT last_issuer,last_issuance_id FROM plugin_entitlement_feature_activations WHERE installation_uuid=$1 AND plugin_id=$2 AND organization_uuid=$3 AND feature=$4`, binding.InstallationID, binding.PluginID, binding.OrganizationID, feature).Scan(&lastIssuer, &lastIssuance)
@@ -377,18 +414,21 @@ func DecidePluginEntitlementTx(ctx context.Context, db Databaser, tx Tx, binding
 	graceObserved := decision.State == string(entitlements.Grace) && !observedGrace.Valid
 	expiryObserved := decision.State == string(entitlements.Expired) && !observedExpired.Valid
 	if !evaluated.Valid || effectiveNow.After(evaluated.Time) || graceObserved || expiryObserved || activationChanged {
-		if err := tx.QueryRowContext(ctx, `UPDATE plugin_entitlement_bindings SET evaluated_through=$4,observed_grace_at=CASE WHEN $5 AND observed_grace_at IS NULL THEN $4 ELSE observed_grace_at END,observed_expired_at=CASE WHEN $6 AND observed_expired_at IS NULL THEN $4 ELSE observed_expired_at END,revision=revision+1 WHERE installation_uuid=$1 AND plugin_id=$2 AND organization_uuid=$3 RETURNING revision`, binding.InstallationID, binding.PluginID, binding.OrganizationID, effectiveNow, graceObserved, expiryObserved).Scan(&decision.Revision); err != nil {
+		if err := tx.QueryRowContext(ctx, `UPDATE plugin_entitlement_bindings SET evaluated_through=$4,observed_grace_at=CASE WHEN $5 AND observed_grace_at IS NULL THEN $4 ELSE observed_grace_at END,observed_expired_at=CASE WHEN $6 AND observed_expired_at IS NULL THEN $4 ELSE observed_expired_at END,revision=revision+1 WHERE installation_uuid=$1 AND plugin_id=$2 AND organization_uuid IS NOT DISTINCT FROM $3 RETURNING revision`, binding.InstallationID, binding.PluginID, scope, effectiveNow, graceObserved, expiryObserved).Scan(&decision.Revision); err != nil {
 			return decision, err
 		}
 	}
 	var auditDigest [32]byte
 	copy(auditDigest[:], sourceDigest)
+	// A feature activation belongs to the organization; grace and expiry to
+	// the covering grant's binding.
 	for _, event := range []struct {
-		active bool
-		kind   string
-	}{{activationChanged, "feature_activated"}, {graceObserved, "grace_observed"}, {expiryObserved, "expiry_observed"}} {
+		active  bool
+		kind    string
+		binding *entitlements.Binding
+	}{{activationChanged, "feature_activated", &binding}, {graceObserved, "grace_observed", &covering}, {expiryObserved, "expiry_observed", &covering}} {
 		if event.active {
-			if err := entitlementAudit(ctx, db, tx, issuer, &binding, event.kind, sequence, entitlements.TrustClass(storedClass), importer, auditDigest); err != nil {
+			if err := entitlementAudit(ctx, db, tx, issuer, event.binding, event.kind, sequence, entitlements.TrustClass(storedClass), importer, auditDigest); err != nil {
 				return decision, err
 			}
 		}
@@ -424,11 +464,13 @@ func SweepPluginEntitlementBoundaries(ctx context.Context, db Databaser, now tim
 	candidates := []candidate{}
 	for rows.Next() {
 		var item candidate
-		if err := rows.Scan(&item.binding.InstallationID, &item.binding.PluginID, &item.binding.OrganizationID, &item.issuer); err != nil {
+		var organization uuid.NullUUID
+		if err := rows.Scan(&item.binding.InstallationID, &item.binding.PluginID, &organization, &item.issuer); err != nil {
 			_ = rows.Close()
 			_ = tx.Rollback()
 			return 0, err
 		}
+		item.binding.OrganizationID = organization.UUID
 		candidates = append(candidates, item)
 	}
 	err = rows.Err()
@@ -458,7 +500,7 @@ func SweepPluginEntitlementBoundaries(ctx context.Context, db Databaser, now tim
 		var source []byte
 		err = effectTx.QueryRowContext(ctx, `SELECT b.issuer,b.grant_sequence,b.evaluated_through,b.observed_grace_at,b.observed_expired_at,g.expires_at,g.grace_until,g.trust_class,g.importer,g.source_digest
 			FROM plugin_entitlement_bindings b JOIN plugin_entitlement_grants g ON g.issuer=b.issuer AND g.issuance_id=b.issuance_id
-			WHERE b.installation_uuid=$1 AND b.plugin_id=$2 AND b.organization_uuid=$3 FOR UPDATE OF b`, item.binding.InstallationID, item.binding.PluginID, item.binding.OrganizationID).Scan(&issuer, &sequence, &evaluated, &graceObserved, &expiryObserved, &expiresAt, &graceUntil, &trustClass, &importer, &source)
+			WHERE b.installation_uuid=$1 AND b.plugin_id=$2 AND b.organization_uuid IS NOT DISTINCT FROM $3 FOR UPDATE OF b`, item.binding.InstallationID, item.binding.PluginID, organizationScope(item.binding.OrganizationID)).Scan(&issuer, &sequence, &evaluated, &graceObserved, &expiryObserved, &expiresAt, &graceUntil, &trustClass, &importer, &source)
 		if err != nil || issuer != item.issuer {
 			_ = effectTx.Rollback()
 			if err == nil {
@@ -476,7 +518,7 @@ func SweepPluginEntitlementBoundaries(ctx context.Context, db Databaser, now tim
 			_ = effectTx.Rollback()
 			continue
 		}
-		if _, err := effectTx.ExecContext(ctx, `UPDATE plugin_entitlement_bindings SET evaluated_through=$4,observed_grace_at=CASE WHEN $5 THEN $4 ELSE observed_grace_at END,observed_expired_at=CASE WHEN $6 THEN $4 ELSE observed_expired_at END,revision=revision+1 WHERE installation_uuid=$1 AND plugin_id=$2 AND organization_uuid=$3`, item.binding.InstallationID, item.binding.PluginID, item.binding.OrganizationID, effectiveNow, markGrace, markExpired); err != nil {
+		if _, err := effectTx.ExecContext(ctx, `UPDATE plugin_entitlement_bindings SET evaluated_through=$4,observed_grace_at=CASE WHEN $5 THEN $4 ELSE observed_grace_at END,observed_expired_at=CASE WHEN $6 THEN $4 ELSE observed_expired_at END,revision=revision+1 WHERE installation_uuid=$1 AND plugin_id=$2 AND organization_uuid IS NOT DISTINCT FROM $3`, item.binding.InstallationID, item.binding.PluginID, organizationScope(item.binding.OrganizationID), effectiveNow, markGrace, markExpired); err != nil {
 			_ = effectTx.Rollback()
 			return observed, err
 		}

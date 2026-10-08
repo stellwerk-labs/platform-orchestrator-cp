@@ -113,6 +113,10 @@ type PluginEnablement struct {
 	// CapabilityRegistration tells whether IAM holds the capability
 	// declarations of the served package for this organization.
 	CapabilityRegistration PluginCapabilityRegistration `json:"capability_registration"`
+	// EntitlementGrant is the grant that covers the organization when the
+	// served package requires a licence: the organization's own grant or
+	// else the installation-wide grant. Reads derive it; it is not stored.
+	EntitlementGrant *PluginEntitlementGrantStatus `json:"entitlement_grant,omitempty"`
 }
 
 // Capability registration states of an enablement.

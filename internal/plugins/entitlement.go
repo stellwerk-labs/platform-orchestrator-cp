@@ -34,8 +34,11 @@ type FeatureAccess struct {
 }
 
 type EntitlementStatus struct {
-	Features map[string]FeatureAccess `json:"features"`
-	Warning  *EntitlementWarning      `json:"warning,omitempty"`
+	// GrantScope names the grant that covers the organization: its own
+	// organization grant or the installation-wide grant. Empty without one.
+	GrantScope string                   `json:"grant_scope,omitempty"`
+	Features   map[string]FeatureAccess `json:"features"`
+	Warning    *EntitlementWarning      `json:"warning,omitempty"`
 }
 
 // EntitlementGraceWarning is the stable code clients key on. The message is
@@ -198,7 +201,7 @@ func (r *InstallationRegistry) applyEntitlement(ctx context.Context, org string,
 
 func projectEntitlement(item Installation, descriptor Descriptor, status EntitlementStatus) Descriptor {
 	// A resolver cannot advertise a feature that was not in the signed manifest.
-	filtered := EntitlementStatus{Features: map[string]FeatureAccess{}}
+	filtered := EntitlementStatus{GrantScope: status.GrantScope, Features: map[string]FeatureAccess{}}
 	forward, retained := false, false
 	for _, feature := range item.Entitlement.Features {
 		access, found := status.Features[feature]

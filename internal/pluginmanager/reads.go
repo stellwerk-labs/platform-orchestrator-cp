@@ -52,7 +52,7 @@ func (m *Manager) Installations(ctx context.Context) (InstallationPage, error) {
 		}
 		page.Items = make([]Installation, 0, len(installations))
 		for _, installation := range installations {
-			item, err := describe(ctx, tx, installation, page.Revision)
+			item, err := m.describe(ctx, tx, installation, page.Revision)
 			if err != nil {
 				return err
 			}
@@ -74,7 +74,7 @@ func (m *Manager) Installation(ctx context.Context, id uuid.UUID) (Installation,
 		if err != nil {
 			return err
 		}
-		result, err = describe(ctx, tx, installation, revision)
+		result, err = m.describe(ctx, tx, installation, revision)
 		return err
 	})
 	return result, err

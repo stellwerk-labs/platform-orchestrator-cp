@@ -8,6 +8,8 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -275,6 +277,164 @@ func TestPluginEntitlementSweepPersistsBoundaries(t *testing.T) {
 	require.NoError(t, f.db.(*databaser).DB.QueryRowContext(t.Context(), `SELECT observed_grace_at,observed_expired_at FROM plugin_entitlement_bindings`).Scan(&grace, &expiry))
 	require.True(t, grace.Valid)
 	require.True(t, expiry.Valid)
+}
+
+// installationGrant signs a grant without an organization: it covers every
+// organization of the fixture's installation.
+func (f entitlementFixture) installationGrant(t *testing.T, issuance uuid.UUID, sequence, expires, grace uint64, features []string, limit uint64) entitlements.Grant {
+	t.Helper()
+	limits := map[string]uint64{}
+	if limit != 0 {
+		limits["organizations"] = limit
+	}
+	claims := map[uint64]any{1: uint64(1), 2: "grant", 3: "development.example", 4: issuance[:], 5: sequence, 6: f.binding.PluginID, 7: f.binding.InstallationID[:], 9: features, 10: limits, 11: uint64(100), 12: uint64(100), 13: expires, 14: grace, 15: "development"}
+	scope := f.binding
+	scope.OrganizationID = uuid.Nil
+	grant, err := entitlements.VerifyGrant(f.sign(t, claims), f.trust, entitlements.Development, scope, time.Unix(100, 0))
+	require.NoError(t, err)
+	require.True(t, grant.InstallationWide())
+	return grant
+}
+
+// decideFor decides feature for the organization with UUID org of the
+// fixture's installation.
+func (f entitlementFixture) decideFor(t *testing.T, org uuid.UUID, now int64, feature string, activate bool) PluginEntitlementDecision {
+	t.Helper()
+	binding := f.binding
+	binding.OrganizationID = org
+	tx, err := f.db.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	defer func() { _ = tx.Rollback() }()
+	decision, err := DecidePluginEntitlementTx(t.Context(), f.db, tx, binding, feature, PluginEntitlementAccess{Enabled: true, Retained: true, Compatible: true, Activate: activate}, time.Unix(now, 0),
+		func(raw []byte, now time.Time) (entitlements.Grant, error) {
+			return entitlements.VerifyGrant(raw, f.trust, entitlements.Development, binding, now)
+		})
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
+	return decision
+}
+
+func TestAnInstallationWideGrantCoversEveryOrganizationWithoutAGrantOfItsOwn(t *testing.T) {
+	f := newEntitlementFixture(t)
+	ctx := t.Context()
+	db := f.db.(*databaser).DB
+	source := sha256.Sum256([]byte("operator-file"))
+	acme := f.binding.OrganizationID
+	later, err := f.db.CreateOrg(ctx, nil, &Org{Id: "later-" + uuid.NewString(), CreatedAt: time.Now(), CreatedBy: uuid.New(), Source: OrgSourceInternal, Plan: OrgPlanCustom})
+	require.NoError(t, err)
+	wide := f.installationGrant(t, uuid.New(), 1, 200, 250, []string{"feature-a"}, 2)
+	imported, err := ImportPluginEntitlementGrant(ctx, f.db, nil, wide, "internal_system", source)
+	require.NoError(t, err)
+	require.True(t, imported)
+	var stored string
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT COALESCE(organization_uuid::text,'none') || ' ' || limits::text FROM plugin_entitlement_grants`).Scan(&stored))
+	require.Equal(t, `none {"organizations": 2}`, stored, "an installation-wide grant names no organization")
+
+	// It covers every organization, also one created after the import.
+	for _, org := range []uuid.UUID{acme, later.Uuid} {
+		decision := f.decideFor(t, org, 150, "feature-a", true)
+		require.True(t, decision.Forward, org)
+		require.Equal(t, PluginGrantScopeInstallation, decision.Scope)
+	}
+	var activations string
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT string_agg(organization_uuid::text, ' ' ORDER BY organization_uuid::text) FROM plugin_entitlement_feature_activations`).Scan(&activations))
+	expected := []string{acme.String(), later.Uuid.String()}
+	slices.Sort(expected)
+	require.Equal(t, strings.Join(expected, " "), activations, "features activate per organization")
+	var audited string
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT string_agg(COALESCE(organization_uuid::text, 'none'), ' ' ORDER BY organization_uuid::text) FROM plugin_entitlement_audit_events WHERE kind='feature_activated'`).Scan(&audited))
+	require.Equal(t, strings.Join(expected, " "), audited, "each activation is audited for its organization")
+	require.Equal(t, int64(2), f.organizationLimit(t))
+
+	// An organization grant wins for its organization, in features and
+	// validity: acme's own grant licenses only feature-b and has expired.
+	own := f.grant(t, uuid.New(), 1, 100, 120, 130, []string{"feature-b"})
+	_, err = ImportPluginEntitlementGrant(ctx, f.db, nil, own, "internal_system", source)
+	require.NoError(t, err)
+	decision := f.decideFor(t, acme, 150, "feature-a", false)
+	require.Equal(t, PluginGrantScopeOrganization, decision.Scope)
+	require.Equal(t, "expired", decision.State)
+	require.False(t, decision.Forward, "acme's own grant decides, not the installation-wide one")
+	require.True(t, decision.Read, "feature-a stays readable where it was activated")
+	require.True(t, f.decideFor(t, later.Uuid, 150, "feature-a", false).Forward, "the other organization keeps the installation-wide grant")
+
+	// A higher sequence replaces the installation-wide grant, a lower one is
+	// refused, and the same sequence with other content conflicts.
+	renewal := f.installationGrant(t, uuid.New(), 2, 400, 450, []string{"feature-a"}, 0)
+	_, err = ImportPluginEntitlementGrant(ctx, f.db, nil, renewal, "internal_system", source)
+	require.NoError(t, err)
+	renewed := f.decideFor(t, later.Uuid, 300, "feature-a", false)
+	require.Equal(t, "valid", renewed.State)
+	require.Equal(t, int64(400), renewed.ExpiresAt.Unix())
+	require.Zero(t, f.organizationLimit(t), "the renewal carries no limit")
+	_, err = ImportPluginEntitlementGrant(ctx, f.db, nil, wide, "internal_system", source)
+	require.ErrorContains(t, err, "stale")
+	_, err = ImportPluginEntitlementGrant(ctx, f.db, nil, f.installationGrant(t, uuid.New(), 2, 500, 550, []string{"feature-a"}, 0), "internal_system", source)
+	require.ErrorContains(t, err, "same grant sequence")
+
+	// Revoking the installation-wide grant revokes it for every
+	// organization it covers, and only those. The revocation advances the
+	// binding's revision like every change of its decision.
+	_, err = ImportPluginEntitlementRevocations(ctx, f.db, nil, f.revocations(t, 1, renewal.IssuanceID), "internal_system", source)
+	require.NoError(t, err)
+	revoked := f.decideFor(t, later.Uuid, 300, "feature-a", false)
+	require.Equal(t, "revoked", revoked.State)
+	require.Equal(t, renewed.Revision+1, revoked.Revision)
+	require.Equal(t, PluginGrantScopeOrganization, f.decideFor(t, acme, 300, "feature-b", false).Scope)
+
+	// Grace and expiry of the installation-wide grant are observed on its
+	// own binding, and audited without an organization.
+	expiring := f.installationGrant(t, uuid.New(), 3, 600, 650, []string{"feature-a"}, 0)
+	_, err = ImportPluginEntitlementGrant(ctx, f.db, nil, expiring, "internal_system", source)
+	require.NoError(t, err)
+	count, err := SweepPluginEntitlementBoundaries(ctx, f.db, time.Unix(650, 0), 100)
+	require.NoError(t, err)
+	require.Equal(t, 1, count, "acme's own expiry was observed by its decision already")
+	var unscoped int
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT count(*) FROM plugin_entitlement_audit_events WHERE kind='expiry_observed' AND organization_uuid IS NULL`).Scan(&unscoped))
+	require.Equal(t, 1, unscoped)
+
+	// Storage holds one current installation-wide binding and one grant per
+	// issuer, binding and sequence, NULL organization included.
+	_, err = db.ExecContext(ctx, `INSERT INTO plugin_entitlement_bindings (installation_uuid,plugin_id,organization_uuid,issuer,issuance_id,grant_sequence,revision)
+		VALUES ($1,$2,NULL,'development.example',$3,3,1)`, f.binding.InstallationID, f.binding.PluginID, expiring.IssuanceID)
+	require.ErrorContains(t, err, "plugin_entitlement_bindings_key")
+	_, err = db.ExecContext(ctx, `INSERT INTO plugin_entitlement_grants (issuer,issuance_id,grant_sequence,installation_uuid,plugin_id,organization_uuid,cose,digest,key_id,features,limits,issued_at,not_before,expires_at,grace_until,trust_class,importer,source_digest)
+		SELECT issuer,$1,grant_sequence,installation_uuid,plugin_id,organization_uuid,cose,digest,key_id,features,limits,issued_at,not_before,expires_at,grace_until,trust_class,importer,source_digest
+		FROM plugin_entitlement_grants WHERE issuance_id=$2`, uuid.New(), expiring.IssuanceID)
+	require.ErrorContains(t, err, "plugin_entitlement_grants_sequence_key")
+	_, err = db.ExecContext(ctx, `UPDATE plugin_entitlement_grants SET limits='{"organizations": 3}' WHERE issuance_id=$1`, own.IssuanceID)
+	require.ErrorContains(t, err, "plugin_entitlement_grants_limits_scope", "only an installation-wide grant limits organizations")
+}
+
+// organizationLimit reads the organization limit of the fixture's
+// installation.
+func (f entitlementFixture) organizationLimit(t *testing.T) int64 {
+	t.Helper()
+	tx, err := f.db.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	defer func() { _ = tx.Rollback() }()
+	limit, err := PluginOrganizationLimit(t.Context(), tx, f.binding.InstallationID, f.binding.PluginID)
+	require.NoError(t, err)
+	return limit
+}
+
+func TestInstallationWideGrantsBlockTheDowngrade(t *testing.T) {
+	f := newEntitlementFixture(t)
+	provider := extensionMigrationProvider(t, f.db)
+	wide := f.installationGrant(t, uuid.New(), 1, 200, 250, []string{"feature-a"}, 0)
+	_, err := ImportPluginEntitlementGrant(t.Context(), f.db, nil, wide, "internal_system", sha256.Sum256([]byte("operator-file")))
+	require.NoError(t, err)
+	_, err = provider.DownTo(t.Context(), 47)
+	require.ErrorContains(t, err, "cannot downgrade while installation-wide entitlement grants exist")
+	_, err = f.db.(*databaser).ExecContext(t.Context(), `DELETE FROM plugin_entitlement_bindings`)
+	require.NoError(t, err)
+	_, err = f.db.(*databaser).ExecContext(t.Context(), `DELETE FROM plugin_entitlement_grants`)
+	require.NoError(t, err)
+	_, err = provider.DownTo(t.Context(), 47)
+	require.NoError(t, err)
+	_, err = provider.UpTo(t.Context(), 48)
+	require.NoError(t, err)
 }
 
 func TestPluginEntitlementImportRollbackLeavesNoEvidence(t *testing.T) {

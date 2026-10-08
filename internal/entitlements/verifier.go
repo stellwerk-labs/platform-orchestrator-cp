@@ -56,6 +56,10 @@ type TrustStore struct {
 	Issuers []Issuer
 }
 
+// Binding is what a grant must fit. OrganizationID names the organization a
+// grant is to cover: its own organization grant or an installation-wide grant
+// fits. uuid.Nil asks for the installation scope, which only an
+// installation-wide grant fits.
 type Binding struct {
 	PluginID         string
 	InstallationID   uuid.UUID
@@ -63,6 +67,14 @@ type Binding struct {
 	DeclaredFeatures []string
 }
 
+// LimitOrganizations is the one limit name of the v1 profile: the number of
+// organizations an installation-wide grant lets Core enable.
+const LimitOrganizations = "organizations"
+
+// Grant is a verified grant. OrganizationID is uuid.Nil for an
+// installation-wide grant (claim 8 absent), which covers every organization
+// of the installation; OrganizationLimit is then its optional cap on enabled
+// organizations, zero for none.
 type Grant struct {
 	Envelope          []byte
 	Issuer            string
@@ -74,7 +86,7 @@ type Grant struct {
 	OrganizationID    uuid.UUID
 	Features          []string
 	EffectiveFeatures []string
-	Limits            map[string]int64
+	OrganizationLimit int64
 	IssuedAt          int64
 	NotBefore         int64
 	ExpiresAt         int64
@@ -129,9 +141,18 @@ func init() {
 	}
 }
 
-// VerifyGrant authenticates an exact installation and organisation grant.
-// Grant features absent from the signed package declaration remain in Features
-// for audit but are omitted from EffectiveFeatures. V1 accepts no limits.
+// InstallationWide reports whether the grant covers every organization of
+// its installation.
+func (g Grant) InstallationWide() bool {
+	return g.OrganizationID == uuid.Nil
+}
+
+// VerifyGrant authenticates a grant of the binding's plugin and installation
+// that fits the binding's scope: an organization grant only for exactly its
+// organization, an installation-wide grant for every organization and for the
+// installation scope. Grant features absent from the signed package
+// declaration remain in Features for audit but are omitted from
+// EffectiveFeatures.
 func VerifyGrant(raw []byte, trust TrustStore, mode TrustClass, binding Binding, now time.Time) (Grant, error) {
 	var out Grant
 	if err := validateBinding(binding); err != nil {
@@ -155,7 +176,8 @@ func VerifyGrant(raw []byte, trust TrustStore, mode TrustClass, binding Binding,
 	if claims.TrustClass != mode {
 		return out, errors.New("signed entitlement trust class does not match verifier mode")
 	}
-	if claims.PluginID != binding.PluginID || claims.InstallationID != binding.InstallationID || claims.OrganizationID != binding.OrganizationID {
+	if claims.PluginID != binding.PluginID || claims.InstallationID != binding.InstallationID ||
+		(!claims.InstallationWide() && claims.OrganizationID != binding.OrganizationID) {
 		return out, errors.New("entitlement binding mismatch")
 	}
 	if err := checkIssuedAt(claims.IssuedAt, now); err != nil {
@@ -285,16 +307,20 @@ func decodeMajor(raw []byte, major byte, dst any) error {
 	return decodeMode.Unmarshal(raw, dst)
 }
 
-func decodeMap(raw []byte, fields int) (map[uint64]cbor.RawMessage, error) {
+// decodeMap decodes a claim map with the labels 1 to fields, each present
+// unless it is optional, and no other label.
+func decodeMap(raw []byte, fields uint64, optional ...uint64) (map[uint64]cbor.RawMessage, error) {
 	var values map[uint64]cbor.RawMessage
 	if err := decodeMajor(raw, 5, &values); err != nil {
 		return nil, err
 	}
-	if len(values) != fields {
-		return nil, errors.New("missing or unknown entitlement claim")
+	for label := range values {
+		if label < 1 || label > fields {
+			return nil, errors.New("missing or unknown entitlement claim")
+		}
 	}
-	for label := 1; label <= fields; label++ {
-		if _, ok := values[uint64(label)]; !ok {
+	for label := uint64(1); label <= fields; label++ {
+		if _, ok := values[label]; !ok && !slices.Contains(optional, label) {
 			return nil, errors.New("missing or unknown entitlement claim")
 		}
 	}
@@ -311,7 +337,9 @@ func field[T any](values map[uint64]cbor.RawMessage, label uint64, major byte) (
 
 func decodeGrant(raw []byte) (Grant, error) {
 	var out Grant
-	values, err := decodeMap(raw, 15)
+	// Claim 8, the organization, is the only optional claim: without it the
+	// grant covers the whole installation.
+	values, err := decodeMap(raw, 15, 8)
 	if err != nil {
 		return out, err
 	}
@@ -348,21 +376,34 @@ func decodeGrant(raw []byte) (Grant, error) {
 	if out.InstallationID, err = parseUUID(installation); err != nil {
 		return out, err
 	}
-	organization, err := field[[]byte](values, 8, 2)
-	if err != nil {
-		return out, err
-	}
-	if out.OrganizationID, err = parseUUID(organization); err != nil {
-		return out, err
+	_, scoped := values[8]
+	var organization []byte
+	if scoped {
+		if organization, err = field[[]byte](values, 8, 2); err != nil {
+			return out, err
+		}
+		if out.OrganizationID, err = parseUUID(organization); err != nil {
+			return out, err
+		}
 	}
 	if out.Features, err = field[[]string](values, 9, 4); err != nil || len(out.Features) < 1 || len(out.Features) > 64 || !sortedSlugs(out.Features) {
 		return out, errors.New("invalid grant features")
 	}
+	// Claim 10 is empty or caps the organizations of an installation-wide
+	// grant at 1 to MaxInt64.
 	limits, err := field[map[string]uint64](values, 10, 5)
-	if err != nil || len(limits) != 0 {
+	if err != nil {
 		return out, errors.New("unsupported grant limits")
 	}
-	out.Limits = map[string]int64{}
+	for name, value := range limits {
+		if name != LimitOrganizations || value == 0 || value > math.MaxInt64 {
+			return out, errors.New("unsupported grant limits")
+		}
+		out.OrganizationLimit = int64(value)
+	}
+	if out.OrganizationLimit != 0 && scoped {
+		return out, errors.New("the organization limit belongs to installation-wide grants")
+	}
 	issued, err := field[uint64](values, 11, 0)
 	if err != nil || issued > math.MaxInt64 {
 		return out, errors.New("invalid issued_at")
@@ -385,11 +426,15 @@ func decodeGrant(raw []byte) (Grant, error) {
 		return out, errors.New("invalid signed grant trust class")
 	}
 	out.TrustClass = TrustClass(trustClass)
-	canonical, err := encodeMode.Marshal(map[uint64]any{
+	claims := map[uint64]any{
 		1: version, 2: kind, 3: out.Issuer, 4: issuance, 5: sequence,
-		6: out.PluginID, 7: installation, 8: organization, 9: out.Features,
+		6: out.PluginID, 7: installation, 9: out.Features,
 		10: limits, 11: issued, 12: notBefore, 13: expires, 14: graceUntil, 15: trustClass,
-	})
+	}
+	if scoped {
+		claims[8] = organization
+	}
+	canonical, err := encodeMode.Marshal(claims)
 	if err != nil || !bytes.Equal(raw, canonical) {
 		return Grant{}, errors.New("non-deterministic grant payload")
 	}
@@ -485,7 +530,7 @@ func asciiIdentifier(value string) bool {
 }
 
 func validateBinding(binding Binding) error {
-	if len(binding.PluginID) > 255 || !pluginID.MatchString(binding.PluginID) || binding.InstallationID == uuid.Nil || binding.OrganizationID == uuid.Nil {
+	if len(binding.PluginID) > 255 || !pluginID.MatchString(binding.PluginID) || binding.InstallationID == uuid.Nil {
 		return errors.New("invalid expected entitlement binding")
 	}
 	if !sortedSlugs(binding.DeclaredFeatures) {

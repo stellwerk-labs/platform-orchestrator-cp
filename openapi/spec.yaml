@@ -282,7 +282,7 @@ paths:
     post:
       operationId: importPluginEntitlementBundle
       summary: Import signed entitlement grants and revocations.
-      description: Requires plugin_manager_write. Each document must verify against the configured issuer trust; a grant must match exactly the installation UUID, plugin and organization of an enabled installation. A rejected document is reported and never blocks the others. Imports take effect without a restart.
+      description: Requires plugin_manager_write. Each document must verify against the configured issuer trust. An organization grant must match exactly the installation UUID, plugin and organization of an enablement; an installation-wide grant (no organization) must match the installation UUID and plugin of an installed, active or disabled installation, also before any organization is enabled, and covers every organization without a grant of its own, including organizations created later. A higher sequence replaces the current grant of the same binding (plugin, installation and organization, or plugin and installation). A rejected document is reported and never blocks the others. Imports take effect without a restart.
       tags: [Plugin Manager]
       security: [{userIdHeader: []}]
       parameters:
@@ -3667,6 +3667,7 @@ components:
           type: array
           description: Every organization the installation is enabled for, ordered by organization ID.
           items: {$ref: '#/components/schemas/PluginEnablement'}
+        entitlement: {$ref: '#/components/schemas/PluginInstallationEntitlement'}
         pending_organizations:
           type: array
           description: Only in organization mode all, absent when empty. The active organizations without an enablement, ordered by ID, which Core could not enable when they were created because the plugin host was off. Setting mode all again enables them.
@@ -3730,6 +3731,42 @@ components:
         updated_at: {type: string, format: date-time}
         updated_by: {type: string, format: uuid}
         capability_registration: {$ref: '#/components/schemas/PluginCapabilityRegistration'}
+        entitlement_grant:
+          description: Only when the served package requires a licence. The grant that covers the organization, its own organization grant or else the installation-wide grant; absent while none does, and the organization is then not entitled.
+          allOf:
+            - {$ref: '#/components/schemas/PluginEntitlementGrant'}
+    PluginInstallationEntitlement:
+      type: object
+      description: Only when the served package requires a licence. Each enablement shows the grant that covers its organization.
+      required: [enabled_organizations]
+      properties:
+        installation_grant: {$ref: '#/components/schemas/PluginEntitlementGrant'}
+        enabled_organizations: {type: integer, minimum: 0, description: "The enabled enablements of the installation, which the installation-wide grant's organization_limit caps."}
+    PluginEntitlementGrant:
+      type: object
+      description: An imported grant as an operator sees it. Core decides with the grant that covers an organization; plugins see only the non-secret feature projection.
+      required: [scope, issuer, issuance_id, sequence, features, trust_class, not_before, expires_at, grace_until, state]
+      properties:
+        scope: {$ref: '#/components/schemas/PluginGrantScope'}
+        issuer: {type: string}
+        issuance_id: {type: string, format: uuid}
+        sequence: {type: integer, format: int64, minimum: 1}
+        features:
+          type: array
+          items: {type: string}
+        organization_limit: {type: integer, format: int64, minimum: 1, description: Only on an installation-wide grant that carries one. The number of organizations the installation may enable.}
+        trust_class:
+          type: string
+          enum: [production, development]
+          x-enum-varnames: [PluginEntitlementGrantTrustClassProduction, PluginEntitlementGrantTrustClassDevelopment]
+        not_before: {type: string, format: date-time}
+        expires_at: {type: string, format: date-time}
+        grace_until: {type: string, format: date-time}
+        state:
+          type: string
+          enum: [valid, grace, expired, not_yet_valid, revoked, untrusted]
+          x-enum-varnames: [PluginEntitlementGrantStateValid, PluginEntitlementGrantStateGrace, PluginEntitlementGrantStateExpired, PluginEntitlementGrantStateNotYetValid, PluginEntitlementGrantStateRevoked, PluginEntitlementGrantStateUntrusted]
+          description: The grant's state under the current issuer trust, never earlier than the time Core's decisions observed.
     PluginInstallationPage:
       type: object
       required: [revision, items]
@@ -4334,11 +4371,17 @@ components:
       description: Non-secret server-derived licence projection. Neither this projection nor a capability grants IAM permissions or authorizes execution.
       required: [features]
       properties:
+        grant_scope: {$ref: '#/components/schemas/PluginGrantScope'}
         features:
           type: object
           additionalProperties:
             $ref: '#/components/schemas/PluginFeatureAccess'
         warning: {$ref: '#/components/schemas/PluginEntitlementWarning'}
+    PluginGrantScope:
+      type: string
+      description: 'The grant that covers the organization: organization when the organization has a grant of its own, which then decides alone (feature set, validity and revocation), installation when the installation-wide grant covers it. Absent while no grant covers the organization, which is then not entitled.'
+      enum: [organization, installation]
+      x-enum-varnames: [PluginGrantScopeOrganization, PluginGrantScopeInstallation]
     PluginEntitlementWarning:
       type: object
       description: Machine-readable licence warning that never changes authorization. While a declared feature is in its signed grace period, forward work still succeeds. After grace_until forward work is refused with plugin_not_entitled; read, export, cancel and rollback remain available.

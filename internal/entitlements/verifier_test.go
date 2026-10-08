@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/hex"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -323,6 +324,140 @@ func TestCurrentTrustAndKeyValidity(t *testing.T) {
 	trust.Issuers = nil
 	if _, err := VerifyGrant(raw, trust, Production, binding, time.Unix(100, 0)); err == nil {
 		t.Fatal("removed issuer still grants authority")
+	}
+}
+
+// Golden grant payloads of the licence tool, copied from
+// progressive-rollouts-plugin tools/licence/internal/wire/wire_test.go
+// (goldenOrganizationGrant, goldenInstallationGrant,
+// goldenInstallationGrantWithLimit): Core must accept exactly the bytes the
+// tool signs. The installation-wide grants have fourteen claims (map header
+// 0xae) because claim 8 is absent; the last one carries claim 10
+// {"organizations": 25}.
+const (
+	toolOrganizationGrant          = "af010102656772616e7403697374656c6c7765726b0450ec3dd34205b24c0ab3929fa998e1c81d05070678226465762e7374656c6c7765726b2e70726f67726573736976652d726f6c6c6f75747307504ec3e35b80fb426faeb596bcd0b2f94c0850680e8afdb0f84d13b64a22f4aca4118b09817470726f67726573736976652d726f6c6c6f7574730aa00b1a6ac4e2c00c1a6ac4e2c00d1a6ac634400e1a6ac785c00f6a70726f64756374696f6e"
+	toolInstallationGrant          = "ae010102656772616e7403697374656c6c7765726b0450ec3dd34205b24c0ab3929fa998e1c81d05070678226465762e7374656c6c7765726b2e70726f67726573736976652d726f6c6c6f75747307504ec3e35b80fb426faeb596bcd0b2f94c09817470726f67726573736976652d726f6c6c6f7574730aa00b1a6ac4e2c00c1a6ac4e2c00d1a6ac634400e1a6ac785c00f6a70726f64756374696f6e"
+	toolInstallationGrantWithLimit = "ae010102656772616e7403697374656c6c7765726b0450ec3dd34205b24c0ab3929fa998e1c81d05070678226465762e7374656c6c7765726b2e70726f67726573736976652d726f6c6c6f75747307504ec3e35b80fb426faeb596bcd0b2f94c09817470726f67726573736976652d726f6c6c6f7574730aa16d6f7267616e697a6174696f6e7318190b1a6ac4e2c00c1a6ac4e2c00d1a6ac634400e1a6ac785c00f6a70726f64756374696f6e"
+)
+
+func TestLicenceToolGoldenGrantsVerifyForTheirScope(t *testing.T) {
+	public, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const plugin = "dev.stellwerk.progressive-rollouts"
+	trust := TrustStore{Class: Production, Issuers: []Issuer{{ID: "stellwerk", PluginIDs: []string{plugin},
+		Keys: []Key{{ID: []byte("tool-key"), PublicKey: public, Purposes: []Purpose{GrantPurpose}}}}}}
+	issued := time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC)
+	other := uuid.MustParse("0f6b2a62-9a3e-4f0e-8d1c-3b7a5e9c2d41")
+	for _, c := range []struct {
+		name         string
+		payload      string
+		organization uuid.UUID
+		limit        int64
+	}{
+		{"organization grant", toolOrganizationGrant, testOrganization, 0},
+		{"installation-wide grant", toolInstallationGrant, uuid.Nil, 0},
+		{"installation-wide grant with limit", toolInstallationGrantWithLimit, uuid.Nil, 25},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			payload, err := hex.DecodeString(c.payload)
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw := signIndependent(t, payload, private, encoded(t, map[int]any{1: -8, 4: []byte("tool-key")}))
+			fits := map[string]uuid.UUID{"its organization": testOrganization, "another organization": other, "the installation scope": uuid.Nil}
+			for scope, organization := range fits {
+				binding := Binding{PluginID: plugin, InstallationID: testInstallation, OrganizationID: organization, DeclaredFeatures: []string{"progressive-rollouts"}}
+				grant, err := VerifyGrant(raw, trust, Production, binding, issued)
+				if c.organization != uuid.Nil && organization != c.organization {
+					if err == nil {
+						t.Fatalf("an organization grant fit %s", scope)
+					}
+					continue
+				}
+				if err != nil {
+					t.Fatalf("%s: %v", scope, err)
+				}
+				want := Grant{Issuer: "stellwerk", IssuanceID: testIssuance, Sequence: 7, PluginID: plugin, InstallationID: testInstallation, OrganizationID: c.organization,
+					Features: []string{"progressive-rollouts"}, OrganizationLimit: c.limit, IssuedAt: issued.Unix(), NotBefore: issued.Unix(),
+					ExpiresAt: issued.Unix() + 86400, GraceUntil: issued.Unix() + 2*86400, TrustClass: Production}
+				if grant.Issuer != want.Issuer || grant.IssuanceID != want.IssuanceID || grant.Sequence != want.Sequence || grant.PluginID != want.PluginID ||
+					grant.InstallationID != want.InstallationID || grant.OrganizationID != want.OrganizationID || strings.Join(grant.Features, ",") != "progressive-rollouts" ||
+					grant.OrganizationLimit != want.OrganizationLimit || grant.IssuedAt != want.IssuedAt || grant.NotBefore != want.NotBefore ||
+					grant.ExpiresAt != want.ExpiresAt || grant.GraceUntil != want.GraceUntil || grant.TrustClass != want.TrustClass {
+					t.Fatalf("%s: decoded %+v, want %+v", scope, grant, want)
+				}
+				if grant.InstallationWide() != (c.organization == uuid.Nil) {
+					t.Fatalf("%s: installation-wide is %v", scope, grant.InstallationWide())
+				}
+			}
+		})
+	}
+}
+
+func TestInstallationScopeAndOrganizationLimitAreStrict(t *testing.T) {
+	private, trust, binding := fixture(t)
+	installationWide := func(limits map[string]uint64) map[uint64]any {
+		claims := grantClaims()
+		delete(claims, 8)
+		claims[10] = limits
+		return claims
+	}
+	scope := binding
+	scope.OrganizationID = uuid.Nil
+	for _, c := range []struct {
+		name   string
+		limits map[string]uint64
+		want   int64
+	}{{"no limit", map[string]uint64{}, 0}, {"one organization", map[string]uint64{"organizations": 1}, 1}, {"largest limit", map[string]uint64{"organizations": math.MaxInt64}, math.MaxInt64}} {
+		grant, err := VerifyGrant(validEnvelope(t, installationWide(c.limits), private), trust, Production, scope, time.Unix(100, 0))
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if grant.OrganizationID != uuid.Nil || grant.OrganizationLimit != c.want {
+			t.Fatalf("%s: wrong scope or limit %+v", c.name, grant)
+		}
+	}
+	nilOrganization := grantClaims()
+	nilOrganization[8] = uuid.Nil[:]
+	shortOrganization := grantClaims()
+	shortOrganization[8] = testOrganization[:15]
+	textOrganization := grantClaims()
+	textOrganization[8] = testOrganization.String()
+	limitedOrganization := grantClaims()
+	limitedOrganization[10] = map[string]uint64{"organizations": 3}
+	missingFeatures := installationWide(map[string]uint64{})
+	delete(missingFeatures, 9)
+	missingFeatures[8] = testOrganization[:]
+	// Sequence 1 with a needless one-byte argument: still decodable, never
+	// the canonical encoding Core re-creates.
+	nonCanonical := bytes.Replace(encoded(t, installationWide(map[string]uint64{})), []byte{0x05, 0x01}, []byte{0x05, 0x18, 0x01}, 1)
+	for name, claims := range map[string]map[uint64]any{
+		"nil organization":                  nilOrganization,
+		"organization of 15 bytes":          shortOrganization,
+		"organization as text":              textOrganization,
+		"limit on an organization grant":    limitedOrganization,
+		"zero organizations":                installationWide(map[string]uint64{"organizations": 0}),
+		"more organizations than int64":     installationWide(map[string]uint64{"organizations": math.MaxInt64 + 1}),
+		"unknown limit name":                installationWide(map[string]uint64{"seats": 5}),
+		"organizations and an unknown name": installationWide(map[string]uint64{"organizations": 3, "seats": 5}),
+	} {
+		if _, err := VerifyGrant(validEnvelope(t, claims, private), trust, Production, binding, time.Unix(100, 0)); err == nil {
+			t.Fatalf("%s: accepted", name)
+		}
+	}
+	// Claim 8 is the only claim that may be missing.
+	if _, err := VerifyGrant(validEnvelope(t, missingFeatures, private), trust, Production, binding, time.Unix(100, 0)); err == nil || !strings.Contains(err.Error(), "missing or unknown entitlement claim") {
+		t.Fatalf("fourteen claims without claim 9: %v", err)
+	}
+	raw := signIndependent(t, nonCanonical, private, encoded(t, map[int]any{1: -8, 4: []byte("test-key")}))
+	if _, err := VerifyGrant(raw, trust, Production, scope, time.Unix(100, 0)); err == nil || !strings.Contains(err.Error(), "non-deterministic") {
+		t.Fatalf("a non-canonical installation-wide payload: %v", err)
+	}
+	// An organization grant never fits the installation scope.
+	if _, err := VerifyGrant(validEnvelope(t, grantClaims(), private), trust, Production, scope, time.Unix(100, 0)); err == nil {
+		t.Fatal("an organization grant fit the installation scope")
 	}
 }
 

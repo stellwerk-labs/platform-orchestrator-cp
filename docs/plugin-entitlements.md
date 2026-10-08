@@ -18,11 +18,38 @@ Platform operators import signed grants and revocation snapshots with
 see [adr-plugin-manager.md](adr-plugin-manager.md)). The request carries the
 exact bundle file bytes, base64-encoded. An import applies without a restart
 and reports how many documents it imported, with one diagnostic per skipped
-document. A grant matches only the binding (installation UUID, plugin,
-organization) of an installation enabled for that organization. Upgrade,
-disable, uninstall and reinstall keep the installation UUID, so imported
-grants keep applying once the installation serves the organization again; a
-purge retires the UUID and its grants never match again.
+document. An organization grant matches only the binding (installation UUID,
+plugin, organization) of an installation enabled for that organization; an
+installation-wide grant matches the installation UUID and plugin of an
+installed, active or disabled installation, also before any organization is
+enabled. Upgrade, disable, uninstall and reinstall keep the installation UUID,
+so imported grants keep applying once the installation serves the
+organization again; a purge retires the UUID and its grants never match
+again.
+
+## Grant scope
+
+A grant either names one organization (claim 8) or none. Without an
+organization it is installation-wide: it covers every organization of the
+installation that has no grant of its own, including organizations created
+later. For an organization with its own grant, that grant decides alone, with
+its features, validity and revocation; the installation-wide grant does not
+fill in for a feature it lacks or for its expiry. Feature activations stay per
+organization, under whichever grant covers it. A grant with a higher sequence
+replaces the current grant of the same binding: plugin, installation and
+organization for an organization grant, plugin and installation for an
+installation-wide grant.
+
+An installation-wide grant may carry the limit `organizations` (claim 10, 1 to
+2^63-1), the number of organizations the installation may enable.
+
+Reads show which grant covers an organization. Discovery and the plugin's own
+preflight carry `entitlement.grant_scope` (`organization` or `installation`,
+absent without a grant). The Plugin Manager's installation read carries, for a
+package that requires a licence, `entitlement.installation_grant` and
+`entitlement.enabled_organizations`, and on each enablement the covering
+`entitlement_grant` with issuer, issuance, sequence, features, limit, validity
+and its state under the current trust.
 
 ## Feature states
 

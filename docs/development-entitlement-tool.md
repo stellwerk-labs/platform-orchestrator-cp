@@ -34,7 +34,8 @@ directory on write failure. It prints only a status and output path.
 
 Validity and grace are each bounded to seven days, with one-second resolution.
 The grant starts at issuance, has sequence `1`, and binds exactly one plugin,
-installation, organization, and sorted feature set. It contains a signed
+installation, organization, and sorted feature set; the tool issues no
+installation-wide grants. It contains a signed
 `trust_class: development` claim. The tool verifies its own trust file and
 signed bundle with Core's strict parsers before writing them. Production mode
 rejects the same signed bytes even if their public key is copied into a

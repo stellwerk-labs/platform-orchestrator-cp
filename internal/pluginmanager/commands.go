@@ -52,7 +52,21 @@ type Installation struct {
 	// not enable them when they were created. Setting mode all again enables
 	// them.
 	PendingOrganizations []string `json:"pending_organizations,omitempty"`
-	Revision             int64    `json:"revision"`
+	// Entitlement is the licence of an installation whose served package
+	// requires one.
+	Entitlement *InstallationEntitlement `json:"entitlement,omitempty"`
+	Revision    int64                    `json:"revision"`
+}
+
+// InstallationEntitlement is the licence of an installation. Each enablement
+// shows the grant that covers its organization.
+type InstallationEntitlement struct {
+	// InstallationGrant is the current installation-wide grant, absent
+	// without one.
+	InstallationGrant *model.PluginEntitlementGrantStatus `json:"installation_grant,omitempty"`
+	// EnabledOrganizations counts the enabled enablements, which the
+	// installation-wide grant's organization limit caps.
+	EnabledOrganizations int `json:"enabled_organizations"`
 }
 
 // BundleImport reports an entitlement bundle import.
@@ -148,22 +162,29 @@ func (m *Manager) respondInstallation(id uuid.UUID) func(context.Context, model.
 		if err != nil {
 			return nil, err
 		}
-		return describe(ctx, tx, installation, revision)
+		return m.describe(ctx, tx, installation, revision)
 	}
 }
 
-// describe derives availability and the status diagnostic of an
-// installation.
-func describe(ctx context.Context, tx model.Tx, installation model.PluginInstallation, revision int64) (Installation, error) {
+// describe derives availability, the licence, the pending organizations and
+// the status diagnostic of an installation.
+func (m *Manager) describe(ctx context.Context, tx model.Tx, installation model.PluginInstallation, revision int64) (Installation, error) {
 	result := Installation{PluginInstallation: installation, Availability: plugins.StateUnavailable, Revision: revision}
 	switch installation.State {
 	case model.PluginInstallationActive:
 		result.Availability = plugins.StateAvailable
 	case model.PluginInstallationDisabled:
 		result.Availability = plugins.StateNotEnabled
-	case model.PluginInstallationUninstalled, model.PluginInstallationPurged:
+	case model.PluginInstallationPurged:
 		result.Availability = plugins.StateNotInstalled
 		return result, nil
+	case model.PluginInstallationUninstalled:
+		// An uninstalled installation keeps its UUID and with it its licence.
+		result.Availability = plugins.StateNotInstalled
+		return result, m.describeEntitlement(ctx, tx, &result)
+	}
+	if err := m.describeEntitlement(ctx, tx, &result); err != nil {
+		return result, err
 	}
 	pending, err := pendingOrganizations(ctx, tx, installation)
 	if err != nil {
@@ -183,6 +204,51 @@ func describe(ctx context.Context, tx model.Tx, installation model.PluginInstall
 	}
 	result.Diagnostic = diagnose(installation.Observation, installation.InstallationID, pkg.ManifestSHA256, manifest.MigrationGeneration)
 	return result, nil
+}
+
+// describeEntitlement adds the licence of an installation whose served
+// package requires one: the installation-wide grant and the number of
+// enabled organizations its limit counts, and on each enablement the grant
+// that covers its organization, its own or else the installation-wide one.
+func (m *Manager) describeEntitlement(ctx context.Context, tx model.Tx, result *Installation) error {
+	manifest, err := m.packageManifest(ctx, tx, result.PackageSHA256)
+	if err != nil {
+		return err
+	}
+	if manifest.Entitlement == nil || manifest.Entitlement.Mode != plugins.EntitlementRequired {
+		return nil
+	}
+	grants, err := m.entitlements.GrantStatuses(ctx, tx, result.InstallationID, result.PluginID, manifest.Entitlement.Features)
+	if err != nil {
+		return err
+	}
+	result.Entitlement = &InstallationEntitlement{EnabledOrganizations: enabledOrganizations(result.Organizations)}
+	if grant, found := grants[""]; found {
+		result.Entitlement.InstallationGrant = &grant
+	}
+	organizations := slices.Clone(result.Organizations)
+	for i := range organizations {
+		grant, found := grants[organizations[i].OrgID]
+		if !found {
+			grant, found = grants[""]
+		}
+		if found {
+			organizations[i].EntitlementGrant = &grant
+		}
+	}
+	result.Organizations = organizations
+	return nil
+}
+
+// enabledOrganizations counts the enabled enablements.
+func enabledOrganizations(enablements []model.PluginEnablement) int {
+	count := 0
+	for _, enablement := range enablements {
+		if enablement.State == model.PluginEnablementEnabled {
+			count++
+		}
+	}
+	return count
 }
 
 // PushPackage registers an immutable package. Pushing the same digest and

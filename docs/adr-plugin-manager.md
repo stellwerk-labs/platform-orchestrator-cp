@@ -108,7 +108,8 @@ events, journal consumers, entitlement bindings) is keyed by organization and
 plugin. A grant, cursor, Pin receipt or event of one organization is
 therefore not found in another, and a gateway delegation names the
 organization of its request. A licence grant names one organization of the
-installation.
+installation, or none: an installation-wide grant covers every organization
+that has no grant of its own ([plugin-entitlements.md](plugin-entitlements.md)).
 
 The security statement for `v1alpha`: a compromised plugin reaches every
 organization its installation is enabled for, within the plugin boundary

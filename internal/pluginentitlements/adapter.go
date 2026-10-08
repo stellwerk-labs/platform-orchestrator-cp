@@ -255,8 +255,10 @@ func matchGrant(encoded []byte, trust entitlements.TrustStore, mode entitlements
 	return entitlements.Grant{}, false
 }
 
-// candidateBindings returns the binding of every organization enablement of
-// an installation whose package requires an entitlement.
+// candidateBindings returns, for every installation Core can serve whose
+// package requires an entitlement, the installation scope, which an
+// installation-wide grant fits even before any organization is enabled, and
+// the binding of each organization enablement.
 func (a *Adapter) candidateBindings(ctx context.Context, tx model.Tx) ([]entitlements.Binding, error) {
 	installations, err := model.ListPluginInstallations(ctx, tx)
 	if err != nil {
@@ -264,7 +266,9 @@ func (a *Adapter) candidateBindings(ctx context.Context, tx model.Tx) ([]entitle
 	}
 	candidates := []entitlements.Binding{}
 	for _, installation := range installations {
-		if len(installation.Organizations) == 0 {
+		switch installation.State {
+		case model.PluginInstallationInstalled, model.PluginInstallationActive, model.PluginInstallationDisabled:
+		default:
 			continue
 		}
 		pkg, err := model.GetPluginPackage(ctx, tx, installation.PackageSHA256)
@@ -278,6 +282,7 @@ func (a *Adapter) candidateBindings(ctx context.Context, tx model.Tx) ([]entitle
 		if manifest.Entitlement == nil || manifest.Entitlement.Mode != plugins.EntitlementRequired {
 			continue
 		}
+		candidates = append(candidates, entitlements.Binding{PluginID: installation.PluginID, InstallationID: installation.InstallationID, DeclaredFeatures: slices.Clone(manifest.Entitlement.Features)})
 		for _, enablement := range installation.Organizations {
 			organization, err := a.db.GetOrg(ctx, tx, enablement.OrgID)
 			if err != nil {
@@ -313,6 +318,17 @@ func (a *Adapter) binding(ctx context.Context, db model.Databaser, tx model.Tx, 
 	}
 	binding = entitlements.Binding{PluginID: item.ID, InstallationID: installationID, OrganizationID: organization.Uuid, DeclaredFeatures: slices.Clone(item.Entitlement.Features)}
 	return binding, state, nil
+}
+
+// GrantStatuses returns the current grant of every binding of the
+// installation with its state under current trust, keyed by organization ID,
+// the installation-wide grant under "". declared are the features of the
+// served package.
+func (a *Adapter) GrantStatuses(ctx context.Context, tx model.Tx, installation uuid.UUID, plugin string, declared []string) (map[string]model.PluginEntitlementGrantStatus, error) {
+	return model.PluginEntitlementGrantStatuses(ctx, tx, installation, plugin, a.now(), func(raw []byte, binding entitlements.Binding, now time.Time) (entitlements.Grant, error) {
+		binding.DeclaredFeatures = declared
+		return entitlements.VerifyGrant(raw, a.trust, a.mode, binding, now)
+	})
 }
 
 func (a *Adapter) verifier(binding entitlements.Binding) model.PluginGrantVerifier {
@@ -364,6 +380,7 @@ func (a *Adapter) ResolveEntitlement(ctx context.Context, org string, item plugi
 				return status, err
 			}
 		}
+		status.GrantScope = decision.Scope
 		class := string(decision.TrustClass)
 		if class == "" {
 			class = string(a.mode)

@@ -740,6 +740,54 @@ func (e PluginEnablementPutState) Valid() bool {
 	}
 }
 
+// Defines values for PluginEntitlementGrantState.
+const (
+	PluginEntitlementGrantStateExpired     PluginEntitlementGrantState = "expired"
+	PluginEntitlementGrantStateGrace       PluginEntitlementGrantState = "grace"
+	PluginEntitlementGrantStateNotYetValid PluginEntitlementGrantState = "not_yet_valid"
+	PluginEntitlementGrantStateRevoked     PluginEntitlementGrantState = "revoked"
+	PluginEntitlementGrantStateUntrusted   PluginEntitlementGrantState = "untrusted"
+	PluginEntitlementGrantStateValid       PluginEntitlementGrantState = "valid"
+)
+
+// Valid indicates whether the value is a known member of the PluginEntitlementGrantState enum.
+func (e PluginEntitlementGrantState) Valid() bool {
+	switch e {
+	case PluginEntitlementGrantStateExpired:
+		return true
+	case PluginEntitlementGrantStateGrace:
+		return true
+	case PluginEntitlementGrantStateNotYetValid:
+		return true
+	case PluginEntitlementGrantStateRevoked:
+		return true
+	case PluginEntitlementGrantStateUntrusted:
+		return true
+	case PluginEntitlementGrantStateValid:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginEntitlementGrantTrustClass.
+const (
+	PluginEntitlementGrantTrustClassDevelopment PluginEntitlementGrantTrustClass = "development"
+	PluginEntitlementGrantTrustClassProduction  PluginEntitlementGrantTrustClass = "production"
+)
+
+// Valid indicates whether the value is a known member of the PluginEntitlementGrantTrustClass enum.
+func (e PluginEntitlementGrantTrustClass) Valid() bool {
+	switch e {
+	case PluginEntitlementGrantTrustClassDevelopment:
+		return true
+	case PluginEntitlementGrantTrustClassProduction:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PluginEntitlementWarningCode.
 const (
 	PluginEntitlementWarningCodeGrace PluginEntitlementWarningCode = "plugin_entitlement_grace"
@@ -749,6 +797,24 @@ const (
 func (e PluginEntitlementWarningCode) Valid() bool {
 	switch e {
 	case PluginEntitlementWarningCodeGrace:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginGrantScope.
+const (
+	PluginGrantScopeInstallation PluginGrantScope = "installation"
+	PluginGrantScopeOrganization PluginGrantScope = "organization"
+)
+
+// Valid indicates whether the value is a known member of the PluginGrantScope enum.
+func (e PluginGrantScope) Valid() bool {
+	switch e {
+	case PluginGrantScopeInstallation:
+		return true
+	case PluginGrantScopeOrganization:
 		return true
 	default:
 		return false
@@ -3154,11 +3220,14 @@ type PluginEnablement struct {
 	CapabilityRegistration PluginCapabilityRegistration `json:"capability_registration"`
 	CreatedAt              time.Time                    `json:"created_at"`
 	CreatedBy              openapi_types.UUID           `json:"created_by"`
-	OrgId                  string                       `json:"org_id"`
-	State                  PluginEnablementState        `json:"state"`
-	Timezone               string                       `json:"timezone"`
-	UpdatedAt              time.Time                    `json:"updated_at"`
-	UpdatedBy              openapi_types.UUID           `json:"updated_by"`
+
+	// EntitlementGrant Only when the served package requires a licence. The grant that covers the organization, its own organization grant or else the installation-wide grant; absent while none does, and the organization is then not entitled.
+	EntitlementGrant *PluginEntitlementGrant `json:"entitlement_grant,omitempty"`
+	OrgId            string                  `json:"org_id"`
+	State            PluginEnablementState   `json:"state"`
+	Timezone         string                  `json:"timezone"`
+	UpdatedAt        time.Time               `json:"updated_at"`
+	UpdatedBy        openapi_types.UUID      `json:"updated_by"`
 }
 
 // PluginEnablementState defines model for PluginEnablement.State.
@@ -3198,9 +3267,39 @@ type PluginEntitlementBundleImportRequest struct {
 	Reason           string `json:"reason"`
 }
 
+// PluginEntitlementGrant An imported grant as an operator sees it. Core decides with the grant that covers an organization; plugins see only the non-secret feature projection.
+type PluginEntitlementGrant struct {
+	ExpiresAt  time.Time          `json:"expires_at"`
+	Features   []string           `json:"features"`
+	GraceUntil time.Time          `json:"grace_until"`
+	IssuanceId openapi_types.UUID `json:"issuance_id"`
+	Issuer     string             `json:"issuer"`
+	NotBefore  time.Time          `json:"not_before"`
+
+	// OrganizationLimit Only on an installation-wide grant that carries one. The number of organizations the installation may enable.
+	OrganizationLimit *int64 `json:"organization_limit,omitempty"`
+
+	// Scope The grant that covers the organization: organization when the organization has a grant of its own, which then decides alone (feature set, validity and revocation), installation when the installation-wide grant covers it. Absent while no grant covers the organization, which is then not entitled.
+	Scope    PluginGrantScope `json:"scope"`
+	Sequence int64            `json:"sequence"`
+
+	// State The grant's state under the current issuer trust, never earlier than the time Core's decisions observed.
+	State      PluginEntitlementGrantState      `json:"state"`
+	TrustClass PluginEntitlementGrantTrustClass `json:"trust_class"`
+}
+
+// PluginEntitlementGrantState The grant's state under the current issuer trust, never earlier than the time Core's decisions observed.
+type PluginEntitlementGrantState string
+
+// PluginEntitlementGrantTrustClass defines model for PluginEntitlementGrant.TrustClass.
+type PluginEntitlementGrantTrustClass string
+
 // PluginEntitlementStatus Non-secret server-derived licence projection. Neither this projection nor a capability grants IAM permissions or authorizes execution.
 type PluginEntitlementStatus struct {
 	Features map[string]PluginFeatureAccess `json:"features"`
+
+	// GrantScope The grant that covers the organization: organization when the organization has a grant of its own, which then decides alone (feature set, validity and revocation), installation when the installation-wide grant covers it. Absent while no grant covers the organization, which is then not entitled.
+	GrantScope *PluginGrantScope `json:"grant_scope,omitempty"`
 
 	// Warning Machine-readable licence warning that never changes authorization. While a declared feature is in its signed grace period, forward work still succeeds. After grace_until forward work is refused with plugin_not_entitled; read, export, cancel and rollback remain available.
 	Warning *PluginEntitlementWarning `json:"warning,omitempty"`
@@ -3238,6 +3337,9 @@ type PluginFeatureAccess struct {
 	TrustClass string `json:"trust_class"`
 }
 
+// PluginGrantScope The grant that covers the organization: organization when the organization has a grant of its own, which then decides alone (feature set, validity and revocation), installation when the installation-wide grant covers it. Absent while no grant covers the organization, which is then not entitled.
+type PluginGrantScope string
+
 // PluginInstallation defines model for PluginInstallation.
 type PluginInstallation struct {
 	AdmissionCheckerId *openapi_types.UUID     `json:"admission_checker_id,omitempty"`
@@ -3247,8 +3349,11 @@ type PluginInstallation struct {
 	CreatedBy          openapi_types.UUID      `json:"created_by"`
 
 	// Diagnostic Why the last status read from the running plugin does not prove the package Core is to serve (the pending upgrade's, if any). Absent while it does or before Core read it.
-	Diagnostic     *PluginInstallationDiagnostic `json:"diagnostic,omitempty"`
-	InstallationId openapi_types.UUID            `json:"installation_id"`
+	Diagnostic *PluginInstallationDiagnostic `json:"diagnostic,omitempty"`
+
+	// Entitlement Only when the served package requires a licence. Each enablement shows the grant that covers its organization.
+	Entitlement    *PluginInstallationEntitlement `json:"entitlement,omitempty"`
+	InstallationId openapi_types.UUID             `json:"installation_id"`
 
 	// Observation What Core last read from the running plugin's status endpoint, on activation. Either the report or a failure with its detail.
 	Observation *PluginStatusObservation `json:"observation,omitempty"`
@@ -3304,6 +3409,15 @@ type PluginInstallationDiagnostic struct {
 
 // PluginInstallationDiagnosticCode defines model for PluginInstallationDiagnostic.Code.
 type PluginInstallationDiagnosticCode string
+
+// PluginInstallationEntitlement Only when the served package requires a licence. Each enablement shows the grant that covers its organization.
+type PluginInstallationEntitlement struct {
+	// EnabledOrganizations The enabled enablements of the installation, which the installation-wide grant's organization_limit caps.
+	EnabledOrganizations int `json:"enabled_organizations"`
+
+	// InstallationGrant An imported grant as an operator sees it. Core decides with the grant that covers an organization; plugins see only the non-secret feature projection.
+	InstallationGrant *PluginEntitlementGrant `json:"installation_grant,omitempty"`
+}
 
 // PluginInstallationIdentity defines model for PluginInstallationIdentity.
 type PluginInstallationIdentity struct {

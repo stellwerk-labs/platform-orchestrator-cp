@@ -125,6 +125,10 @@ func pluginEntitlementToAPI(status *plugins.EntitlementStatus) *PluginEntitlemen
 		return nil
 	}
 	result := &PluginEntitlementStatus{Features: map[string]PluginFeatureAccess{}, Warning: pluginEntitlementWarningToAPI(status.Warning)}
+	if status.GrantScope != "" {
+		scope := PluginGrantScope(status.GrantScope)
+		result.GrantScope = &scope
+	}
 	for feature, access := range status.Features {
 		result.Features[feature] = PluginFeatureAccess{State: access.State, TrustClass: access.TrustClass, Forward: access.Forward, Read: access.Read, Safety: access.Safety, ExpiresAt: access.ExpiresAt, GraceUntil: access.GraceUntil}
 	}
