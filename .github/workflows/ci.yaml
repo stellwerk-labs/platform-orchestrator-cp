@@ -139,7 +139,7 @@ jobs:
           build-args: |
             SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
           tags: ghcr.io/stellwerk-labs/platform-orchestrator-cp:${{ inputs.candidate_tag }}
-          sbom: true
+          sbom: generator=docker/buildkit-syft-scanner@sha256:ae4f3b554449e7e25548e7d8ccc029d17357348e30c6e3df01b92bc93654d6a9
           provenance: mode=max
           labels: |
             org.opencontainers.image.version=${{ inputs.candidate_tag }}
@@ -157,7 +157,7 @@ jobs:
           build-args: |
             SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
           tags: ghcr.io/stellwerk-labs/platform-orchestrator-cp:${{ inputs.candidate_tag }}
-          sbom: true
+          sbom: generator=docker/buildkit-syft-scanner@sha256:ae4f3b554449e7e25548e7d8ccc029d17357348e30c6e3df01b92bc93654d6a9
           provenance: mode=max
           labels: |
             org.opencontainers.image.version=${{ inputs.candidate_tag }}
@@ -498,7 +498,7 @@ jobs:
           build-args: |
             SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
           tags: ghcr.io/stellwerk-labs/platform-orchestrator-cp:${{ steps.release.outputs.version }}
-          sbom: true
+          sbom: generator=docker/buildkit-syft-scanner@sha256:ae4f3b554449e7e25548e7d8ccc029d17357348e30c6e3df01b92bc93654d6a9
           provenance: mode=max
           labels: |
             org.opencontainers.image.version=${{ steps.release.outputs.version }}
@@ -517,7 +517,7 @@ jobs:
           build-args: |
             SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
           tags: ghcr.io/stellwerk-labs/platform-orchestrator-cp:${{ steps.release.outputs.version }}
-          sbom: true
+          sbom: generator=docker/buildkit-syft-scanner@sha256:ae4f3b554449e7e25548e7d8ccc029d17357348e30c6e3df01b92bc93654d6a9
           provenance: mode=max
           labels: |
             org.opencontainers.image.version=${{ steps.release.outputs.version }}
