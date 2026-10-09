@@ -1,6 +1,7 @@
 # Manual release candidates
 
-The normal main-branch release remains unchanged. A separate manual CI path can
+Stable version and tag assignment retains its existing main-branch owner.
+A separate manual CI path can
 publish an explicitly approved, already tagged release candidate without updating
 stable/latest channels. It is enabled only in the original `stellwerk-labs`
 repository, not forks or private mirrors.
@@ -47,6 +48,19 @@ invoked by manual dispatch. Stable publication still follows the normal reviewed
 main-branch release process.
 
 ## Partial publication and recovery
+
+The release reservation stays a draft until the exact inspected index and
+platform manifests have been signed and verified with the pinned Cosign tool.
+Verification requires the producing workflow identity, GitHub Actions issuer
+and exact workflow commit. Source provenance records the source and producing
+workflow commits separately; platform SPDX documents are bound to the inspected
+manifest identities. Cryptographically verified attestations must match the
+expected subject, predicate type and complete predicate, and are checked again
+with an empty registry credential directory before the candidate is exposed.
+The original BuildKit attestations remain unchanged. Their structural presence
+is not described as individual cryptographic verification, and no SLSA assurance
+level is claimed. Dependency seeds remain unqualified even when their origin
+is authenticated.
 
 If image publication fails after the GitHub prerelease is created, treat that RC
 identifier as consumed. Inspect the failure and prepare a newly approved `rc.N+1`

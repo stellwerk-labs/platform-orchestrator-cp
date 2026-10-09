@@ -90,7 +90,7 @@ class CandidateReleaseTests(unittest.TestCase):
         self.assertIn("github.event_name == 'workflow_dispatch'", publication)
         self.assertIn("environment: public-release-candidate", publication)
         self.assertIn("- candidate-preflight", publication)
-        self.assertIn("--verify-tag --prerelease --latest=false", publication)
+        self.assertIn("--verify-tag --draft --prerelease --latest=false", publication)
         self.assertIn("ref: ${{ inputs.candidate_sha }}", publication)
         self.assertIn("--check-image-absent", publication)
         self.assertNotIn("semantic-release-action@", publication)
