@@ -88,3 +88,20 @@
 - The new raw stream exposed the public Distroless container home. Exempt only
   exact `/home/nonroot/` from the developer-home pattern, never from secret or
   other concrete scans. Private homes and a credential under that path fail.
+
+## Isolated CP public-source scanner parity
+
+- Based this separate branch on e8e5ace0d5ac9332c26d490c293f077ec75e95bf.
+  Original release/control worktrees, contexts and tar archives remain frozen.
+- The real tar-built CP image produced exactly 82 findings from the same seven
+  public files verified for DP. Every file hash, module version/sum, logical
+  path, rule/location and per-file count matches the existing reviewed policy.
+- Ported only the three DP scanner/test files' exact delta, byte-identical to
+  DP afterward. All 30 helper tests pass, with strict negative regressions.
+- Actual unchanged CP image export rescan passes in 65.48 seconds, accepting
+  exactly 82 public-source findings and zero binary exceptions. This does not
+  replace root's separate artifact/SBOM/publication review.
+- Independently compared every other tracked file with the frozen source:
+  Go/schema/modules, Dockerfile, production build/notice helpers and the sole
+  Go embed pattern (model migration SQL) are unchanged. Root decides image
+  qualification and any later source/CI repin; no new source identity claimed.

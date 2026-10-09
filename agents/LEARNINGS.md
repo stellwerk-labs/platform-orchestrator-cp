@@ -10,3 +10,12 @@
 - Gitleaks8.30.1 always loads the scan target's .gitleaksignore even with --gitleaks-ignore-path /dev/null. Reject artifact ignore files explicitly, disable inline allow comments and isolate stdin scanner working directories.
 - ORAS local-layout digest-only resolution can return application/octet-stream and omit image dependencies. Resolve a descriptor-verified root tag, select the platform and verify its destination manifest and blobs. Unprivileged Syft needs a writable mode1777 temporary filesystem and explicit cache location.
 - Parsed tar entries omit arbitrary PAX fields and trailing bytes; gzip decompression also discards optional wrapper fields. Scan retained non-body tar bytes and every validated gzip member's wrapper separately from executable bodies.
+
+## Cross-component source-notice parity
+
+- CP's compiled dependency graph includes the same exact public reciprocal
+  dependency fixtures as DP. Classify each actual file and module identity
+  before porting a policy; matching module names alone are insufficient.
+- Scanner-only changes can be reviewed independently of unchanged production
+  Go, schema, module, build and embedded inputs. Preserve that distinction in
+  image source labels and qualification evidence.
