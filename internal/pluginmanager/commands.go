@@ -230,7 +230,7 @@ func (m *Manager) describeEntitlement(ctx context.Context, tx model.Tx, result *
 	organizations := slices.Clone(result.Organizations)
 	for i := range organizations {
 		grant, found := grants[organizations[i].OrgID]
-		if !found {
+		if !found || model.PluginEntitlementFallback(grant.State, grants[""].State) {
 			grant, found = grants[""]
 		}
 		if found {

@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
+	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -29,6 +30,36 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/require"
 )
+
+func TestPluginEffectsRequireReadCommittedEvenWithAnotherSessionDefault(t *testing.T) {
+	dsn := os.Getenv("PLUGIN_TEST_DATABASE_URL")
+	require.NotEmpty(t, dsn)
+	t.Setenv("PLUGIN_TEST_DATABASE_URL", dsn+" default_transaction_isolation='repeatable read'")
+	f := newPluginEntitlementAPIFixture(t)
+	tx, err := f.db.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	var isolation string
+	require.NoError(t, tx.QueryRowContext(t.Context(), `SHOW transaction_isolation`).Scan(&isolation))
+	require.Equal(t, "repeatable read", isolation, "the fixture must exercise a non-default session setting")
+	require.NoError(t, tx.Rollback())
+	for _, options := range []*sql.TxOptions{nil, {}, {Isolation: sql.LevelReadCommitted}} {
+		var before sql.TxOptions
+		if options != nil {
+			before = *options
+		}
+		tx, err := f.server.pluginEffectDatabase("acme", f.item, "effect.commit", false).BeginTx(t.Context(), options)
+		require.NoError(t, err)
+		require.NoError(t, tx.QueryRowContext(t.Context(), `SHOW transaction_isolation`).Scan(&isolation))
+		require.Equal(t, "read committed", isolation)
+		require.NoError(t, tx.Commit())
+		if options != nil {
+			require.Equal(t, before, *options, "the caller's options are not modified")
+		}
+	}
+	status, err := f.adapter.ResolveEntitlement(t.Context(), "acme", f.item)
+	require.NoError(t, err)
+	require.True(t, status.Features["feature-a"].Forward)
+}
 
 type pluginEntitlementAPIFixture struct {
 	db        model.Databaser

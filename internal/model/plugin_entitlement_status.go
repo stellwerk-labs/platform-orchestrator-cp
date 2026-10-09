@@ -14,6 +14,8 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/entitlements"
 )
 
+const pluginGrantRevoked = "revoked"
+
 // storedGrant is the grant Core stored as the current one of a binding.
 type storedGrant struct {
 	covering              entitlements.Binding
@@ -40,7 +42,7 @@ func grantState(verified entitlements.Grant, trusted, revoked bool, effectiveNow
 	case !trusted:
 		return "untrusted"
 	case revoked:
-		return "revoked"
+		return pluginGrantRevoked
 	default:
 		return string(entitlements.EvaluateTime(verified, effectiveNow.Unix()))
 	}
@@ -68,6 +70,14 @@ type PluginEntitlementGrantStatus struct {
 // PluginGrantVerifierFor re-verifies a stored envelope for a binding, as
 // decisions do, without I/O.
 type PluginGrantVerifierFor func(raw []byte, binding entitlements.Binding, now time.Time) (entitlements.Grant, error)
+
+// PluginEntitlementFallback selects a current installation licence only after
+// the organisation's licence expires or is revoked. Missing features, future
+// licences and failed verification never broaden an organisation's grant.
+func PluginEntitlementFallback(organizationState, installationState string) bool {
+	return (organizationState == string(entitlements.Expired) || organizationState == pluginGrantRevoked) &&
+		(installationState == string(entitlements.Valid) || installationState == string(entitlements.Grace))
+}
 
 // PluginEntitlementGrantStatuses returns the current grant of every binding
 // of the installation, keyed by organization ID, the installation-wide grant

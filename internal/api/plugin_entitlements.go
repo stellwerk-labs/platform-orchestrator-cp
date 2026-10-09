@@ -93,13 +93,13 @@ func (db *pluginEffectDatabase) BeginTx(ctx context.Context, options *sql.TxOpti
 	if licensed && (!exists || policy.RequiredFeature == "" || db.guard == nil) {
 		return nil, pluginBoundaryError(409, "plugin_not_entitled", "The plugin requires a verified signed licence before this operation can proceed.")
 	}
-	// Enablement checks hold row locks and entitlement decisions persist their
-	// monotonic clock and audit evidence. No effect caller may accidentally
-	// substitute a read-only transaction.
-	if options != nil && options.ReadOnly {
-		return nil, pluginBoundaryError(500, "plugin_effect_transaction_invalid", "The plugin effect requires a writable authorization transaction.")
+	// Revalidation must see an import that committed while it waited for the
+	// entitlement guard, including a newly inserted organization binding.
+	// Pin READ COMMITTED explicitly: a session's default can be different.
+	if options != nil && (options.ReadOnly || (options.Isolation != sql.LevelDefault && options.Isolation != sql.LevelReadCommitted)) {
+		return nil, pluginBoundaryError(500, "plugin_effect_transaction_invalid", "The plugin effect requires a writable READ COMMITTED authorization transaction.")
 	}
-	tx, err := db.Databaser.BeginTx(ctx, options)
+	tx, err := db.Databaser.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return nil, err
 	}

@@ -346,15 +346,14 @@ func TestAnInstallationWideGrantCoversEveryOrganizationWithoutAGrantOfItsOwn(t *
 	require.Equal(t, strings.Join(expected, " "), audited, "each activation is audited for its organization")
 	require.Equal(t, int64(2), f.organizationLimit(t))
 
-	// An organization grant wins for its organization, in features and
-	// validity: acme's own grant licenses only feature-b and has expired.
+	// An expired organization grant falls back without merging feature sets.
 	own := f.grant(t, uuid.New(), 1, 100, 120, 130, []string{"feature-b"})
 	_, err = ImportPluginEntitlementGrant(ctx, f.db, nil, own, "internal_system", source)
 	require.NoError(t, err)
 	decision := f.decideFor(t, acme, 150, "feature-a", false)
-	require.Equal(t, PluginGrantScopeOrganization, decision.Scope)
-	require.Equal(t, "expired", decision.State)
-	require.False(t, decision.Forward, "acme's own grant decides, not the installation-wide one")
+	require.Equal(t, PluginGrantScopeInstallation, decision.Scope)
+	require.Equal(t, "valid", decision.State)
+	require.True(t, decision.Forward, "the current installation grant covers the expired organization grant")
 	require.True(t, decision.Read, "feature-a stays readable where it was activated")
 	require.True(t, f.decideFor(t, later.Uuid, 150, "feature-a", false).Forward, "the other organization keeps the installation-wide grant")
 

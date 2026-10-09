@@ -1,5 +1,22 @@
 # Worklog
 
+## Organisation licence fallback
+
+- A valid or grace organisation grant keeps precedence. Expired or revoked
+  organisation grants fall back to a valid or grace installation grant without
+  merging feature sets or deleting grant, revocation or audit evidence.
+- Operator status, discovery, service preflight and transactional effects use
+  the same scope-selection rule. Disabled or incompatible installations remain
+  blocked. All enabled organisations count against the soft enablement limit;
+  a lower renewal limit does not disable existing organisations.
+- Imports hold an exclusive transaction guard across document savepoints;
+  decisions hold its shared counterpart through their effects. Effect and
+  discovery transactions explicitly use READ COMMITTED, independent of a
+  session's default isolation.
+- Unit, real PostgreSQL/API, concurrent revocation and rejected-document tests
+  cover these rules. Overlay mutations demonstrate that the fallback and
+  isolation regressions fail when their fixes are removed. No schema change.
+
 ## Immutable BuildKit SBOM generator
 
 - Pinned BuildKit's existing SBOM generator to

@@ -5,6 +5,7 @@ package pluginentitlements
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"errors"
 	"fmt"
 	"slices"
@@ -134,6 +135,11 @@ func (a *Adapter) ImportBundle(ctx context.Context, tx model.Tx, raw []byte, imp
 	}
 	grants, snapshots, rejected := verifyBundle(bundle, a.trust, a.mode, candidates, a.now().UTC())
 	result.Diagnostics = append(result.Diagnostics, rejected...)
+	if len(grants)+len(snapshots) > 0 {
+		if err := model.LockPluginEntitlementImportTx(ctx, tx); err != nil {
+			return result, err
+		}
+	}
 	for _, grant := range grants {
 		imported, err := importDocument(ctx, tx, func() (bool, error) {
 			return model.ImportPluginEntitlementGrant(ctx, a.db, tx, grant.Grant, importer, bundle.Digest)
@@ -354,7 +360,7 @@ func (a *Adapter) ResolveEntitlement(ctx context.Context, org string, item plugi
 	if !item.Licensed() {
 		return status, nil
 	}
-	tx, err := a.db.BeginTx(ctx, nil)
+	tx, err := a.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return status, err
 	}

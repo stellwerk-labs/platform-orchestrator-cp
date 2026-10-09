@@ -31,11 +31,17 @@ again.
 
 A grant either names one organization (claim 8) or none. Without an
 organization it is installation-wide: it covers every organization of the
-installation that has no grant of its own, including organizations created
-later. For an organization with its own grant, that grant decides alone, with
-its features, validity and revocation; the installation-wide grant does not
-fill in for a feature it lacks or for its expiry. Feature activations stay per
-organization, under whichever grant covers it. A grant with a higher sequence
+installation that has no current grant of its own, including organizations
+created later. A valid organization grant, including grace, takes precedence
+without combining its features with the installation-wide grant. When the
+organization grant expires after grace or is revoked, a valid or grace
+installation-wide grant takes over. A future or unverifiable organization
+grant does not trigger fallback. A valid renewal restores the organization's
+own grant, and both scopes retain their grant, revocation and audit history.
+Enablement, compatibility and IAM checks still apply independently.
+
+Feature activations stay per organization, under whichever grant covers it.
+A grant with a higher sequence
 replaces the current grant of the same binding: plugin, installation and
 organization for an organization grant, plugin and installation for an
 installation-wide grant.
@@ -63,7 +69,8 @@ and its state under the current trust.
 ## Feature states
 
 Each declared feature has one effective state per organization. Discovery
-returns it as `entitlement.features.<feature>.state`.
+returns it as `entitlement.features.<feature>.state`, after selecting the
+covering grant as described above.
 
 | State | Forward work | Read, export, cancel, rollback |
 |---|---|---|
@@ -94,8 +101,9 @@ listed `features`. The same `PluginEntitlementWarning` object appears in:
 
 The warning never changes authorization. Clients (Console, CLI, Terraform
 provider, plugins) should show `message` and `grace_until` wherever they show
-the operation's result. After `grace_until` the feature is `expired` and forward
-work is refused as in the table above.
+the operation's result. After `grace_until` the covering grant is selected again.
+If no current grant covers the feature, forward work is refused as in the table
+above.
 
 ## Start-up and import: what can stop Core
 

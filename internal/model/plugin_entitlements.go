@@ -18,9 +18,8 @@ import (
 
 const entitlementEventSubject = "io.platform-orchestrator.plugin-entitlement.changed"
 
-// Scopes of the grant that covers an organization. An organization grant
-// wins for its organization; an installation-wide grant covers every other
-// organization of its installation.
+// Scopes of the grant that covers an organization. A current organization
+// grant wins; an expired or revoked one can fall back to the installation.
 const (
 	PluginGrantScopeOrganization = "organization"
 	PluginGrantScopeInstallation = "installation"
@@ -60,6 +59,20 @@ type PluginEntitlementAccess struct {
 // PluginGrantVerifier re-verifies persisted COSE against the current local
 // trust store and signed package declaration. It must do no I/O or network work.
 type PluginGrantVerifier func([]byte, time.Time) (entitlements.Grant, error)
+
+// LockPluginEntitlementImportTx fences a complete bundle, including rejected
+// document savepoints, against decisions that may inspect both grant scopes.
+// Imports must take it before all issuer/binding locks and before savepoints.
+// Decision transactions must never upgrade their shared guard to an import.
+func LockPluginEntitlementImportTx(ctx context.Context, tx Tx) error {
+	_, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(640, 1)`)
+	return err
+}
+
+func entitlementDecisionLock(ctx context.Context, tx Tx) error {
+	_, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock_shared(640, 1)`)
+	return err
+}
 
 func entitlementIssuerLock(ctx context.Context, tx Tx, issuer string, exclusive bool) error {
 	query := `SELECT pg_advisory_xact_lock_shared(hashtextextended($1, 638))`
@@ -138,6 +151,9 @@ func ImportPluginEntitlementGrant(ctx context.Context, db Databaser, optionalTx 
 	scope := organizationScope(grant.OrganizationID)
 	return inTransaction(ctx, db, optionalTx, func(tx Tx) (bool, error) {
 		var err error
+		if err := LockPluginEntitlementImportTx(ctx, tx); err != nil {
+			return false, err
+		}
 		if err := entitlementIssuerLock(ctx, tx, grant.Issuer, false); err != nil {
 			return false, err
 		}
@@ -211,6 +227,9 @@ func ImportPluginEntitlementRevocations(ctx context.Context, db Databaser, optio
 	}
 	return inTransaction(ctx, db, optionalTx, func(tx Tx) (bool, error) {
 		var err error
+		if err := LockPluginEntitlementImportTx(ctx, tx); err != nil {
+			return false, err
+		}
 		if err := entitlementIssuerLock(ctx, tx, snapshot.Issuer, true); err != nil {
 			return false, err
 		}
@@ -312,27 +331,53 @@ func ImportPluginEntitlementRevocations(ctx context.Context, db Databaser, optio
 }
 
 // DecidePluginEntitlementTx is the authoritative admission point for the
-// organization of binding. The organization's own grant decides when it has
-// one, in feature set, validity and revocation alike; otherwise the
-// installation-wide grant does. Feature activations stay per organization.
-// The caller owns tx and must commit its effect in this same transaction. The
+// organization of binding. A current organization grant takes precedence;
+// an expired or revoked one falls back to a current installation-wide grant.
+// Feature sets are never combined. Activations stay per organization.
+// The caller owns a READ COMMITTED tx and commits its effect in that same
+// transaction. A shared guard fences rare imports until the effect commits.
+// All decisions take it before issuer/binding locks. The
 // verifier reads only in-memory local trust and signed package metadata while
 // locks are held. A failed trust check still permits historical read/safety
 // activation.
-//
-// An organization grant imported while this decision locks the
-// installation-wide binding takes effect from the next decision: this one
-// orders before that import, which never changes the installation-wide
-// binding.
 func DecidePluginEntitlementTx(ctx context.Context, db Databaser, tx Tx, binding entitlements.Binding, feature string, access PluginEntitlementAccess, now time.Time, verify PluginGrantVerifier) (PluginEntitlementDecision, error) {
 	decision := PluginEntitlementDecision{Feature: feature, State: "not_entitled"}
 	if tx == nil || verify == nil || binding.InstallationID == uuid.Nil || binding.OrganizationID == uuid.Nil || binding.PluginID == "" || feature == "" || now.IsZero() {
 		return decision, NewErrBadRequest("exact entitlement decision inputs and caller transaction are required")
 	}
+	if err := entitlementDecisionLock(ctx, tx); err != nil {
+		return decision, err
+	}
+	inspect := access
+	inspect.Activate = false
+	scope := organizationScope(binding.OrganizationID)
+	decision, err := decidePluginGrantTx(ctx, db, tx, binding, scope, feature, inspect, now, verify)
+	if err != nil {
+		return decision, err
+	}
+	if decision.Scope == "" || decision.State == string(entitlements.Expired) || decision.State == pluginGrantRevoked {
+		wide, err := decidePluginGrantTx(ctx, db, tx, binding, uuid.NullUUID{}, feature, inspect, now, verify)
+		if err != nil {
+			return decision, err
+		}
+		if decision.Scope == "" || PluginEntitlementFallback(decision.State, wide.State) {
+			decision, scope = wide, uuid.NullUUID{}
+		}
+	}
+	if access.Activate {
+		if !decision.Forward {
+			return decision, NewErrConflict("feature cannot be activated without a current forward entitlement")
+		}
+		return decidePluginGrantTx(ctx, db, tx, binding, scope, feature, access, now, verify)
+	}
+	return decision, nil
+}
+
+func decidePluginGrantTx(ctx context.Context, db Databaser, tx Tx, binding entitlements.Binding, scope uuid.NullUUID, feature string, access PluginEntitlementAccess, now time.Time, verify PluginGrantVerifier) (PluginEntitlementDecision, error) {
+	decision := PluginEntitlementDecision{Feature: feature, State: "not_entitled"}
 	var issuer string
-	var scope uuid.NullUUID
-	err := tx.QueryRowContext(ctx, `SELECT issuer,organization_uuid FROM plugin_entitlement_bindings WHERE installation_uuid=$1 AND plugin_id=$2
-		AND (organization_uuid=$3 OR organization_uuid IS NULL) ORDER BY organization_uuid NULLS LAST LIMIT 1`, binding.InstallationID, binding.PluginID, binding.OrganizationID).Scan(&issuer, &scope)
+	err := tx.QueryRowContext(ctx, `SELECT issuer FROM plugin_entitlement_bindings WHERE installation_uuid=$1 AND plugin_id=$2
+		AND organization_uuid IS NOT DISTINCT FROM $3`, binding.InstallationID, binding.PluginID, scope).Scan(&issuer)
 	if errors.Is(err, sql.ErrNoRows) {
 		return decision, nil
 	}
@@ -483,6 +528,10 @@ func SweepPluginEntitlementBoundaries(ctx context.Context, db Databaser, now tim
 	for _, item := range candidates {
 		effectTx, err := db.BeginTx(ctx, nil)
 		if err != nil {
+			return observed, err
+		}
+		if err := entitlementDecisionLock(ctx, effectTx); err != nil {
+			_ = effectTx.Rollback()
 			return observed, err
 		}
 		if err := entitlementIssuerLock(ctx, effectTx, item.issuer, false); err != nil {

@@ -3,6 +3,7 @@
 package api
 
 import (
+	"crypto/sha256"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/require"
 
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
 )
 
@@ -145,26 +147,26 @@ func TestAnInstallationWideGrantCoversNewOrganizationsAndAnOrganizationGrantWins
 	require.Equal(t, grantScope(PluginGrantScopeInstallation), covering)
 	require.NoError(t, l.effect("beta"))
 
-	// acme's own grant wins for acme: it has expired, so acme is no longer
-	// entitled while beta keeps the installation-wide grant.
+	// An expired organisation grant falls back to the current installation
+	// grant. Operator status, discovery and effect admission agree.
 	acme, err := l.db.GetOrg(t.Context(), nil, "acme")
 	require.NoError(t, err)
 	l.importGrants("Import acme's own licence", l.signGrantForOrganization(t, l.id, acme.Uuid, uuid.New(), 1, l.base-3, l.base-2))
 	own := l.read()
-	require.Equal(t, PluginGrantScopeOrganization, l.grantOf(own, "acme").Scope)
-	require.Equal(t, PluginEntitlementGrantStateExpired, l.grantOf(own, "acme").State)
+	require.Equal(t, PluginGrantScopeInstallation, l.grantOf(own, "acme").Scope)
+	require.Equal(t, PluginEntitlementGrantStateValid, l.grantOf(own, "acme").State)
 	require.Equal(t, PluginGrantScopeInstallation, l.grantOf(own, "beta").Scope)
 	state, covering = l.served("acme")
-	require.Equal(t, PluginAvailabilityStateNotEntitled, state)
-	require.Equal(t, grantScope(PluginGrantScopeOrganization), covering)
-	requirePlatformEntitlementCode(t, l.effect("acme"), "plugin_not_entitled")
+	require.Equal(t, PluginAvailabilityStateAvailable, state)
+	require.Equal(t, grantScope(PluginGrantScopeInstallation), covering)
+	require.NoError(t, l.effect("acme"))
 	state, covering = l.served("beta")
 	require.Equal(t, PluginAvailabilityStateAvailable, state)
 	require.Equal(t, grantScope(PluginGrantScopeInstallation), covering)
 	require.NoError(t, l.effect("beta"))
 
 	// The plugin's own licence preflight names the covering grant too.
-	for org, want := range map[string]PluginGrantScope{"acme": PluginGrantScopeOrganization, "beta": PluginGrantScopeInstallation} {
+	for org, want := range map[string]PluginGrantScope{"acme": PluginGrantScopeInstallation, "beta": PluginGrantScopeInstallation} {
 		preflight := decode[PluginCapability](t, l.api.call(uuid.MustParse(l.item.ServiceUserID), http.MethodGet, "/orgs/"+org+"/plugins/"+l.item.ID+"/entitlement", "", nil), http.StatusOK)
 		require.Equal(t, grantScope(want), preflight.Entitlement.GrantScope, org)
 	}
@@ -189,6 +191,10 @@ func TestTheOrganizationLimitRefusesEnablementsBeyondIt(t *testing.T) {
 	l.api.createOrganization("beta")
 	all := l.api.setOrganizationMode(l.id, PluginOrganizationModeAll, "UTC")
 	require.Equal(t, 2, all.Entitlement.EnabledOrganizations)
+	beta, err := l.db.GetOrg(t.Context(), nil, "beta")
+	require.NoError(t, err)
+	l.importGrants("License beta separately", l.signGrantForOrganization(t, l.id, beta.Uuid, uuid.New(), 1, l.base+10, l.base+20))
+	require.Equal(t, 2, l.read().Entitlement.EnabledOrganizations, "an organization's own licence does not free a limit slot")
 
 	// The limit is reached: a new organization is still created, without an
 	// enablement, and waits as pending.
@@ -239,4 +245,40 @@ func TestTheOrganizationLimitRefusesEnablementsBeyondIt(t *testing.T) {
 	for _, org := range []string{"acme", "beta", "gamma"} {
 		require.NoError(t, l.effect(org), "every enabled organization is covered: %s", org)
 	}
+	l.importGrants("Lower the limit without withdrawing access", l.signInstallationGrant(t, l.id, uuid.New(), 4, l.base+10, l.base+20, 1))
+	require.Equal(t, 4, l.read().Entitlement.EnabledOrganizations)
+	for _, org := range []string{"acme", "beta", "gamma"} {
+		require.NoError(t, l.effect(org), "a lower limit never disables existing access")
+	}
+}
+
+func TestRevokedOrganizationGrantFallsBackAndRenewalTakesPrecedence(t *testing.T) {
+	l := newLicensedOrganizations(t)
+	wide, own := uuid.New(), uuid.New()
+	l.importGrants("Import both licence scopes",
+		l.signInstallationGrant(t, l.id, wide, 1, l.base+100, l.base+200, 0),
+		l.signGrantFor(t, l.id, own, 1, l.base+10, l.base+20))
+	require.Equal(t, own, l.grantOf(l.read(), "acme").IssuanceId)
+	state, scope := l.served("acme")
+	require.Equal(t, PluginAvailabilityStateAvailable, state)
+	require.Equal(t, grantScope(PluginGrantScopeOrganization), scope)
+	_, err := model.ImportPluginEntitlementRevocations(t.Context(), l.db, nil, l.signRevocation(t, own), "internal_system", sha256.Sum256([]byte("operator-file")))
+	require.NoError(t, err)
+	require.Equal(t, wide, l.grantOf(l.read(), "acme").IssuanceId)
+	state, scope = l.served("acme")
+	require.Equal(t, PluginAvailabilityStateAvailable, state)
+	require.Equal(t, grantScope(PluginGrantScopeInstallation), scope)
+	require.NoError(t, l.effect("acme"))
+	preflight := decode[PluginCapability](t, l.api.call(uuid.MustParse(l.item.ServiceUserID), http.MethodGet, "/orgs/acme/plugins/"+l.item.ID+"/entitlement", "", nil), http.StatusOK)
+	require.Equal(t, grantScope(PluginGrantScopeInstallation), preflight.Entitlement.GrantScope)
+	decode[PluginInstallation](t, l.enable("acme", PluginEnablementPutStateDisabled), http.StatusOK)
+	require.Error(t, l.effect("acme"), "fallback cannot enable a disabled organization")
+	decode[PluginInstallation](t, l.enable("acme", PluginEnablementPutStateEnabled), http.StatusOK)
+	renewed := uuid.New()
+	l.importGrants("Renew the organization's licence", l.signGrantFor(t, l.id, renewed, 2, l.base+10, l.base+20))
+	require.Equal(t, renewed, l.grantOf(l.read(), "acme").IssuanceId)
+	state, scope = l.served("acme")
+	require.Equal(t, PluginAvailabilityStateAvailable, state)
+	require.Equal(t, grantScope(PluginGrantScopeOrganization), scope)
+	require.NoError(t, l.effect("acme"))
 }

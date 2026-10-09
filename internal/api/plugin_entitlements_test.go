@@ -1,6 +1,7 @@
 package api
 
 import (
+	"database/sql"
 	"encoding/json"
 	"testing"
 	"time"
@@ -9,6 +10,29 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
 	"github.com/stretchr/testify/require"
 )
+
+func TestPluginEffectRejectsUnsafeTransactionOptionsBeforeOpeningDatabase(t *testing.T) {
+	for _, options := range []sql.TxOptions{
+		{ReadOnly: true},
+		{Isolation: sql.LevelReadCommitted, ReadOnly: true},
+		{Isolation: sql.LevelReadUncommitted},
+		{Isolation: sql.LevelWriteCommitted},
+		{Isolation: sql.LevelRepeatableRead},
+		{Isolation: sql.LevelSnapshot},
+		{Isolation: sql.LevelSerializable},
+		{Isolation: sql.LevelLinearizable},
+		{Isolation: sql.IsolationLevel(100)},
+	} {
+		t.Run(options.Isolation.String(), func(t *testing.T) {
+			server := &Server{}
+			tx, err := server.pluginEffectDatabase("acme", plugins.Installation{}, "effect.commit", false).BeginTx(t.Context(), &options)
+			require.Nil(t, tx)
+			var denied *herrors.PlatformOrchestratorError
+			require.ErrorAs(t, err, &denied)
+			require.Equal(t, "plugin_effect_transaction_invalid", denied.Code)
+		})
+	}
+}
 
 func TestPluginFeatureAccessNeverUsesAnotherFeaturesLicence(t *testing.T) {
 	descriptor := plugins.Descriptor{State: plugins.StateAvailable, Mode: plugins.ModeFull, Entitlement: &plugins.EntitlementStatus{Features: map[string]plugins.FeatureAccess{
