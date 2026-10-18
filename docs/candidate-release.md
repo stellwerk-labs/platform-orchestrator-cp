@@ -68,9 +68,62 @@ with updated notes. Do not rerun publication in order to overwrite an existing
 candidate, delete its evidence or move its tag. A partially published candidate is
 not a usable release.
 
+## Repeat source tests without publishing
+
+Use the CI workflow's `tests_only` mode when an integration dependency changes
+after an RC or stable image has already been published. Do not redispatch the
+candidate publisher to repeat tests against an occupied release.
+
+Before dispatch, freeze and review these inputs:
+
+- `candidate_tag`: the existing canonical RC or stable tag, not a new tag.
+- `candidate_sha`: the full commit SHA that tag identifies.
+- `verification_base_sha`: the full ancestor SHA immediately before the complete
+  landing range to validate. Choosing a later ancestor would omit history, so
+  review the range itself, not just the ancestry check. Do not use the current
+  default-branch head after the source has landed.
+- The approved dispatch ref and its resolved workflow commit. Its
+  `.github/workflows/ci.yaml` must be byte-identical to the source workflow.
+- The exact compatible IAM and DP image digests in the repository variables.
+  Retain their readbacks with the run identity; a source SHA does not freeze
+  mutable repository configuration.
+
+After the required action approval, dispatch with `tests_only=true` and the three
+identity inputs above. For example, with the reviewed values already assigned:
+
+```sh
+gh workflow run ci.yaml --repo stellwerk-labs/platform-orchestrator-cp \
+  --ref "$APPROVED_WORKFLOW_REF" \
+  -f candidate_tag="$EXISTING_RELEASE_TAG" \
+  -f candidate_sha="$APPROVED_SOURCE_SHA" \
+  -F tests_only=true \
+  -f verification_base_sha="$APPROVED_HISTORY_BASE_SHA"
+```
+
+The read-only preflight checks the exact checkout, remote tag identity,
+GitHub-verified source signature, nonempty ancestor range and workflow bytes.
+RCs require an annotated, verified tag signature. Existing lightweight stable
+tags are accepted to preserve the normal version-assignment owner; they are
+bound to the exact remote commit and are not described as signed tags.
+Annotated stable tags require a verified signature too.
+
+All four existing gates run: unit, integration, PostgreSQL integration and
+complete-range commit validation. Both publishers are excluded. This mode
+creates no release, image, tag or package, and has no publication permissions or
+review environment. It does not rebuild or requalify already-published image
+bytes. Record source, workflow, tag kind/object, history base, effective dependency
+digests and run/attempt with the results.
+
+Local real-Git fixtures can use the helper's explicit `--allowed-signers-file`
+option for offline SSH verification. CI does not use that option or choose its
+own trust file. Local fixtures prove the helper and mode wiring, not a hosted
+run, actual integration success or public artifact qualification.
+
 ## Local checks
 
 Run `PYTHONDONTWRITEBYTECODE=1 python3 scripts/candidate-release_test.py`.
 These standard-library tests validate identity, reviewer requirements, registry
 absence handling and workflow separation. They do not publish artifacts or prove
 that remote environment protection, credentials or registry access are configured.
+Run `PYTHONDONTWRITEBYTECODE=1 python3 scripts/release-verification_test.py` for
+the tests-only identity, signature and job-selection regressions.

@@ -1,5 +1,19 @@
 # Worklog
 
+## Nonpublishing exact-source release verification
+
+- Added `tests_only` and explicit history-base inputs to the existing workflow.
+  Manual source gates require the selected identity preflight; normal PR/main
+  behavior and all candidate/stable publisher dependencies remain intact.
+- Added real signed Git fixtures and bounded job-selection truth tables, covering
+  wrong/missing/unsigned tags, untrusted keys, unsigned source, workflow drift,
+  empty/nonancestor ranges and the existing lightweight stable tag convention.
+- Added operator documentation for exact inputs, configuration readbacks and
+  evidence limits. See DECISIONS.md and LEARNINGS.md for trust and history rules.
+- Local helper, candidate, stable and workflow contracts are the verification
+  scope. No application, schema, image, hosted run or publication is changed or
+  qualified by these controls alone.
+
 ## Complete raw tar metadata coverage
 
 - Retain every raw layer header, PAX extension, padding and trailing byte in a

@@ -103,7 +103,9 @@ class CandidateReleaseTests(unittest.TestCase):
         jobs = dict(re.findall(r"^  ([a-z-]+):\n(.*?)(?=^  [a-z-]+:\n|\Z)", text, re.M | re.S))
         for publisher in ("candidate-release", "release"):
             self.assertIn("- commitlint", jobs[publisher])
-        self.assertNotIn("\n    if:", jobs["commitlint"])
+        self.assertIn("needs: [candidate-preflight, verification-preflight]", jobs["commitlint"])
+        self.assertIn("needs.verification-preflight.result == 'success'", jobs["commitlint"])
+        self.assertIn("!inputs.tests_only", jobs["candidate-release"])
         self.assertIn("inputs.candidate_sha || github.sha", jobs["commitlint"])
         self.assertIn('bash scripts/check-release-commits.sh "$base" "$head"', jobs["commitlint"])
 

@@ -1,5 +1,13 @@
 # Decisions
 
+- Add a nonpublishing manual mode to the existing CI workflow, reusing all four
+  source gates rather than duplicating them. Require an exact existing tag/source,
+  authenticated signature/ref checks, matching workflow bytes and an explicitly
+  reviewed nonempty history base. Exclude both publishers before any write job.
+- Preserve the automatic stable tag owner. Lightweight stable tags are exact
+  authenticated ref bindings, not signed-tag evidence; RCs and annotated stable
+  tags still require verified tag signatures.
+
 - Preserve the complete pinned Distroless base and BuildKit SBOM/provenance.
 - Reproducibility compares actual platform payload manifests/configurations/layers/binaries/notices. Attestation and full index variance is recorded, not suppressed.
 - Collect production notice graphs separately for each Linux architecture and all shipped executables. Restrict SDK classifier exceptions to exact declared module identities and verified legal bytes/source provenance.

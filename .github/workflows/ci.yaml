@@ -4,12 +4,21 @@ on:
   workflow_dispatch:
     inputs:
       candidate_tag:
-        description: "Pre-existing approved vX.Y.Z-rc.N tag (never stable/latest)"
+        description: "Approved existing RC tag; stable tags are accepted only in tests-only mode"
         required: true
         type: string
       candidate_sha:
         description: "Approved full 40-character commit SHA identified by that tag"
         required: true
+        type: string
+      tests_only:
+        description: "Run all source gates without any release or image publication"
+        required: false
+        type: boolean
+        default: false
+      verification_base_sha:
+        description: "Tests-only: full ancestor commit SHA for the complete history gate"
+        required: false
         type: string
   push:
     branches:
@@ -25,7 +34,7 @@ concurrency:
 
 jobs:
   candidate-preflight:
-    if: github.repository == 'stellwerk-labs/platform-orchestrator-cp' && github.event_name == 'workflow_dispatch'
+    if: github.repository == 'stellwerk-labs/platform-orchestrator-cp' && github.event_name == 'workflow_dispatch' && !inputs.tests_only
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -50,8 +59,32 @@ jobs:
           python3 scripts/candidate-release.py "$CANDIDATE_TAG" "$CANDIDATE_SHA" \
             --environment-json "$RUNNER_TEMP/candidate-environment.json"
 
+  verification-preflight:
+    if: github.event_name == 'workflow_dispatch' && inputs.tests_only
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact verification source and history
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.candidate_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify source, existing tag, workflow and nonempty history range
+        env:
+          VERIFICATION_TAG: ${{ inputs.candidate_tag }}
+          VERIFICATION_SHA: ${{ inputs.candidate_sha }}
+          VERIFICATION_BASE_SHA: ${{ inputs.verification_base_sha }}
+          VERIFICATION_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/release-verification.py "$VERIFICATION_TAG" "$VERIFICATION_SHA" \
+            "$VERIFICATION_BASE_SHA" "$VERIFICATION_WORKFLOW_SHA"
+
   candidate-release:
-    if: github.repository == 'stellwerk-labs/platform-orchestrator-cp' && github.event_name == 'workflow_dispatch'
+    if: github.repository == 'stellwerk-labs/platform-orchestrator-cp' && github.event_name == 'workflow_dispatch' && !inputs.tests_only
     needs:
       - candidate-preflight
       - commitlint
@@ -241,6 +274,8 @@ jobs:
           CANDIDATE_TAG: ${{ inputs.candidate_tag }}
         run: gh release edit "$CANDIDATE_TAG" --draft=false --latest=false
   unit:
+    needs: [candidate-preflight, verification-preflight]
+    if: ${{ !cancelled() && (github.event_name != 'workflow_dispatch' || (!inputs.tests_only && needs.candidate-preflight.result == 'success') || (inputs.tests_only && needs.verification-preflight.result == 'success')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -255,6 +290,7 @@ jobs:
           python3 scripts/stable-release-preflight_test.py
           python3 scripts/server-publication_test.py
           python3 scripts/release_workflow_test.py
+          python3 scripts/release-verification_test.py
 
       - name: Checkout the exact semantic-release action
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -319,6 +355,8 @@ jobs:
           path: cover.out
 
   integration:
+    needs: [candidate-preflight, verification-preflight]
+    if: ${{ !cancelled() && (github.event_name != 'workflow_dispatch' || (!inputs.tests_only && needs.candidate-preflight.result == 'success') || (inputs.tests_only && needs.verification-preflight.result == 'success')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -367,6 +405,8 @@ jobs:
         run: make clean
 
   integration-postgres:
+    needs: [candidate-preflight, verification-preflight]
+    if: ${{ !cancelled() && (github.event_name != 'workflow_dispatch' || (!inputs.tests_only && needs.candidate-preflight.result == 'success') || (inputs.tests_only && needs.verification-preflight.result == 'success')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -415,6 +455,8 @@ jobs:
         run: make clean
 
   commitlint:
+    needs: [candidate-preflight, verification-preflight]
+    if: ${{ !cancelled() && (github.event_name != 'workflow_dispatch' || (!inputs.tests_only && needs.candidate-preflight.result == 'success') || (inputs.tests_only && needs.verification-preflight.result == 'success')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -431,12 +473,17 @@ jobs:
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
           PUSH_BASE: ${{ github.event.before }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          TESTS_ONLY: ${{ inputs.tests_only }}
+          VERIFICATION_BASE_SHA: ${{ inputs.verification_base_sha }}
         run: |
           set -euo pipefail
           case "$EVENT_NAME" in
             pull_request) base="$PR_BASE"; head="$PR_HEAD" ;;
             push) base="$PUSH_BASE"; head="$GITHUB_SHA" ;;
-            workflow_dispatch) base="refs/remotes/origin/$DEFAULT_BRANCH"; head=HEAD ;;
+            workflow_dispatch)
+              if [ "$TESTS_ONLY" = true ]; then base="$VERIFICATION_BASE_SHA";
+              else base="refs/remotes/origin/$DEFAULT_BRANCH"; fi
+              head=HEAD ;;
             *) echo "Unsupported commit validation event: $EVENT_NAME" >&2; exit 1 ;;
           esac
           bash scripts/check-release-commits.sh "$base" "$head"
