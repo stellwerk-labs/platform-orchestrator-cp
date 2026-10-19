@@ -84,7 +84,7 @@ jobs:
             "$VERIFICATION_BASE_SHA" "$VERIFICATION_WORKFLOW_SHA"
 
   candidate-release:
-    if: github.repository == 'stellwerk-labs/platform-orchestrator-cp' && github.event_name == 'workflow_dispatch' && !inputs.tests_only
+    if: ${{ !cancelled() && github.repository == 'stellwerk-labs/platform-orchestrator-cp' && github.event_name == 'workflow_dispatch' && !inputs.tests_only && needs.candidate-preflight.result == 'success' && needs.commitlint.result == 'success' && needs.unit.result == 'success' && needs.integration.result == 'success' && needs.integration-postgres.result == 'success' }}
     needs:
       - candidate-preflight
       - commitlint
@@ -492,7 +492,7 @@ jobs:
           bash scripts/check-release-commits.sh "$base" "$head"
 
   release:
-    if: github.repository == 'stellwerk-labs/platform-orchestrator-cp' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: ${{ !cancelled() && github.repository == 'stellwerk-labs/platform-orchestrator-cp' && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.commitlint.result == 'success' && needs.unit.result == 'success' && needs.integration.result == 'success' && needs.integration-postgres.result == 'success' }}
     needs:
       - commitlint
       - unit

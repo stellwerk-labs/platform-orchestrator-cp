@@ -23,6 +23,24 @@ def condition(job, values):
     expression = next(line.strip()[4:] for line in JOBS[job].splitlines()
                       if line.strip().startswith("if: "))
     expression = expression.removeprefix("${{").removesuffix("}}").strip()
+    # GitHub applies success() unless an explicit status function is present.
+    # A skipped ancestor counts even when the direct source gates succeeded.
+    # This is a bounded wiring check, not a general Actions scheduler.
+    ancestors = set()
+    pending = list(dependencies(job))
+    while pending:
+        dependency = pending.pop()
+        if dependency not in ancestors:
+            ancestors.add(dependency)
+            pending.extend(dependencies(dependency))
+    values = dict(values)
+    values["success()"] = all(values["needs." + name + ".result"] == "success"
+                              for name in ancestors)
+    values["failure()"] = any(values["needs." + name + ".result"] == "failure"
+                              for name in ancestors)
+    values["always()"] = True
+    if not re.search(r"\b(?:always|success|failure|cancelled)\s*\(", expression):
+        expression = "success() && (" + expression + ")"
     for name, value in sorted(values.items(), key=lambda item: -len(item[0])):
         expression = expression.replace(name, repr(value))
     expression = re.sub(r"!(?!=)", " not ", expression).replace("&&", " and ").replace("||", " or ").strip()
@@ -34,6 +52,18 @@ def condition(job, values):
     return bool(eval(compile(tree, "<workflow condition>", "eval"), {"__builtins__": {}}, {}))
 
 
+def dependencies(job):
+    inline = re.search(r"^    needs: \[([^]]+)\]$", JOBS[job], re.M)
+    if inline:
+        return tuple(name.strip() for name in inline[1].split(","))
+    multiline = re.search(r"^    needs:\n((?:      - [a-z-]+\n)+)", JOBS[job], re.M)
+    if multiline:
+        return tuple(re.findall(r"      - ([a-z-]+)", multiline[1]))
+    if "    needs:" in JOBS[job]:
+        raise ValueError("unexpected dependency syntax in the bounded wiring check")
+    return ()
+
+
 class VerificationWorkflowTests(unittest.TestCase):
     def values(self, **overrides):
         values = {
@@ -42,6 +72,8 @@ class VerificationWorkflowTests(unittest.TestCase):
             "inputs.tests_only": True, "cancelled()": False,
             "needs.candidate-preflight.result": "skipped",
             "needs.verification-preflight.result": "success",
+            "needs.unit.result": "success", "needs.integration.result": "success",
+            "needs.integration-postgres.result": "success", "needs.commitlint.result": "success",
         }
         values.update(overrides)
         return values
@@ -71,14 +103,54 @@ class VerificationWorkflowTests(unittest.TestCase):
     def test_ordinary_pr_and_push_keep_all_source_gates(self):
         for event in ("pull_request", "push"):
             values = self.values(**{"github.event_name": event,
+                                    "needs.candidate-preflight.result": "skipped",
                                     "needs.verification-preflight.result": "skipped"})
             for gate in ("unit", "integration", "integration-postgres", "commitlint"):
                 self.assertTrue(condition(gate, values))
             self.assertEqual(condition("release", values), event == "push")
             self.assertFalse(condition("candidate-release", values))
-        values = self.values(**{"inputs.tests_only": False})
+        values = self.values(**{"inputs.tests_only": False,
+                                "needs.candidate-preflight.result": "success",
+                                "needs.verification-preflight.result": "skipped"})
         self.assertTrue(condition("candidate-release", values))
         self.assertFalse(condition("release", values))
+
+    def test_candidate_publisher_reaches_review_after_unused_preflight_is_skipped(self):
+        values = self.values(**{"inputs.tests_only": False,
+                                "needs.candidate-preflight.result": "success",
+                                "needs.verification-preflight.result": "skipped"})
+        self.assertTrue(condition("candidate-release", values))
+
+    def test_tests_only_cannot_publish_even_when_all_dependency_results_are_successful(self):
+        values = self.values(**{"needs.candidate-preflight.result": "success",
+                                "needs.verification-preflight.result": "success"})
+        for publisher in ("candidate-release", "release"):
+            self.assertFalse(condition(publisher, values))
+
+    def test_stable_publisher_runs_after_both_manual_preflights_are_skipped(self):
+        values = self.values(**{"github.event_name": "push", "inputs.tests_only": False,
+                                "needs.candidate-preflight.result": "skipped",
+                                "needs.verification-preflight.result": "skipped"})
+        self.assertTrue(condition("release", values))
+
+    def test_publishers_fail_closed_for_every_non_green_required_dependency(self):
+        for publisher, event in (("candidate-release", "workflow_dispatch"), ("release", "push")):
+            values = self.values(**{"github.event_name": event, "inputs.tests_only": False,
+                                    "needs.candidate-preflight.result": "success" if event == "workflow_dispatch" else "skipped",
+                                    "needs.verification-preflight.result": "skipped"})
+            required = {"unit", "integration", "integration-postgres", "commitlint"}
+            if publisher == "candidate-release":
+                required.add("candidate-preflight")
+            self.assertEqual(set(dependencies(publisher)), required)
+            self.assertTrue(condition(publisher, values))
+            for dependency, result in itertools.product(required, ("failure", "skipped", "cancelled")):
+                with self.subTest(publisher=publisher, dependency=dependency, result=result):
+                    self.assertFalse(condition(publisher, {**values, "needs." + dependency + ".result": result}))
+            self.assertFalse(condition(publisher, {**values, "cancelled()": True}))
+            self.assertFalse(condition(publisher, {**values, "github.repository": "example/fork"}))
+            self.assertFalse(condition(publisher, {**values, "github.event_name": "pull_request"}))
+            if publisher == "release":
+                self.assertFalse(condition(publisher, {**values, "github.ref": "refs/heads/not-main"}))
 
     def test_verification_has_read_only_permissions_and_explicit_source_history(self):
         job = JOBS["verification-preflight"]
