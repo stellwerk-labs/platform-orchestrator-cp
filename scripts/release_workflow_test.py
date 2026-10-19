@@ -18,6 +18,32 @@ def component(directory):
 
 
 class WorkflowTests(unittest.TestCase):
+    def assert_host_test_codegen(self, workflow):
+        jobs = dict(re.findall(r"^  ([a-z][a-z0-9-]*):\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)",
+                               workflow, re.M | re.S))
+        for job_name, target in (("unit", "test-unit"),
+                                 ("integration-postgres", "test-integration-postgres")):
+            job = jobs[job_name]
+            self.assertIn("run: make generate", job, job_name)
+            self.assertLess(job.index("run: make generate"),
+                            job.index("run: make " + target), job_name)
+
+    def test_host_package_jobs_generate_in_their_own_checkout(self):
+        self.assert_host_test_codegen((ROOT / ".github/workflows/ci.yaml").read_text())
+
+    def test_postgres_codegen_guard_rejects_missing_or_late_generation(self):
+        workflow = (ROOT / ".github/workflows/ci.yaml").read_text()
+        before, postgres = workflow.split("  integration-postgres:\n", 1)
+        generation = "      - name: Generate\n        run: make generate\n\n"
+        self.assertIn(generation, postgres)
+        without_generation = postgres.replace(generation, "", 1)
+        test_run = "        run: make test-integration-postgres\n"
+        self.assertIn(test_run, without_generation)
+        late_generation = without_generation.replace(test_run, test_run + "\n" + generation, 1)
+        for case, changed in (("missing", without_generation), ("after-tests", late_generation)):
+            with self.subTest(case=case), self.assertRaises(AssertionError):
+                self.assert_host_test_codegen(before + "  integration-postgres:\n" + changed)
+
     def test_every_image_publisher_validates_complete_local_layout_first(self):
         workflow = (ROOT / ".github/workflows/ci.yaml").read_text()
         publishers = 0
