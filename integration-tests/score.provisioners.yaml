@@ -19,7 +19,7 @@
     WORKOS_API_KEY: dumbworkoskey
     SSO_CALLBACK_URL_PATH: /auth/sso/callback
     OTEL_EXPORTER_OTLP_ENDPOINT: ""
-    RUNNER_IMAGE: "ghcr.io/stellwerk-labs/platform-orchestrator-runner:v2.0.0"
+    RUNNER_IMAGE: "ghcr.io/stellwerk-labs/platform-orchestrator-runner:v2.0.0@sha256:f636885947e5dc9bd4c412cd5fc35796a079b5f972d0993f5c28e31aff47f638"
     SSO_STATE_SECRET: {{ env "SSO_STATE_SECRET" | default "test-sso-state-secret-for-integration-tests" }}
 
 - uri: template://service

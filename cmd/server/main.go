@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/pkg/errors"
@@ -32,7 +33,12 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/api"
 	apimiddleware "github.com/stellwerk-labs/platform-orchestrator-cp/internal/api/middleware"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/config"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/entitlements"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/events"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginentitlements"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginmanager"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/vault"
 
@@ -121,9 +127,24 @@ func main() {
 	dbConnStr := fmt.Sprintf(
 		"dbname=%s user=%s password=%s host=%s port=%s connect_timeout=5 sslmode=disable",
 		cfg.DatabaseName, cfg.DatabaseUser, cfg.DatabasePassword, cfg.DatabaseHost, cfg.DatabasePort)
-	db, err := model.NewDatabaser(ctx, zap.L(), dbConnStr)
+	// Only a plugin host keeps the extension resource journal. Which
+	// organizations it journals is Plugin Manager state in the database.
+	var dbOptions []model.DatabaserOption
+	retention := model.ExtensionResourceRetention{Window: cfg.PluginEventJournalRetention, Batch: journalRetentionBatch}
+	if cfg.PluginHostEnabled {
+		if err := retention.Validate(); err != nil {
+			zap.L().Fatal("Invalid plugin event journal retention", zap.Error(err))
+		}
+		dbOptions = append(dbOptions, model.WithExtensionResourceJournal())
+	}
+	db, err := model.NewDatabaser(ctx, zap.L(), dbConnStr, dbOptions...)
 	if err != nil {
 		zap.L().Fatal("Failed to initialize database", zap.Error(err))
+	}
+	// Record before serving whether this server journals each organization, so
+	// a subscriber returning after a pause sees the gap.
+	if err := model.ReconcileExtensionResourceJournal(ctx, db, cfg.PluginHostEnabled); err != nil {
+		zap.L().Fatal("Failed to reconcile the extension resource journal", zap.Error(err))
 	}
 	defer func() {
 		zap.L().Info("Closing database")
@@ -165,7 +186,7 @@ func main() {
 		}
 	}
 	hstandardoutbox.MessageIDPrefix = "platform-orchestrator-cp-"
-	publisher := hnats.NewPublisher(jetStream, hmessaging.EventsStreamName, zap.L())
+	publisher := events.NewPublisher(hnats.NewPublisher(jetStream, hmessaging.EventsStreamName, zap.L()))
 
 	vaultHttpClient := &http.Client{
 		Transport: otelhttp.NewTransport(http.DefaultTransport),
@@ -187,6 +208,63 @@ func main() {
 		Publisher: publisher,
 		DpClient:  dpClient,
 		IamClient: iamClient,
+
+		DeploymentAdmissionIdentity: uuid.UUID(cfg.DeploymentAdmissionIdentity),
+	}
+	var gateway *plugins.Gateway
+	var entitlementAdapter *pluginentitlements.Adapter
+	if cfg.PluginHostEnabled {
+		signingKey, err := plugins.LoadSigningKey(cfg.PluginSigningKeyFile)
+		if err != nil {
+			zap.L().Fatal("Failed to initialize plugin gateway", zap.Error(err))
+		}
+		registry := &plugins.InstallationRegistry{}
+		gateway = &plugins.Gateway{Registry: registry, SigningKey: signingKey, Issuer: cfg.PluginIssuer}
+		if err := gateway.Validate(); err != nil {
+			zap.L().Fatal("Failed to initialize plugin gateway", zap.Error(err))
+		}
+		var caPEM []byte
+		if cfg.PluginCAFile != "" {
+			caPEM, err = os.ReadFile(cfg.PluginCAFile)
+			if err != nil {
+				zap.L().Fatal("Failed to read the operator plugin CA bundle", zap.Error(err))
+			}
+		}
+		gateway.Client, err = plugins.NewServiceHTTPClient(caPEM)
+		if err != nil {
+			zap.L().Fatal("Failed to initialize verified plugin transport", zap.Error(err))
+		}
+		server.PluginGateway = gateway
+		server.PluginJournalRetention = retention.Window
+		server.Plugins = registry
+		var diagnostics []pluginentitlements.Diagnostic
+		entitlementAdapter, diagnostics, err = pluginentitlements.New(db, entitlements.TrustClass(cfg.PluginEntitlementMode), cfg.PluginEntitlementTrustFile, time.Now)
+		if err != nil {
+			zap.L().Fatal("Failed to initialize offline plugin entitlements", zap.Error(err))
+		}
+		// Licence material never stops Core; a licence problem degrades only
+		// the affected plugins, which report not_entitled or untrusted.
+		for _, diagnostic := range diagnostics {
+			zap.L().Error("Plugin entitlement material was not applied; affected plugins stay unentitled", zap.String("diagnostic", diagnostic.Code), zap.String("detail", diagnostic.Detail))
+		}
+		registry.Entitlements = entitlementAdapter
+		server.PluginEntitlements = entitlementAdapter
+		server.PluginManager, err = pluginmanager.New(pluginmanager.Config{
+			Database: db, Registry: registry, Entitlements: entitlementAdapter, StatusClient: gateway.Client, IAM: iamClient, AllowDevelopmentHTTP: cfg.PluginDevelopmentHTTP,
+			Logger: zap.L(),
+		})
+		if err != nil {
+			zap.L().Fatal("Invalid Plugin Manager configuration", zap.Error(err))
+		}
+		// Serve plugins only once this replica holds a snapshot.
+		if err := server.PluginManager.Refresh(ctx); err != nil {
+			zap.L().Fatal("Failed to load the Plugin Manager state", zap.Error(err))
+		}
+		server.PluginDataPlane, err = plugins.NewDataPlanePort(cfg.DataPlaneUrl, gateway, cfg.PluginDevelopmentHTTP || cfg.PluginDataPlaneInternalHTTP)
+		if err != nil {
+			zap.L().Fatal("Failed to initialize the fixed Data Plane plugin port", zap.Error(err))
+		}
+		server.PluginDataPlane.Client = gateway.Client
 	}
 
 	echoServer, err := hecho.DefaultEchoServerWithValidation(&hecho.ValidatedServerConfig{
@@ -212,6 +290,12 @@ func main() {
 
 	bgCtx, bgCancel := context.WithCancel(ctx)
 	defer bgCancel()
+	if gateway != nil {
+		go server.PluginManager.Run(bgCtx, cfg.PluginManagerRefreshInterval)
+		go runEvery(bgCtx, capabilityReconcileInterval, capabilityReconcileTimeout, server.Logger, "plugin capability reconciliation", server.PluginManager.ReconcileCapabilities)
+		go runEvery(bgCtx, entitlementSweepInterval, entitlementSweepTimeout, server.Logger, "entitlement boundary sweep", sweepPluginEntitlements(entitlementAdapter))
+		go runEvery(bgCtx, journalRetentionInterval, journalRetentionTimeout, server.Logger, "extension journal retention", pruneExtensionJournal(db, retention, server.Logger))
+	}
 	go func() {
 		zap.L().Info("Starting scheduled flush of pending messages")
 		reliableoutbox.ScheduledFlushPendingMessages(bgCtx, server.Database.AsReliableOutboxStore(), publisher, reliableoutbox.DefaultScheduledFlushPeriodFunc)

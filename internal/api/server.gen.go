@@ -49,6 +49,45 @@ func (e CoreModuleVersionMigrationGeneration) Valid() bool {
 	}
 }
 
+// Defines values for DeploymentAdmissionReceiptState.
+const (
+	AdmissionStateActive  DeploymentAdmissionReceiptState = "active"
+	AdmissionStateSettled DeploymentAdmissionReceiptState = "settled"
+)
+
+// Valid indicates whether the value is a known member of the DeploymentAdmissionReceiptState enum.
+func (e DeploymentAdmissionReceiptState) Valid() bool {
+	switch e {
+	case AdmissionStateActive:
+		return true
+	case AdmissionStateSettled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeploymentAdmissionRequestMode.
+const (
+	AdmissionModeDeploy   DeploymentAdmissionRequestMode = "deploy"
+	AdmissionModeDestroy  DeploymentAdmissionRequestMode = "destroy"
+	AdmissionModeRollback DeploymentAdmissionRequestMode = "rollback"
+)
+
+// Valid indicates whether the value is a known member of the DeploymentAdmissionRequestMode enum.
+func (e DeploymentAdmissionRequestMode) Valid() bool {
+	switch e {
+	case AdmissionModeDeploy:
+		return true
+	case AdmissionModeDestroy:
+		return true
+	case AdmissionModeRollback:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for EnvironmentStatus.
 const (
 	EnvironmentStatusActive       EnvironmentStatus = "active"
@@ -412,6 +451,27 @@ func (e OrganizationStatus) Valid() bool {
 	}
 }
 
+// Defines values for PluginAuthorizationCheckRequestResourcesType.
+const (
+	PluginAuthorizationCheckRequestResourcesTypeEnvironment  PluginAuthorizationCheckRequestResourcesType = "environment"
+	PluginAuthorizationCheckRequestResourcesTypeOrganization PluginAuthorizationCheckRequestResourcesType = "organization"
+	PluginAuthorizationCheckRequestResourcesTypeProject      PluginAuthorizationCheckRequestResourcesType = "project"
+)
+
+// Valid indicates whether the value is a known member of the PluginAuthorizationCheckRequestResourcesType enum.
+func (e PluginAuthorizationCheckRequestResourcesType) Valid() bool {
+	switch e {
+	case PluginAuthorizationCheckRequestResourcesTypeEnvironment:
+		return true
+	case PluginAuthorizationCheckRequestResourcesTypeOrganization:
+		return true
+	case PluginAuthorizationCheckRequestResourcesTypeProject:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PluginAvailabilityState.
 const (
 	PluginAvailabilityStateAvailable    PluginAvailabilityState = "available"
@@ -436,6 +496,558 @@ func (e PluginAvailabilityState) Valid() bool {
 	case PluginAvailabilityStateNotInstalled:
 		return true
 	case PluginAvailabilityStateUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginCapabilityRegistrationState.
+const (
+	PluginCapabilityRegistrationStateFailed     PluginCapabilityRegistrationState = "failed"
+	PluginCapabilityRegistrationStatePending    PluginCapabilityRegistrationState = "pending"
+	PluginCapabilityRegistrationStateRegistered PluginCapabilityRegistrationState = "registered"
+)
+
+// Valid indicates whether the value is a known member of the PluginCapabilityRegistrationState enum.
+func (e PluginCapabilityRegistrationState) Valid() bool {
+	switch e {
+	case PluginCapabilityRegistrationStateFailed:
+		return true
+	case PluginCapabilityRegistrationStatePending:
+		return true
+	case PluginCapabilityRegistrationStateRegistered:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginContractLevel.
+const (
+	PluginContractLevelV1alpha PluginContractLevel = "v1alpha"
+)
+
+// Valid indicates whether the value is a known member of the PluginContractLevel enum.
+func (e PluginContractLevel) Valid() bool {
+	switch e {
+	case PluginContractLevelV1alpha:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginContributionMode.
+const (
+	Full       PluginContributionMode = "full"
+	Hidden     PluginContributionMode = "hidden"
+	ReadOnly   PluginContributionMode = "read_only"
+	SafetyOnly PluginContributionMode = "safety_only"
+)
+
+// Valid indicates whether the value is a known member of the PluginContributionMode enum.
+func (e PluginContributionMode) Valid() bool {
+	switch e {
+	case Full:
+		return true
+	case Hidden:
+		return true
+	case ReadOnly:
+		return true
+	case SafetyOnly:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginContributionUiContextualActionsResourceType.
+const (
+	PluginContributionUiContextualActionsResourceTypeModuleVersion PluginContributionUiContextualActionsResourceType = "module_version"
+)
+
+// Valid indicates whether the value is a known member of the PluginContributionUiContextualActionsResourceType enum.
+func (e PluginContributionUiContextualActionsResourceType) Valid() bool {
+	switch e {
+	case PluginContributionUiContextualActionsResourceTypeModuleVersion:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginContributionUiContextualActionsRouteQuery.
+const (
+	PluginContributionUiContextualActionsRouteQueryModuleId        PluginContributionUiContextualActionsRouteQuery = "$module_id"
+	PluginContributionUiContextualActionsRouteQuerySemanticVersion PluginContributionUiContextualActionsRouteQuery = "$semantic_version"
+	PluginContributionUiContextualActionsRouteQueryVersionUuid     PluginContributionUiContextualActionsRouteQuery = "$version_uuid"
+)
+
+// Valid indicates whether the value is a known member of the PluginContributionUiContextualActionsRouteQuery enum.
+func (e PluginContributionUiContextualActionsRouteQuery) Valid() bool {
+	switch e {
+	case PluginContributionUiContextualActionsRouteQueryModuleId:
+		return true
+	case PluginContributionUiContextualActionsRouteQuerySemanticVersion:
+		return true
+	case PluginContributionUiContextualActionsRouteQueryVersionUuid:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginContributionUiCoreOperationsMethod.
+const (
+	GET  PluginContributionUiCoreOperationsMethod = "GET"
+	POST PluginContributionUiCoreOperationsMethod = "POST"
+)
+
+// Valid indicates whether the value is a known member of the PluginContributionUiCoreOperationsMethod enum.
+func (e PluginContributionUiCoreOperationsMethod) Valid() bool {
+	switch e {
+	case GET:
+		return true
+	case POST:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginContributionUiSdkVersion.
+const (
+	N1 PluginContributionUiSdkVersion = "1"
+)
+
+// Valid indicates whether the value is a known member of the PluginContributionUiSdkVersion enum.
+func (e PluginContributionUiSdkVersion) Valid() bool {
+	switch e {
+	case N1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginDeploymentReadRequestKind.
+const (
+	PluginDeploymentReadRequestKindDeployment PluginDeploymentReadRequestKind = "deployment"
+	PluginDeploymentReadRequestKindDispatch   PluginDeploymentReadRequestKind = "dispatch"
+	PluginDeploymentReadRequestKindPlan       PluginDeploymentReadRequestKind = "plan"
+	PluginDeploymentReadRequestKindReadiness  PluginDeploymentReadRequestKind = "readiness"
+)
+
+// Valid indicates whether the value is a known member of the PluginDeploymentReadRequestKind enum.
+func (e PluginDeploymentReadRequestKind) Valid() bool {
+	switch e {
+	case PluginDeploymentReadRequestKindDeployment:
+		return true
+	case PluginDeploymentReadRequestKindDispatch:
+		return true
+	case PluginDeploymentReadRequestKindPlan:
+		return true
+	case PluginDeploymentReadRequestKindReadiness:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginDeploymentSubmitRequestApprovalScope.
+const (
+	PluginDeploymentApprovalScopeEnvironment PluginDeploymentSubmitRequestApprovalScope = "environment"
+	PluginDeploymentApprovalScopeProject     PluginDeploymentSubmitRequestApprovalScope = "project"
+)
+
+// Valid indicates whether the value is a known member of the PluginDeploymentSubmitRequestApprovalScope enum.
+func (e PluginDeploymentSubmitRequestApprovalScope) Valid() bool {
+	switch e {
+	case PluginDeploymentApprovalScopeEnvironment:
+		return true
+	case PluginDeploymentApprovalScopeProject:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginDeploymentSubmitRequestMode.
+const (
+	PluginDeploymentSubmitModeDeploy   PluginDeploymentSubmitRequestMode = "deploy"
+	PluginDeploymentSubmitModeRollback PluginDeploymentSubmitRequestMode = "rollback"
+)
+
+// Valid indicates whether the value is a known member of the PluginDeploymentSubmitRequestMode enum.
+func (e PluginDeploymentSubmitRequestMode) Valid() bool {
+	switch e {
+	case PluginDeploymentSubmitModeDeploy:
+		return true
+	case PluginDeploymentSubmitModeRollback:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginDispatchCheckAction.
+const (
+	ExternalDeploymentAdmit    PluginDispatchCheckAction = "external-deployment.admit"
+	ExternalDeploymentRollback PluginDispatchCheckAction = "external-deployment.rollback"
+)
+
+// Valid indicates whether the value is a known member of the PluginDispatchCheckAction enum.
+func (e PluginDispatchCheckAction) Valid() bool {
+	switch e {
+	case ExternalDeploymentAdmit:
+		return true
+	case ExternalDeploymentRollback:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginEnablementState.
+const (
+	PluginEnablementStateDisabled PluginEnablementState = "disabled"
+	PluginEnablementStateEnabled  PluginEnablementState = "enabled"
+)
+
+// Valid indicates whether the value is a known member of the PluginEnablementState enum.
+func (e PluginEnablementState) Valid() bool {
+	switch e {
+	case PluginEnablementStateDisabled:
+		return true
+	case PluginEnablementStateEnabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginEnablementPutState.
+const (
+	PluginEnablementPutStateDisabled PluginEnablementPutState = "disabled"
+	PluginEnablementPutStateEnabled  PluginEnablementPutState = "enabled"
+)
+
+// Valid indicates whether the value is a known member of the PluginEnablementPutState enum.
+func (e PluginEnablementPutState) Valid() bool {
+	switch e {
+	case PluginEnablementPutStateDisabled:
+		return true
+	case PluginEnablementPutStateEnabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginEntitlementGrantState.
+const (
+	PluginEntitlementGrantStateExpired     PluginEntitlementGrantState = "expired"
+	PluginEntitlementGrantStateGrace       PluginEntitlementGrantState = "grace"
+	PluginEntitlementGrantStateNotYetValid PluginEntitlementGrantState = "not_yet_valid"
+	PluginEntitlementGrantStateRevoked     PluginEntitlementGrantState = "revoked"
+	PluginEntitlementGrantStateUntrusted   PluginEntitlementGrantState = "untrusted"
+	PluginEntitlementGrantStateValid       PluginEntitlementGrantState = "valid"
+)
+
+// Valid indicates whether the value is a known member of the PluginEntitlementGrantState enum.
+func (e PluginEntitlementGrantState) Valid() bool {
+	switch e {
+	case PluginEntitlementGrantStateExpired:
+		return true
+	case PluginEntitlementGrantStateGrace:
+		return true
+	case PluginEntitlementGrantStateNotYetValid:
+		return true
+	case PluginEntitlementGrantStateRevoked:
+		return true
+	case PluginEntitlementGrantStateUntrusted:
+		return true
+	case PluginEntitlementGrantStateValid:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginEntitlementGrantTrustClass.
+const (
+	PluginEntitlementGrantTrustClassDevelopment PluginEntitlementGrantTrustClass = "development"
+	PluginEntitlementGrantTrustClassProduction  PluginEntitlementGrantTrustClass = "production"
+)
+
+// Valid indicates whether the value is a known member of the PluginEntitlementGrantTrustClass enum.
+func (e PluginEntitlementGrantTrustClass) Valid() bool {
+	switch e {
+	case PluginEntitlementGrantTrustClassDevelopment:
+		return true
+	case PluginEntitlementGrantTrustClassProduction:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginEntitlementWarningCode.
+const (
+	PluginEntitlementWarningCodeGrace PluginEntitlementWarningCode = "plugin_entitlement_grace"
+)
+
+// Valid indicates whether the value is a known member of the PluginEntitlementWarningCode enum.
+func (e PluginEntitlementWarningCode) Valid() bool {
+	switch e {
+	case PluginEntitlementWarningCodeGrace:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginGrantScope.
+const (
+	PluginGrantScopeInstallation PluginGrantScope = "installation"
+	PluginGrantScopeOrganization PluginGrantScope = "organization"
+)
+
+// Valid indicates whether the value is a known member of the PluginGrantScope enum.
+func (e PluginGrantScope) Valid() bool {
+	switch e {
+	case PluginGrantScopeInstallation:
+		return true
+	case PluginGrantScopeOrganization:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginInstallationState.
+const (
+	PluginInstallationStateActive      PluginInstallationState = "active"
+	PluginInstallationStateDisabled    PluginInstallationState = "disabled"
+	PluginInstallationStateInstalled   PluginInstallationState = "installed"
+	PluginInstallationStatePurged      PluginInstallationState = "purged"
+	PluginInstallationStateUninstalled PluginInstallationState = "uninstalled"
+)
+
+// Valid indicates whether the value is a known member of the PluginInstallationState enum.
+func (e PluginInstallationState) Valid() bool {
+	switch e {
+	case PluginInstallationStateActive:
+		return true
+	case PluginInstallationStateDisabled:
+		return true
+	case PluginInstallationStateInstalled:
+		return true
+	case PluginInstallationStatePurged:
+		return true
+	case PluginInstallationStateUninstalled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginInstallationDiagnosticCode.
+const (
+	PluginDiagnosticInstallationMismatch        PluginInstallationDiagnosticCode = "plugin_installation_mismatch"
+	PluginDiagnosticMigrationGenerationMismatch PluginInstallationDiagnosticCode = "plugin_migration_generation_mismatch"
+	PluginDiagnosticPackageDigestMismatch       PluginInstallationDiagnosticCode = "plugin_package_digest_mismatch"
+	PluginDiagnosticStatusInvalid               PluginInstallationDiagnosticCode = "plugin_status_invalid"
+	PluginDiagnosticStatusUnreachable           PluginInstallationDiagnosticCode = "plugin_status_unreachable"
+)
+
+// Valid indicates whether the value is a known member of the PluginInstallationDiagnosticCode enum.
+func (e PluginInstallationDiagnosticCode) Valid() bool {
+	switch e {
+	case PluginDiagnosticInstallationMismatch:
+		return true
+	case PluginDiagnosticMigrationGenerationMismatch:
+		return true
+	case PluginDiagnosticPackageDigestMismatch:
+		return true
+	case PluginDiagnosticStatusInvalid:
+		return true
+	case PluginDiagnosticStatusUnreachable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginModuleOperationReceiptState.
+const (
+	PluginModuleOperationReceiptStateActive   PluginModuleOperationReceiptState = "active"
+	PluginModuleOperationReceiptStateReleased PluginModuleOperationReceiptState = "released"
+)
+
+// Valid indicates whether the value is a known member of the PluginModuleOperationReceiptState enum.
+func (e PluginModuleOperationReceiptState) Valid() bool {
+	switch e {
+	case PluginModuleOperationReceiptStateActive:
+		return true
+	case PluginModuleOperationReceiptStateReleased:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginModuleOperationRequestAction.
+const (
+	PluginModuleOperationRequestActionPromote PluginModuleOperationRequestAction = "promote"
+	PluginModuleOperationRequestActionRelease PluginModuleOperationRequestAction = "release"
+	PluginModuleOperationRequestActionReserve PluginModuleOperationRequestAction = "reserve"
+	PluginModuleOperationRequestActionRestore PluginModuleOperationRequestAction = "restore"
+)
+
+// Valid indicates whether the value is a known member of the PluginModuleOperationRequestAction enum.
+func (e PluginModuleOperationRequestAction) Valid() bool {
+	switch e {
+	case PluginModuleOperationRequestActionPromote:
+		return true
+	case PluginModuleOperationRequestActionRelease:
+		return true
+	case PluginModuleOperationRequestActionReserve:
+		return true
+	case PluginModuleOperationRequestActionRestore:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginOperationAuthorizationRequestAction.
+const (
+	Activate PluginOperationAuthorizationRequestAction = "activate"
+	Prepare  PluginOperationAuthorizationRequestAction = "prepare"
+	Release  PluginOperationAuthorizationRequestAction = "release"
+	Suspend  PluginOperationAuthorizationRequestAction = "suspend"
+)
+
+// Valid indicates whether the value is a known member of the PluginOperationAuthorizationRequestAction enum.
+func (e PluginOperationAuthorizationRequestAction) Valid() bool {
+	switch e {
+	case Activate:
+		return true
+	case Prepare:
+		return true
+	case Release:
+		return true
+	case Suspend:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginOperationGrantState.
+const (
+	PluginOperationGrantStateActive    PluginOperationGrantState = "active"
+	PluginOperationGrantStatePrepared  PluginOperationGrantState = "prepared"
+	PluginOperationGrantStateReleased  PluginOperationGrantState = "released"
+	PluginOperationGrantStateSuspended PluginOperationGrantState = "suspended"
+)
+
+// Valid indicates whether the value is a known member of the PluginOperationGrantState enum.
+func (e PluginOperationGrantState) Valid() bool {
+	switch e {
+	case PluginOperationGrantStateActive:
+		return true
+	case PluginOperationGrantStatePrepared:
+		return true
+	case PluginOperationGrantStateReleased:
+		return true
+	case PluginOperationGrantStateSuspended:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginOrganizationMode.
+const (
+	PluginOrganizationModeAll      PluginOrganizationMode = "all"
+	PluginOrganizationModeSelected PluginOrganizationMode = "selected"
+)
+
+// Valid indicates whether the value is a known member of the PluginOrganizationMode enum.
+func (e PluginOrganizationMode) Valid() bool {
+	switch e {
+	case PluginOrganizationModeAll:
+		return true
+	case PluginOrganizationModeSelected:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginPinOperationReceiptAction.
+const (
+	Begin     PluginPinOperationReceiptAction = "begin"
+	Cancel    PluginPinOperationReceiptAction = "cancel"
+	Reconcile PluginPinOperationReceiptAction = "reconcile"
+	Restore   PluginPinOperationReceiptAction = "restore"
+)
+
+// Valid indicates whether the value is a known member of the PluginPinOperationReceiptAction enum.
+func (e PluginPinOperationReceiptAction) Valid() bool {
+	switch e {
+	case Begin:
+		return true
+	case Cancel:
+		return true
+	case Reconcile:
+		return true
+	case Restore:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginPinOperationRequestAction.
+const (
+	PluginPinBegin     PluginPinOperationRequestAction = "begin"
+	PluginPinCancel    PluginPinOperationRequestAction = "cancel"
+	PluginPinReconcile PluginPinOperationRequestAction = "reconcile"
+	PluginPinRestore   PluginPinOperationRequestAction = "restore"
+)
+
+// Valid indicates whether the value is a known member of the PluginPinOperationRequestAction enum.
+func (e PluginPinOperationRequestAction) Valid() bool {
+	switch e {
+	case PluginPinBegin:
+		return true
+	case PluginPinCancel:
+		return true
+	case PluginPinReconcile:
+		return true
+	case PluginPinRestore:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginStatusObservationFailure.
+const (
+	PluginStatusFailureInvalid     PluginStatusObservationFailure = "plugin_status_invalid"
+	PluginStatusFailureUnreachable PluginStatusObservationFailure = "plugin_status_unreachable"
+)
+
+// Valid indicates whether the value is a known member of the PluginStatusObservationFailure enum.
+func (e PluginStatusObservationFailure) Valid() bool {
+	switch e {
+	case PluginStatusFailureInvalid:
+		return true
+	case PluginStatusFailureUnreachable:
 		return true
 	default:
 		return false
@@ -529,6 +1141,33 @@ func (e StateStorageType) Valid() bool {
 	}
 }
 
+// Defines values for SettleDeploymentAdmissionJSONBodyOutcome.
+const (
+	AdmissionOutcomeAbsent     SettleDeploymentAdmissionJSONBodyOutcome = "absent"
+	AdmissionOutcomeCancelled  SettleDeploymentAdmissionJSONBodyOutcome = "cancelled"
+	AdmissionOutcomeFailed     SettleDeploymentAdmissionJSONBodyOutcome = "failed"
+	AdmissionOutcomeSucceeded  SettleDeploymentAdmissionJSONBodyOutcome = "succeeded"
+	AdmissionOutcomeTerminated SettleDeploymentAdmissionJSONBodyOutcome = "terminated"
+)
+
+// Valid indicates whether the value is a known member of the SettleDeploymentAdmissionJSONBodyOutcome enum.
+func (e SettleDeploymentAdmissionJSONBodyOutcome) Valid() bool {
+	switch e {
+	case AdmissionOutcomeAbsent:
+		return true
+	case AdmissionOutcomeCancelled:
+		return true
+	case AdmissionOutcomeFailed:
+		return true
+	case AdmissionOutcomeSucceeded:
+		return true
+	case AdmissionOutcomeTerminated:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for TransitionEnvironmentModuleVersionPinParamsPinAction.
 const (
 	TransitionEnvironmentModuleVersionPinParamsPinActionDiscard TransitionEnvironmentModuleVersionPinParamsPinAction = "discard"
@@ -589,6 +1228,42 @@ func (e TransitionModuleVersionParamsLifecycleAction) Valid() bool {
 	}
 }
 
+// Defines values for ControlPluginOperationGrantJSONBodyAction.
+const (
+	PluginGrantControlRelease ControlPluginOperationGrantJSONBodyAction = "release"
+	PluginGrantControlSuspend ControlPluginOperationGrantJSONBodyAction = "suspend"
+)
+
+// Valid indicates whether the value is a known member of the ControlPluginOperationGrantJSONBodyAction enum.
+func (e ControlPluginOperationGrantJSONBodyAction) Valid() bool {
+	switch e {
+	case PluginGrantControlRelease:
+		return true
+	case PluginGrantControlSuspend:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetPluginDeploymentMaterialParamsMaterialKind.
+const (
+	PluginDeploymentMaterialLogs    GetPluginDeploymentMaterialParamsMaterialKind = "logs"
+	PluginDeploymentMaterialOutputs GetPluginDeploymentMaterialParamsMaterialKind = "outputs"
+)
+
+// Valid indicates whether the value is a known member of the GetPluginDeploymentMaterialParamsMaterialKind enum.
+func (e GetPluginDeploymentMaterialParamsMaterialKind) Valid() bool {
+	switch e {
+	case PluginDeploymentMaterialLogs:
+		return true
+	case PluginDeploymentMaterialOutputs:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ChangeResourceTypeCatalogueStatusParamsCatalogueAction.
 const (
 	ChangeResourceTypeCatalogueStatusParamsCatalogueActionArchive   ChangeResourceTypeCatalogueStatusParamsCatalogueAction = "archive"
@@ -601,6 +1276,33 @@ func (e ChangeResourceTypeCatalogueStatusParamsCatalogueAction) Valid() bool {
 	case ChangeResourceTypeCatalogueStatusParamsCatalogueActionArchive:
 		return true
 	case ChangeResourceTypeCatalogueStatusParamsCatalogueActionUnarchive:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TransitionPluginInstallationParamsInstallationAction.
+const (
+	PluginInstallationActionActivate  TransitionPluginInstallationParamsInstallationAction = "activate"
+	PluginInstallationActionDisable   TransitionPluginInstallationParamsInstallationAction = "disable"
+	PluginInstallationActionEnable    TransitionPluginInstallationParamsInstallationAction = "enable"
+	PluginInstallationActionReinstall TransitionPluginInstallationParamsInstallationAction = "reinstall"
+	PluginInstallationActionUninstall TransitionPluginInstallationParamsInstallationAction = "uninstall"
+)
+
+// Valid indicates whether the value is a known member of the TransitionPluginInstallationParamsInstallationAction enum.
+func (e TransitionPluginInstallationParamsInstallationAction) Valid() bool {
+	switch e {
+	case PluginInstallationActionActivate:
+		return true
+	case PluginInstallationActionDisable:
+		return true
+	case PluginInstallationActionEnable:
+		return true
+	case PluginInstallationActionReinstall:
+		return true
+	case PluginInstallationActionUninstall:
 		return true
 	default:
 		return false
@@ -764,6 +1466,62 @@ type CoreModuleVersionDetail struct {
 type CoreModuleVersionPage struct {
 	Items         []CoreModuleVersionDetail `json:"items"`
 	NextPageToken *string                   `json:"next_page_token,omitempty"`
+}
+
+// DeploymentAdmissionReceipt defines model for DeploymentAdmissionReceipt.
+type DeploymentAdmissionReceipt struct {
+	AdmissionId     openapi_types.UUID              `json:"admission_id"`
+	EnvironmentUuid openapi_types.UUID              `json:"environment_uuid"`
+	Epoch           int64                           `json:"epoch"`
+	Mode            string                          `json:"mode"`
+	Outcome         *string                         `json:"outcome,omitempty"`
+	ProjectUuid     openapi_types.UUID              `json:"project_uuid"`
+	RequestDigest   string                          `json:"request_digest"`
+	State           DeploymentAdmissionReceiptState `json:"state"`
+}
+
+// DeploymentAdmissionReceiptState defines model for DeploymentAdmissionReceipt.State.
+type DeploymentAdmissionReceiptState string
+
+// DeploymentAdmissionRequest defines model for DeploymentAdmissionRequest.
+type DeploymentAdmissionRequest struct {
+	ActorId openapi_types.UUID `json:"actor_id"`
+
+	// CarryForwardModuleVersions Exact subset of module_versions retained from the Environment's effective base. This evidence permits an archived Module to carry forward only its already-active Version.
+	CarryForwardModuleVersions *map[string]openapi_types.UUID `json:"carry_forward_module_versions,omitempty"`
+
+	// ConfirmedRestrictedVersionUuids Exact Defective target Version UUIDs used by this compiled Deployment and explicitly confirmed by the authorised caller.
+	ConfirmedRestrictedVersionUuids *[]openapi_types.UUID          `json:"confirmed_restricted_version_uuids,omitempty"`
+	EnvironmentUuid                 openapi_types.UUID             `json:"environment_uuid"`
+	Mode                            DeploymentAdmissionRequestMode `json:"mode"`
+
+	// ModuleVersions Exact resolved Module UUID to Version UUID graph admitted for execution.
+	ModuleVersions map[string]openapi_types.UUID `json:"module_versions"`
+	ProjectUuid    openapi_types.UUID            `json:"project_uuid"`
+	RequestDigest  string                        `json:"request_digest"`
+}
+
+// DeploymentAdmissionRequestMode defines model for DeploymentAdmissionRequest.Mode.
+type DeploymentAdmissionRequestMode string
+
+// DeploymentOutcomeAcknowledgement defines model for DeploymentOutcomeAcknowledgement.
+type DeploymentOutcomeAcknowledgement struct {
+	AcknowledgedAt time.Time          `json:"acknowledged_at"`
+	ActorId        openapi_types.UUID `json:"actor_id"`
+	DeploymentId   openapi_types.UUID `json:"deployment_id"`
+	EnvironmentId  openapi_types.UUID `json:"environment_id"`
+	OperationRef   string             `json:"operation_ref"`
+	PluginId       string             `json:"plugin_id"`
+	Reason         string             `json:"reason"`
+
+	// Replayed True when this identical acknowledgement had already been recorded.
+	Replayed bool `json:"replayed"`
+}
+
+// DeploymentOutcomeAcknowledgementBody defines model for DeploymentOutcomeAcknowledgementBody.
+type DeploymentOutcomeAcknowledgementBody struct {
+	// Reason Why the operator is certain the Runner attempt can no longer change the Environment, for example the confirmed removal of its job.
+	Reason string `json:"reason"`
 }
 
 // Environment An environment.
@@ -1908,6 +2666,18 @@ type ModuleVersionComparisonSnapshot struct {
 	SourceRevision  string              `json:"source_revision"`
 }
 
+// ModuleVersionLifecycle defines model for ModuleVersionLifecycle.
+type ModuleVersionLifecycle struct {
+	// ArtifactDigest Optional external artifact claim. Empty for inline source or when omitted at publication.
+	ArtifactDigest string                      `json:"artifact_digest"`
+	CreatedAt      time.Time                   `json:"created_at"`
+	ModuleId       string                      `json:"module_id"`
+	ModuleUuid     openapi_types.UUID          `json:"module_uuid"`
+	Status         ModuleVersionSemanticStatus `json:"status"`
+	Version        string                      `json:"version"`
+	VersionUuid    openapi_types.UUID          `json:"version_uuid"`
+}
+
 // ModuleVersionLifecycleEvent defines model for ModuleVersionLifecycleEvent.
 type ModuleVersionLifecycleEvent struct {
 	Actor                  openapi_types.UUID           `json:"actor"`
@@ -2189,6 +2959,54 @@ type Organization struct {
 // OrganizationStatus The current status of the org.
 type OrganizationStatus string
 
+// PluginAuditEvent defines model for PluginAuditEvent.
+type PluginAuditEvent struct {
+	Action string             `json:"action"`
+	Actor  openapi_types.UUID `json:"actor"`
+
+	// After The changed resource after the change.
+	After json.RawMessage `json:"after,omitempty"`
+
+	// Before The changed resource before the change. Absent for a creation.
+	Before               json.RawMessage     `json:"before,omitempty"`
+	Id                   int64               `json:"id"`
+	IdempotencyKeySha256 string              `json:"idempotency_key_sha256"`
+	InstallationId       *openapi_types.UUID `json:"installation_id,omitempty"`
+	OccurredAt           time.Time           `json:"occurred_at"`
+	OrgId                *string             `json:"org_id,omitempty"`
+	Reason               string              `json:"reason"`
+	RequestId            *string             `json:"request_id,omitempty"`
+	Revision             int64               `json:"revision"`
+}
+
+// PluginAuditEventPage defines model for PluginAuditEventPage.
+type PluginAuditEventPage struct {
+	Items []PluginAuditEvent `json:"items"`
+}
+
+// PluginAuthorizationCheckRequest defines model for PluginAuthorizationCheckRequest.
+type PluginAuthorizationCheckRequest struct {
+	GrantFence  *int64                 `json:"grant_fence,omitempty"`
+	OperationId *openapi_types.UUID    `json:"operation_id,omitempty"`
+	Permission  string                 `json:"permission"`
+	Proof       *PluginDelegationProof `json:"proof,omitempty"`
+	Resources   []struct {
+		Id   string                                       `json:"id"`
+		Type PluginAuthorizationCheckRequestResourcesType `json:"type"`
+	} `json:"resources"`
+
+	// SubjectId Optional subject to revalidate inside a persisted grant. Forbidden with fresh proof authority.
+	SubjectId *openapi_types.UUID `json:"subject_id,omitempty"`
+}
+
+// PluginAuthorizationCheckRequestResourcesType defines model for PluginAuthorizationCheckRequest.Resources.Type.
+type PluginAuthorizationCheckRequestResourcesType string
+
+// PluginAuthorizationCheckResult defines model for PluginAuthorizationCheckResult.
+type PluginAuthorizationCheckResult struct {
+	Allowed bool `json:"allowed"`
+}
+
 // PluginAvailabilityState defines model for PluginAvailabilityState.
 type PluginAvailabilityState string
 
@@ -2197,7 +3015,13 @@ type PluginCapability struct {
 	// AdminAction Scope-safe remediation guidance for an administrator.
 	AdminAction  *string  `json:"admin_action,omitempty"`
 	Capabilities []string `json:"capabilities"`
-	DisplayName  string   `json:"display_name"`
+
+	// ContractLevel Level of the plugin contracts this Control Plane implements. v1alpha supports first-party Stellwerk plugins only and is not a stable partner contract.
+	ContractLevel PluginContractLevel `json:"contract_level"`
+	DisplayName   string              `json:"display_name"`
+
+	// Entitlement Non-secret server-derived licence projection. Neither this projection nor a capability grants IAM permissions or authorizes execution.
+	Entitlement *PluginEntitlementStatus `json:"entitlement,omitempty"`
 
 	// Id Immutable reverse-DNS plugin identity.
 	Id    string                  `json:"id"`
@@ -2206,6 +3030,696 @@ type PluginCapability struct {
 	// Version Immutable installed plugin artifact version when installed.
 	Version *string `json:"version,omitempty"`
 }
+
+// PluginCapabilityRegistration Whether IAM holds the capability declarations of the served package for the organization. Core registers them right after the organization is enabled and after every activation, and at start-up and every minute compares every enabled organization's catalogue in IAM with the served package and replaces only what drifted. Disabling or removing an enablement keeps the catalogue in IAM.
+type PluginCapabilityRegistration struct {
+	// Detail Why the last attempt failed.
+	Detail *string `json:"detail,omitempty"`
+
+	// PackageSha256 The package Core last reconciled for the organization.
+	PackageSha256 *string `json:"package_sha256,omitempty"`
+
+	// ReconciledAt When Core last reconciled the organization.
+	ReconciledAt *time.Time `json:"reconciled_at,omitempty"`
+
+	// State registered once Core registered or confirmed the served package's declarations; pending until Core reconciled the served package for the organization, for example right after an upgrade switched it; failed when Core's last attempt for the served package failed, which Core retries.
+	State PluginCapabilityRegistrationState `json:"state"`
+}
+
+// PluginCapabilityRegistrationState registered once Core registered or confirmed the served package's declarations; pending until Core reconciled the served package for the organization, for example right after an upgrade switched it; failed when Core's last attempt for the served package failed, which Core retries.
+type PluginCapabilityRegistrationState string
+
+// PluginContractLevel Level of the plugin contracts this Control Plane implements. v1alpha supports first-party Stellwerk plugins only and is not a stable partner contract.
+type PluginContractLevel string
+
+// PluginContribution defines model for PluginContribution.
+type PluginContribution struct {
+	DisplayName string `json:"display_name"`
+
+	// Entitlement Non-secret server-derived licence projection. Neither this projection nor a capability grants IAM permissions or authorizes execution.
+	Entitlement *PluginEntitlementStatus `json:"entitlement,omitempty"`
+	Id          string                   `json:"id"`
+	Mode        PluginContributionMode   `json:"mode"`
+	Operations  []struct {
+		Id       string `json:"id"`
+		Method   string `json:"method"`
+		Mutating bool   `json:"mutating"`
+
+		// RequiredFeature Declared licence feature required by this operation, if any.
+		RequiredFeature *string `json:"required_feature,omitempty"`
+	} `json:"operations"`
+	State PluginAvailabilityState `json:"state"`
+	Ui    *struct {
+		// ContextualActions Declarative navigation into the plugin, not Core authorization or executable UI code. Present only in full mode with the required operation advertised.
+		ContextualActions *[]struct {
+			Id                  string                                            `json:"id"`
+			Label               string                                            `json:"label"`
+			Primary             *bool                                             `json:"primary,omitempty"`
+			RequiredOperationId string                                            `json:"required_operation_id"`
+			ResourceType        PluginContributionUiContextualActionsResourceType `json:"resource_type"`
+			Route               struct {
+				Path  string                                                      `json:"path"`
+				Query *map[string]PluginContributionUiContextualActionsRouteQuery `json:"query,omitempty"`
+			} `json:"route"`
+			When struct {
+				LifecycleStatus         []ModuleVersionSemanticStatus `json:"lifecycle_status"`
+				SemanticVersionRequired bool                          `json:"semantic_version_required"`
+			} `json:"when"`
+		} `json:"contextual_actions,omitempty"`
+
+		// CoreOperations Named Console SDK operations executed with the user's independent Core permissions, never forwarded to the plugin.
+		CoreOperations *[]struct {
+			Id       string                                   `json:"id"`
+			Method   PluginContributionUiCoreOperationsMethod `json:"method"`
+			Mutating bool                                     `json:"mutating"`
+		} `json:"core_operations,omitempty"`
+		Entrypoint      string                         `json:"entrypoint"`
+		NavigationLabel string                         `json:"navigation_label"`
+		Origin          string                         `json:"origin"`
+		RoutePrefix     string                         `json:"route_prefix"`
+		SdkVersion      PluginContributionUiSdkVersion `json:"sdk_version"`
+	} `json:"ui,omitempty"`
+	Version *string `json:"version,omitempty"`
+}
+
+// PluginContributionMode defines model for PluginContribution.Mode.
+type PluginContributionMode string
+
+// PluginContributionUiContextualActionsResourceType defines model for PluginContribution.Ui.ContextualActions.ResourceType.
+type PluginContributionUiContextualActionsResourceType string
+
+// PluginContributionUiContextualActionsRouteQuery defines model for PluginContribution.Ui.ContextualActions.Route.Query.
+type PluginContributionUiContextualActionsRouteQuery string
+
+// PluginContributionUiCoreOperationsMethod defines model for PluginContribution.Ui.CoreOperations.Method.
+type PluginContributionUiCoreOperationsMethod string
+
+// PluginContributionUiSdkVersion defines model for PluginContribution.Ui.SdkVersion.
+type PluginContributionUiSdkVersion string
+
+// PluginContributionPage defines model for PluginContributionPage.
+type PluginContributionPage struct {
+	// ContractLevel Level of the plugin contracts this Control Plane implements. v1alpha supports first-party Stellwerk plugins only and is not a stable partner contract.
+	ContractLevel PluginContractLevel  `json:"contract_level"`
+	Items         []PluginContribution `json:"items"`
+}
+
+// PluginDelegationProof defines model for PluginDelegationProof.
+type PluginDelegationProof struct {
+	Assertion string `json:"assertion"`
+
+	// Body Base64-encoded exact original request bytes. Decoding and re-encoding JSON would invalidate the signature.
+	Body           *[]byte              `json:"body,omitempty"`
+	IdempotencyKey string               `json:"idempotency_key"`
+	OperationId    string               `json:"operation_id"`
+	PathParameters *map[string]string   `json:"path_parameters,omitempty"`
+	Query          *map[string][]string `json:"query,omitempty"`
+}
+
+// PluginDeploymentReadRequest defines model for PluginDeploymentReadRequest.
+type PluginDeploymentReadRequest struct {
+	// DeploymentId Required for deployment inspection of exactly one Environment.
+	DeploymentId *openapi_types.UUID `json:"deployment_id,omitempty"`
+
+	// DispatchId Required for receipt inspection after a lost dispatch response. This is a read, never a retry of execution.
+	DispatchId   *string `json:"dispatch_id,omitempty"`
+	Environments []struct {
+		EnvId     string `json:"env_id"`
+		ProjectId string `json:"project_id"`
+	} `json:"environments"`
+	GrantFence *int64                          `json:"grant_fence,omitempty"`
+	Kind       PluginDeploymentReadRequestKind `json:"kind"`
+
+	// ModuleVersions For plan only. Module slug or UUID to exact immutable Version UUID. Core supplies the corresponding version coordinate and artifact digest.
+	ModuleVersions *map[string]openapi_types.UUID `json:"module_versions,omitempty"`
+
+	// OperationId Background inspection uses this immutable grant and grant_fence instead of a user proof. Current actor authorization is always rechecked.
+	OperationId *openapi_types.UUID    `json:"operation_id,omitempty"`
+	Proof       *PluginDelegationProof `json:"proof,omitempty"`
+
+	// RequestId Required for background inspection. Preserve across retries of the same logical inspection.
+	RequestId *string `json:"request_id,omitempty"`
+}
+
+// PluginDeploymentReadRequestKind defines model for PluginDeploymentReadRequest.Kind.
+type PluginDeploymentReadRequestKind string
+
+// PluginDeploymentSubmitRequest defines model for PluginDeploymentSubmitRequest.
+type PluginDeploymentSubmitRequest struct {
+	Approval *struct {
+		ActorId openapi_types.UUID                         `json:"actor_id"`
+		Scope   PluginDeploymentSubmitRequestApprovalScope `json:"scope"`
+	} `json:"approval,omitempty"`
+
+	// ApprovedPinBoundaries Omit only for an approval-free operation. Otherwise include every target Module UUID and the approval's latest Pin activation UUID, or the nil UUID if no Pin activation ever existed. Requires approval actor and scope.
+	ApprovedPinBoundaries *map[string]openapi_types.UUID `json:"approved_pin_boundaries,omitempty"`
+	EnvironmentUuid       openapi_types.UUID             `json:"environment_uuid"`
+
+	// FirstForwardDeploymentId Optional assertion of the immutable first forward Deployment in this operation and Environment. Data Plane owns the lineage; omission cannot reset an existing rollback base.
+	FirstForwardDeploymentId *openapi_types.UUID               `json:"first_forward_deployment_id,omitempty"`
+	GrantFence               int64                             `json:"grant_fence"`
+	Mode                     PluginDeploymentSubmitRequestMode `json:"mode"`
+	Plan                     *struct {
+		Fingerprint    string                        `json:"fingerprint"`
+		ModuleVersions map[string]openapi_types.UUID `json:"module_versions"`
+		SnapshotId     openapi_types.UUID            `json:"snapshot_id"`
+	} `json:"plan,omitempty"`
+	RequestId string `json:"request_id"`
+	Rollback  *struct {
+		ForwardDeploymentId openapi_types.UUID `json:"forward_deployment_id"`
+
+		// RetryOfRollbackDeploymentId Explicit retry of this operation's own authoritatively failed rollback Deployment. It must remain the current Environment head and target the same immutable rollback base. Does not permit automatic infrastructure retries.
+		RetryOfRollbackDeploymentId *openapi_types.UUID `json:"retry_of_rollback_deployment_id,omitempty"`
+	} `json:"rollback,omitempty"`
+}
+
+// PluginDeploymentSubmitRequestApprovalScope defines model for PluginDeploymentSubmitRequest.Approval.Scope.
+type PluginDeploymentSubmitRequestApprovalScope string
+
+// PluginDeploymentSubmitRequestMode defines model for PluginDeploymentSubmitRequest.Mode.
+type PluginDeploymentSubmitRequestMode string
+
+// PluginDispatchAuthorization defines model for PluginDispatchAuthorization.
+type PluginDispatchAuthorization struct {
+	Action          string             `json:"action"`
+	ActorId         openapi_types.UUID `json:"actor_id"`
+	DispatchId      string             `json:"dispatch_id"`
+	EnvironmentUuid openapi_types.UUID `json:"environment_uuid"`
+	Fence           int64              `json:"fence"`
+	OperationId     openapi_types.UUID `json:"operation_id"`
+	OrgId           string             `json:"org_id"`
+	PluginId        string             `json:"plugin_id"`
+	ProjectUuid     openapi_types.UUID `json:"project_uuid"`
+	RequestDigest   string             `json:"request_digest"`
+}
+
+// PluginDispatchCheck defines model for PluginDispatchCheck.
+type PluginDispatchCheck struct {
+	Action          PluginDispatchCheckAction `json:"action"`
+	DispatchId      string                    `json:"dispatch_id"`
+	EnvironmentUuid openapi_types.UUID        `json:"environment_uuid"`
+	Fence           int64                     `json:"fence"`
+	ProjectUuid     openapi_types.UUID        `json:"project_uuid"`
+	RequestDigest   string                    `json:"request_digest"`
+}
+
+// PluginDispatchCheckAction defines model for PluginDispatchCheck.Action.
+type PluginDispatchCheckAction string
+
+// PluginEnablement defines model for PluginEnablement.
+type PluginEnablement struct {
+	ApprovalPolicies map[string]string `json:"approval_policies"`
+
+	// CapabilityRegistration Whether IAM holds the capability declarations of the served package for the organization. Core registers them right after the organization is enabled and after every activation, and at start-up and every minute compares every enabled organization's catalogue in IAM with the served package and replaces only what drifted. Disabling or removing an enablement keeps the catalogue in IAM.
+	CapabilityRegistration PluginCapabilityRegistration `json:"capability_registration"`
+	CreatedAt              time.Time                    `json:"created_at"`
+	CreatedBy              openapi_types.UUID           `json:"created_by"`
+
+	// EntitlementGrant Only when the served package requires a licence. The grant that covers the organization, its own organization grant or else the installation-wide grant; absent while none does, and the organization is then not entitled.
+	EntitlementGrant *PluginEntitlementGrant `json:"entitlement_grant,omitempty"`
+	OrgId            string                  `json:"org_id"`
+	State            PluginEnablementState   `json:"state"`
+	Timezone         string                  `json:"timezone"`
+	UpdatedAt        time.Time               `json:"updated_at"`
+	UpdatedBy        openapi_types.UUID      `json:"updated_by"`
+}
+
+// PluginEnablementState defines model for PluginEnablement.State.
+type PluginEnablementState string
+
+// PluginEnablementPut defines model for PluginEnablementPut.
+type PluginEnablementPut struct {
+	// ApprovalPolicies Deployment approval scope (environment or project) to an authorization policy the package owns. They apply to approvals in this organization only.
+	ApprovalPolicies *map[string]string       `json:"approval_policies,omitempty"`
+	ExpectedRevision int64                    `json:"expected_revision"`
+	Reason           string                   `json:"reason"`
+	State            PluginEnablementPutState `json:"state"`
+
+	// Timezone IANA timezone of the organization for calendar policies. Omitted means UTC.
+	Timezone *string `json:"timezone,omitempty"`
+}
+
+// PluginEnablementPutState defines model for PluginEnablementPut.State.
+type PluginEnablementPutState string
+
+// PluginEntitlementBundleImport defines model for PluginEntitlementBundleImport.
+type PluginEntitlementBundleImport struct {
+	Diagnostics []struct {
+		Code   string `json:"code"`
+		Detail string `json:"detail"`
+	} `json:"diagnostics"`
+	ImportedGrants      int   `json:"imported_grants"`
+	ImportedRevocations int   `json:"imported_revocations"`
+	Revision            int64 `json:"revision"`
+}
+
+// PluginEntitlementBundleImportRequest defines model for PluginEntitlementBundleImportRequest.
+type PluginEntitlementBundleImportRequest struct {
+	// Bundle The exact bytes of the signed entitlement bundle file, base64-encoded.
+	Bundle           []byte `json:"bundle"`
+	ExpectedRevision int64  `json:"expected_revision"`
+	Reason           string `json:"reason"`
+}
+
+// PluginEntitlementGrant An imported grant as an operator sees it. Core decides with the grant that covers an organization; plugins see only the non-secret feature projection.
+type PluginEntitlementGrant struct {
+	ExpiresAt  time.Time          `json:"expires_at"`
+	Features   []string           `json:"features"`
+	GraceUntil time.Time          `json:"grace_until"`
+	IssuanceId openapi_types.UUID `json:"issuance_id"`
+	Issuer     string             `json:"issuer"`
+	NotBefore  time.Time          `json:"not_before"`
+
+	// OrganizationLimit Only on an installation-wide grant that carries one. The number of organizations the installation may enable.
+	OrganizationLimit *int64 `json:"organization_limit,omitempty"`
+
+	// Scope The grant that covers the organization: organization when the organization has a grant of its own, which then decides alone (feature set, validity and revocation), installation when the installation-wide grant covers it. Absent while no grant covers the organization, which is then not entitled.
+	Scope    PluginGrantScope `json:"scope"`
+	Sequence int64            `json:"sequence"`
+
+	// State The grant's state under the current issuer trust, never earlier than the time Core's decisions observed.
+	State      PluginEntitlementGrantState      `json:"state"`
+	TrustClass PluginEntitlementGrantTrustClass `json:"trust_class"`
+}
+
+// PluginEntitlementGrantState The grant's state under the current issuer trust, never earlier than the time Core's decisions observed.
+type PluginEntitlementGrantState string
+
+// PluginEntitlementGrantTrustClass defines model for PluginEntitlementGrant.TrustClass.
+type PluginEntitlementGrantTrustClass string
+
+// PluginEntitlementStatus Non-secret server-derived licence projection. Neither this projection nor a capability grants IAM permissions or authorizes execution.
+type PluginEntitlementStatus struct {
+	Features map[string]PluginFeatureAccess `json:"features"`
+
+	// GrantScope The grant that covers the organization: organization when the organization has a grant of its own, which then decides alone (feature set, validity and revocation), installation when the installation-wide grant covers it. Absent while no grant covers the organization, which is then not entitled.
+	GrantScope *PluginGrantScope `json:"grant_scope,omitempty"`
+
+	// Warning Machine-readable licence warning that never changes authorization. While a declared feature is in its signed grace period, forward work still succeeds. After grace_until forward work is refused with plugin_not_entitled; read, export, cancel and rollback remain available.
+	Warning *PluginEntitlementWarning `json:"warning,omitempty"`
+}
+
+// PluginEntitlementWarning Machine-readable licence warning that never changes authorization. While a declared feature is in its signed grace period, forward work still succeeds. After grace_until forward work is refused with plugin_not_entitled; read, export, cancel and rollback remain available.
+type PluginEntitlementWarning struct {
+	Code PluginEntitlementWarningCode `json:"code"`
+
+	// Features Declared features in their grace period, sorted.
+	Features []string `json:"features"`
+
+	// GraceUntil Earliest end of the grace period among the listed features.
+	GraceUntil time.Time `json:"grace_until"`
+
+	// Message Human-readable text a client can show as is.
+	Message string `json:"message"`
+}
+
+// PluginEntitlementWarningCode defines model for PluginEntitlementWarning.Code.
+type PluginEntitlementWarningCode string
+
+// PluginFeatureAccess defines model for PluginFeatureAccess.
+type PluginFeatureAccess struct {
+	ExpiresAt  *time.Time `json:"expires_at,omitempty"`
+	Forward    bool       `json:"forward"`
+	GraceUntil *time.Time `json:"grace_until,omitempty"`
+	Read       bool       `json:"read"`
+	Safety     bool       `json:"safety"`
+
+	// State Effective persisted licence state for this declared feature: valid, grace, expired, not_yet_valid, revoked, untrusted, not_entitled or missing. Forward work is allowed in valid and grace.
+	State string `json:"state"`
+
+	// TrustClass Development or production issuer trust. Empty when there is no verified grant.
+	TrustClass string `json:"trust_class"`
+}
+
+// PluginGrantScope The grant that covers the organization: organization when the organization has a grant of its own, which then decides alone (feature set, validity and revocation), installation when the installation-wide grant covers it. Absent while no grant covers the organization, which is then not entitled.
+type PluginGrantScope string
+
+// PluginInstallation defines model for PluginInstallation.
+type PluginInstallation struct {
+	AdmissionCheckerId *openapi_types.UUID     `json:"admission_checker_id,omitempty"`
+	Availability       PluginAvailabilityState `json:"availability"`
+	BackendUrl         string                  `json:"backend_url"`
+	CreatedAt          time.Time               `json:"created_at"`
+	CreatedBy          openapi_types.UUID      `json:"created_by"`
+
+	// Diagnostic Why the last status read from the running plugin does not prove the package Core is to serve (the pending upgrade's, if any). Absent while it does or before Core read it.
+	Diagnostic *PluginInstallationDiagnostic `json:"diagnostic,omitempty"`
+
+	// Entitlement Only when the served package requires a licence. Each enablement shows the grant that covers its organization.
+	Entitlement    *PluginInstallationEntitlement `json:"entitlement,omitempty"`
+	InstallationId openapi_types.UUID             `json:"installation_id"`
+
+	// Observation What Core last read from the running plugin's status endpoint, on activation. Either the report or a failure with its detail.
+	Observation *PluginStatusObservation `json:"observation,omitempty"`
+
+	// OrganizationDefaults The timezone and approval policies of every enablement Core creates on its own. Changing them changes no existing enablement.
+	OrganizationDefaults PluginOrganizationDefaults `json:"organization_defaults"`
+
+	// OrganizationMode selected while the operator enables each organization; all while Core enables every organization, existing and created later, except those whose enablement is disabled.
+	OrganizationMode PluginOrganizationMode `json:"organization_mode"`
+
+	// Organizations Every organization the installation is enabled for, ordered by organization ID.
+	Organizations []PluginEnablement `json:"organizations"`
+
+	// PackageSha256 The package Core serves.
+	PackageSha256 string `json:"package_sha256"`
+
+	// PendingOrganizations Only in organization mode all, absent when empty. The active organizations without an enablement, ordered by ID, which Core could not enable when they were created because the plugin host was off or the installation-wide grant's organization limit was reached. Setting mode all again enables them.
+	PendingOrganizations *[]string `json:"pending_organizations,omitempty"`
+	PluginId             string    `json:"plugin_id"`
+
+	// Revision The Plugin Manager revision this response reflects.
+	Revision      *int64                  `json:"revision,omitempty"`
+	ServiceUserId *openapi_types.UUID     `json:"service_user_id,omitempty"`
+	State         PluginInstallationState `json:"state"`
+
+	// TargetPackageSha256 The package of a pending upgrade. Core serves package_sha256 until an activate reads this digest from the running plugin.
+	TargetPackageSha256 *string            `json:"target_package_sha256,omitempty"`
+	UiOrigin            *string            `json:"ui_origin,omitempty"`
+	UpdatedAt           time.Time          `json:"updated_at"`
+	UpdatedBy           openapi_types.UUID `json:"updated_by"`
+}
+
+// PluginInstallationState defines model for PluginInstallation.State.
+type PluginInstallationState string
+
+// PluginInstallationCreate defines model for PluginInstallationCreate.
+type PluginInstallationCreate struct {
+	// BackendUrl Origin of the plugin backend. HTTPS outside explicit development mode.
+	BackendUrl       string `json:"backend_url"`
+	ExpectedRevision int64  `json:"expected_revision"`
+	PackageSha256    string `json:"package_sha256"`
+	Reason           string `json:"reason"`
+
+	// UiOrigin Origin of the plugin UI. Required exactly when the package contributes a UI.
+	UiOrigin *string `json:"ui_origin,omitempty"`
+}
+
+// PluginInstallationDiagnostic Why the last status read from the running plugin does not prove the package Core is to serve (the pending upgrade's, if any). Absent while it does or before Core read it.
+type PluginInstallationDiagnostic struct {
+	Code    PluginInstallationDiagnosticCode `json:"code"`
+	Message string                           `json:"message"`
+}
+
+// PluginInstallationDiagnosticCode defines model for PluginInstallationDiagnostic.Code.
+type PluginInstallationDiagnosticCode string
+
+// PluginInstallationEntitlement Only when the served package requires a licence. Each enablement shows the grant that covers its organization.
+type PluginInstallationEntitlement struct {
+	// EnabledOrganizations The enabled enablements of the installation, which the installation-wide grant's organization_limit caps.
+	EnabledOrganizations int `json:"enabled_organizations"`
+
+	// InstallationGrant An imported grant as an operator sees it. Core decides with the grant that covers an organization; plugins see only the non-secret feature projection.
+	InstallationGrant *PluginEntitlementGrant `json:"installation_grant,omitempty"`
+}
+
+// PluginInstallationIdentity defines model for PluginInstallationIdentity.
+type PluginInstallationIdentity struct {
+	// AdmissionCheckerId The Data Plane admission checker, a platform principal with a static token.
+	AdmissionCheckerId openapi_types.UUID `json:"admission_checker_id"`
+	ExpectedRevision   int64              `json:"expected_revision"`
+	Reason             string             `json:"reason"`
+
+	// ServiceUserId The platform principal IAM binds to the plugin workload of this installation.
+	ServiceUserId openapi_types.UUID `json:"service_user_id"`
+}
+
+// PluginInstallationPage defines model for PluginInstallationPage.
+type PluginInstallationPage struct {
+	Items    []PluginInstallation `json:"items"`
+	Revision int64                `json:"revision"`
+}
+
+// PluginInstallationUpgrade defines model for PluginInstallationUpgrade.
+type PluginInstallationUpgrade struct {
+	ExpectedRevision int64 `json:"expected_revision"`
+
+	// PackageSha256 A registered package of the same plugin.
+	PackageSha256 string `json:"package_sha256"`
+	Reason        string `json:"reason"`
+}
+
+// PluginInventory defines model for PluginInventory.
+type PluginInventory struct {
+	EnvironmentTypes []EnvironmentType             `json:"environment_types"`
+	Environments     []Environment                 `json:"environments"`
+	Modules          []ModuleCatalogueEntry        `json:"modules"`
+	PinEvents        []ModuleVersionPinEvent       `json:"pin_events"`
+	Pins             []EnvironmentModuleVersionPin `json:"pins"`
+	Versions         []CoreModuleVersion           `json:"versions"`
+}
+
+// PluginInventoryRequest defines model for PluginInventoryRequest.
+type PluginInventoryRequest struct {
+	ModuleIds []string                `json:"module_ids"`
+	Proof     PluginDelegationProof   `json:"proof"`
+	Selector  PluginInventorySelector `json:"selector"`
+}
+
+// PluginInventorySelector defines model for PluginInventorySelector.
+type PluginInventorySelector struct {
+	EnvironmentIds   *[]openapi_types.UUID `json:"environment_ids,omitempty"`
+	EnvironmentTypes *[]string             `json:"environment_types,omitempty"`
+	Labels           *map[string]string    `json:"labels,omitempty"`
+	ProjectIds       *[]string             `json:"project_ids,omitempty"`
+}
+
+// PluginInvocation defines model for PluginInvocation.
+type PluginInvocation struct {
+	Body           *json.RawMessage     `json:"body,omitempty"`
+	IdempotencyKey *string              `json:"idempotency_key,omitempty"`
+	OperationId    string               `json:"operation_id"`
+	PathParameters *map[string]string   `json:"path_parameters,omitempty"`
+	Query          *map[string][]string `json:"query,omitempty"`
+}
+
+// PluginInvocationResult defines model for PluginInvocationResult.
+type PluginInvocationResult struct {
+	Body json.RawMessage `json:"body"`
+
+	// EntitlementWarning Machine-readable licence warning that never changes authorization. While a declared feature is in its signed grace period, forward work still succeeds. After grace_until forward work is refused with plugin_not_entitled; read, export, cancel and rollback remain available.
+	EntitlementWarning *PluginEntitlementWarning `json:"entitlement_warning,omitempty"`
+	Status             int                       `json:"status"`
+}
+
+// PluginManagerCommand defines model for PluginManagerCommand.
+type PluginManagerCommand struct {
+	// ExpectedRevision The Plugin Manager revision the operator decided on. A write against another revision fails with 409 plugin_manager_revision_conflict; read the current state and retry.
+	ExpectedRevision int64 `json:"expected_revision"`
+
+	// Reason Why the change is made. Recorded in the audit event.
+	Reason string `json:"reason"`
+}
+
+// PluginModuleOperationReceipt defines model for PluginModuleOperationReceipt.
+type PluginModuleOperationReceipt struct {
+	Action      string                            `json:"action"`
+	Fence       int64                             `json:"fence"`
+	ModuleUuids []openapi_types.UUID              `json:"module_uuids"`
+	OperationId openapi_types.UUID                `json:"operation_id"`
+	OrgId       string                            `json:"org_id"`
+	PluginId    string                            `json:"plugin_id"`
+	RequestId   string                            `json:"request_id"`
+	State       PluginModuleOperationReceiptState `json:"state"`
+}
+
+// PluginModuleOperationReceiptState defines model for PluginModuleOperationReceipt.State.
+type PluginModuleOperationReceiptState string
+
+// PluginModuleOperationRequest defines model for PluginModuleOperationRequest.
+type PluginModuleOperationRequest struct {
+	Action        PluginModuleOperationRequestAction `json:"action"`
+	ExpectedFence int64                              `json:"expected_fence"`
+	GrantFence    int64                              `json:"grant_fence"`
+	Reason        string                             `json:"reason"`
+	RequestId     string                             `json:"request_id"`
+	Targets       []struct {
+		ExpectedDefaultUuid *openapi_types.UUID `json:"expected_default_uuid,omitempty"`
+
+		// ExpectedResourceVersion Required CAS revision for promotion. For a grant-bound restore, Core derives the locked captured-baseline revision and the client may send zero; exact Default lineage and grant fences still apply.
+		ExpectedResourceVersion int64              `json:"expected_resource_version"`
+		ModuleUuid              openapi_types.UUID `json:"module_uuid"`
+		VersionUuid             openapi_types.UUID `json:"version_uuid"`
+	} `json:"targets"`
+}
+
+// PluginModuleOperationRequestAction defines model for PluginModuleOperationRequest.Action.
+type PluginModuleOperationRequestAction string
+
+// PluginOperationAuthorizationRequest defines model for PluginOperationAuthorizationRequest.
+type PluginOperationAuthorizationRequest struct {
+	Action           PluginOperationAuthorizationRequestAction `json:"action"`
+	ExpectedRevision int64                                     `json:"expected_revision"`
+	Intent           *PluginOperationIntent                    `json:"intent,omitempty"`
+	Proof            PluginDelegationProof                     `json:"proof"`
+	Reason           string                                    `json:"reason"`
+}
+
+// PluginOperationAuthorizationRequestAction defines model for PluginOperationAuthorizationRequest.Action.
+type PluginOperationAuthorizationRequestAction string
+
+// PluginOperationGrant defines model for PluginOperationGrant.
+type PluginOperationGrant struct {
+	ActorId openapi_types.UUID `json:"actor_id"`
+
+	// Availability Current plugin availability, returned by the service-only grant read. Not part of the frozen grant and never an execution credential.
+	Availability *PluginAvailabilityState `json:"availability,omitempty"`
+
+	// BaselineDefaults Core-captured Default Version UUIDs at preparation, null when a Module had no Default. Restoration cannot select arbitrary historical versions.
+	BaselineDefaults map[string]*openapi_types.UUID `json:"baseline_defaults"`
+
+	// Entitlement Current non-secret licence preflight for scheduler safety. Every Core effect independently reauthorizes in its own transaction.
+	Entitlement     *PluginEntitlementStatus  `json:"entitlement,omitempty"`
+	Intent          PluginOperationIntent     `json:"intent"`
+	OperationId     openapi_types.UUID        `json:"operation_id"`
+	OrgId           string                    `json:"org_id"`
+	PluginId        string                    `json:"plugin_id"`
+	Revision        int64                     `json:"revision"`
+	SourceOperation string                    `json:"source_operation"`
+	State           PluginOperationGrantState `json:"state"`
+}
+
+// PluginOperationGrantState defines model for PluginOperationGrant.State.
+type PluginOperationGrantState string
+
+// PluginOperationIntent defines model for PluginOperationIntent.
+type PluginOperationIntent struct {
+	Actions      []string `json:"actions"`
+	Environments []struct {
+		EnvironmentId openapi_types.UUID `json:"environment_id"`
+		ProjectId     openapi_types.UUID `json:"project_id"`
+	} `json:"environments"`
+	Fingerprint string               `json:"fingerprint"`
+	Modules     []openapi_types.UUID `json:"modules"`
+
+	// TargetVersions Exact Module UUID to immutable target Version UUID binding, with exactly one entry for every frozen Module.
+	TargetVersions map[string]openapi_types.UUID `json:"target_versions"`
+}
+
+// PluginOrganizationDefaults The timezone and approval policies of every enablement Core creates on its own. Changing them changes no existing enablement.
+type PluginOrganizationDefaults struct {
+	ApprovalPolicies map[string]string `json:"approval_policies"`
+	Timezone         string            `json:"timezone"`
+}
+
+// PluginOrganizationMode selected while the operator enables each organization; all while Core enables every organization, existing and created later, except those whose enablement is disabled.
+type PluginOrganizationMode string
+
+// PluginOrganizationModePut defines model for PluginOrganizationModePut.
+type PluginOrganizationModePut struct {
+	// DefaultApprovalPolicies Deployment approval scope (environment or project) to an authorization policy the package owns, for every enablement Core creates. Omitted means none.
+	DefaultApprovalPolicies *map[string]string `json:"default_approval_policies,omitempty"`
+
+	// DefaultTimezone IANA timezone of every enablement Core creates. Omitted means UTC.
+	DefaultTimezone  *string `json:"default_timezone,omitempty"`
+	ExpectedRevision int64   `json:"expected_revision"`
+
+	// Mode selected while the operator enables each organization; all while Core enables every organization, existing and created later, except those whose enablement is disabled.
+	Mode   PluginOrganizationMode `json:"mode"`
+	Reason string                 `json:"reason"`
+}
+
+// PluginPackage defines model for PluginPackage.
+type PluginPackage struct {
+	CreatedAt      time.Time          `json:"created_at"`
+	CreatedBy      openapi_types.UUID `json:"created_by"`
+	Manifest       json.RawMessage    `json:"manifest"`
+	ManifestSha256 string             `json:"manifest_sha256"`
+	PluginId       string             `json:"plugin_id"`
+
+	// Revision The Plugin Manager revision this response reflects.
+	Revision *int64 `json:"revision,omitempty"`
+	Version  string `json:"version"`
+}
+
+// PluginPackagePage defines model for PluginPackagePage.
+type PluginPackagePage struct {
+	Items    []PluginPackage `json:"items"`
+	Revision int64           `json:"revision"`
+}
+
+// PluginPackagePush defines model for PluginPackagePush.
+type PluginPackagePush struct {
+	ExpectedRevision int64 `json:"expected_revision"`
+
+	// Manifest The registration manifest of the package (identity, migration generation, capabilities, operations, UI contribution, service grants, authorization policies, entitlement declaration). Unknown fields are rejected. migration_generation is the plugin-owned schema generation the package runs on, 0 or absent while the plugin owns no schema. Each capability is declared once and in the plugin's own namespace, as an object with id (plugin.<plugin ID>.<name> with a one-segment name of lowercase letters, digits and inner hyphens, at most 255 characters in all), display_name, description, category, level (read, write or manage) and scopes (organization, project, environment); each operation is declared once and none in Core's host namespace (core., iam.); the UI route_prefix is a slash followed by lowercase segments without a trailing slash, its only spelling.
+	Manifest json.RawMessage `json:"manifest"`
+
+	// ManifestSha256 SHA-256 of the package manifest the plugin runtime verifies.
+	ManifestSha256 string `json:"manifest_sha256"`
+	Reason         string `json:"reason"`
+}
+
+// PluginPinOperationReceipt defines model for PluginPinOperationReceipt.
+type PluginPinOperationReceipt struct {
+	Action      PluginPinOperationReceiptAction `json:"action"`
+	OperationId openapi_types.UUID              `json:"operation_id"`
+	Pins        []EnvironmentModuleVersionPin   `json:"pins"`
+	RequestId   string                          `json:"request_id"`
+}
+
+// PluginPinOperationReceiptAction defines model for PluginPinOperationReceipt.Action.
+type PluginPinOperationReceiptAction string
+
+// PluginPinOperationRequest defines model for PluginPinOperationRequest.
+type PluginPinOperationRequest struct {
+	Action     PluginPinOperationRequestAction `json:"action"`
+	GrantFence int64                           `json:"grant_fence"`
+	Proof      *PluginDelegationProof          `json:"proof,omitempty"`
+	Reason     string                          `json:"reason"`
+	RequestId  string                          `json:"request_id"`
+	Targets    []struct {
+		// DeploymentId Required only for reconcile or restore.
+		DeploymentId            *openapi_types.UUID `json:"deployment_id,omitempty"`
+		ExpectedResourceVersion int64               `json:"expected_resource_version"`
+		PinId                   openapi_types.UUID  `json:"pin_id"`
+
+		// TargetVersionUuid Required only for begin.
+		TargetVersionUuid *openapi_types.UUID `json:"target_version_uuid,omitempty"`
+	} `json:"targets"`
+}
+
+// PluginPinOperationRequestAction defines model for PluginPinOperationRequest.Action.
+type PluginPinOperationRequestAction string
+
+// PluginResourceEvent defines model for PluginResourceEvent.
+type PluginResourceEvent struct {
+	ActivationEventId *openapi_types.UUID `json:"activation_event_id,omitempty"`
+	ActorId           *openapi_types.UUID `json:"actor_id,omitempty"`
+	EnvironmentUuid   *openapi_types.UUID `json:"environment_uuid,omitempty"`
+	EventId           openapi_types.UUID  `json:"event_id"`
+	FromStatus        *string             `json:"from_status,omitempty"`
+	ModuleUuid        *openapi_types.UUID `json:"module_uuid,omitempty"`
+	OccurredAt        time.Time           `json:"occurred_at"`
+	OperationId       *openapi_types.UUID `json:"operation_id,omitempty"`
+	PinId             *openapi_types.UUID `json:"pin_id,omitempty"`
+	ProjectUuid       *openapi_types.UUID `json:"project_uuid,omitempty"`
+	Reason            *string             `json:"reason,omitempty"`
+	ToStatus          *string             `json:"to_status,omitempty"`
+	Transition        *string             `json:"transition,omitempty"`
+	Type              string              `json:"type"`
+	VersionUuid       *openapi_types.UUID `json:"version_uuid,omitempty"`
+}
+
+// PluginStatusObservation What Core last read from the running plugin's status endpoint, on activation. Either the report or a failure with its detail.
+type PluginStatusObservation struct {
+	// Detail The cause of a failure.
+	Detail  *string                         `json:"detail,omitempty"`
+	Failure *PluginStatusObservationFailure `json:"failure,omitempty"`
+
+	// InstallationId The installation UUID the plugin reported.
+	InstallationId *openapi_types.UUID `json:"installation_id,omitempty"`
+
+	// MigrationGeneration The migration generation applied in the plugin database.
+	MigrationGeneration *int64    `json:"migration_generation,omitempty"`
+	ObservedAt          time.Time `json:"observed_at"`
+
+	// PackageSha256 The package digest the plugin reported.
+	PackageSha256 *string `json:"package_sha256,omitempty"`
+}
+
+// PluginStatusObservationFailure defines model for PluginStatusObservation.Failure.
+type PluginStatusObservationFailure string
 
 // Project A project.
 type Project struct {
@@ -2694,6 +4208,9 @@ type IdempotencyKeyHeader = string
 // IncludeNonDeveloperAccessibleQueryParam defines model for includeNonDeveloperAccessibleQueryParam.
 type IncludeNonDeveloperAccessibleQueryParam = bool
 
+// InstallationIdPathParam defines model for installationIdPathParam.
+type InstallationIdPathParam = openapi_types.UUID
+
 // ModuleIdPathParam defines model for moduleIdPathParam.
 type ModuleIdPathParam = string
 
@@ -2747,6 +4264,9 @@ type N404NotFound = Error
 
 // N409Conflict A standard error response
 type N409Conflict = Error
+
+// N503ServiceUnavailable A standard error response
+type N503ServiceUnavailable = Error
 
 // ListInternalOrganizationsParams defines parameters for ListInternalOrganizations.
 type ListInternalOrganizationsParams struct {
@@ -2845,6 +4365,17 @@ type InternalListResourceTypesParams struct {
 	// Page The page token to request from
 	Page *PageTokenQueryParam `form:"page,omitempty" json:"page,omitempty"`
 }
+
+// SettleDeploymentAdmissionJSONBody defines parameters for SettleDeploymentAdmission.
+type SettleDeploymentAdmissionJSONBody struct {
+	EnvironmentUuid openapi_types.UUID                       `json:"environment_uuid"`
+	Outcome         SettleDeploymentAdmissionJSONBodyOutcome `json:"outcome"`
+	ProjectUuid     openapi_types.UUID                       `json:"project_uuid"`
+	RequestDigest   string                                   `json:"request_digest"`
+}
+
+// SettleDeploymentAdmissionJSONBodyOutcome defines parameters for SettleDeploymentAdmission.
+type SettleDeploymentAdmissionJSONBodyOutcome string
 
 // ListEnvironmentTypesParams defines parameters for ListEnvironmentTypes.
 type ListEnvironmentTypesParams struct {
@@ -3004,6 +4535,47 @@ type PublishStableModuleVersionSuccessorParams struct {
 	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
 }
 
+// ControlPluginOperationGrantJSONBody defines parameters for ControlPluginOperationGrant.
+type ControlPluginOperationGrantJSONBody struct {
+	Action     ControlPluginOperationGrantJSONBodyAction `json:"action"`
+	GrantFence int64                                     `json:"grant_fence"`
+	Reason     string                                    `json:"reason"`
+	RequestId  string                                    `json:"request_id"`
+}
+
+// ControlPluginOperationGrantJSONBodyAction defines parameters for ControlPluginOperationGrant.
+type ControlPluginOperationGrantJSONBodyAction string
+
+// ReconcilePluginDeploymentJSONBody defines parameters for ReconcilePluginDeployment.
+type ReconcilePluginDeploymentJSONBody struct {
+	GrantFence      int64                          `json:"grant_fence"`
+	OriginalRequest *PluginDeploymentSubmitRequest `json:"original_request,omitempty"`
+	Withdraw        bool                           `json:"withdraw"`
+}
+
+// PublishPluginEventJSONBody defines parameters for PublishPluginEvent.
+type PublishPluginEventJSONBody struct {
+	Data       map[string]interface{} `json:"data"`
+	EventId    openapi_types.UUID     `json:"event_id"`
+	GrantFence int64                  `json:"grant_fence"`
+	OccurredAt time.Time              `json:"occurred_at"`
+	Type       string                 `json:"type"`
+}
+
+// GetPluginPinOperationReceiptParams defines parameters for GetPluginPinOperationReceipt.
+type GetPluginPinOperationReceiptParams struct {
+	GrantFence int64 `form:"grant_fence" json:"grant_fence"`
+}
+
+// ReadPluginResourceEventsParams defines parameters for ReadPluginResourceEvents.
+type ReadPluginResourceEventsParams struct {
+	After *string `form:"after,omitempty" json:"after,omitempty"`
+	Limit *int    `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// GetPluginDeploymentMaterialParamsMaterialKind defines parameters for GetPluginDeploymentMaterial.
+type GetPluginDeploymentMaterialParamsMaterialKind string
+
 // ListProjectsParams defines parameters for ListProjects.
 type ListProjectsParams struct {
 	// PerPage The maximum number of items to return in a page of results
@@ -3109,6 +4681,76 @@ type ListRunnersParams struct {
 	ByRunnerType *string `form:"byRunnerType,omitempty" json:"byRunnerType,omitempty"`
 }
 
+// ListPluginAuditEventsParams defines parameters for ListPluginAuditEvents.
+type ListPluginAuditEventsParams struct {
+	// After Return events after this event ID.
+	After *int64 `form:"after,omitempty" json:"after,omitempty"`
+	Limit *int   `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ImportPluginEntitlementBundleParams defines parameters for ImportPluginEntitlementBundle.
+type ImportPluginEntitlementBundleParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// CreatePluginInstallationParams defines parameters for CreatePluginInstallation.
+type CreatePluginInstallationParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// PurgePluginInstallationParams defines parameters for PurgePluginInstallation.
+type PurgePluginInstallationParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// TransitionPluginInstallationParams defines parameters for TransitionPluginInstallation.
+type TransitionPluginInstallationParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// TransitionPluginInstallationParamsInstallationAction defines parameters for TransitionPluginInstallation.
+type TransitionPluginInstallationParamsInstallationAction string
+
+// SetPluginInstallationIdentityParams defines parameters for SetPluginInstallationIdentity.
+type SetPluginInstallationIdentityParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// SetPluginOrganizationModeParams defines parameters for SetPluginOrganizationMode.
+type SetPluginOrganizationModeParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// RemovePluginEnablementParams defines parameters for RemovePluginEnablement.
+type RemovePluginEnablementParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// PutPluginEnablementParams defines parameters for PutPluginEnablement.
+type PutPluginEnablementParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// UpgradePluginInstallationParams defines parameters for UpgradePluginInstallation.
+type UpgradePluginInstallationParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
+// PushPluginPackageParams defines parameters for PushPluginPackage.
+type PushPluginPackageParams struct {
+	// IdempotencyKey Stable caller-generated key used to deduplicate command retries.
+	IdempotencyKey IdempotencyKeyHeader `json:"Idempotency-Key"`
+}
+
 // CreateInternalOrganizationJSONRequestBody defines body for CreateInternalOrganization for application/json ContentType.
 type CreateInternalOrganizationJSONRequestBody = InternalOrganizationCreateBody
 
@@ -3141,6 +4783,15 @@ type InternalCreateResourceTypeJSONRequestBody = ResourceTypeCreateBody
 
 // InternalUpdateResourceTypeJSONRequestBody defines body for InternalUpdateResourceType for application/json ContentType.
 type InternalUpdateResourceTypeJSONRequestBody = ResourceTypeUpdateBody
+
+// AuthorizeDeploymentAdmissionJSONRequestBody defines body for AuthorizeDeploymentAdmission for application/json ContentType.
+type AuthorizeDeploymentAdmissionJSONRequestBody = DeploymentAdmissionRequest
+
+// SealDeploymentAdmissionAbsenceJSONRequestBody defines body for SealDeploymentAdmissionAbsence for application/json ContentType.
+type SealDeploymentAdmissionAbsenceJSONRequestBody = DeploymentAdmissionRequest
+
+// SettleDeploymentAdmissionJSONRequestBody defines body for SettleDeploymentAdmission for application/json ContentType.
+type SettleDeploymentAdmissionJSONRequestBody SettleDeploymentAdmissionJSONBody
 
 // CreateEnvironmentTypeJSONRequestBody defines body for CreateEnvironmentType for application/json ContentType.
 type CreateEnvironmentTypeJSONRequestBody = EnvironmentTypeCreateBody
@@ -3199,6 +4850,42 @@ type TransitionModuleVersionJSONRequestBody = ModuleReasonedCommand
 // PublishStableModuleVersionSuccessorJSONRequestBody defines body for PublishStableModuleVersionSuccessor for application/json ContentType.
 type PublishStableModuleVersionSuccessorJSONRequestBody = StableModuleVersionSuccessorBody
 
+// CheckPluginAuthorizationJSONRequestBody defines body for CheckPluginAuthorization for application/json ContentType.
+type CheckPluginAuthorizationJSONRequestBody = PluginAuthorizationCheckRequest
+
+// ReadPluginDeploymentDataJSONRequestBody defines body for ReadPluginDeploymentData for application/json ContentType.
+type ReadPluginDeploymentDataJSONRequestBody = PluginDeploymentReadRequest
+
+// ReadPluginInventoryJSONRequestBody defines body for ReadPluginInventory for application/json ContentType.
+type ReadPluginInventoryJSONRequestBody = PluginInventoryRequest
+
+// InvokePluginOperationJSONRequestBody defines body for InvokePluginOperation for application/json ContentType.
+type InvokePluginOperationJSONRequestBody = PluginInvocation
+
+// AuthorizePluginOperationJSONRequestBody defines body for AuthorizePluginOperation for application/json ContentType.
+type AuthorizePluginOperationJSONRequestBody = PluginOperationAuthorizationRequest
+
+// CheckPluginOperationDispatchJSONRequestBody defines body for CheckPluginOperationDispatch for application/json ContentType.
+type CheckPluginOperationDispatchJSONRequestBody = PluginDispatchCheck
+
+// ControlPluginOperationGrantJSONRequestBody defines body for ControlPluginOperationGrant for application/json ContentType.
+type ControlPluginOperationGrantJSONRequestBody ControlPluginOperationGrantJSONBody
+
+// SubmitPluginDeploymentJSONRequestBody defines body for SubmitPluginDeployment for application/json ContentType.
+type SubmitPluginDeploymentJSONRequestBody = PluginDeploymentSubmitRequest
+
+// ReconcilePluginDeploymentJSONRequestBody defines body for ReconcilePluginDeployment for application/json ContentType.
+type ReconcilePluginDeploymentJSONRequestBody ReconcilePluginDeploymentJSONBody
+
+// PublishPluginEventJSONRequestBody defines body for PublishPluginEvent for application/json ContentType.
+type PublishPluginEventJSONRequestBody PublishPluginEventJSONBody
+
+// ApplyPluginModuleOperationJSONRequestBody defines body for ApplyPluginModuleOperation for application/json ContentType.
+type ApplyPluginModuleOperationJSONRequestBody = PluginModuleOperationRequest
+
+// ApplyPluginPinOperationJSONRequestBody defines body for ApplyPluginPinOperation for application/json ContentType.
+type ApplyPluginPinOperationJSONRequestBody = PluginPinOperationRequest
+
 // CreateProjectJSONRequestBody defines body for CreateProject for application/json ContentType.
 type CreateProjectJSONRequestBody = ProjectCreateBody
 
@@ -3210,6 +4897,9 @@ type CreateEnvironmentJSONRequestBody = EnvironmentCreateBody
 
 // UpdateEnvironmentJSONRequestBody defines body for UpdateEnvironment for application/json ContentType.
 type UpdateEnvironmentJSONRequestBody = EnvironmentUpdateBody
+
+// AcknowledgeDeploymentOutcomeJSONRequestBody defines body for AcknowledgeDeploymentOutcome for application/json ContentType.
+type AcknowledgeDeploymentOutcomeJSONRequestBody = DeploymentOutcomeAcknowledgementBody
 
 // CreateResourceTypeJSONRequestBody defines body for CreateResourceType for application/json ContentType.
 type CreateResourceTypeJSONRequestBody = ResourceTypeCreateBody
@@ -3228,6 +4918,36 @@ type CreateRunnerJSONRequestBody = RunnerCreateBody
 
 // UpdateRunnerJSONRequestBody defines body for UpdateRunner for application/json ContentType.
 type UpdateRunnerJSONRequestBody = RunnerUpdateBody
+
+// ImportPluginEntitlementBundleJSONRequestBody defines body for ImportPluginEntitlementBundle for application/json ContentType.
+type ImportPluginEntitlementBundleJSONRequestBody = PluginEntitlementBundleImportRequest
+
+// CreatePluginInstallationJSONRequestBody defines body for CreatePluginInstallation for application/json ContentType.
+type CreatePluginInstallationJSONRequestBody = PluginInstallationCreate
+
+// PurgePluginInstallationJSONRequestBody defines body for PurgePluginInstallation for application/json ContentType.
+type PurgePluginInstallationJSONRequestBody = PluginManagerCommand
+
+// TransitionPluginInstallationJSONRequestBody defines body for TransitionPluginInstallation for application/json ContentType.
+type TransitionPluginInstallationJSONRequestBody = PluginManagerCommand
+
+// SetPluginInstallationIdentityJSONRequestBody defines body for SetPluginInstallationIdentity for application/json ContentType.
+type SetPluginInstallationIdentityJSONRequestBody = PluginInstallationIdentity
+
+// SetPluginOrganizationModeJSONRequestBody defines body for SetPluginOrganizationMode for application/json ContentType.
+type SetPluginOrganizationModeJSONRequestBody = PluginOrganizationModePut
+
+// RemovePluginEnablementJSONRequestBody defines body for RemovePluginEnablement for application/json ContentType.
+type RemovePluginEnablementJSONRequestBody = PluginManagerCommand
+
+// PutPluginEnablementJSONRequestBody defines body for PutPluginEnablement for application/json ContentType.
+type PutPluginEnablementJSONRequestBody = PluginEnablementPut
+
+// UpgradePluginInstallationJSONRequestBody defines body for UpgradePluginInstallation for application/json ContentType.
+type UpgradePluginInstallationJSONRequestBody = PluginInstallationUpgrade
+
+// PushPluginPackageJSONRequestBody defines body for PushPluginPackage for application/json ContentType.
+type PushPluginPackageJSONRequestBody = PluginPackagePush
 
 // AsK8sRunnerConfiguration returns the union data inside the RunnerConfiguration as a K8sRunnerConfiguration
 func (t RunnerConfiguration) AsK8sRunnerConfiguration() (K8sRunnerConfiguration, error) {
@@ -3810,6 +5530,15 @@ type ServerInterface interface {
 	// Get the details of the identified organization.
 	// (GET /orgs/{orgId})
 	GetOrganization(ctx echo.Context, orgId OrgIdPathParam) error
+	// Protect one ordinary Data Plane admission against concurrent Pin changes.
+	// (POST /orgs/{orgId}/deployment-admissions/{admissionId})
+	AuthorizeDeploymentAdmission(ctx echo.Context, orgId OrgIdPathParam, admissionId openapi_types.UUID) error
+	// Permanently close an uncommitted admission, including a delayed authorize request.
+	// (POST /orgs/{orgId}/deployment-admissions/{admissionId}/seal-absence)
+	SealDeploymentAdmissionAbsence(ctx echo.Context, orgId OrgIdPathParam, admissionId openapi_types.UUID) error
+	// Settle an exact ordinary admission from the authenticated Data Plane's durable outcome.
+	// (POST /orgs/{orgId}/deployment-admissions/{admissionId}/settle)
+	SettleDeploymentAdmission(ctx echo.Context, orgId OrgIdPathParam, admissionId openapi_types.UUID) error
 	// List environment types in the organization
 	// (GET /orgs/{orgId}/env-types)
 	ListEnvironmentTypes(ctx echo.Context, orgId OrgIdPathParam, params ListEnvironmentTypesParams) error
@@ -3888,6 +5617,9 @@ type ServerInterface interface {
 
 	// (POST /orgs/{orgId}/module-version-pins/{pinId}/notes)
 	AppendEnvironmentModuleVersionPinNote(ctx echo.Context, orgId OrgIdPathParam, pinId openapi_types.UUID, params AppendEnvironmentModuleVersionPinNoteParams) error
+	// List Proposed versions of active Modules.
+	// (GET /orgs/{orgId}/module-versions/proposed)
+	ListProposedModuleVersions(ctx echo.Context, orgId OrgIdPathParam) error
 	// List modules in the org
 	// (GET /orgs/{orgId}/modules)
 	ListModules(ctx echo.Context, orgId OrgIdPathParam, params ListModulesParams) error
@@ -3936,9 +5668,66 @@ type ServerInterface interface {
 	// Inspect observed Environment adoption and Pin usage for one immutable Module Version
 	// (GET /orgs/{orgId}/modules/{moduleId}/versions/{moduleVersionId}/usage)
 	GetModuleVersionUsage(ctx echo.Context, orgId OrgIdPathParam, moduleId ModuleIdPathParam, moduleVersionId ModuleVersionIdPathParam) error
+	// Discover registered plugin UI contributions for this organization.
+	// (GET /orgs/{orgId}/plugins)
+	ListPluginContributions(ctx echo.Context, orgId OrgIdPathParam) error
 	// Discover an installed plugin and its availability for this organization.
 	// (GET /orgs/{orgId}/plugins/{pluginId})
 	GetPluginCapability(ctx echo.Context, orgId OrgIdPathParam, pluginId string) error
+	// Evaluate one configured plugin-local capability using current IAM state.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/authorization-checks)
+	CheckPluginAuthorization(ctx echo.Context, orgId OrgIdPathParam, pluginId string) error
+	// Authorize and forward a closed Deployment inspection or planning request.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/deployment-reads)
+	ReadPluginDeploymentData(ctx echo.Context, orgId OrgIdPathParam, pluginId string) error
+	// Read this installation's current offline licence decision as its configured service.
+	// (GET /orgs/{orgId}/plugins/{pluginId}/entitlement)
+	GetPluginEntitlement(ctx echo.Context, orgId OrgIdPathParam, pluginId string) error
+	// Read an authorized, bounded and consistent snapshot of Core metadata.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/inventory)
+	ReadPluginInventory(ctx echo.Context, orgId OrgIdPathParam, pluginId string) error
+	// Invoke an explicitly registered add-on operation with delegated actor identity.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/invoke)
+	InvokePluginOperation(ctx echo.Context, orgId OrgIdPathParam, pluginId string) error
+	// Recover persisted operation bounds using the configured plugin service identity.
+	// (GET /orgs/{orgId}/plugins/{pluginId}/operations/{operationId})
+	GetPluginOperationGrant(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID) error
+	// Persist or control a bounded operation using the configured service identity and original delegated command.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/authorize)
+	AuthorizePluginOperation(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID) error
+	// Reauthorize an exact persisted plugin dispatch for the configured deployment service.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/check)
+	CheckPluginOperationDispatch(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID) error
+	// Suspend or release existing delegated operation authority without replaying a human request.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/control)
+	ControlPluginOperationGrant(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID) error
+	// Admit one exact planned Deployment through the normal Data Plane path.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/deployments)
+	SubmitPluginDeployment(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID) error
+	// Recover an exact dispatch and settle its protection only from authoritative Data Plane evidence.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/deployments/{dispatchId}/reconcile)
+	ReconcilePluginDeployment(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID, dispatchId string) error
+
+	// (POST /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/events)
+	PublishPluginEvent(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID) error
+
+	// (GET /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/inventory)
+	ReadPluginOperationInventory(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID) error
+	// Atomically reserve, release, promote or restore the exact frozen Module set.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/modules)
+	ApplyPluginModuleOperation(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID) error
+	// Apply an atomic, operation-bound Pin override or reconciliation.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/pins)
+	ApplyPluginPinOperation(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID) error
+	// Recover a committed Pin command result without replaying a user proof.
+	// (GET /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/pins/receipts/{requestId})
+	GetPluginPinOperationReceipt(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID, requestId string, params GetPluginPinOperationReceiptParams) error
+
+	// (GET /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/resource-events)
+	ReadPluginResourceEvents(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID, params ReadPluginResourceEventsParams) error
+	// Retrieve plugin-owned Deployment material using the caller's independent Orchestrator permission.
+	// (GET /orgs/{orgId}/plugins/{pluginId}/projects/{projectUuid}/envs/{environmentUuid}/deployments/{deploymentId}/{materialKind})
+	GetPluginDeploymentMaterial(ctx echo.Context, orgId OrgIdPathParam, pluginId string, projectUuid openapi_types.UUID, environmentUuid openapi_types.UUID, deploymentId openapi_types.UUID, materialKind GetPluginDeploymentMaterialParamsMaterialKind) error
 	// List projects
 	// (GET /orgs/{orgId}/projects)
 	ListProjects(ctx echo.Context, orgId OrgIdPathParam, params ListProjectsParams) error
@@ -3978,6 +5767,9 @@ type ServerInterface interface {
 	// Preview retained Module Pins and add-on resources affected by Environment deletion.
 	// (GET /orgs/{orgId}/projects/{projectId}/envs/{envId}/deletion-impact)
 	GetEnvironmentDeletionImpact(ctx echo.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam) error
+	// Acknowledge the unknown Runner outcome of a failed plugin-dispatched Deployment.
+	// (POST /orgs/{orgId}/projects/{projectId}/envs/{envId}/deployments/{deploymentId}/actions/acknowledge-outcome)
+	AcknowledgeDeploymentOutcome(ctx echo.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam, deploymentId openapi_types.UUID) error
 	// List available resource types
 	// (GET /orgs/{orgId}/resource-types)
 	ListResourceTypes(ctx echo.Context, orgId OrgIdPathParam, params ListResourceTypesParams) error
@@ -4023,6 +5815,48 @@ type ServerInterface interface {
 	// Update runner in the org
 	// (PATCH /orgs/{orgId}/runners/{runnerId})
 	UpdateRunner(ctx echo.Context, orgId OrgIdPathParam, runnerId RunnerIdPathParam) error
+	// Read the append-only Plugin Manager audit trail.
+	// (GET /plugin-audit-events)
+	ListPluginAuditEvents(ctx echo.Context, params ListPluginAuditEventsParams) error
+	// Import signed entitlement grants and revocations.
+	// (POST /plugin-entitlement-bundles)
+	ImportPluginEntitlementBundle(ctx echo.Context, params ImportPluginEntitlementBundleParams) error
+	// List the plugin installations and their organization enablements.
+	// (GET /plugin-installations)
+	ListPluginInstallations(ctx echo.Context) error
+	// Install a registered package.
+	// (POST /plugin-installations)
+	CreatePluginInstallation(ctx echo.Context, params CreatePluginInstallationParams) error
+	// Purge an uninstalled installation.
+	// (DELETE /plugin-installations/{installationId})
+	PurgePluginInstallation(ctx echo.Context, installationId InstallationIdPathParam, params PurgePluginInstallationParams) error
+	// Read one plugin installation and its organization enablements.
+	// (GET /plugin-installations/{installationId})
+	GetPluginInstallation(ctx echo.Context, installationId InstallationIdPathParam) error
+	// Activate, disable, enable, uninstall or reinstall an installation.
+	// (POST /plugin-installations/{installationId}/actions/{installationAction})
+	TransitionPluginInstallation(ctx echo.Context, installationId InstallationIdPathParam, installationAction TransitionPluginInstallationParamsInstallationAction, params TransitionPluginInstallationParams) error
+	// Record the plugin service user and admission checker of an installation.
+	// (PUT /plugin-installations/{installationId}/identity)
+	SetPluginInstallationIdentity(ctx echo.Context, installationId InstallationIdPathParam, params SetPluginInstallationIdentityParams) error
+	// Choose whether an installation serves selected organizations or all of them.
+	// (PUT /plugin-installations/{installationId}/organization-mode)
+	SetPluginOrganizationMode(ctx echo.Context, installationId InstallationIdPathParam, params SetPluginOrganizationModeParams) error
+	// Remove an installation's enablement for an organization.
+	// (DELETE /plugin-installations/{installationId}/organizations/{orgId})
+	RemovePluginEnablement(ctx echo.Context, installationId InstallationIdPathParam, orgId OrgIdPathParam, params RemovePluginEnablementParams) error
+	// Enable or disable an active installation for an organization.
+	// (PUT /plugin-installations/{installationId}/organizations/{orgId})
+	PutPluginEnablement(ctx echo.Context, installationId InstallationIdPathParam, orgId OrgIdPathParam, params PutPluginEnablementParams) error
+	// Request the package an installation serves next.
+	// (POST /plugin-installations/{installationId}/upgrade)
+	UpgradePluginInstallation(ctx echo.Context, installationId InstallationIdPathParam, params UpgradePluginInstallationParams) error
+	// List the plugin packages known to the Plugin Manager.
+	// (GET /plugin-packages)
+	ListPluginPackages(ctx echo.Context) error
+	// Register an immutable plugin package.
+	// (POST /plugin-packages)
+	PushPluginPackage(ctx echo.Context, params PushPluginPackageParams) error
 }
 
 // ServerInterfaceWrapper converts echo contexts to parameters.
@@ -4868,6 +6702,84 @@ func (w *ServerInterfaceWrapper) GetOrganization(ctx echo.Context) error {
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.GetOrganization(ctx, orgId)
+	return err
+}
+
+// AuthorizeDeploymentAdmission converts echo context to params.
+func (w *ServerInterfaceWrapper) AuthorizeDeploymentAdmission(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "admissionId" -------------
+	var admissionId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "admissionId", ctx.Param("admissionId"), &admissionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter admissionId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.AuthorizeDeploymentAdmission(ctx, orgId, admissionId)
+	return err
+}
+
+// SealDeploymentAdmissionAbsence converts echo context to params.
+func (w *ServerInterfaceWrapper) SealDeploymentAdmissionAbsence(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "admissionId" -------------
+	var admissionId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "admissionId", ctx.Param("admissionId"), &admissionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter admissionId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.SealDeploymentAdmissionAbsence(ctx, orgId, admissionId)
+	return err
+}
+
+// SettleDeploymentAdmission converts echo context to params.
+func (w *ServerInterfaceWrapper) SettleDeploymentAdmission(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "admissionId" -------------
+	var admissionId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "admissionId", ctx.Param("admissionId"), &admissionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter admissionId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.SettleDeploymentAdmission(ctx, orgId, admissionId)
 	return err
 }
 
@@ -5737,6 +7649,24 @@ func (w *ServerInterfaceWrapper) AppendEnvironmentModuleVersionPinNote(ctx echo.
 	return err
 }
 
+// ListProposedModuleVersions converts echo context to params.
+func (w *ServerInterfaceWrapper) ListProposedModuleVersions(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ListProposedModuleVersions(ctx, orgId)
+	return err
+}
+
 // ListModules converts echo context to params.
 func (w *ServerInterfaceWrapper) ListModules(ctx echo.Context) error {
 	var err error
@@ -6350,6 +8280,24 @@ func (w *ServerInterfaceWrapper) GetModuleVersionUsage(ctx echo.Context) error {
 	return err
 }
 
+// ListPluginContributions converts echo context to params.
+func (w *ServerInterfaceWrapper) ListPluginContributions(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ListPluginContributions(ctx, orgId)
+	return err
+}
+
 // GetPluginCapability converts echo context to params.
 func (w *ServerInterfaceWrapper) GetPluginCapability(ctx echo.Context) error {
 	var err error
@@ -6373,6 +8321,643 @@ func (w *ServerInterfaceWrapper) GetPluginCapability(ctx echo.Context) error {
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.GetPluginCapability(ctx, orgId, pluginId)
+	return err
+}
+
+// CheckPluginAuthorization converts echo context to params.
+func (w *ServerInterfaceWrapper) CheckPluginAuthorization(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pluginId" -------------
+	var pluginId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pluginId", ctx.Param("pluginId"), &pluginId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pluginId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.CheckPluginAuthorization(ctx, orgId, pluginId)
+	return err
+}
+
+// ReadPluginDeploymentData converts echo context to params.
+func (w *ServerInterfaceWrapper) ReadPluginDeploymentData(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pluginId" -------------
+	var pluginId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pluginId", ctx.Param("pluginId"), &pluginId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pluginId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ReadPluginDeploymentData(ctx, orgId, pluginId)
+	return err
+}
+
+// GetPluginEntitlement converts echo context to params.
+func (w *ServerInterfaceWrapper) GetPluginEntitlement(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pluginId" -------------
+	var pluginId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pluginId", ctx.Param("pluginId"), &pluginId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pluginId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetPluginEntitlement(ctx, orgId, pluginId)
+	return err
+}
+
+// ReadPluginInventory converts echo context to params.
+func (w *ServerInterfaceWrapper) ReadPluginInventory(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pluginId" -------------
+	var pluginId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pluginId", ctx.Param("pluginId"), &pluginId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pluginId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ReadPluginInventory(ctx, orgId, pluginId)
+	return err
+}
+
+// InvokePluginOperation converts echo context to params.
+func (w *ServerInterfaceWrapper) InvokePluginOperation(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pluginId" -------------
+	var pluginId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pluginId", ctx.Param("pluginId"), &pluginId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pluginId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.InvokePluginOperation(ctx, orgId, pluginId)
+	return err
+}
+
+// GetPluginOperationGrant converts echo context to params.
+func (w *ServerInterfaceWrapper) GetPluginOperationGrant(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pluginId" -------------
+	var pluginId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pluginId", ctx.Param("pluginId"), &pluginId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pluginId: %s", err))
+	}
+
+	// ------------- Path parameter "operationId" -------------
+	var operationId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "operationId", ctx.Param("operationId"), &operationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter operationId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetPluginOperationGrant(ctx, orgId, pluginId, operationId)
+	return err
+}
+
+// AuthorizePluginOperation converts echo context to params.
+func (w *ServerInterfaceWrapper) AuthorizePluginOperation(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pluginId" -------------
+	var pluginId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pluginId", ctx.Param("pluginId"), &pluginId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pluginId: %s", err))
+	}
+
+	// ------------- Path parameter "operationId" -------------
+	var operationId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "operationId", ctx.Param("operationId"), &operationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter operationId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.AuthorizePluginOperation(ctx, orgId, pluginId, operationId)
+	return err
+}
+
+// CheckPluginOperationDispatch converts echo context to params.
+func (w *ServerInterfaceWrapper) CheckPluginOperationDispatch(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pluginId" -------------
+	var pluginId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pluginId", ctx.Param("pluginId"), &pluginId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pluginId: %s", err))
+	}
+
+	// ------------- Path parameter "operationId" -------------
+	var operationId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "operationId", ctx.Param("operationId"), &operationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter operationId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.CheckPluginOperationDispatch(ctx, orgId, pluginId, operationId)
+	return err
+}
+
+// ControlPluginOperationGrant converts echo context to params.
+func (w *ServerInterfaceWrapper) ControlPluginOperationGrant(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pluginId" -------------
+	var pluginId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pluginId", ctx.Param("pluginId"), &pluginId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pluginId: %s", err))
+	}
+
+	// ------------- Path parameter "operationId" -------------
+	var operationId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "operationId", ctx.Param("operationId"), &operationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter operationId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ControlPluginOperationGrant(ctx, orgId, pluginId, operationId)
+	return err
+}
+
+// SubmitPluginDeployment converts echo context to params.
+func (w *ServerInterfaceWrapper) SubmitPluginDeployment(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pluginId" -------------
+	var pluginId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pluginId", ctx.Param("pluginId"), &pluginId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pluginId: %s", err))
+	}
+
+	// ------------- Path parameter "operationId" -------------
+	var operationId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "operationId", ctx.Param("operationId"), &operationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter operationId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.SubmitPluginDeployment(ctx, orgId, pluginId, operationId)
+	return err
+}
+
+// ReconcilePluginDeployment converts echo context to params.
+func (w *ServerInterfaceWrapper) ReconcilePluginDeployment(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pluginId" -------------
+	var pluginId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pluginId", ctx.Param("pluginId"), &pluginId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pluginId: %s", err))
+	}
+
+	// ------------- Path parameter "operationId" -------------
+	var operationId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "operationId", ctx.Param("operationId"), &operationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter operationId: %s", err))
+	}
+
+	// ------------- Path parameter "dispatchId" -------------
+	var dispatchId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "dispatchId", ctx.Param("dispatchId"), &dispatchId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter dispatchId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ReconcilePluginDeployment(ctx, orgId, pluginId, operationId, dispatchId)
+	return err
+}
+
+// PublishPluginEvent converts echo context to params.
+func (w *ServerInterfaceWrapper) PublishPluginEvent(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pluginId" -------------
+	var pluginId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pluginId", ctx.Param("pluginId"), &pluginId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pluginId: %s", err))
+	}
+
+	// ------------- Path parameter "operationId" -------------
+	var operationId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "operationId", ctx.Param("operationId"), &operationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter operationId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.PublishPluginEvent(ctx, orgId, pluginId, operationId)
+	return err
+}
+
+// ReadPluginOperationInventory converts echo context to params.
+func (w *ServerInterfaceWrapper) ReadPluginOperationInventory(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pluginId" -------------
+	var pluginId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pluginId", ctx.Param("pluginId"), &pluginId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pluginId: %s", err))
+	}
+
+	// ------------- Path parameter "operationId" -------------
+	var operationId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "operationId", ctx.Param("operationId"), &operationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter operationId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ReadPluginOperationInventory(ctx, orgId, pluginId, operationId)
+	return err
+}
+
+// ApplyPluginModuleOperation converts echo context to params.
+func (w *ServerInterfaceWrapper) ApplyPluginModuleOperation(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pluginId" -------------
+	var pluginId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pluginId", ctx.Param("pluginId"), &pluginId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pluginId: %s", err))
+	}
+
+	// ------------- Path parameter "operationId" -------------
+	var operationId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "operationId", ctx.Param("operationId"), &operationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter operationId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApplyPluginModuleOperation(ctx, orgId, pluginId, operationId)
+	return err
+}
+
+// ApplyPluginPinOperation converts echo context to params.
+func (w *ServerInterfaceWrapper) ApplyPluginPinOperation(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pluginId" -------------
+	var pluginId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pluginId", ctx.Param("pluginId"), &pluginId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pluginId: %s", err))
+	}
+
+	// ------------- Path parameter "operationId" -------------
+	var operationId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "operationId", ctx.Param("operationId"), &operationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter operationId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ApplyPluginPinOperation(ctx, orgId, pluginId, operationId)
+	return err
+}
+
+// GetPluginPinOperationReceipt converts echo context to params.
+func (w *ServerInterfaceWrapper) GetPluginPinOperationReceipt(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pluginId" -------------
+	var pluginId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pluginId", ctx.Param("pluginId"), &pluginId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pluginId: %s", err))
+	}
+
+	// ------------- Path parameter "operationId" -------------
+	var operationId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "operationId", ctx.Param("operationId"), &operationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter operationId: %s", err))
+	}
+
+	// ------------- Path parameter "requestId" -------------
+	var requestId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "requestId", ctx.Param("requestId"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter requestId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetPluginPinOperationReceiptParams
+	// ------------- Required query parameter "grant_fence" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "grant_fence", ctx.QueryParams(), &params.GrantFence, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter grant_fence: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetPluginPinOperationReceipt(ctx, orgId, pluginId, operationId, requestId, params)
+	return err
+}
+
+// ReadPluginResourceEvents converts echo context to params.
+func (w *ServerInterfaceWrapper) ReadPluginResourceEvents(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pluginId" -------------
+	var pluginId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pluginId", ctx.Param("pluginId"), &pluginId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pluginId: %s", err))
+	}
+
+	// ------------- Path parameter "operationId" -------------
+	var operationId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "operationId", ctx.Param("operationId"), &operationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter operationId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ReadPluginResourceEventsParams
+	// ------------- Optional query parameter "after" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "after", ctx.QueryParams(), &params.After, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter after: %s", err))
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", ctx.QueryParams(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter limit: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ReadPluginResourceEvents(ctx, orgId, pluginId, operationId, params)
+	return err
+}
+
+// GetPluginDeploymentMaterial converts echo context to params.
+func (w *ServerInterfaceWrapper) GetPluginDeploymentMaterial(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pluginId" -------------
+	var pluginId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pluginId", ctx.Param("pluginId"), &pluginId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pluginId: %s", err))
+	}
+
+	// ------------- Path parameter "projectUuid" -------------
+	var projectUuid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectUuid", ctx.Param("projectUuid"), &projectUuid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter projectUuid: %s", err))
+	}
+
+	// ------------- Path parameter "environmentUuid" -------------
+	var environmentUuid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environmentUuid", ctx.Param("environmentUuid"), &environmentUuid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter environmentUuid: %s", err))
+	}
+
+	// ------------- Path parameter "deploymentId" -------------
+	var deploymentId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deploymentId", ctx.Param("deploymentId"), &deploymentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter deploymentId: %s", err))
+	}
+
+	// ------------- Path parameter "materialKind" -------------
+	var materialKind GetPluginDeploymentMaterialParamsMaterialKind
+
+	err = runtime.BindStyledParameterWithOptions("simple", "materialKind", ctx.Param("materialKind"), &materialKind, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter materialKind: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetPluginDeploymentMaterial(ctx, orgId, pluginId, projectUuid, environmentUuid, deploymentId, materialKind)
 	return err
 }
 
@@ -6849,6 +9434,48 @@ func (w *ServerInterfaceWrapper) GetEnvironmentDeletionImpact(ctx echo.Context) 
 	return err
 }
 
+// AcknowledgeDeploymentOutcome converts echo context to params.
+func (w *ServerInterfaceWrapper) AcknowledgeDeploymentOutcome(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "projectId" -------------
+	var projectId ProjectIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "projectId", ctx.Param("projectId"), &projectId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter projectId: %s", err))
+	}
+
+	// ------------- Path parameter "envId" -------------
+	var envId EnvIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "envId", ctx.Param("envId"), &envId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter envId: %s", err))
+	}
+
+	// ------------- Path parameter "deploymentId" -------------
+	var deploymentId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "deploymentId", ctx.Param("deploymentId"), &deploymentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter deploymentId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.AcknowledgeDeploymentOutcome(ctx, orgId, projectId, envId, deploymentId)
+	return err
+}
+
 // ListResourceTypes converts echo context to params.
 func (w *ServerInterfaceWrapper) ListResourceTypes(ctx echo.Context) error {
 	var err error
@@ -7297,6 +9924,476 @@ func (w *ServerInterfaceWrapper) UpdateRunner(ctx echo.Context) error {
 	return err
 }
 
+// ListPluginAuditEvents converts echo context to params.
+func (w *ServerInterfaceWrapper) ListPluginAuditEvents(ctx echo.Context) error {
+	var err error
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListPluginAuditEventsParams
+	// ------------- Optional query parameter "after" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "after", ctx.QueryParams(), &params.After, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter after: %s", err))
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", ctx.QueryParams(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter limit: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ListPluginAuditEvents(ctx, params)
+	return err
+}
+
+// ImportPluginEntitlementBundle converts echo context to params.
+func (w *ServerInterfaceWrapper) ImportPluginEntitlementBundle(ctx echo.Context) error {
+	var err error
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ImportPluginEntitlementBundleParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ImportPluginEntitlementBundle(ctx, params)
+	return err
+}
+
+// ListPluginInstallations converts echo context to params.
+func (w *ServerInterfaceWrapper) ListPluginInstallations(ctx echo.Context) error {
+	var err error
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ListPluginInstallations(ctx)
+	return err
+}
+
+// CreatePluginInstallation converts echo context to params.
+func (w *ServerInterfaceWrapper) CreatePluginInstallation(ctx echo.Context) error {
+	var err error
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreatePluginInstallationParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.CreatePluginInstallation(ctx, params)
+	return err
+}
+
+// PurgePluginInstallation converts echo context to params.
+func (w *ServerInterfaceWrapper) PurgePluginInstallation(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "installationId" -------------
+	var installationId InstallationIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "installationId", ctx.Param("installationId"), &installationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter installationId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PurgePluginInstallationParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.PurgePluginInstallation(ctx, installationId, params)
+	return err
+}
+
+// GetPluginInstallation converts echo context to params.
+func (w *ServerInterfaceWrapper) GetPluginInstallation(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "installationId" -------------
+	var installationId InstallationIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "installationId", ctx.Param("installationId"), &installationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter installationId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetPluginInstallation(ctx, installationId)
+	return err
+}
+
+// TransitionPluginInstallation converts echo context to params.
+func (w *ServerInterfaceWrapper) TransitionPluginInstallation(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "installationId" -------------
+	var installationId InstallationIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "installationId", ctx.Param("installationId"), &installationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter installationId: %s", err))
+	}
+
+	// ------------- Path parameter "installationAction" -------------
+	var installationAction TransitionPluginInstallationParamsInstallationAction
+
+	err = runtime.BindStyledParameterWithOptions("simple", "installationAction", ctx.Param("installationAction"), &installationAction, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter installationAction: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params TransitionPluginInstallationParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.TransitionPluginInstallation(ctx, installationId, installationAction, params)
+	return err
+}
+
+// SetPluginInstallationIdentity converts echo context to params.
+func (w *ServerInterfaceWrapper) SetPluginInstallationIdentity(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "installationId" -------------
+	var installationId InstallationIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "installationId", ctx.Param("installationId"), &installationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter installationId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SetPluginInstallationIdentityParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.SetPluginInstallationIdentity(ctx, installationId, params)
+	return err
+}
+
+// SetPluginOrganizationMode converts echo context to params.
+func (w *ServerInterfaceWrapper) SetPluginOrganizationMode(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "installationId" -------------
+	var installationId InstallationIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "installationId", ctx.Param("installationId"), &installationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter installationId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SetPluginOrganizationModeParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.SetPluginOrganizationMode(ctx, installationId, params)
+	return err
+}
+
+// RemovePluginEnablement converts echo context to params.
+func (w *ServerInterfaceWrapper) RemovePluginEnablement(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "installationId" -------------
+	var installationId InstallationIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "installationId", ctx.Param("installationId"), &installationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter installationId: %s", err))
+	}
+
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RemovePluginEnablementParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.RemovePluginEnablement(ctx, installationId, orgId, params)
+	return err
+}
+
+// PutPluginEnablement converts echo context to params.
+func (w *ServerInterfaceWrapper) PutPluginEnablement(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "installationId" -------------
+	var installationId InstallationIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "installationId", ctx.Param("installationId"), &installationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter installationId: %s", err))
+	}
+
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PutPluginEnablementParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.PutPluginEnablement(ctx, installationId, orgId, params)
+	return err
+}
+
+// UpgradePluginInstallation converts echo context to params.
+func (w *ServerInterfaceWrapper) UpgradePluginInstallation(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "installationId" -------------
+	var installationId InstallationIdPathParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "installationId", ctx.Param("installationId"), &installationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter installationId: %s", err))
+	}
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpgradePluginInstallationParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.UpgradePluginInstallation(ctx, installationId, params)
+	return err
+}
+
+// ListPluginPackages converts echo context to params.
+func (w *ServerInterfaceWrapper) ListPluginPackages(ctx echo.Context) error {
+	var err error
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ListPluginPackages(ctx)
+	return err
+}
+
+// PushPluginPackage converts echo context to params.
+func (w *ServerInterfaceWrapper) PushPluginPackage(ctx echo.Context) error {
+	var err error
+
+	ctx.Set(UserIdHeaderScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PushPluginPackageParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKeyHeader
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for Idempotency-Key, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter Idempotency-Key: %s", err))
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter Idempotency-Key is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.PushPluginPackage(ctx, params)
+	return err
+}
+
 // This is a simple interface which specifies echo.Route addition functions which
 // are present on both echo.Echo and echo.Group, since we want to allow using
 // either of them for path registration
@@ -7349,6 +10446,9 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.PATCH(baseURL+"/internal/resource-types/:typeId", wrapper.InternalUpdateResourceType)
 	router.POST(baseURL+"/orgs", wrapper.CreateOrganization)
 	router.GET(baseURL+"/orgs/:orgId", wrapper.GetOrganization)
+	router.POST(baseURL+"/orgs/:orgId/deployment-admissions/:admissionId", wrapper.AuthorizeDeploymentAdmission)
+	router.POST(baseURL+"/orgs/:orgId/deployment-admissions/:admissionId/seal-absence", wrapper.SealDeploymentAdmissionAbsence)
+	router.POST(baseURL+"/orgs/:orgId/deployment-admissions/:admissionId/settle", wrapper.SettleDeploymentAdmission)
 	router.GET(baseURL+"/orgs/:orgId/env-types", wrapper.ListEnvironmentTypes)
 	router.POST(baseURL+"/orgs/:orgId/env-types", wrapper.CreateEnvironmentType)
 	router.DELETE(baseURL+"/orgs/:orgId/env-types/:envTypeId", wrapper.DeleteEnvironmentType)
@@ -7375,6 +10475,7 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.POST(baseURL+"/orgs/:orgId/module-version-pins/:pinId/actions/:pinAction", wrapper.TransitionEnvironmentModuleVersionPin)
 	router.GET(baseURL+"/orgs/:orgId/module-version-pins/:pinId/events", wrapper.ListEnvironmentModuleVersionPinEvents)
 	router.POST(baseURL+"/orgs/:orgId/module-version-pins/:pinId/notes", wrapper.AppendEnvironmentModuleVersionPinNote)
+	router.GET(baseURL+"/orgs/:orgId/module-versions/proposed", wrapper.ListProposedModuleVersions)
 	router.GET(baseURL+"/orgs/:orgId/modules", wrapper.ListModules)
 	router.POST(baseURL+"/orgs/:orgId/modules", wrapper.CreateModule)
 	router.DELETE(baseURL+"/orgs/:orgId/modules/:moduleId", wrapper.DeleteModule)
@@ -7391,7 +10492,26 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.GET(baseURL+"/orgs/:orgId/modules/:moduleId/versions/:moduleVersionId/events", wrapper.ListModuleVersionLifecycleEvents)
 	router.POST(baseURL+"/orgs/:orgId/modules/:moduleId/versions/:moduleVersionId/stable-successor", wrapper.PublishStableModuleVersionSuccessor)
 	router.GET(baseURL+"/orgs/:orgId/modules/:moduleId/versions/:moduleVersionId/usage", wrapper.GetModuleVersionUsage)
+	router.GET(baseURL+"/orgs/:orgId/plugins", wrapper.ListPluginContributions)
 	router.GET(baseURL+"/orgs/:orgId/plugins/:pluginId", wrapper.GetPluginCapability)
+	router.POST(baseURL+"/orgs/:orgId/plugins/:pluginId/authorization-checks", wrapper.CheckPluginAuthorization)
+	router.POST(baseURL+"/orgs/:orgId/plugins/:pluginId/deployment-reads", wrapper.ReadPluginDeploymentData)
+	router.GET(baseURL+"/orgs/:orgId/plugins/:pluginId/entitlement", wrapper.GetPluginEntitlement)
+	router.POST(baseURL+"/orgs/:orgId/plugins/:pluginId/inventory", wrapper.ReadPluginInventory)
+	router.POST(baseURL+"/orgs/:orgId/plugins/:pluginId/invoke", wrapper.InvokePluginOperation)
+	router.GET(baseURL+"/orgs/:orgId/plugins/:pluginId/operations/:operationId", wrapper.GetPluginOperationGrant)
+	router.POST(baseURL+"/orgs/:orgId/plugins/:pluginId/operations/:operationId/authorize", wrapper.AuthorizePluginOperation)
+	router.POST(baseURL+"/orgs/:orgId/plugins/:pluginId/operations/:operationId/check", wrapper.CheckPluginOperationDispatch)
+	router.POST(baseURL+"/orgs/:orgId/plugins/:pluginId/operations/:operationId/control", wrapper.ControlPluginOperationGrant)
+	router.POST(baseURL+"/orgs/:orgId/plugins/:pluginId/operations/:operationId/deployments", wrapper.SubmitPluginDeployment)
+	router.POST(baseURL+"/orgs/:orgId/plugins/:pluginId/operations/:operationId/deployments/:dispatchId/reconcile", wrapper.ReconcilePluginDeployment)
+	router.POST(baseURL+"/orgs/:orgId/plugins/:pluginId/operations/:operationId/events", wrapper.PublishPluginEvent)
+	router.GET(baseURL+"/orgs/:orgId/plugins/:pluginId/operations/:operationId/inventory", wrapper.ReadPluginOperationInventory)
+	router.POST(baseURL+"/orgs/:orgId/plugins/:pluginId/operations/:operationId/modules", wrapper.ApplyPluginModuleOperation)
+	router.POST(baseURL+"/orgs/:orgId/plugins/:pluginId/operations/:operationId/pins", wrapper.ApplyPluginPinOperation)
+	router.GET(baseURL+"/orgs/:orgId/plugins/:pluginId/operations/:operationId/pins/receipts/:requestId", wrapper.GetPluginPinOperationReceipt)
+	router.GET(baseURL+"/orgs/:orgId/plugins/:pluginId/operations/:operationId/resource-events", wrapper.ReadPluginResourceEvents)
+	router.GET(baseURL+"/orgs/:orgId/plugins/:pluginId/projects/:projectUuid/envs/:environmentUuid/deployments/:deploymentId/:materialKind", wrapper.GetPluginDeploymentMaterial)
 	router.GET(baseURL+"/orgs/:orgId/projects", wrapper.ListProjects)
 	router.POST(baseURL+"/orgs/:orgId/projects", wrapper.CreateProject)
 	router.DELETE(baseURL+"/orgs/:orgId/projects/:projectId", wrapper.DeleteProject)
@@ -7405,6 +10525,7 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.POST(baseURL+"/orgs/:orgId/projects/:projectId/envs/:envId/actions/refresh_runner", wrapper.UpdateRunnerInAnEnvironment)
 	router.GET(baseURL+"/orgs/:orgId/projects/:projectId/envs/:envId/available-resource-types", wrapper.ListAvailableResourceTypes)
 	router.GET(baseURL+"/orgs/:orgId/projects/:projectId/envs/:envId/deletion-impact", wrapper.GetEnvironmentDeletionImpact)
+	router.POST(baseURL+"/orgs/:orgId/projects/:projectId/envs/:envId/deployments/:deploymentId/actions/acknowledge-outcome", wrapper.AcknowledgeDeploymentOutcome)
 	router.GET(baseURL+"/orgs/:orgId/resource-types", wrapper.ListResourceTypes)
 	router.POST(baseURL+"/orgs/:orgId/resource-types", wrapper.CreateResourceType)
 	router.DELETE(baseURL+"/orgs/:orgId/resource-types/:typeId", wrapper.DeleteResourceType)
@@ -7420,6 +10541,20 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.DELETE(baseURL+"/orgs/:orgId/runners/:runnerId", wrapper.DeleteRunner)
 	router.GET(baseURL+"/orgs/:orgId/runners/:runnerId", wrapper.GetRunner)
 	router.PATCH(baseURL+"/orgs/:orgId/runners/:runnerId", wrapper.UpdateRunner)
+	router.GET(baseURL+"/plugin-audit-events", wrapper.ListPluginAuditEvents)
+	router.POST(baseURL+"/plugin-entitlement-bundles", wrapper.ImportPluginEntitlementBundle)
+	router.GET(baseURL+"/plugin-installations", wrapper.ListPluginInstallations)
+	router.POST(baseURL+"/plugin-installations", wrapper.CreatePluginInstallation)
+	router.DELETE(baseURL+"/plugin-installations/:installationId", wrapper.PurgePluginInstallation)
+	router.GET(baseURL+"/plugin-installations/:installationId", wrapper.GetPluginInstallation)
+	router.POST(baseURL+"/plugin-installations/:installationId/actions/:installationAction", wrapper.TransitionPluginInstallation)
+	router.PUT(baseURL+"/plugin-installations/:installationId/identity", wrapper.SetPluginInstallationIdentity)
+	router.PUT(baseURL+"/plugin-installations/:installationId/organization-mode", wrapper.SetPluginOrganizationMode)
+	router.DELETE(baseURL+"/plugin-installations/:installationId/organizations/:orgId", wrapper.RemovePluginEnablement)
+	router.PUT(baseURL+"/plugin-installations/:installationId/organizations/:orgId", wrapper.PutPluginEnablement)
+	router.POST(baseURL+"/plugin-installations/:installationId/upgrade", wrapper.UpgradePluginInstallation)
+	router.GET(baseURL+"/plugin-packages", wrapper.ListPluginPackages)
+	router.POST(baseURL+"/plugin-packages", wrapper.PushPluginPackage)
 
 }
 
@@ -7439,6 +10574,8 @@ type N403ForbiddenJSONResponse Error
 type N404NotFoundJSONResponse Error
 
 type N409ConflictJSONResponse Error
+
+type N503ServiceUnavailableJSONResponse Error
 
 type ListInternalOrganizationsRequestObject struct {
 	Params ListInternalOrganizationsParams
@@ -8331,6 +11468,182 @@ type GetOrganization404JSONResponse struct{ N404NotFoundJSONResponse }
 func (response GetOrganization404JSONResponse) VisitGetOrganizationResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AuthorizeDeploymentAdmissionRequestObject struct {
+	OrgId       OrgIdPathParam     `json:"orgId"`
+	AdmissionId openapi_types.UUID `json:"admissionId"`
+	Body        *AuthorizeDeploymentAdmissionJSONRequestBody
+}
+
+type AuthorizeDeploymentAdmissionResponseObject interface {
+	VisitAuthorizeDeploymentAdmissionResponse(w http.ResponseWriter) error
+}
+
+type AuthorizeDeploymentAdmission200JSONResponse DeploymentAdmissionReceipt
+
+func (response AuthorizeDeploymentAdmission200JSONResponse) VisitAuthorizeDeploymentAdmissionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AuthorizeDeploymentAdmission400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response AuthorizeDeploymentAdmission400JSONResponse) VisitAuthorizeDeploymentAdmissionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AuthorizeDeploymentAdmission403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response AuthorizeDeploymentAdmission403JSONResponse) VisitAuthorizeDeploymentAdmissionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AuthorizeDeploymentAdmission404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response AuthorizeDeploymentAdmission404JSONResponse) VisitAuthorizeDeploymentAdmissionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AuthorizeDeploymentAdmission409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response AuthorizeDeploymentAdmission409JSONResponse) VisitAuthorizeDeploymentAdmissionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AuthorizeDeploymentAdmission503JSONResponse struct {
+	N503ServiceUnavailableJSONResponse
+}
+
+func (response AuthorizeDeploymentAdmission503JSONResponse) VisitAuthorizeDeploymentAdmissionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SealDeploymentAdmissionAbsenceRequestObject struct {
+	OrgId       OrgIdPathParam     `json:"orgId"`
+	AdmissionId openapi_types.UUID `json:"admissionId"`
+	Body        *SealDeploymentAdmissionAbsenceJSONRequestBody
+}
+
+type SealDeploymentAdmissionAbsenceResponseObject interface {
+	VisitSealDeploymentAdmissionAbsenceResponse(w http.ResponseWriter) error
+}
+
+type SealDeploymentAdmissionAbsence200JSONResponse DeploymentAdmissionReceipt
+
+func (response SealDeploymentAdmissionAbsence200JSONResponse) VisitSealDeploymentAdmissionAbsenceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SealDeploymentAdmissionAbsence400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response SealDeploymentAdmissionAbsence400JSONResponse) VisitSealDeploymentAdmissionAbsenceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SealDeploymentAdmissionAbsence403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response SealDeploymentAdmissionAbsence403JSONResponse) VisitSealDeploymentAdmissionAbsenceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SealDeploymentAdmissionAbsence404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response SealDeploymentAdmissionAbsence404JSONResponse) VisitSealDeploymentAdmissionAbsenceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SealDeploymentAdmissionAbsence409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response SealDeploymentAdmissionAbsence409JSONResponse) VisitSealDeploymentAdmissionAbsenceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SettleDeploymentAdmissionRequestObject struct {
+	OrgId       OrgIdPathParam     `json:"orgId"`
+	AdmissionId openapi_types.UUID `json:"admissionId"`
+	Body        *SettleDeploymentAdmissionJSONRequestBody
+}
+
+type SettleDeploymentAdmissionResponseObject interface {
+	VisitSettleDeploymentAdmissionResponse(w http.ResponseWriter) error
+}
+
+type SettleDeploymentAdmission200JSONResponse DeploymentAdmissionReceipt
+
+func (response SettleDeploymentAdmission200JSONResponse) VisitSettleDeploymentAdmissionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SettleDeploymentAdmission400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response SettleDeploymentAdmission400JSONResponse) VisitSettleDeploymentAdmissionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SettleDeploymentAdmission403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response SettleDeploymentAdmission403JSONResponse) VisitSettleDeploymentAdmissionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SettleDeploymentAdmission404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response SettleDeploymentAdmission404JSONResponse) VisitSettleDeploymentAdmissionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SettleDeploymentAdmission409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response SettleDeploymentAdmission409JSONResponse) VisitSettleDeploymentAdmissionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -9336,6 +12649,41 @@ func (response AppendEnvironmentModuleVersionPinNote409JSONResponse) VisitAppend
 	return json.NewEncoder(w).Encode(response)
 }
 
+type ListProposedModuleVersionsRequestObject struct {
+	OrgId OrgIdPathParam `json:"orgId"`
+}
+
+type ListProposedModuleVersionsResponseObject interface {
+	VisitListProposedModuleVersionsResponse(w http.ResponseWriter) error
+}
+
+type ListProposedModuleVersions200JSONResponse []ModuleVersionLifecycle
+
+func (response ListProposedModuleVersions200JSONResponse) VisitListProposedModuleVersionsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListProposedModuleVersions403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ListProposedModuleVersions403JSONResponse) VisitListProposedModuleVersionsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListProposedModuleVersions404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ListProposedModuleVersions404JSONResponse) VisitListProposedModuleVersionsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type ListModulesRequestObject struct {
 	OrgId  OrgIdPathParam `json:"orgId"`
 	Params ListModulesParams
@@ -9994,6 +13342,32 @@ func (response GetModuleVersionUsage404JSONResponse) VisitGetModuleVersionUsageR
 	return json.NewEncoder(w).Encode(response)
 }
 
+type ListPluginContributionsRequestObject struct {
+	OrgId OrgIdPathParam `json:"orgId"`
+}
+
+type ListPluginContributionsResponseObject interface {
+	VisitListPluginContributionsResponse(w http.ResponseWriter) error
+}
+
+type ListPluginContributions200JSONResponse PluginContributionPage
+
+func (response ListPluginContributions200JSONResponse) VisitListPluginContributionsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListPluginContributions403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ListPluginContributions403JSONResponse) VisitListPluginContributionsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type GetPluginCapabilityRequestObject struct {
 	OrgId    OrgIdPathParam `json:"orgId"`
 	PluginId string         `json:"pluginId"`
@@ -10026,6 +13400,1126 @@ type GetPluginCapability404JSONResponse struct{ N404NotFoundJSONResponse }
 func (response GetPluginCapability404JSONResponse) VisitGetPluginCapabilityResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CheckPluginAuthorizationRequestObject struct {
+	OrgId    OrgIdPathParam `json:"orgId"`
+	PluginId string         `json:"pluginId"`
+	Body     *CheckPluginAuthorizationJSONRequestBody
+}
+
+type CheckPluginAuthorizationResponseObject interface {
+	VisitCheckPluginAuthorizationResponse(w http.ResponseWriter) error
+}
+
+type CheckPluginAuthorization200JSONResponse PluginAuthorizationCheckResult
+
+func (response CheckPluginAuthorization200JSONResponse) VisitCheckPluginAuthorizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CheckPluginAuthorization400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response CheckPluginAuthorization400JSONResponse) VisitCheckPluginAuthorizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CheckPluginAuthorization403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response CheckPluginAuthorization403JSONResponse) VisitCheckPluginAuthorizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CheckPluginAuthorization404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response CheckPluginAuthorization404JSONResponse) VisitCheckPluginAuthorizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CheckPluginAuthorization409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response CheckPluginAuthorization409JSONResponse) VisitCheckPluginAuthorizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CheckPluginAuthorization503JSONResponse struct {
+	N503ServiceUnavailableJSONResponse
+}
+
+func (response CheckPluginAuthorization503JSONResponse) VisitCheckPluginAuthorizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReadPluginDeploymentDataRequestObject struct {
+	OrgId    OrgIdPathParam `json:"orgId"`
+	PluginId string         `json:"pluginId"`
+	Body     *ReadPluginDeploymentDataJSONRequestBody
+}
+
+type ReadPluginDeploymentDataResponseObject interface {
+	VisitReadPluginDeploymentDataResponse(w http.ResponseWriter) error
+}
+
+type ReadPluginDeploymentData200JSONResponse PluginInvocationResult
+
+func (response ReadPluginDeploymentData200JSONResponse) VisitReadPluginDeploymentDataResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReadPluginDeploymentData400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response ReadPluginDeploymentData400JSONResponse) VisitReadPluginDeploymentDataResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReadPluginDeploymentData403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ReadPluginDeploymentData403JSONResponse) VisitReadPluginDeploymentDataResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReadPluginDeploymentData404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ReadPluginDeploymentData404JSONResponse) VisitReadPluginDeploymentDataResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReadPluginDeploymentData503JSONResponse struct {
+	N503ServiceUnavailableJSONResponse
+}
+
+func (response ReadPluginDeploymentData503JSONResponse) VisitReadPluginDeploymentDataResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginEntitlementRequestObject struct {
+	OrgId    OrgIdPathParam `json:"orgId"`
+	PluginId string         `json:"pluginId"`
+}
+
+type GetPluginEntitlementResponseObject interface {
+	VisitGetPluginEntitlementResponse(w http.ResponseWriter) error
+}
+
+type GetPluginEntitlement200JSONResponse PluginCapability
+
+func (response GetPluginEntitlement200JSONResponse) VisitGetPluginEntitlementResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginEntitlement403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response GetPluginEntitlement403JSONResponse) VisitGetPluginEntitlementResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginEntitlement404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response GetPluginEntitlement404JSONResponse) VisitGetPluginEntitlementResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginEntitlement503JSONResponse struct {
+	N503ServiceUnavailableJSONResponse
+}
+
+func (response GetPluginEntitlement503JSONResponse) VisitGetPluginEntitlementResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReadPluginInventoryRequestObject struct {
+	OrgId    OrgIdPathParam `json:"orgId"`
+	PluginId string         `json:"pluginId"`
+	Body     *ReadPluginInventoryJSONRequestBody
+}
+
+type ReadPluginInventoryResponseObject interface {
+	VisitReadPluginInventoryResponse(w http.ResponseWriter) error
+}
+
+type ReadPluginInventory200JSONResponse PluginInventory
+
+func (response ReadPluginInventory200JSONResponse) VisitReadPluginInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReadPluginInventory400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response ReadPluginInventory400JSONResponse) VisitReadPluginInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReadPluginInventory403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ReadPluginInventory403JSONResponse) VisitReadPluginInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReadPluginInventory404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ReadPluginInventory404JSONResponse) VisitReadPluginInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReadPluginInventory503JSONResponse struct {
+	N503ServiceUnavailableJSONResponse
+}
+
+func (response ReadPluginInventory503JSONResponse) VisitReadPluginInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type InvokePluginOperationRequestObject struct {
+	OrgId    OrgIdPathParam `json:"orgId"`
+	PluginId string         `json:"pluginId"`
+	Body     *InvokePluginOperationJSONRequestBody
+}
+
+type InvokePluginOperationResponseObject interface {
+	VisitInvokePluginOperationResponse(w http.ResponseWriter) error
+}
+
+type InvokePluginOperation200JSONResponse PluginInvocationResult
+
+func (response InvokePluginOperation200JSONResponse) VisitInvokePluginOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type InvokePluginOperation400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response InvokePluginOperation400JSONResponse) VisitInvokePluginOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type InvokePluginOperation403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response InvokePluginOperation403JSONResponse) VisitInvokePluginOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type InvokePluginOperation404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response InvokePluginOperation404JSONResponse) VisitInvokePluginOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type InvokePluginOperation409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response InvokePluginOperation409JSONResponse) VisitInvokePluginOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type InvokePluginOperation503JSONResponse struct {
+	N503ServiceUnavailableJSONResponse
+}
+
+func (response InvokePluginOperation503JSONResponse) VisitInvokePluginOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginOperationGrantRequestObject struct {
+	OrgId       OrgIdPathParam     `json:"orgId"`
+	PluginId    string             `json:"pluginId"`
+	OperationId openapi_types.UUID `json:"operationId"`
+}
+
+type GetPluginOperationGrantResponseObject interface {
+	VisitGetPluginOperationGrantResponse(w http.ResponseWriter) error
+}
+
+type GetPluginOperationGrant200JSONResponse PluginOperationGrant
+
+func (response GetPluginOperationGrant200JSONResponse) VisitGetPluginOperationGrantResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginOperationGrant403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response GetPluginOperationGrant403JSONResponse) VisitGetPluginOperationGrantResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginOperationGrant404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response GetPluginOperationGrant404JSONResponse) VisitGetPluginOperationGrantResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AuthorizePluginOperationRequestObject struct {
+	OrgId       OrgIdPathParam     `json:"orgId"`
+	PluginId    string             `json:"pluginId"`
+	OperationId openapi_types.UUID `json:"operationId"`
+	Body        *AuthorizePluginOperationJSONRequestBody
+}
+
+type AuthorizePluginOperationResponseObject interface {
+	VisitAuthorizePluginOperationResponse(w http.ResponseWriter) error
+}
+
+type AuthorizePluginOperation200JSONResponse PluginOperationGrant
+
+func (response AuthorizePluginOperation200JSONResponse) VisitAuthorizePluginOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AuthorizePluginOperation400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response AuthorizePluginOperation400JSONResponse) VisitAuthorizePluginOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AuthorizePluginOperation403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response AuthorizePluginOperation403JSONResponse) VisitAuthorizePluginOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AuthorizePluginOperation404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response AuthorizePluginOperation404JSONResponse) VisitAuthorizePluginOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AuthorizePluginOperation409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response AuthorizePluginOperation409JSONResponse) VisitAuthorizePluginOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AuthorizePluginOperation503JSONResponse struct {
+	N503ServiceUnavailableJSONResponse
+}
+
+func (response AuthorizePluginOperation503JSONResponse) VisitAuthorizePluginOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CheckPluginOperationDispatchRequestObject struct {
+	OrgId       OrgIdPathParam     `json:"orgId"`
+	PluginId    string             `json:"pluginId"`
+	OperationId openapi_types.UUID `json:"operationId"`
+	Body        *CheckPluginOperationDispatchJSONRequestBody
+}
+
+type CheckPluginOperationDispatchResponseObject interface {
+	VisitCheckPluginOperationDispatchResponse(w http.ResponseWriter) error
+}
+
+type CheckPluginOperationDispatch200JSONResponse PluginDispatchAuthorization
+
+func (response CheckPluginOperationDispatch200JSONResponse) VisitCheckPluginOperationDispatchResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CheckPluginOperationDispatch400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response CheckPluginOperationDispatch400JSONResponse) VisitCheckPluginOperationDispatchResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CheckPluginOperationDispatch403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response CheckPluginOperationDispatch403JSONResponse) VisitCheckPluginOperationDispatchResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CheckPluginOperationDispatch404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response CheckPluginOperationDispatch404JSONResponse) VisitCheckPluginOperationDispatchResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CheckPluginOperationDispatch409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response CheckPluginOperationDispatch409JSONResponse) VisitCheckPluginOperationDispatchResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CheckPluginOperationDispatch503JSONResponse struct {
+	N503ServiceUnavailableJSONResponse
+}
+
+func (response CheckPluginOperationDispatch503JSONResponse) VisitCheckPluginOperationDispatchResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ControlPluginOperationGrantRequestObject struct {
+	OrgId       OrgIdPathParam     `json:"orgId"`
+	PluginId    string             `json:"pluginId"`
+	OperationId openapi_types.UUID `json:"operationId"`
+	Body        *ControlPluginOperationGrantJSONRequestBody
+}
+
+type ControlPluginOperationGrantResponseObject interface {
+	VisitControlPluginOperationGrantResponse(w http.ResponseWriter) error
+}
+
+type ControlPluginOperationGrant200JSONResponse PluginOperationGrant
+
+func (response ControlPluginOperationGrant200JSONResponse) VisitControlPluginOperationGrantResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ControlPluginOperationGrant400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response ControlPluginOperationGrant400JSONResponse) VisitControlPluginOperationGrantResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ControlPluginOperationGrant403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ControlPluginOperationGrant403JSONResponse) VisitControlPluginOperationGrantResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ControlPluginOperationGrant404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ControlPluginOperationGrant404JSONResponse) VisitControlPluginOperationGrantResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ControlPluginOperationGrant409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response ControlPluginOperationGrant409JSONResponse) VisitControlPluginOperationGrantResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ControlPluginOperationGrant503JSONResponse struct {
+	N503ServiceUnavailableJSONResponse
+}
+
+func (response ControlPluginOperationGrant503JSONResponse) VisitControlPluginOperationGrantResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SubmitPluginDeploymentRequestObject struct {
+	OrgId       OrgIdPathParam     `json:"orgId"`
+	PluginId    string             `json:"pluginId"`
+	OperationId openapi_types.UUID `json:"operationId"`
+	Body        *SubmitPluginDeploymentJSONRequestBody
+}
+
+type SubmitPluginDeploymentResponseObject interface {
+	VisitSubmitPluginDeploymentResponse(w http.ResponseWriter) error
+}
+
+type SubmitPluginDeployment200JSONResponse PluginInvocationResult
+
+func (response SubmitPluginDeployment200JSONResponse) VisitSubmitPluginDeploymentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SubmitPluginDeployment400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response SubmitPluginDeployment400JSONResponse) VisitSubmitPluginDeploymentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SubmitPluginDeployment403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response SubmitPluginDeployment403JSONResponse) VisitSubmitPluginDeploymentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SubmitPluginDeployment404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response SubmitPluginDeployment404JSONResponse) VisitSubmitPluginDeploymentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SubmitPluginDeployment409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response SubmitPluginDeployment409JSONResponse) VisitSubmitPluginDeploymentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SubmitPluginDeployment503JSONResponse struct {
+	N503ServiceUnavailableJSONResponse
+}
+
+func (response SubmitPluginDeployment503JSONResponse) VisitSubmitPluginDeploymentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReconcilePluginDeploymentRequestObject struct {
+	OrgId       OrgIdPathParam     `json:"orgId"`
+	PluginId    string             `json:"pluginId"`
+	OperationId openapi_types.UUID `json:"operationId"`
+	DispatchId  string             `json:"dispatchId"`
+	Body        *ReconcilePluginDeploymentJSONRequestBody
+}
+
+type ReconcilePluginDeploymentResponseObject interface {
+	VisitReconcilePluginDeploymentResponse(w http.ResponseWriter) error
+}
+
+type ReconcilePluginDeployment200JSONResponse PluginInvocationResult
+
+func (response ReconcilePluginDeployment200JSONResponse) VisitReconcilePluginDeploymentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReconcilePluginDeployment400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response ReconcilePluginDeployment400JSONResponse) VisitReconcilePluginDeploymentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReconcilePluginDeployment403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ReconcilePluginDeployment403JSONResponse) VisitReconcilePluginDeploymentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReconcilePluginDeployment404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ReconcilePluginDeployment404JSONResponse) VisitReconcilePluginDeploymentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReconcilePluginDeployment409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response ReconcilePluginDeployment409JSONResponse) VisitReconcilePluginDeploymentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReconcilePluginDeployment503JSONResponse struct {
+	N503ServiceUnavailableJSONResponse
+}
+
+func (response ReconcilePluginDeployment503JSONResponse) VisitReconcilePluginDeploymentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PublishPluginEventRequestObject struct {
+	OrgId       OrgIdPathParam     `json:"orgId"`
+	PluginId    string             `json:"pluginId"`
+	OperationId openapi_types.UUID `json:"operationId"`
+	Body        *PublishPluginEventJSONRequestBody
+}
+
+type PublishPluginEventResponseObject interface {
+	VisitPublishPluginEventResponse(w http.ResponseWriter) error
+}
+
+type PublishPluginEvent204Response struct {
+}
+
+func (response PublishPluginEvent204Response) VisitPublishPluginEventResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type PublishPluginEvent400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response PublishPluginEvent400JSONResponse) VisitPublishPluginEventResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PublishPluginEvent403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response PublishPluginEvent403JSONResponse) VisitPublishPluginEventResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PublishPluginEvent404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response PublishPluginEvent404JSONResponse) VisitPublishPluginEventResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PublishPluginEvent409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response PublishPluginEvent409JSONResponse) VisitPublishPluginEventResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReadPluginOperationInventoryRequestObject struct {
+	OrgId       OrgIdPathParam     `json:"orgId"`
+	PluginId    string             `json:"pluginId"`
+	OperationId openapi_types.UUID `json:"operationId"`
+}
+
+type ReadPluginOperationInventoryResponseObject interface {
+	VisitReadPluginOperationInventoryResponse(w http.ResponseWriter) error
+}
+
+type ReadPluginOperationInventory200JSONResponse PluginInventory
+
+func (response ReadPluginOperationInventory200JSONResponse) VisitReadPluginOperationInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReadPluginOperationInventory403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ReadPluginOperationInventory403JSONResponse) VisitReadPluginOperationInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReadPluginOperationInventory404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ReadPluginOperationInventory404JSONResponse) VisitReadPluginOperationInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReadPluginOperationInventory409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response ReadPluginOperationInventory409JSONResponse) VisitReadPluginOperationInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ApplyPluginModuleOperationRequestObject struct {
+	OrgId       OrgIdPathParam     `json:"orgId"`
+	PluginId    string             `json:"pluginId"`
+	OperationId openapi_types.UUID `json:"operationId"`
+	Body        *ApplyPluginModuleOperationJSONRequestBody
+}
+
+type ApplyPluginModuleOperationResponseObject interface {
+	VisitApplyPluginModuleOperationResponse(w http.ResponseWriter) error
+}
+
+type ApplyPluginModuleOperation200JSONResponse PluginModuleOperationReceipt
+
+func (response ApplyPluginModuleOperation200JSONResponse) VisitApplyPluginModuleOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ApplyPluginModuleOperation400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response ApplyPluginModuleOperation400JSONResponse) VisitApplyPluginModuleOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ApplyPluginModuleOperation403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ApplyPluginModuleOperation403JSONResponse) VisitApplyPluginModuleOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ApplyPluginModuleOperation404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ApplyPluginModuleOperation404JSONResponse) VisitApplyPluginModuleOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ApplyPluginModuleOperation409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response ApplyPluginModuleOperation409JSONResponse) VisitApplyPluginModuleOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ApplyPluginModuleOperation503JSONResponse struct {
+	N503ServiceUnavailableJSONResponse
+}
+
+func (response ApplyPluginModuleOperation503JSONResponse) VisitApplyPluginModuleOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ApplyPluginPinOperationRequestObject struct {
+	OrgId       OrgIdPathParam     `json:"orgId"`
+	PluginId    string             `json:"pluginId"`
+	OperationId openapi_types.UUID `json:"operationId"`
+	Body        *ApplyPluginPinOperationJSONRequestBody
+}
+
+type ApplyPluginPinOperationResponseObject interface {
+	VisitApplyPluginPinOperationResponse(w http.ResponseWriter) error
+}
+
+type ApplyPluginPinOperation200JSONResponse []EnvironmentModuleVersionPin
+
+func (response ApplyPluginPinOperation200JSONResponse) VisitApplyPluginPinOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ApplyPluginPinOperation400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response ApplyPluginPinOperation400JSONResponse) VisitApplyPluginPinOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ApplyPluginPinOperation403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ApplyPluginPinOperation403JSONResponse) VisitApplyPluginPinOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ApplyPluginPinOperation404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ApplyPluginPinOperation404JSONResponse) VisitApplyPluginPinOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ApplyPluginPinOperation409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response ApplyPluginPinOperation409JSONResponse) VisitApplyPluginPinOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ApplyPluginPinOperation503JSONResponse struct {
+	N503ServiceUnavailableJSONResponse
+}
+
+func (response ApplyPluginPinOperation503JSONResponse) VisitApplyPluginPinOperationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginPinOperationReceiptRequestObject struct {
+	OrgId       OrgIdPathParam     `json:"orgId"`
+	PluginId    string             `json:"pluginId"`
+	OperationId openapi_types.UUID `json:"operationId"`
+	RequestId   string             `json:"requestId"`
+	Params      GetPluginPinOperationReceiptParams
+}
+
+type GetPluginPinOperationReceiptResponseObject interface {
+	VisitGetPluginPinOperationReceiptResponse(w http.ResponseWriter) error
+}
+
+type GetPluginPinOperationReceipt200JSONResponse PluginPinOperationReceipt
+
+func (response GetPluginPinOperationReceipt200JSONResponse) VisitGetPluginPinOperationReceiptResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginPinOperationReceipt400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response GetPluginPinOperationReceipt400JSONResponse) VisitGetPluginPinOperationReceiptResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginPinOperationReceipt403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response GetPluginPinOperationReceipt403JSONResponse) VisitGetPluginPinOperationReceiptResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginPinOperationReceipt404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response GetPluginPinOperationReceipt404JSONResponse) VisitGetPluginPinOperationReceiptResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginPinOperationReceipt409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response GetPluginPinOperationReceipt409JSONResponse) VisitGetPluginPinOperationReceiptResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginPinOperationReceipt503JSONResponse struct {
+	N503ServiceUnavailableJSONResponse
+}
+
+func (response GetPluginPinOperationReceipt503JSONResponse) VisitGetPluginPinOperationReceiptResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReadPluginResourceEventsRequestObject struct {
+	OrgId       OrgIdPathParam     `json:"orgId"`
+	PluginId    string             `json:"pluginId"`
+	OperationId openapi_types.UUID `json:"operationId"`
+	Params      ReadPluginResourceEventsParams
+}
+
+type ReadPluginResourceEventsResponseObject interface {
+	VisitReadPluginResourceEventsResponse(w http.ResponseWriter) error
+}
+
+type ReadPluginResourceEvents200JSONResponse struct {
+	Events               []PluginResourceEvent `json:"events"`
+	NextCursor           string                `json:"next_cursor"`
+	OrganizationTimezone string                `json:"organization_timezone"`
+}
+
+func (response ReadPluginResourceEvents200JSONResponse) VisitReadPluginResourceEventsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReadPluginResourceEvents400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response ReadPluginResourceEvents400JSONResponse) VisitReadPluginResourceEventsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReadPluginResourceEvents403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ReadPluginResourceEvents403JSONResponse) VisitReadPluginResourceEventsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReadPluginResourceEvents404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ReadPluginResourceEvents404JSONResponse) VisitReadPluginResourceEventsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReadPluginResourceEvents409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response ReadPluginResourceEvents409JSONResponse) VisitReadPluginResourceEventsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginDeploymentMaterialRequestObject struct {
+	OrgId           OrgIdPathParam                                `json:"orgId"`
+	PluginId        string                                        `json:"pluginId"`
+	ProjectUuid     openapi_types.UUID                            `json:"projectUuid"`
+	EnvironmentUuid openapi_types.UUID                            `json:"environmentUuid"`
+	DeploymentId    openapi_types.UUID                            `json:"deploymentId"`
+	MaterialKind    GetPluginDeploymentMaterialParamsMaterialKind `json:"materialKind"`
+}
+
+type GetPluginDeploymentMaterialResponseObject interface {
+	VisitGetPluginDeploymentMaterialResponse(w http.ResponseWriter) error
+}
+
+type GetPluginDeploymentMaterial200ResponseHeaders struct {
+	CacheControl        string
+	ContentDisposition  string
+	XContentTypeOptions string
+}
+
+type GetPluginDeploymentMaterial200TextResponse struct {
+	Body    string
+	Headers GetPluginDeploymentMaterial200ResponseHeaders
+}
+
+func (response GetPluginDeploymentMaterial200TextResponse) VisitGetPluginDeploymentMaterialResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Cache-Control", fmt.Sprint(response.Headers.CacheControl))
+	w.Header().Set("Content-Disposition", fmt.Sprint(response.Headers.ContentDisposition))
+	w.Header().Set("X-Content-Type-Options", fmt.Sprint(response.Headers.XContentTypeOptions))
+	w.WriteHeader(200)
+
+	_, err := w.Write([]byte(response.Body))
+	return err
+}
+
+type GetPluginDeploymentMaterial400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response GetPluginDeploymentMaterial400JSONResponse) VisitGetPluginDeploymentMaterialResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginDeploymentMaterial403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response GetPluginDeploymentMaterial403JSONResponse) VisitGetPluginDeploymentMaterialResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginDeploymentMaterial404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response GetPluginDeploymentMaterial404JSONResponse) VisitGetPluginDeploymentMaterialResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginDeploymentMaterial409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response GetPluginDeploymentMaterial409JSONResponse) VisitGetPluginDeploymentMaterialResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginDeploymentMaterial413JSONResponse Error
+
+func (response GetPluginDeploymentMaterial413JSONResponse) VisitGetPluginDeploymentMaterialResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginDeploymentMaterial503JSONResponse struct {
+	N503ServiceUnavailableJSONResponse
+}
+
+func (response GetPluginDeploymentMaterial503JSONResponse) VisitGetPluginDeploymentMaterialResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -10452,6 +14946,72 @@ type GetEnvironmentDeletionImpact404JSONResponse struct{ N404NotFoundJSONRespons
 func (response GetEnvironmentDeletionImpact404JSONResponse) VisitGetEnvironmentDeletionImpactResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AcknowledgeDeploymentOutcomeRequestObject struct {
+	OrgId        OrgIdPathParam     `json:"orgId"`
+	ProjectId    ProjectIdPathParam `json:"projectId"`
+	EnvId        EnvIdPathParam     `json:"envId"`
+	DeploymentId openapi_types.UUID `json:"deploymentId"`
+	Body         *AcknowledgeDeploymentOutcomeJSONRequestBody
+}
+
+type AcknowledgeDeploymentOutcomeResponseObject interface {
+	VisitAcknowledgeDeploymentOutcomeResponse(w http.ResponseWriter) error
+}
+
+type AcknowledgeDeploymentOutcome200JSONResponse DeploymentOutcomeAcknowledgement
+
+func (response AcknowledgeDeploymentOutcome200JSONResponse) VisitAcknowledgeDeploymentOutcomeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AcknowledgeDeploymentOutcome201JSONResponse DeploymentOutcomeAcknowledgement
+
+func (response AcknowledgeDeploymentOutcome201JSONResponse) VisitAcknowledgeDeploymentOutcomeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AcknowledgeDeploymentOutcome400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response AcknowledgeDeploymentOutcome400JSONResponse) VisitAcknowledgeDeploymentOutcomeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AcknowledgeDeploymentOutcome403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response AcknowledgeDeploymentOutcome403JSONResponse) VisitAcknowledgeDeploymentOutcomeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AcknowledgeDeploymentOutcome404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response AcknowledgeDeploymentOutcome404JSONResponse) VisitAcknowledgeDeploymentOutcomeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AcknowledgeDeploymentOutcome409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response AcknowledgeDeploymentOutcome409JSONResponse) VisitAcknowledgeDeploymentOutcomeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -10980,6 +15540,703 @@ func (response UpdateRunner409JSONResponse) VisitUpdateRunnerResponse(w http.Res
 	return json.NewEncoder(w).Encode(response)
 }
 
+type ListPluginAuditEventsRequestObject struct {
+	Params ListPluginAuditEventsParams
+}
+
+type ListPluginAuditEventsResponseObject interface {
+	VisitListPluginAuditEventsResponse(w http.ResponseWriter) error
+}
+
+type ListPluginAuditEvents200JSONResponse PluginAuditEventPage
+
+func (response ListPluginAuditEvents200JSONResponse) VisitListPluginAuditEventsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListPluginAuditEvents400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response ListPluginAuditEvents400JSONResponse) VisitListPluginAuditEventsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListPluginAuditEvents403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ListPluginAuditEvents403JSONResponse) VisitListPluginAuditEventsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListPluginAuditEvents404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ListPluginAuditEvents404JSONResponse) VisitListPluginAuditEventsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ImportPluginEntitlementBundleRequestObject struct {
+	Params ImportPluginEntitlementBundleParams
+	Body   *ImportPluginEntitlementBundleJSONRequestBody
+}
+
+type ImportPluginEntitlementBundleResponseObject interface {
+	VisitImportPluginEntitlementBundleResponse(w http.ResponseWriter) error
+}
+
+type ImportPluginEntitlementBundle200JSONResponse PluginEntitlementBundleImport
+
+func (response ImportPluginEntitlementBundle200JSONResponse) VisitImportPluginEntitlementBundleResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ImportPluginEntitlementBundle400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response ImportPluginEntitlementBundle400JSONResponse) VisitImportPluginEntitlementBundleResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ImportPluginEntitlementBundle403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ImportPluginEntitlementBundle403JSONResponse) VisitImportPluginEntitlementBundleResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ImportPluginEntitlementBundle404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ImportPluginEntitlementBundle404JSONResponse) VisitImportPluginEntitlementBundleResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ImportPluginEntitlementBundle409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response ImportPluginEntitlementBundle409JSONResponse) VisitImportPluginEntitlementBundleResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListPluginInstallationsRequestObject struct {
+}
+
+type ListPluginInstallationsResponseObject interface {
+	VisitListPluginInstallationsResponse(w http.ResponseWriter) error
+}
+
+type ListPluginInstallations200JSONResponse PluginInstallationPage
+
+func (response ListPluginInstallations200JSONResponse) VisitListPluginInstallationsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListPluginInstallations403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ListPluginInstallations403JSONResponse) VisitListPluginInstallationsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListPluginInstallations404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ListPluginInstallations404JSONResponse) VisitListPluginInstallationsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreatePluginInstallationRequestObject struct {
+	Params CreatePluginInstallationParams
+	Body   *CreatePluginInstallationJSONRequestBody
+}
+
+type CreatePluginInstallationResponseObject interface {
+	VisitCreatePluginInstallationResponse(w http.ResponseWriter) error
+}
+
+type CreatePluginInstallation201JSONResponse PluginInstallation
+
+func (response CreatePluginInstallation201JSONResponse) VisitCreatePluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreatePluginInstallation400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response CreatePluginInstallation400JSONResponse) VisitCreatePluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreatePluginInstallation403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response CreatePluginInstallation403JSONResponse) VisitCreatePluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreatePluginInstallation404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response CreatePluginInstallation404JSONResponse) VisitCreatePluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreatePluginInstallation409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response CreatePluginInstallation409JSONResponse) VisitCreatePluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PurgePluginInstallationRequestObject struct {
+	InstallationId InstallationIdPathParam `json:"installationId"`
+	Params         PurgePluginInstallationParams
+	Body           *PurgePluginInstallationJSONRequestBody
+}
+
+type PurgePluginInstallationResponseObject interface {
+	VisitPurgePluginInstallationResponse(w http.ResponseWriter) error
+}
+
+type PurgePluginInstallation200JSONResponse PluginInstallation
+
+func (response PurgePluginInstallation200JSONResponse) VisitPurgePluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PurgePluginInstallation400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response PurgePluginInstallation400JSONResponse) VisitPurgePluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PurgePluginInstallation403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response PurgePluginInstallation403JSONResponse) VisitPurgePluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PurgePluginInstallation404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response PurgePluginInstallation404JSONResponse) VisitPurgePluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PurgePluginInstallation409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response PurgePluginInstallation409JSONResponse) VisitPurgePluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginInstallationRequestObject struct {
+	InstallationId InstallationIdPathParam `json:"installationId"`
+}
+
+type GetPluginInstallationResponseObject interface {
+	VisitGetPluginInstallationResponse(w http.ResponseWriter) error
+}
+
+type GetPluginInstallation200JSONResponse PluginInstallation
+
+func (response GetPluginInstallation200JSONResponse) VisitGetPluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginInstallation403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response GetPluginInstallation403JSONResponse) VisitGetPluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPluginInstallation404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response GetPluginInstallation404JSONResponse) VisitGetPluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TransitionPluginInstallationRequestObject struct {
+	InstallationId     InstallationIdPathParam                              `json:"installationId"`
+	InstallationAction TransitionPluginInstallationParamsInstallationAction `json:"installationAction"`
+	Params             TransitionPluginInstallationParams
+	Body               *TransitionPluginInstallationJSONRequestBody
+}
+
+type TransitionPluginInstallationResponseObject interface {
+	VisitTransitionPluginInstallationResponse(w http.ResponseWriter) error
+}
+
+type TransitionPluginInstallation200JSONResponse PluginInstallation
+
+func (response TransitionPluginInstallation200JSONResponse) VisitTransitionPluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TransitionPluginInstallation400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response TransitionPluginInstallation400JSONResponse) VisitTransitionPluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TransitionPluginInstallation403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response TransitionPluginInstallation403JSONResponse) VisitTransitionPluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TransitionPluginInstallation404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response TransitionPluginInstallation404JSONResponse) VisitTransitionPluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TransitionPluginInstallation409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response TransitionPluginInstallation409JSONResponse) VisitTransitionPluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SetPluginInstallationIdentityRequestObject struct {
+	InstallationId InstallationIdPathParam `json:"installationId"`
+	Params         SetPluginInstallationIdentityParams
+	Body           *SetPluginInstallationIdentityJSONRequestBody
+}
+
+type SetPluginInstallationIdentityResponseObject interface {
+	VisitSetPluginInstallationIdentityResponse(w http.ResponseWriter) error
+}
+
+type SetPluginInstallationIdentity200JSONResponse PluginInstallation
+
+func (response SetPluginInstallationIdentity200JSONResponse) VisitSetPluginInstallationIdentityResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SetPluginInstallationIdentity400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response SetPluginInstallationIdentity400JSONResponse) VisitSetPluginInstallationIdentityResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SetPluginInstallationIdentity403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response SetPluginInstallationIdentity403JSONResponse) VisitSetPluginInstallationIdentityResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SetPluginInstallationIdentity404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response SetPluginInstallationIdentity404JSONResponse) VisitSetPluginInstallationIdentityResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SetPluginInstallationIdentity409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response SetPluginInstallationIdentity409JSONResponse) VisitSetPluginInstallationIdentityResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SetPluginOrganizationModeRequestObject struct {
+	InstallationId InstallationIdPathParam `json:"installationId"`
+	Params         SetPluginOrganizationModeParams
+	Body           *SetPluginOrganizationModeJSONRequestBody
+}
+
+type SetPluginOrganizationModeResponseObject interface {
+	VisitSetPluginOrganizationModeResponse(w http.ResponseWriter) error
+}
+
+type SetPluginOrganizationMode200JSONResponse PluginInstallation
+
+func (response SetPluginOrganizationMode200JSONResponse) VisitSetPluginOrganizationModeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SetPluginOrganizationMode400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response SetPluginOrganizationMode400JSONResponse) VisitSetPluginOrganizationModeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SetPluginOrganizationMode403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response SetPluginOrganizationMode403JSONResponse) VisitSetPluginOrganizationModeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SetPluginOrganizationMode404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response SetPluginOrganizationMode404JSONResponse) VisitSetPluginOrganizationModeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type SetPluginOrganizationMode409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response SetPluginOrganizationMode409JSONResponse) VisitSetPluginOrganizationModeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RemovePluginEnablementRequestObject struct {
+	InstallationId InstallationIdPathParam `json:"installationId"`
+	OrgId          OrgIdPathParam          `json:"orgId"`
+	Params         RemovePluginEnablementParams
+	Body           *RemovePluginEnablementJSONRequestBody
+}
+
+type RemovePluginEnablementResponseObject interface {
+	VisitRemovePluginEnablementResponse(w http.ResponseWriter) error
+}
+
+type RemovePluginEnablement200JSONResponse PluginInstallation
+
+func (response RemovePluginEnablement200JSONResponse) VisitRemovePluginEnablementResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RemovePluginEnablement400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response RemovePluginEnablement400JSONResponse) VisitRemovePluginEnablementResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RemovePluginEnablement403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response RemovePluginEnablement403JSONResponse) VisitRemovePluginEnablementResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RemovePluginEnablement404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response RemovePluginEnablement404JSONResponse) VisitRemovePluginEnablementResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RemovePluginEnablement409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response RemovePluginEnablement409JSONResponse) VisitRemovePluginEnablementResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PutPluginEnablementRequestObject struct {
+	InstallationId InstallationIdPathParam `json:"installationId"`
+	OrgId          OrgIdPathParam          `json:"orgId"`
+	Params         PutPluginEnablementParams
+	Body           *PutPluginEnablementJSONRequestBody
+}
+
+type PutPluginEnablementResponseObject interface {
+	VisitPutPluginEnablementResponse(w http.ResponseWriter) error
+}
+
+type PutPluginEnablement200JSONResponse PluginInstallation
+
+func (response PutPluginEnablement200JSONResponse) VisitPutPluginEnablementResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PutPluginEnablement400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response PutPluginEnablement400JSONResponse) VisitPutPluginEnablementResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PutPluginEnablement403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response PutPluginEnablement403JSONResponse) VisitPutPluginEnablementResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PutPluginEnablement404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response PutPluginEnablement404JSONResponse) VisitPutPluginEnablementResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PutPluginEnablement409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response PutPluginEnablement409JSONResponse) VisitPutPluginEnablementResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpgradePluginInstallationRequestObject struct {
+	InstallationId InstallationIdPathParam `json:"installationId"`
+	Params         UpgradePluginInstallationParams
+	Body           *UpgradePluginInstallationJSONRequestBody
+}
+
+type UpgradePluginInstallationResponseObject interface {
+	VisitUpgradePluginInstallationResponse(w http.ResponseWriter) error
+}
+
+type UpgradePluginInstallation200JSONResponse PluginInstallation
+
+func (response UpgradePluginInstallation200JSONResponse) VisitUpgradePluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpgradePluginInstallation400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response UpgradePluginInstallation400JSONResponse) VisitUpgradePluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpgradePluginInstallation403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response UpgradePluginInstallation403JSONResponse) VisitUpgradePluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpgradePluginInstallation404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response UpgradePluginInstallation404JSONResponse) VisitUpgradePluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpgradePluginInstallation409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response UpgradePluginInstallation409JSONResponse) VisitUpgradePluginInstallationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListPluginPackagesRequestObject struct {
+}
+
+type ListPluginPackagesResponseObject interface {
+	VisitListPluginPackagesResponse(w http.ResponseWriter) error
+}
+
+type ListPluginPackages200JSONResponse PluginPackagePage
+
+func (response ListPluginPackages200JSONResponse) VisitListPluginPackagesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListPluginPackages403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response ListPluginPackages403JSONResponse) VisitListPluginPackagesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListPluginPackages404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response ListPluginPackages404JSONResponse) VisitListPluginPackagesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PushPluginPackageRequestObject struct {
+	Params PushPluginPackageParams
+	Body   *PushPluginPackageJSONRequestBody
+}
+
+type PushPluginPackageResponseObject interface {
+	VisitPushPluginPackageResponse(w http.ResponseWriter) error
+}
+
+type PushPluginPackage201JSONResponse PluginPackage
+
+func (response PushPluginPackage201JSONResponse) VisitPushPluginPackageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PushPluginPackage400JSONResponse struct{ N400BadRequestJSONResponse }
+
+func (response PushPluginPackage400JSONResponse) VisitPushPluginPackageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PushPluginPackage403JSONResponse struct{ N403ForbiddenJSONResponse }
+
+func (response PushPluginPackage403JSONResponse) VisitPushPluginPackageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PushPluginPackage404JSONResponse struct{ N404NotFoundJSONResponse }
+
+func (response PushPluginPackage404JSONResponse) VisitPushPluginPackageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PushPluginPackage409JSONResponse struct{ N409ConflictJSONResponse }
+
+func (response PushPluginPackage409JSONResponse) VisitPushPluginPackageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// List internal state for Organizations
@@ -11054,6 +16311,15 @@ type StrictServerInterface interface {
 	// Get the details of the identified organization.
 	// (GET /orgs/{orgId})
 	GetOrganization(ctx context.Context, request GetOrganizationRequestObject) (GetOrganizationResponseObject, error)
+	// Protect one ordinary Data Plane admission against concurrent Pin changes.
+	// (POST /orgs/{orgId}/deployment-admissions/{admissionId})
+	AuthorizeDeploymentAdmission(ctx context.Context, request AuthorizeDeploymentAdmissionRequestObject) (AuthorizeDeploymentAdmissionResponseObject, error)
+	// Permanently close an uncommitted admission, including a delayed authorize request.
+	// (POST /orgs/{orgId}/deployment-admissions/{admissionId}/seal-absence)
+	SealDeploymentAdmissionAbsence(ctx context.Context, request SealDeploymentAdmissionAbsenceRequestObject) (SealDeploymentAdmissionAbsenceResponseObject, error)
+	// Settle an exact ordinary admission from the authenticated Data Plane's durable outcome.
+	// (POST /orgs/{orgId}/deployment-admissions/{admissionId}/settle)
+	SettleDeploymentAdmission(ctx context.Context, request SettleDeploymentAdmissionRequestObject) (SettleDeploymentAdmissionResponseObject, error)
 	// List environment types in the organization
 	// (GET /orgs/{orgId}/env-types)
 	ListEnvironmentTypes(ctx context.Context, request ListEnvironmentTypesRequestObject) (ListEnvironmentTypesResponseObject, error)
@@ -11132,6 +16398,9 @@ type StrictServerInterface interface {
 
 	// (POST /orgs/{orgId}/module-version-pins/{pinId}/notes)
 	AppendEnvironmentModuleVersionPinNote(ctx context.Context, request AppendEnvironmentModuleVersionPinNoteRequestObject) (AppendEnvironmentModuleVersionPinNoteResponseObject, error)
+	// List Proposed versions of active Modules.
+	// (GET /orgs/{orgId}/module-versions/proposed)
+	ListProposedModuleVersions(ctx context.Context, request ListProposedModuleVersionsRequestObject) (ListProposedModuleVersionsResponseObject, error)
 	// List modules in the org
 	// (GET /orgs/{orgId}/modules)
 	ListModules(ctx context.Context, request ListModulesRequestObject) (ListModulesResponseObject, error)
@@ -11180,9 +16449,66 @@ type StrictServerInterface interface {
 	// Inspect observed Environment adoption and Pin usage for one immutable Module Version
 	// (GET /orgs/{orgId}/modules/{moduleId}/versions/{moduleVersionId}/usage)
 	GetModuleVersionUsage(ctx context.Context, request GetModuleVersionUsageRequestObject) (GetModuleVersionUsageResponseObject, error)
+	// Discover registered plugin UI contributions for this organization.
+	// (GET /orgs/{orgId}/plugins)
+	ListPluginContributions(ctx context.Context, request ListPluginContributionsRequestObject) (ListPluginContributionsResponseObject, error)
 	// Discover an installed plugin and its availability for this organization.
 	// (GET /orgs/{orgId}/plugins/{pluginId})
 	GetPluginCapability(ctx context.Context, request GetPluginCapabilityRequestObject) (GetPluginCapabilityResponseObject, error)
+	// Evaluate one configured plugin-local capability using current IAM state.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/authorization-checks)
+	CheckPluginAuthorization(ctx context.Context, request CheckPluginAuthorizationRequestObject) (CheckPluginAuthorizationResponseObject, error)
+	// Authorize and forward a closed Deployment inspection or planning request.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/deployment-reads)
+	ReadPluginDeploymentData(ctx context.Context, request ReadPluginDeploymentDataRequestObject) (ReadPluginDeploymentDataResponseObject, error)
+	// Read this installation's current offline licence decision as its configured service.
+	// (GET /orgs/{orgId}/plugins/{pluginId}/entitlement)
+	GetPluginEntitlement(ctx context.Context, request GetPluginEntitlementRequestObject) (GetPluginEntitlementResponseObject, error)
+	// Read an authorized, bounded and consistent snapshot of Core metadata.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/inventory)
+	ReadPluginInventory(ctx context.Context, request ReadPluginInventoryRequestObject) (ReadPluginInventoryResponseObject, error)
+	// Invoke an explicitly registered add-on operation with delegated actor identity.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/invoke)
+	InvokePluginOperation(ctx context.Context, request InvokePluginOperationRequestObject) (InvokePluginOperationResponseObject, error)
+	// Recover persisted operation bounds using the configured plugin service identity.
+	// (GET /orgs/{orgId}/plugins/{pluginId}/operations/{operationId})
+	GetPluginOperationGrant(ctx context.Context, request GetPluginOperationGrantRequestObject) (GetPluginOperationGrantResponseObject, error)
+	// Persist or control a bounded operation using the configured service identity and original delegated command.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/authorize)
+	AuthorizePluginOperation(ctx context.Context, request AuthorizePluginOperationRequestObject) (AuthorizePluginOperationResponseObject, error)
+	// Reauthorize an exact persisted plugin dispatch for the configured deployment service.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/check)
+	CheckPluginOperationDispatch(ctx context.Context, request CheckPluginOperationDispatchRequestObject) (CheckPluginOperationDispatchResponseObject, error)
+	// Suspend or release existing delegated operation authority without replaying a human request.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/control)
+	ControlPluginOperationGrant(ctx context.Context, request ControlPluginOperationGrantRequestObject) (ControlPluginOperationGrantResponseObject, error)
+	// Admit one exact planned Deployment through the normal Data Plane path.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/deployments)
+	SubmitPluginDeployment(ctx context.Context, request SubmitPluginDeploymentRequestObject) (SubmitPluginDeploymentResponseObject, error)
+	// Recover an exact dispatch and settle its protection only from authoritative Data Plane evidence.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/deployments/{dispatchId}/reconcile)
+	ReconcilePluginDeployment(ctx context.Context, request ReconcilePluginDeploymentRequestObject) (ReconcilePluginDeploymentResponseObject, error)
+
+	// (POST /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/events)
+	PublishPluginEvent(ctx context.Context, request PublishPluginEventRequestObject) (PublishPluginEventResponseObject, error)
+
+	// (GET /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/inventory)
+	ReadPluginOperationInventory(ctx context.Context, request ReadPluginOperationInventoryRequestObject) (ReadPluginOperationInventoryResponseObject, error)
+	// Atomically reserve, release, promote or restore the exact frozen Module set.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/modules)
+	ApplyPluginModuleOperation(ctx context.Context, request ApplyPluginModuleOperationRequestObject) (ApplyPluginModuleOperationResponseObject, error)
+	// Apply an atomic, operation-bound Pin override or reconciliation.
+	// (POST /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/pins)
+	ApplyPluginPinOperation(ctx context.Context, request ApplyPluginPinOperationRequestObject) (ApplyPluginPinOperationResponseObject, error)
+	// Recover a committed Pin command result without replaying a user proof.
+	// (GET /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/pins/receipts/{requestId})
+	GetPluginPinOperationReceipt(ctx context.Context, request GetPluginPinOperationReceiptRequestObject) (GetPluginPinOperationReceiptResponseObject, error)
+
+	// (GET /orgs/{orgId}/plugins/{pluginId}/operations/{operationId}/resource-events)
+	ReadPluginResourceEvents(ctx context.Context, request ReadPluginResourceEventsRequestObject) (ReadPluginResourceEventsResponseObject, error)
+	// Retrieve plugin-owned Deployment material using the caller's independent Orchestrator permission.
+	// (GET /orgs/{orgId}/plugins/{pluginId}/projects/{projectUuid}/envs/{environmentUuid}/deployments/{deploymentId}/{materialKind})
+	GetPluginDeploymentMaterial(ctx context.Context, request GetPluginDeploymentMaterialRequestObject) (GetPluginDeploymentMaterialResponseObject, error)
 	// List projects
 	// (GET /orgs/{orgId}/projects)
 	ListProjects(ctx context.Context, request ListProjectsRequestObject) (ListProjectsResponseObject, error)
@@ -11222,6 +16548,9 @@ type StrictServerInterface interface {
 	// Preview retained Module Pins and add-on resources affected by Environment deletion.
 	// (GET /orgs/{orgId}/projects/{projectId}/envs/{envId}/deletion-impact)
 	GetEnvironmentDeletionImpact(ctx context.Context, request GetEnvironmentDeletionImpactRequestObject) (GetEnvironmentDeletionImpactResponseObject, error)
+	// Acknowledge the unknown Runner outcome of a failed plugin-dispatched Deployment.
+	// (POST /orgs/{orgId}/projects/{projectId}/envs/{envId}/deployments/{deploymentId}/actions/acknowledge-outcome)
+	AcknowledgeDeploymentOutcome(ctx context.Context, request AcknowledgeDeploymentOutcomeRequestObject) (AcknowledgeDeploymentOutcomeResponseObject, error)
 	// List available resource types
 	// (GET /orgs/{orgId}/resource-types)
 	ListResourceTypes(ctx context.Context, request ListResourceTypesRequestObject) (ListResourceTypesResponseObject, error)
@@ -11267,6 +16596,48 @@ type StrictServerInterface interface {
 	// Update runner in the org
 	// (PATCH /orgs/{orgId}/runners/{runnerId})
 	UpdateRunner(ctx context.Context, request UpdateRunnerRequestObject) (UpdateRunnerResponseObject, error)
+	// Read the append-only Plugin Manager audit trail.
+	// (GET /plugin-audit-events)
+	ListPluginAuditEvents(ctx context.Context, request ListPluginAuditEventsRequestObject) (ListPluginAuditEventsResponseObject, error)
+	// Import signed entitlement grants and revocations.
+	// (POST /plugin-entitlement-bundles)
+	ImportPluginEntitlementBundle(ctx context.Context, request ImportPluginEntitlementBundleRequestObject) (ImportPluginEntitlementBundleResponseObject, error)
+	// List the plugin installations and their organization enablements.
+	// (GET /plugin-installations)
+	ListPluginInstallations(ctx context.Context, request ListPluginInstallationsRequestObject) (ListPluginInstallationsResponseObject, error)
+	// Install a registered package.
+	// (POST /plugin-installations)
+	CreatePluginInstallation(ctx context.Context, request CreatePluginInstallationRequestObject) (CreatePluginInstallationResponseObject, error)
+	// Purge an uninstalled installation.
+	// (DELETE /plugin-installations/{installationId})
+	PurgePluginInstallation(ctx context.Context, request PurgePluginInstallationRequestObject) (PurgePluginInstallationResponseObject, error)
+	// Read one plugin installation and its organization enablements.
+	// (GET /plugin-installations/{installationId})
+	GetPluginInstallation(ctx context.Context, request GetPluginInstallationRequestObject) (GetPluginInstallationResponseObject, error)
+	// Activate, disable, enable, uninstall or reinstall an installation.
+	// (POST /plugin-installations/{installationId}/actions/{installationAction})
+	TransitionPluginInstallation(ctx context.Context, request TransitionPluginInstallationRequestObject) (TransitionPluginInstallationResponseObject, error)
+	// Record the plugin service user and admission checker of an installation.
+	// (PUT /plugin-installations/{installationId}/identity)
+	SetPluginInstallationIdentity(ctx context.Context, request SetPluginInstallationIdentityRequestObject) (SetPluginInstallationIdentityResponseObject, error)
+	// Choose whether an installation serves selected organizations or all of them.
+	// (PUT /plugin-installations/{installationId}/organization-mode)
+	SetPluginOrganizationMode(ctx context.Context, request SetPluginOrganizationModeRequestObject) (SetPluginOrganizationModeResponseObject, error)
+	// Remove an installation's enablement for an organization.
+	// (DELETE /plugin-installations/{installationId}/organizations/{orgId})
+	RemovePluginEnablement(ctx context.Context, request RemovePluginEnablementRequestObject) (RemovePluginEnablementResponseObject, error)
+	// Enable or disable an active installation for an organization.
+	// (PUT /plugin-installations/{installationId}/organizations/{orgId})
+	PutPluginEnablement(ctx context.Context, request PutPluginEnablementRequestObject) (PutPluginEnablementResponseObject, error)
+	// Request the package an installation serves next.
+	// (POST /plugin-installations/{installationId}/upgrade)
+	UpgradePluginInstallation(ctx context.Context, request UpgradePluginInstallationRequestObject) (UpgradePluginInstallationResponseObject, error)
+	// List the plugin packages known to the Plugin Manager.
+	// (GET /plugin-packages)
+	ListPluginPackages(ctx context.Context, request ListPluginPackagesRequestObject) (ListPluginPackagesResponseObject, error)
+	// Register an immutable plugin package.
+	// (POST /plugin-packages)
+	PushPluginPackage(ctx context.Context, request PushPluginPackageRequestObject) (PushPluginPackageResponseObject, error)
 }
 
 type StrictHandlerFunc = strictecho.StrictEchoHandlerFunc
@@ -11965,6 +17336,102 @@ func (sh *strictHandler) GetOrganization(ctx echo.Context, orgId OrgIdPathParam)
 		return err
 	} else if validResponse, ok := response.(GetOrganizationResponseObject); ok {
 		return validResponse.VisitGetOrganizationResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// AuthorizeDeploymentAdmission operation middleware
+func (sh *strictHandler) AuthorizeDeploymentAdmission(ctx echo.Context, orgId OrgIdPathParam, admissionId openapi_types.UUID) error {
+	var request AuthorizeDeploymentAdmissionRequestObject
+
+	request.OrgId = orgId
+	request.AdmissionId = admissionId
+
+	var body AuthorizeDeploymentAdmissionJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AuthorizeDeploymentAdmission(ctx.Request().Context(), request.(AuthorizeDeploymentAdmissionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AuthorizeDeploymentAdmission")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(AuthorizeDeploymentAdmissionResponseObject); ok {
+		return validResponse.VisitAuthorizeDeploymentAdmissionResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// SealDeploymentAdmissionAbsence operation middleware
+func (sh *strictHandler) SealDeploymentAdmissionAbsence(ctx echo.Context, orgId OrgIdPathParam, admissionId openapi_types.UUID) error {
+	var request SealDeploymentAdmissionAbsenceRequestObject
+
+	request.OrgId = orgId
+	request.AdmissionId = admissionId
+
+	var body SealDeploymentAdmissionAbsenceJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.SealDeploymentAdmissionAbsence(ctx.Request().Context(), request.(SealDeploymentAdmissionAbsenceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SealDeploymentAdmissionAbsence")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(SealDeploymentAdmissionAbsenceResponseObject); ok {
+		return validResponse.VisitSealDeploymentAdmissionAbsenceResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// SettleDeploymentAdmission operation middleware
+func (sh *strictHandler) SettleDeploymentAdmission(ctx echo.Context, orgId OrgIdPathParam, admissionId openapi_types.UUID) error {
+	var request SettleDeploymentAdmissionRequestObject
+
+	request.OrgId = orgId
+	request.AdmissionId = admissionId
+
+	var body SettleDeploymentAdmissionJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.SettleDeploymentAdmission(ctx.Request().Context(), request.(SettleDeploymentAdmissionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SettleDeploymentAdmission")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(SettleDeploymentAdmissionResponseObject); ok {
+		return validResponse.VisitSettleDeploymentAdmissionResponse(ctx.Response())
 	} else if response != nil {
 		return fmt.Errorf("unexpected response type: %T", response)
 	}
@@ -12721,6 +18188,31 @@ func (sh *strictHandler) AppendEnvironmentModuleVersionPinNote(ctx echo.Context,
 	return nil
 }
 
+// ListProposedModuleVersions operation middleware
+func (sh *strictHandler) ListProposedModuleVersions(ctx echo.Context, orgId OrgIdPathParam) error {
+	var request ListProposedModuleVersionsRequestObject
+
+	request.OrgId = orgId
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListProposedModuleVersions(ctx.Request().Context(), request.(ListProposedModuleVersionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListProposedModuleVersions")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ListProposedModuleVersionsResponseObject); ok {
+		return validResponse.VisitListProposedModuleVersionsResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
 // ListModules operation middleware
 func (sh *strictHandler) ListModules(ctx echo.Context, orgId OrgIdPathParam, params ListModulesParams) error {
 	var request ListModulesRequestObject
@@ -13192,6 +18684,31 @@ func (sh *strictHandler) GetModuleVersionUsage(ctx echo.Context, orgId OrgIdPath
 	return nil
 }
 
+// ListPluginContributions operation middleware
+func (sh *strictHandler) ListPluginContributions(ctx echo.Context, orgId OrgIdPathParam) error {
+	var request ListPluginContributionsRequestObject
+
+	request.OrgId = orgId
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPluginContributions(ctx.Request().Context(), request.(ListPluginContributionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPluginContributions")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ListPluginContributionsResponseObject); ok {
+		return validResponse.VisitListPluginContributionsResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
 // GetPluginCapability operation middleware
 func (sh *strictHandler) GetPluginCapability(ctx echo.Context, orgId OrgIdPathParam, pluginId string) error {
 	var request GetPluginCapabilityRequestObject
@@ -13212,6 +18729,566 @@ func (sh *strictHandler) GetPluginCapability(ctx echo.Context, orgId OrgIdPathPa
 		return err
 	} else if validResponse, ok := response.(GetPluginCapabilityResponseObject); ok {
 		return validResponse.VisitGetPluginCapabilityResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// CheckPluginAuthorization operation middleware
+func (sh *strictHandler) CheckPluginAuthorization(ctx echo.Context, orgId OrgIdPathParam, pluginId string) error {
+	var request CheckPluginAuthorizationRequestObject
+
+	request.OrgId = orgId
+	request.PluginId = pluginId
+
+	var body CheckPluginAuthorizationJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.CheckPluginAuthorization(ctx.Request().Context(), request.(CheckPluginAuthorizationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CheckPluginAuthorization")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(CheckPluginAuthorizationResponseObject); ok {
+		return validResponse.VisitCheckPluginAuthorizationResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ReadPluginDeploymentData operation middleware
+func (sh *strictHandler) ReadPluginDeploymentData(ctx echo.Context, orgId OrgIdPathParam, pluginId string) error {
+	var request ReadPluginDeploymentDataRequestObject
+
+	request.OrgId = orgId
+	request.PluginId = pluginId
+
+	var body ReadPluginDeploymentDataJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ReadPluginDeploymentData(ctx.Request().Context(), request.(ReadPluginDeploymentDataRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReadPluginDeploymentData")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ReadPluginDeploymentDataResponseObject); ok {
+		return validResponse.VisitReadPluginDeploymentDataResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// GetPluginEntitlement operation middleware
+func (sh *strictHandler) GetPluginEntitlement(ctx echo.Context, orgId OrgIdPathParam, pluginId string) error {
+	var request GetPluginEntitlementRequestObject
+
+	request.OrgId = orgId
+	request.PluginId = pluginId
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPluginEntitlement(ctx.Request().Context(), request.(GetPluginEntitlementRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPluginEntitlement")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GetPluginEntitlementResponseObject); ok {
+		return validResponse.VisitGetPluginEntitlementResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ReadPluginInventory operation middleware
+func (sh *strictHandler) ReadPluginInventory(ctx echo.Context, orgId OrgIdPathParam, pluginId string) error {
+	var request ReadPluginInventoryRequestObject
+
+	request.OrgId = orgId
+	request.PluginId = pluginId
+
+	var body ReadPluginInventoryJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ReadPluginInventory(ctx.Request().Context(), request.(ReadPluginInventoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReadPluginInventory")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ReadPluginInventoryResponseObject); ok {
+		return validResponse.VisitReadPluginInventoryResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// InvokePluginOperation operation middleware
+func (sh *strictHandler) InvokePluginOperation(ctx echo.Context, orgId OrgIdPathParam, pluginId string) error {
+	var request InvokePluginOperationRequestObject
+
+	request.OrgId = orgId
+	request.PluginId = pluginId
+
+	var body InvokePluginOperationJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.InvokePluginOperation(ctx.Request().Context(), request.(InvokePluginOperationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "InvokePluginOperation")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(InvokePluginOperationResponseObject); ok {
+		return validResponse.VisitInvokePluginOperationResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// GetPluginOperationGrant operation middleware
+func (sh *strictHandler) GetPluginOperationGrant(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID) error {
+	var request GetPluginOperationGrantRequestObject
+
+	request.OrgId = orgId
+	request.PluginId = pluginId
+	request.OperationId = operationId
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPluginOperationGrant(ctx.Request().Context(), request.(GetPluginOperationGrantRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPluginOperationGrant")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GetPluginOperationGrantResponseObject); ok {
+		return validResponse.VisitGetPluginOperationGrantResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// AuthorizePluginOperation operation middleware
+func (sh *strictHandler) AuthorizePluginOperation(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID) error {
+	var request AuthorizePluginOperationRequestObject
+
+	request.OrgId = orgId
+	request.PluginId = pluginId
+	request.OperationId = operationId
+
+	var body AuthorizePluginOperationJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AuthorizePluginOperation(ctx.Request().Context(), request.(AuthorizePluginOperationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AuthorizePluginOperation")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(AuthorizePluginOperationResponseObject); ok {
+		return validResponse.VisitAuthorizePluginOperationResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// CheckPluginOperationDispatch operation middleware
+func (sh *strictHandler) CheckPluginOperationDispatch(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID) error {
+	var request CheckPluginOperationDispatchRequestObject
+
+	request.OrgId = orgId
+	request.PluginId = pluginId
+	request.OperationId = operationId
+
+	var body CheckPluginOperationDispatchJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.CheckPluginOperationDispatch(ctx.Request().Context(), request.(CheckPluginOperationDispatchRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CheckPluginOperationDispatch")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(CheckPluginOperationDispatchResponseObject); ok {
+		return validResponse.VisitCheckPluginOperationDispatchResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ControlPluginOperationGrant operation middleware
+func (sh *strictHandler) ControlPluginOperationGrant(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID) error {
+	var request ControlPluginOperationGrantRequestObject
+
+	request.OrgId = orgId
+	request.PluginId = pluginId
+	request.OperationId = operationId
+
+	var body ControlPluginOperationGrantJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ControlPluginOperationGrant(ctx.Request().Context(), request.(ControlPluginOperationGrantRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ControlPluginOperationGrant")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ControlPluginOperationGrantResponseObject); ok {
+		return validResponse.VisitControlPluginOperationGrantResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// SubmitPluginDeployment operation middleware
+func (sh *strictHandler) SubmitPluginDeployment(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID) error {
+	var request SubmitPluginDeploymentRequestObject
+
+	request.OrgId = orgId
+	request.PluginId = pluginId
+	request.OperationId = operationId
+
+	var body SubmitPluginDeploymentJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.SubmitPluginDeployment(ctx.Request().Context(), request.(SubmitPluginDeploymentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SubmitPluginDeployment")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(SubmitPluginDeploymentResponseObject); ok {
+		return validResponse.VisitSubmitPluginDeploymentResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ReconcilePluginDeployment operation middleware
+func (sh *strictHandler) ReconcilePluginDeployment(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID, dispatchId string) error {
+	var request ReconcilePluginDeploymentRequestObject
+
+	request.OrgId = orgId
+	request.PluginId = pluginId
+	request.OperationId = operationId
+	request.DispatchId = dispatchId
+
+	var body ReconcilePluginDeploymentJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ReconcilePluginDeployment(ctx.Request().Context(), request.(ReconcilePluginDeploymentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReconcilePluginDeployment")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ReconcilePluginDeploymentResponseObject); ok {
+		return validResponse.VisitReconcilePluginDeploymentResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// PublishPluginEvent operation middleware
+func (sh *strictHandler) PublishPluginEvent(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID) error {
+	var request PublishPluginEventRequestObject
+
+	request.OrgId = orgId
+	request.PluginId = pluginId
+	request.OperationId = operationId
+
+	var body PublishPluginEventJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.PublishPluginEvent(ctx.Request().Context(), request.(PublishPluginEventRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PublishPluginEvent")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(PublishPluginEventResponseObject); ok {
+		return validResponse.VisitPublishPluginEventResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ReadPluginOperationInventory operation middleware
+func (sh *strictHandler) ReadPluginOperationInventory(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID) error {
+	var request ReadPluginOperationInventoryRequestObject
+
+	request.OrgId = orgId
+	request.PluginId = pluginId
+	request.OperationId = operationId
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ReadPluginOperationInventory(ctx.Request().Context(), request.(ReadPluginOperationInventoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReadPluginOperationInventory")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ReadPluginOperationInventoryResponseObject); ok {
+		return validResponse.VisitReadPluginOperationInventoryResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ApplyPluginModuleOperation operation middleware
+func (sh *strictHandler) ApplyPluginModuleOperation(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID) error {
+	var request ApplyPluginModuleOperationRequestObject
+
+	request.OrgId = orgId
+	request.PluginId = pluginId
+	request.OperationId = operationId
+
+	var body ApplyPluginModuleOperationJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ApplyPluginModuleOperation(ctx.Request().Context(), request.(ApplyPluginModuleOperationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ApplyPluginModuleOperation")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ApplyPluginModuleOperationResponseObject); ok {
+		return validResponse.VisitApplyPluginModuleOperationResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ApplyPluginPinOperation operation middleware
+func (sh *strictHandler) ApplyPluginPinOperation(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID) error {
+	var request ApplyPluginPinOperationRequestObject
+
+	request.OrgId = orgId
+	request.PluginId = pluginId
+	request.OperationId = operationId
+
+	var body ApplyPluginPinOperationJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ApplyPluginPinOperation(ctx.Request().Context(), request.(ApplyPluginPinOperationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ApplyPluginPinOperation")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ApplyPluginPinOperationResponseObject); ok {
+		return validResponse.VisitApplyPluginPinOperationResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// GetPluginPinOperationReceipt operation middleware
+func (sh *strictHandler) GetPluginPinOperationReceipt(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID, requestId string, params GetPluginPinOperationReceiptParams) error {
+	var request GetPluginPinOperationReceiptRequestObject
+
+	request.OrgId = orgId
+	request.PluginId = pluginId
+	request.OperationId = operationId
+	request.RequestId = requestId
+	request.Params = params
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPluginPinOperationReceipt(ctx.Request().Context(), request.(GetPluginPinOperationReceiptRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPluginPinOperationReceipt")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GetPluginPinOperationReceiptResponseObject); ok {
+		return validResponse.VisitGetPluginPinOperationReceiptResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ReadPluginResourceEvents operation middleware
+func (sh *strictHandler) ReadPluginResourceEvents(ctx echo.Context, orgId OrgIdPathParam, pluginId string, operationId openapi_types.UUID, params ReadPluginResourceEventsParams) error {
+	var request ReadPluginResourceEventsRequestObject
+
+	request.OrgId = orgId
+	request.PluginId = pluginId
+	request.OperationId = operationId
+	request.Params = params
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ReadPluginResourceEvents(ctx.Request().Context(), request.(ReadPluginResourceEventsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReadPluginResourceEvents")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ReadPluginResourceEventsResponseObject); ok {
+		return validResponse.VisitReadPluginResourceEventsResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// GetPluginDeploymentMaterial operation middleware
+func (sh *strictHandler) GetPluginDeploymentMaterial(ctx echo.Context, orgId OrgIdPathParam, pluginId string, projectUuid openapi_types.UUID, environmentUuid openapi_types.UUID, deploymentId openapi_types.UUID, materialKind GetPluginDeploymentMaterialParamsMaterialKind) error {
+	var request GetPluginDeploymentMaterialRequestObject
+
+	request.OrgId = orgId
+	request.PluginId = pluginId
+	request.ProjectUuid = projectUuid
+	request.EnvironmentUuid = environmentUuid
+	request.DeploymentId = deploymentId
+	request.MaterialKind = materialKind
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPluginDeploymentMaterial(ctx.Request().Context(), request.(GetPluginDeploymentMaterialRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPluginDeploymentMaterial")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GetPluginDeploymentMaterialResponseObject); ok {
+		return validResponse.VisitGetPluginDeploymentMaterialResponse(ctx.Response())
 	} else if response != nil {
 		return fmt.Errorf("unexpected response type: %T", response)
 	}
@@ -13584,6 +19661,40 @@ func (sh *strictHandler) GetEnvironmentDeletionImpact(ctx echo.Context, orgId Or
 		return err
 	} else if validResponse, ok := response.(GetEnvironmentDeletionImpactResponseObject); ok {
 		return validResponse.VisitGetEnvironmentDeletionImpactResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// AcknowledgeDeploymentOutcome operation middleware
+func (sh *strictHandler) AcknowledgeDeploymentOutcome(ctx echo.Context, orgId OrgIdPathParam, projectId ProjectIdPathParam, envId EnvIdPathParam, deploymentId openapi_types.UUID) error {
+	var request AcknowledgeDeploymentOutcomeRequestObject
+
+	request.OrgId = orgId
+	request.ProjectId = projectId
+	request.EnvId = envId
+	request.DeploymentId = deploymentId
+
+	var body AcknowledgeDeploymentOutcomeJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.AcknowledgeDeploymentOutcome(ctx.Request().Context(), request.(AcknowledgeDeploymentOutcomeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AcknowledgeDeploymentOutcome")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(AcknowledgeDeploymentOutcomeResponseObject); ok {
+		return validResponse.VisitAcknowledgeDeploymentOutcomeResponse(ctx.Response())
 	} else if response != nil {
 		return fmt.Errorf("unexpected response type: %T", response)
 	}
@@ -14015,349 +20126,1058 @@ func (sh *strictHandler) UpdateRunner(ctx echo.Context, orgId OrgIdPathParam, ru
 	return nil
 }
 
+// ListPluginAuditEvents operation middleware
+func (sh *strictHandler) ListPluginAuditEvents(ctx echo.Context, params ListPluginAuditEventsParams) error {
+	var request ListPluginAuditEventsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPluginAuditEvents(ctx.Request().Context(), request.(ListPluginAuditEventsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPluginAuditEvents")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ListPluginAuditEventsResponseObject); ok {
+		return validResponse.VisitListPluginAuditEventsResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ImportPluginEntitlementBundle operation middleware
+func (sh *strictHandler) ImportPluginEntitlementBundle(ctx echo.Context, params ImportPluginEntitlementBundleParams) error {
+	var request ImportPluginEntitlementBundleRequestObject
+
+	request.Params = params
+
+	var body ImportPluginEntitlementBundleJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ImportPluginEntitlementBundle(ctx.Request().Context(), request.(ImportPluginEntitlementBundleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ImportPluginEntitlementBundle")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ImportPluginEntitlementBundleResponseObject); ok {
+		return validResponse.VisitImportPluginEntitlementBundleResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ListPluginInstallations operation middleware
+func (sh *strictHandler) ListPluginInstallations(ctx echo.Context) error {
+	var request ListPluginInstallationsRequestObject
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPluginInstallations(ctx.Request().Context(), request.(ListPluginInstallationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPluginInstallations")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ListPluginInstallationsResponseObject); ok {
+		return validResponse.VisitListPluginInstallationsResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// CreatePluginInstallation operation middleware
+func (sh *strictHandler) CreatePluginInstallation(ctx echo.Context, params CreatePluginInstallationParams) error {
+	var request CreatePluginInstallationRequestObject
+
+	request.Params = params
+
+	var body CreatePluginInstallationJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.CreatePluginInstallation(ctx.Request().Context(), request.(CreatePluginInstallationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreatePluginInstallation")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(CreatePluginInstallationResponseObject); ok {
+		return validResponse.VisitCreatePluginInstallationResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// PurgePluginInstallation operation middleware
+func (sh *strictHandler) PurgePluginInstallation(ctx echo.Context, installationId InstallationIdPathParam, params PurgePluginInstallationParams) error {
+	var request PurgePluginInstallationRequestObject
+
+	request.InstallationId = installationId
+	request.Params = params
+
+	var body PurgePluginInstallationJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.PurgePluginInstallation(ctx.Request().Context(), request.(PurgePluginInstallationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PurgePluginInstallation")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(PurgePluginInstallationResponseObject); ok {
+		return validResponse.VisitPurgePluginInstallationResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// GetPluginInstallation operation middleware
+func (sh *strictHandler) GetPluginInstallation(ctx echo.Context, installationId InstallationIdPathParam) error {
+	var request GetPluginInstallationRequestObject
+
+	request.InstallationId = installationId
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPluginInstallation(ctx.Request().Context(), request.(GetPluginInstallationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPluginInstallation")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GetPluginInstallationResponseObject); ok {
+		return validResponse.VisitGetPluginInstallationResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// TransitionPluginInstallation operation middleware
+func (sh *strictHandler) TransitionPluginInstallation(ctx echo.Context, installationId InstallationIdPathParam, installationAction TransitionPluginInstallationParamsInstallationAction, params TransitionPluginInstallationParams) error {
+	var request TransitionPluginInstallationRequestObject
+
+	request.InstallationId = installationId
+	request.InstallationAction = installationAction
+	request.Params = params
+
+	var body TransitionPluginInstallationJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.TransitionPluginInstallation(ctx.Request().Context(), request.(TransitionPluginInstallationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TransitionPluginInstallation")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(TransitionPluginInstallationResponseObject); ok {
+		return validResponse.VisitTransitionPluginInstallationResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// SetPluginInstallationIdentity operation middleware
+func (sh *strictHandler) SetPluginInstallationIdentity(ctx echo.Context, installationId InstallationIdPathParam, params SetPluginInstallationIdentityParams) error {
+	var request SetPluginInstallationIdentityRequestObject
+
+	request.InstallationId = installationId
+	request.Params = params
+
+	var body SetPluginInstallationIdentityJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.SetPluginInstallationIdentity(ctx.Request().Context(), request.(SetPluginInstallationIdentityRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetPluginInstallationIdentity")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(SetPluginInstallationIdentityResponseObject); ok {
+		return validResponse.VisitSetPluginInstallationIdentityResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// SetPluginOrganizationMode operation middleware
+func (sh *strictHandler) SetPluginOrganizationMode(ctx echo.Context, installationId InstallationIdPathParam, params SetPluginOrganizationModeParams) error {
+	var request SetPluginOrganizationModeRequestObject
+
+	request.InstallationId = installationId
+	request.Params = params
+
+	var body SetPluginOrganizationModeJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.SetPluginOrganizationMode(ctx.Request().Context(), request.(SetPluginOrganizationModeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetPluginOrganizationMode")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(SetPluginOrganizationModeResponseObject); ok {
+		return validResponse.VisitSetPluginOrganizationModeResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// RemovePluginEnablement operation middleware
+func (sh *strictHandler) RemovePluginEnablement(ctx echo.Context, installationId InstallationIdPathParam, orgId OrgIdPathParam, params RemovePluginEnablementParams) error {
+	var request RemovePluginEnablementRequestObject
+
+	request.InstallationId = installationId
+	request.OrgId = orgId
+	request.Params = params
+
+	var body RemovePluginEnablementJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.RemovePluginEnablement(ctx.Request().Context(), request.(RemovePluginEnablementRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemovePluginEnablement")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(RemovePluginEnablementResponseObject); ok {
+		return validResponse.VisitRemovePluginEnablementResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// PutPluginEnablement operation middleware
+func (sh *strictHandler) PutPluginEnablement(ctx echo.Context, installationId InstallationIdPathParam, orgId OrgIdPathParam, params PutPluginEnablementParams) error {
+	var request PutPluginEnablementRequestObject
+
+	request.InstallationId = installationId
+	request.OrgId = orgId
+	request.Params = params
+
+	var body PutPluginEnablementJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.PutPluginEnablement(ctx.Request().Context(), request.(PutPluginEnablementRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutPluginEnablement")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(PutPluginEnablementResponseObject); ok {
+		return validResponse.VisitPutPluginEnablementResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// UpgradePluginInstallation operation middleware
+func (sh *strictHandler) UpgradePluginInstallation(ctx echo.Context, installationId InstallationIdPathParam, params UpgradePluginInstallationParams) error {
+	var request UpgradePluginInstallationRequestObject
+
+	request.InstallationId = installationId
+	request.Params = params
+
+	var body UpgradePluginInstallationJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.UpgradePluginInstallation(ctx.Request().Context(), request.(UpgradePluginInstallationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpgradePluginInstallation")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(UpgradePluginInstallationResponseObject); ok {
+		return validResponse.VisitUpgradePluginInstallationResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// ListPluginPackages operation middleware
+func (sh *strictHandler) ListPluginPackages(ctx echo.Context) error {
+	var request ListPluginPackagesRequestObject
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPluginPackages(ctx.Request().Context(), request.(ListPluginPackagesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPluginPackages")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(ListPluginPackagesResponseObject); ok {
+		return validResponse.VisitListPluginPackagesResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// PushPluginPackage operation middleware
+func (sh *strictHandler) PushPluginPackage(ctx echo.Context, params PushPluginPackageParams) error {
+	var request PushPluginPackageRequestObject
+
+	request.Params = params
+
+	var body PushPluginPackageJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.PushPluginPackage(ctx.Request().Context(), request.(PushPluginPackageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PushPluginPackage")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(PushPluginPackageResponseObject); ok {
+		return validResponse.VisitPushPluginPackageResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
+	"zf4UTZ6zWk7+/vv/CwAA//9rlCh2uPADAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

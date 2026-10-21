@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"embed"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/google/uuid"
@@ -30,6 +32,19 @@ const UniqueViolationErrorCode string = "unique_violation"
 type databaser struct {
 	*sql.DB
 	logger *zap.Logger
+	// journal enables the extension resource journal. Whether an organization
+	// is journaled is its journal state, maintained with its subscriptions.
+	journal bool
+}
+
+// DatabaserOption configures optional Databaser behaviour.
+type DatabaserOption func(*databaser)
+
+// WithExtensionResourceJournal records the extension resource journal for the
+// organizations with a resource event subscriber. Without this option Core
+// writes no journal entries and keeps the plain transactional outbox path.
+func WithExtensionResourceJournal() DatabaserOption {
+	return func(d *databaser) { d.journal = true }
 }
 
 type gooseZapLogger struct {
@@ -41,7 +56,7 @@ func (g *gooseZapLogger) Printf(format string, v ...interface{}) {
 }
 
 // NewDatabaser creates a new database provider instance
-func NewDatabaser(ctx context.Context, logger *zap.Logger, connStr string) (Databaser, error) {
+func NewDatabaser(ctx context.Context, logger *zap.Logger, connStr string, options ...DatabaserOption) (Databaser, error) {
 	goose.SetLogger(&gooseZapLogger{SugaredLogger: logger.Named("goose").Sugar()})
 	goose.SetBaseFS(embedMigrations)
 	goose.SetVerbose(logger.Level() <= zap.DebugLevel)
@@ -49,16 +64,46 @@ func NewDatabaser(ctx context.Context, logger *zap.Logger, connStr string) (Data
 		goose.AddNamedMigrationContext("000011_pending_event_messages.go", hstandardoutbox.MigrateUp01, hstandardoutbox.MigrateDown01)
 	})
 
-	if inner, err := hpostgresconnect.InitDatabase(ctx, &hpostgresconnect.Config{
+	inner, err := hpostgresconnect.InitDatabase(ctx, &hpostgresconnect.Config{
 		Logger:  logger,
 		ConnStr: connStr,
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, err
-	} else if err := goose.Up(inner.DB, "migrations"); err != nil {
-		return nil, err
-	} else {
-		return &databaser{DB: inner.DB, logger: logger}, nil
 	}
+	if err := migrate(ctx, inner.DB); err != nil {
+		_ = inner.Close()
+		return nil, err
+	}
+	d := &databaser{DB: inner.DB, logger: logger}
+	for _, option := range options {
+		option(d)
+	}
+	return d, nil
+}
+
+// migrate applies the embedded migrations, but first refuses a database that
+// a newer release has migrated further. goose only applies versions above the
+// database's, so it would apply nothing and report success, and this binary
+// would then serve a schema it does not know. Version numbers have gaps, so
+// the bound is the highest embedded version, never the number of migrations.
+func migrate(ctx context.Context, db *sql.DB) error {
+	embedded, err := goose.CollectMigrations("migrations", 0, goose.MaxVersion)
+	if err != nil {
+		return err
+	}
+	latest, err := embedded.Last()
+	if err != nil {
+		return err
+	}
+	current, err := goose.GetDBVersionContext(ctx, db)
+	if err != nil {
+		return fmt.Errorf("failed to read database migration version: %w", err)
+	}
+	if current > latest.Version {
+		return fmt.Errorf("database schema version %d is newer than this binary's latest migration %d", current, latest.Version)
+	}
+	return goose.UpContext(ctx, db, "migrations")
 }
 
 // Databaser provides an interface which can be used to mock the model
@@ -182,6 +227,59 @@ type TxWithCommit interface {
 	Rollback() error
 }
 
+// journalTransaction keeps the extension projection out of the resource-lock
+// phase. Flushing immediately before the underlying commit preserves the
+// outbox transaction while making the per-organization journal head the final
+// lock class acquired by every application transaction.
+type journalTransaction struct {
+	TxWithCommit
+	ctx       context.Context
+	mu        sync.Mutex
+	finalized bool
+	journal   []extensionResourceJournalEntry
+}
+
+func (t *journalTransaction) insertPendingEventMessages(ctx context.Context, messages []*hstandardoutbox.PendingEventMessage, entries []extensionResourceJournalEntry) ([]*hstandardoutbox.PendingEventMessage, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.finalized {
+		return nil, sql.ErrTxDone
+	}
+	result, err := hstandardoutbox.InsertPendingEventMessages(ctx, t.TxWithCommit, messages)
+	if err != nil {
+		return nil, err
+	}
+	t.journal = append(t.journal, entries...)
+	return result, nil
+}
+
+func (t *journalTransaction) Commit() error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.finalized {
+		return sql.ErrTxDone
+	}
+	t.finalized = true
+	journal := t.journal
+	t.journal = nil
+	if err := flushExtensionJournal(t.ctx, t.TxWithCommit, journal); err != nil {
+		_ = t.TxWithCommit.Rollback()
+		return err
+	}
+	return t.TxWithCommit.Commit()
+}
+
+func (t *journalTransaction) Rollback() error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.finalized {
+		return sql.ErrTxDone
+	}
+	t.finalized = true
+	t.journal = nil
+	return t.TxWithCommit.Rollback()
+}
+
 func (d *databaser) txOrDb(optionalTx Tx) Tx {
 	if optionalTx == nil {
 		return d
@@ -190,7 +288,14 @@ func (d *databaser) txOrDb(optionalTx Tx) Tx {
 }
 
 func (d *databaser) BeginTx(ctx context.Context, opts *sql.TxOptions) (TxWithCommit, error) {
-	return d.DB.BeginTx(ctx, opts)
+	tx, err := d.DB.BeginTx(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	if !d.journal {
+		return tx, nil
+	}
+	return &journalTransaction{TxWithCommit: tx, ctx: ctx}, nil
 }
 
 func (d *databaser) AsReliableOutboxStore() reliableoutbox.Store[*hstandardoutbox.PendingEventMessage] {
@@ -198,7 +303,33 @@ func (d *databaser) AsReliableOutboxStore() reliableoutbox.Store[*hstandardoutbo
 }
 
 func (d *databaser) InsertPendingEventMessages(ctx context.Context, optionalTx Tx, messages []*hstandardoutbox.PendingEventMessage) ([]*hstandardoutbox.PendingEventMessage, error) {
-	return hstandardoutbox.InsertPendingEventMessages(ctx, d.txOrDb(optionalTx), messages)
+	if !d.journal {
+		return hstandardoutbox.InsertPendingEventMessages(ctx, d.txOrDb(optionalTx), messages)
+	}
+	if optionalTx == nil {
+		tx, err := d.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = tx.Rollback() }()
+		result, err := d.InsertPendingEventMessages(ctx, tx, messages)
+		if err != nil {
+			return nil, err
+		}
+		return result, tx.Commit()
+	}
+	entries, err := extensionJournalEntries(messages)
+	if err != nil {
+		return nil, err
+	}
+	journalTx, ok := optionalTx.(*journalTransaction)
+	if len(entries) > 0 && !ok {
+		return nil, errors.New("extension resource events require a Databaser transaction")
+	}
+	if len(entries) > 0 {
+		return journalTx.insertPendingEventMessages(ctx, messages, entries)
+	}
+	return hstandardoutbox.InsertPendingEventMessages(ctx, optionalTx, messages)
 }
 
 type GetMode string

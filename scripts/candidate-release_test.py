@@ -90,7 +90,7 @@ class CandidateReleaseTests(unittest.TestCase):
         self.assertIn("github.event_name == 'workflow_dispatch'", publication)
         self.assertIn("environment: public-release-candidate", publication)
         self.assertIn("- candidate-preflight", publication)
-        self.assertIn("--verify-tag --prerelease --latest=false", publication)
+        self.assertIn("--verify-tag --draft --prerelease --latest=false", publication)
         self.assertIn("ref: ${{ inputs.candidate_sha }}", publication)
         self.assertIn("--check-image-absent", publication)
         self.assertNotIn("semantic-release-action@", publication)
@@ -103,7 +103,9 @@ class CandidateReleaseTests(unittest.TestCase):
         jobs = dict(re.findall(r"^  ([a-z-]+):\n(.*?)(?=^  [a-z-]+:\n|\Z)", text, re.M | re.S))
         for publisher in ("candidate-release", "release"):
             self.assertIn("- commitlint", jobs[publisher])
-        self.assertNotIn("\n    if:", jobs["commitlint"])
+        self.assertIn("needs: [candidate-preflight, verification-preflight]", jobs["commitlint"])
+        self.assertIn("needs.verification-preflight.result == 'success'", jobs["commitlint"])
+        self.assertIn("!inputs.tests_only", jobs["candidate-release"])
         self.assertIn("inputs.candidate_sha || github.sha", jobs["commitlint"])
         self.assertIn('bash scripts/check-release-commits.sh "$base" "$head"', jobs["commitlint"])
 

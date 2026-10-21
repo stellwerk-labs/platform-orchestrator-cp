@@ -33,6 +33,31 @@ type Configuration struct {
 	OTELEnabled   bool          `env:"OTEL_ENABLE, default=false"`
 	LogLevel      string        `env:"LOG_LEVEL, default=INFO"`
 
+	PluginHostEnabled     bool   `env:"PLUGIN_HOST_ENABLED, default=false"`
+	PluginSigningKeyFile  string `env:"PLUGIN_SIGNING_KEY_FILE"`
+	PluginIssuer          string `env:"PLUGIN_ISSUER, default=stellwerk-control-plane"`
+	PluginDevelopmentHTTP bool   `env:"PLUGIN_DEVELOPMENT_HTTP, default=false"`
+	PluginCAFile          string `env:"PLUGIN_CA_FILE"`
+	// PluginManagerRefreshInterval bounds how stale a replica's plugin read
+	// snapshot (discovery, routing, UI) can be.
+	PluginManagerRefreshInterval time.Duration `env:"PLUGIN_MANAGER_REFRESH_INTERVAL, default=2s" validate:"min=100ms,max=1m"`
+	// Entitlement trust is independent of package, transport and identity keys.
+	// Production rejects development issuers even when signatures are valid.
+	PluginEntitlementMode      string `env:"PLUGIN_ENTITLEMENT_MODE, default=production" validate:"oneof=production development"`
+	PluginEntitlementTrustFile string `env:"PLUGIN_ENTITLEMENT_TRUST_FILE"`
+	// PluginEventJournalRetention is the minimum age before an extension
+	// resource journal entry that every active consumer acknowledged is pruned.
+	PluginEventJournalRetention time.Duration `env:"PLUGIN_EVENT_JOURNAL_RETENTION, default=720h"`
+	// PluginDataPlaneInternalHTTP permits only the fixed Core-to-DP origin in
+	// an operator-declared trusted cluster network. It never permits HTTP
+	// plugin backends or service-user bearer credentials over HTTP.
+	PluginDataPlaneInternalHTTP bool `env:"PLUGIN_DATA_PLANE_INTERNAL_HTTP, default=false"`
+	// DeploymentAdmissionIdentity is the IAM platform principal the Data
+	// Plane authenticates as when it asks Core to admit an ordinary
+	// Deployment, one for every organization. Unset, Core refuses every
+	// admission callback.
+	DeploymentAdmissionIdentity ServiceIdentity `env:"DEPLOYMENT_ADMISSION_IDENTITY"`
+
 	VaultURL  string `env:"VAULT_URL" validate:"url"`
 	VaultAuth string `env:"VAULT_AUTH" validate:"required"`
 	VaultRole string `env:"VAULT_ROLE"`

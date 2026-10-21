@@ -17,6 +17,7 @@ const (
 	eventFieldActorType         = "actor_type"
 	eventFieldBulkOperationID   = "bulk_operation_id"
 	eventFieldEnvironmentUUID   = "environment_uuid"
+	eventFieldEventType         = "event_type"
 	eventFieldPinID             = "pin_id"
 	eventFieldProjectUUID       = "project_uuid"
 	eventFieldRevision          = "revision"
@@ -131,6 +132,12 @@ func (d *databaser) CreateEnvironmentModuleVersionPin(ctx context.Context, tx Tx
 	if tx == nil {
 		return nil, errors.New("transaction required")
 	}
+	if err := lockExternalDispatchEnvironment(ctx, tx, environmentUUID); err != nil {
+		return nil, err
+	}
+	if err := checkExternalDispatchBarrier(ctx, tx, orgID, environmentUUID); err != nil {
+		return nil, err
+	}
 	if err := moduleversions.RequireTransitionReason(reason); err != nil {
 		return nil, NewErrBadRequest(err.Error())
 	}
@@ -165,7 +172,8 @@ func (d *databaser) CreateEnvironmentModuleVersionPin(ctx context.Context, tx Tx
 		eventFieldOrgID: orgID, eventFieldPinID: pin.ID, eventFieldEnvironmentUUID: environmentUUID, eventFieldProjectUUID: projectUUID,
 		eventFieldModuleUUID: moduleUUID, eventFieldVersionUUID: versionUUID, eventFieldTransitionID: activationEventID,
 		eventFieldRevision: pin.ResourceVersion, eventFieldToStatus: pin.Status, eventFieldActivationEventID: pin.ActivationEventID,
-		eventFieldActor: actor, eventFieldActorType: actorType, eventFieldReason: reason, eventFieldBulkOperationID: bulkOperationID,
+		eventFieldEventType: "created",
+		eventFieldActor:     actor, eventFieldActorType: actorType, eventFieldReason: reason, eventFieldBulkOperationID: bulkOperationID,
 	}); err != nil {
 		return nil, err
 	}
@@ -179,9 +187,21 @@ func (d *databaser) TransitionEnvironmentModuleVersionPin(ctx context.Context, t
 	if err := moduleversions.RequireTransitionReason(reason); err != nil {
 		return nil, NewErrBadRequest(err.Error())
 	}
-	pin, err := d.GetEnvironmentModuleVersionPin(ctx, tx, orgID, pinID, GetModeForUpdate)
+	pin, err := d.GetEnvironmentModuleVersionPin(ctx, tx, orgID, pinID, GetModeDefault)
 	if err != nil {
 		return nil, err
+	}
+	if err := lockExternalDispatchEnvironment(ctx, tx, pin.EnvironmentUUID); err != nil {
+		return nil, err
+	}
+	pin, err = d.GetEnvironmentModuleVersionPin(ctx, tx, orgID, pinID, GetModeForUpdate)
+	if err != nil {
+		return nil, err
+	}
+	if target == moduleversions.PinActive && pin.Status == moduleversions.PinOverridden {
+		if err := checkExternalDispatchBarrier(ctx, tx, orgID, pin.EnvironmentUUID); err != nil {
+			return nil, err
+		}
 	}
 	if pin.ResourceVersion != expectedVersion {
 		return nil, NewErrConflict("module version pin changed since it was read")
@@ -239,6 +259,7 @@ func (d *databaser) TransitionEnvironmentModuleVersionPin(ctx context.Context, t
 		eventFieldOrgID: orgID, eventFieldPinID: updated.ID, eventFieldEnvironmentUUID: updated.EnvironmentUUID,
 		eventFieldProjectUUID: updated.ProjectUUID, eventFieldModuleUUID: updated.ModuleUUID, eventFieldVersionUUID: updated.VersionUUID,
 		eventFieldTransitionID: eventID, eventFieldRevision: eventRevision, eventFieldFromStatus: pin.Status, eventFieldToStatus: updated.Status,
+		eventFieldEventType:         eventType,
 		eventFieldActivationEventID: updated.ActivationEventID, eventFieldActor: actor, eventFieldActorType: actorType, eventFieldReason: reason,
 		"operation_id": operationID, "deployment_id": deploymentID, eventFieldBulkOperationID: updated.BulkOperationID,
 	}); err != nil {
@@ -292,7 +313,7 @@ func (d *databaser) AppendModuleVersionPinNote(ctx context.Context, tx Tx, orgID
 	if err := d.appendModuleCoreOutboxEvent(ctx, tx, "io.platform-orchestrator.module.version.pin-lifecycle-changed", map[string]any{
 		eventFieldOrgID: orgID, eventFieldPinID: pin.ID, eventFieldEnvironmentUUID: pin.EnvironmentUUID,
 		eventFieldProjectUUID: pin.ProjectUUID, eventFieldModuleUUID: pin.ModuleUUID, eventFieldVersionUUID: pin.VersionUUID,
-		eventFieldTransitionID: event.ID, eventFieldRevision: event.Revision, "event_type": event.EventType,
+		eventFieldTransitionID: event.ID, eventFieldRevision: event.Revision, eventFieldEventType: event.EventType,
 		eventFieldFromStatus: pin.Status, eventFieldToStatus: pin.Status, eventFieldActivationEventID: pin.ActivationEventID,
 		eventFieldActor: actor, eventFieldActorType: actorType, "note": note, eventFieldBulkOperationID: pin.BulkOperationID,
 	}); err != nil {

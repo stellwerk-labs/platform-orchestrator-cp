@@ -124,6 +124,14 @@ func (s *Server) createOrganizationCore(
 		return nil, errors.Wrap(err, "failed to create organization")
 	}
 	logger = logger.With(logging.ZapOrgId(org.Id))
+	// Plugin installations that serve all organizations serve this one from
+	// its creation on.
+	var enabledPlugins []uuid.UUID
+	if s.PluginManager != nil {
+		if enabledPlugins, err = s.PluginManager.EnableNewOrganization(ctx, tx, *org); err != nil {
+			return nil, errors.Wrap(err, "failed to enable plugins for the organization")
+		}
+	}
 	messages, err := s.Database.InsertPendingEventMessages(ctx, tx, events.AsMessages(events.CloudEvent[any]{
 		Type: genevents.IoPlatformOrchestratorOrganizationCreated,
 		Time: org.CreatedAt,
@@ -136,6 +144,13 @@ func (s *Server) createOrganizationCore(
 	// we must persist the organization creation event before creating the membership
 	if err := tx.Commit(); err != nil {
 		return nil, errors.Wrap(err, "failed to commit transaction")
+	}
+	if len(enabledPlugins) > 0 {
+		// This replica serves the new enablements at once; the others within
+		// one refresh interval.
+		if err := s.PluginManager.Refresh(ctx); err != nil {
+			logger.Error("Plugin Manager snapshot refresh after enabling a new organization failed", zap.Error(err))
+		}
 	}
 
 	if optionalAdminUser != nil {
@@ -167,16 +182,43 @@ func (s *Server) createOrganizationCore(
 
 		// if something went wrong, we need to remove the organization we created
 		if createMembershipError != nil {
-			if err := s.Database.DeleteOrg(ctx, nil, org.Id); err != nil {
+			if err := s.discardOrganization(ctx, org); err != nil {
 				logger.Error("failed to delete organization", zap.Error(err))
 			}
 			return nil, createMembershipError
 		}
 	}
 
+	if len(enabledPlugins) > 0 {
+		s.PluginManager.ReconcileOrganizationCapabilities(ctx, org.Id, enabledPlugins)
+	}
 	logger.Info("created org", logging.ZapOrgId(org.Id), logging.ZapOrgUuid(org.Uuid))
 	reliableoutbox.OptimisticPublish(ctx, logger, s.Database.AsReliableOutboxStore(), s.Publisher, messages)
 	return org, nil
+}
+
+// discardOrganization deletes an organization whose creation failed after it
+// committed. The plugin enablements Core created with it block the deletion,
+// so they are removed first, in the same transaction.
+func (s *Server) discardOrganization(ctx context.Context, org *model.Org) error {
+	if s.PluginManager == nil {
+		return s.Database.DeleteOrg(ctx, nil, org.Id)
+	}
+	tx, err := s.Database.BeginTx(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to begin transaction")
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := s.PluginManager.DiscardOrganization(ctx, tx, *org); err != nil {
+		return errors.Wrap(err, "failed to remove the organization's plugin enablements")
+	}
+	if err := s.Database.DeleteOrg(ctx, tx, org.Id); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return errors.Wrap(err, "failed to commit transaction")
+	}
+	return s.PluginManager.Refresh(ctx)
 }
 
 func (s *Server) CreateInternalOrganization(ctx context.Context, request CreateInternalOrganizationRequestObject) (CreateInternalOrganizationResponseObject, error) {

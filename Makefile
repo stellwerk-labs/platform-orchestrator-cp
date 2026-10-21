@@ -58,10 +58,16 @@ clean:
 test-integration: build
 	$(MAKE) -C integration-tests test
 
+## Run the PostgreSQL-backed package tests (build tag integration), starting docker compose containers if necessary
+.PHONY: test-integration-postgres
+test-integration-postgres: build
+	$(MAKE) -C integration-tests test-integration-postgres
+
 ## Run golang tests
 .PHONY: test-unit
 test-unit:
-	go tool gotestsum --format testname -- -coverprofile=cover.out ./internal/...
+	go tool gotestsum --format testname -- -coverprofile=cover.out ./internal/... ./cmd/...
+	cd shared && GOWORK=off go test -count=1 ./...
 
 ## Lint the code
 .PHONY: lint

@@ -27,6 +27,8 @@ type Descriptor struct {
 	Capabilities []string
 	State        AvailabilityState
 	AdminAction  string
+	Mode         AccessMode
+	Entitlement  *EntitlementStatus
 }
 
 type Registry interface {

@@ -995,6 +995,10 @@ func (s *Server) CreateEnvironmentModuleVersionPin(ctx context.Context, request 
 		}
 		return nil, err
 	}
+	admissionEpoch, err := model.ReadEnvironmentAdmissionEpoch(ctx, s.Database, nil, request.OrgId, environment.Uuid)
+	if err != nil {
+		return nil, err
+	}
 	if err := s.validateEnvironmentPinSnapshot(ctx, request.OrgId, *environment, *version); err != nil {
 		return CreateEnvironmentModuleVersionPin409JSONResponse{N409ConflictJSONResponse: Generate409Response(err.Error())}, nil
 	}
@@ -1012,6 +1016,12 @@ func (s *Server) CreateEnvironmentModuleVersionPin(ctx context.Context, request 
 		return nil, err
 	} else if found {
 		return CreateEnvironmentModuleVersionPin201JSONResponse(response), nil
+	}
+	if err := model.CheckEnvironmentAdmissionEpoch(ctx, s.Database, tx, request.OrgId, environment.Uuid, admissionEpoch); err != nil {
+		if conflict, ok := model.IsErrConflict(err); ok {
+			return CreateEnvironmentModuleVersionPin409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(conflict)}, nil
+		}
+		return nil, err
 	}
 	pin, err := s.Database.CreateEnvironmentModuleVersionPin(ctx, tx, request.OrgId, request.Body.ProjectUuid,
 		environment.ProjectId, request.Body.EnvironmentUuid, environment.Id, request.Body.ModuleUuid,
@@ -1275,8 +1285,18 @@ func (s *Server) ReconcileEnvironmentModuleVersionPinOverride(ctx context.Contex
 		if err != nil {
 			return nil, err
 		}
+		admissionEpoch, err := model.ReadEnvironmentAdmissionEpoch(ctx, s.Database, tx, request.OrgId, environment.Uuid)
+		if err != nil {
+			return nil, err
+		}
 		if err := s.validateEnvironmentPinSnapshot(ctx, request.OrgId, *environment, *target); err != nil {
 			return ReconcileEnvironmentModuleVersionPinOverride409JSONResponse{N409ConflictJSONResponse: Generate409Response(err.Error())}, nil
+		}
+		if err := model.CheckEnvironmentAdmissionEpoch(ctx, s.Database, tx, request.OrgId, environment.Uuid, admissionEpoch); err != nil {
+			if conflict, ok := model.IsErrConflict(err); ok {
+				return ReconcileEnvironmentModuleVersionPinOverride409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(conflict)}, nil
+			}
+			return nil, err
 		}
 		targetStatus, eventType = moduleversions.PinOverridden, "override_succeeded"
 	case ModuleVersionPinOverrideReconcileBodyOutcomeFailed:
@@ -1375,8 +1395,18 @@ func (s *Server) RestoreEnvironmentModuleVersionPinAfterRollback(ctx context.Con
 	if err != nil {
 		return nil, err
 	}
+	admissionEpoch, err := model.ReadEnvironmentAdmissionEpoch(ctx, s.Database, tx, request.OrgId, environment.Uuid)
+	if err != nil {
+		return nil, err
+	}
 	if err := s.validateEnvironmentPinSnapshot(ctx, request.OrgId, *environment, *version); err != nil {
 		return RestoreEnvironmentModuleVersionPinAfterRollback409JSONResponse{N409ConflictJSONResponse: Generate409Response(err.Error())}, nil
+	}
+	if err := model.CheckEnvironmentAdmissionEpoch(ctx, s.Database, tx, request.OrgId, environment.Uuid, admissionEpoch); err != nil {
+		if conflict, ok := model.IsErrConflict(err); ok {
+			return RestoreEnvironmentModuleVersionPinAfterRollback409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(conflict)}, nil
+		}
+		return nil, err
 	}
 	updated, err := s.Database.TransitionEnvironmentModuleVersionPin(ctx, tx, request.OrgId, request.PinId,
 		request.Body.ExpectedResourceVersion, moduleversions.PinActive, "restored_after_rollback", actor, "addon",
@@ -1404,10 +1434,11 @@ func (s *Server) RestoreEnvironmentModuleVersionPinAfterRollback(ctx context.Con
 }
 
 type modulePinBulkDecision struct {
-	item        ModuleVersionPinBulkPreviewItem
-	environment model.Environment
-	version     *model.CoreModuleVersion
-	pin         *model.EnvironmentModuleVersionPin
+	item           ModuleVersionPinBulkPreviewItem
+	environment    model.Environment
+	version        *model.CoreModuleVersion
+	pin            *model.EnvironmentModuleVersionPin
+	admissionEpoch int64
 }
 
 func modulePinPreviewHash(action ModuleVersionPinBulkAction, moduleUUID uuid.UUID, items []ModuleVersionPinBulkPreviewItem) string {
@@ -1507,6 +1538,10 @@ func (s *Server) previewModulePinBulk(ctx context.Context, tx model.Tx, userID u
 		}
 		switch body.Action {
 		case ModuleVersionPinBulkActionPin:
+			decision.admissionEpoch, err = model.ReadEnvironmentAdmissionEpoch(ctx, s.Database, tx, orgID, environment.Uuid)
+			if err != nil {
+				return nil, err
+			}
 			version, err := s.currentEnvironmentModuleVersion(ctx, tx, orgID, *environment, *module)
 			if err != nil {
 				problem := err.Error()
@@ -1665,6 +1700,12 @@ func (s *Server) ExecuteEnvironmentModuleVersionPinBulkOperation(ctx context.Con
 		var pin *model.EnvironmentModuleVersionPin
 		switch request.Body.Action {
 		case ModuleVersionPinBulkActionPin:
+			if err := model.CheckEnvironmentAdmissionEpoch(ctx, s.Database, tx, request.OrgId, decision.environment.Uuid, decision.admissionEpoch); err != nil {
+				if conflict, ok := model.IsErrConflict(err); ok {
+					return ExecuteEnvironmentModuleVersionPinBulkOperation409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(conflict)}, nil
+				}
+				return nil, err
+			}
 			if decision.item.IdempotentMatch != nil && *decision.item.IdempotentMatch {
 				pin, err = s.Database.GetEnvironmentModuleVersionPin(ctx, tx, request.OrgId, decision.pin.ID, model.GetModeForUpdate)
 				if err == nil && (pin.Status != moduleversions.PinActive || pin.VersionUUID != decision.version.UUID || pin.ResourceVersion != decision.pin.ResourceVersion) {

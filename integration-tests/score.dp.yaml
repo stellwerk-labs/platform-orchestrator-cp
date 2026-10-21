@@ -7,7 +7,7 @@ service:
       port: 8080
 containers:
   platform-orchestrator-dp:
-    image: ghcr.io/stellwerk-labs/platform-orchestrator-dp:v2.0.0
+    image: ghcr.io/stellwerk-labs/platform-orchestrator-dp:v2.0.0@sha256:275947e6176d45df02979d7d600e7ebb096561e46cd577049761e24e0a8ec9c3
     command: ["/opt/server/server"]
     livenessProbe:
       httpGet:
@@ -27,6 +27,8 @@ containers:
     variables:
       NATS_URL: ${resources.nats.url}
       NATS_TOKEN: ${resources.nats.token}
+      RUNNER_NATS_URL: ${resources.nats.url}
+      RUNNER_NATS_TOKEN: ${resources.nats.token}
       RUNNER_GATEWAY_URL: http://runner-gateway:8080/runner-gateway
       RUNNER_GATEWAY_INTERNAL_URL: http://runner-gateway:8080/runner-gateway
       RUNNER_TOKEN_SALT: ${resources.env.RUNNER_TOKEN_SALT}

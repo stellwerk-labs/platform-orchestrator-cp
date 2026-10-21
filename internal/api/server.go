@@ -6,6 +6,7 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/stellwerk-labs/golib/hecho"
 	"github.com/stellwerk-labs/golib/hmessaging"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/api/middleware"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginmanager"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/token"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/vault"
@@ -23,13 +25,23 @@ import (
 //go:generate go tool oapi-codegen --config=oapi-codegen.cfg.yaml --exclude-tags not-implemented ../../openapi/spec.yaml
 
 type Server struct {
-	Database  model.Databaser
-	Logger    *zap.Logger
-	Vault     vault.VaultClientInterface
-	Publisher hmessaging.Publisher
-	DpClient  orchestratordp.ClientWithResponsesInterface
-	IamClient orchestratoriam.ClientWithResponsesInterface
-	Plugins   plugins.Registry
+	Database           model.Databaser
+	Logger             *zap.Logger
+	Vault              vault.VaultClientInterface
+	Publisher          hmessaging.Publisher
+	DpClient           orchestratordp.ClientWithResponsesInterface
+	IamClient          orchestratoriam.ClientWithResponsesInterface
+	Plugins            plugins.Registry
+	PluginGateway      *plugins.Gateway
+	PluginDataPlane    *plugins.DataPlanePort
+	PluginEntitlements PluginEntitlementGuard
+	// PluginManager is nil while the plugin host is disabled.
+	PluginManager *pluginmanager.Manager
+	// PluginJournalRetention is how long released operations still reconcile.
+	PluginJournalRetention time.Duration
+	// DeploymentAdmissionIdentity is the Data Plane's admission identity for
+	// every organization; uuid.Nil refuses every admission callback.
+	DeploymentAdmissionIdentity uuid.UUID
 }
 
 func (s *Server) MapRoutes(e *echo.Echo) {

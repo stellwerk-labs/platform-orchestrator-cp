@@ -4,13 +4,14 @@ go 1.26.2
 
 require (
 	filippo.io/age v1.3.1
+	github.com/fxamacker/cbor/v2 v2.9.0
 	github.com/getkin/kin-openapi v0.133.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/hcl/v2 v2.24.0
 	github.com/hashicorp/vault/api v1.23.0
 	github.com/labstack/echo/v4 v4.15.1
 	github.com/lib/pq v1.12.3
-	github.com/oapi-codegen/runtime v1.4.0
+	github.com/oapi-codegen/runtime v1.7.0
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose/v3 v3.27.1
 	github.com/stellwerk-labs/golib/hconfig v1.0.0
@@ -24,20 +25,22 @@ require (
 	github.com/stellwerk-labs/golib/hstandardoutbox v1.1.1
 	github.com/stellwerk-labs/golib/htelemetry v1.0.0
 	github.com/stellwerk-labs/golib/hvaultapi v1.0.0
-	github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2 v2.0.0
-	github.com/stellwerk-labs/platform-orchestrator-dp/shared/v2 v2.0.0
+	github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2 v2.1.0
+	github.com/stellwerk-labs/platform-orchestrator-dp/shared/v2 v2.2.0
 	github.com/stellwerk-labs/platform-orchestrator-graph v1.0.0
-	github.com/stellwerk-labs/platform-orchestrator-iam/shared v1.0.0
+	github.com/stellwerk-labs/platform-orchestrator-iam/shared v1.2.0
 	github.com/stretchr/testify v1.11.1
+	github.com/veraison/go-cose v1.3.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0
 	go.opentelemetry.io/otel/sdk v1.43.0
 	go.uber.org/mock v0.6.0
 	go.uber.org/zap v1.27.1
+	golang.org/x/sys v0.43.0
 	k8s.io/api v0.35.3
 	k8s.io/apimachinery v0.35.3
 )
 
-replace github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2 v2.0.0 => ./shared
+replace github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2 v2.1.0 => ./shared
 
 require (
 	filippo.io/hpke v0.4.0 // indirect
@@ -83,7 +86,6 @@ require (
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
-	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.13 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
@@ -136,6 +138,7 @@ require (
 	github.com/nats-io/nkeys v0.4.15 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/oapi-codegen/echo-middleware v1.0.2 // indirect
+	github.com/oapi-codegen/nullable v1.2.0 // indirect
 	github.com/oapi-codegen/oapi-codegen/v2 v2.6.0 // indirect
 	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037 // indirect
 	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
@@ -196,7 +199,6 @@ require (
 	golang.org/x/net v0.53.0 // indirect
 	golang.org/x/oauth2 v0.35.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/term v0.42.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
 	golang.org/x/time v0.15.0 // indirect

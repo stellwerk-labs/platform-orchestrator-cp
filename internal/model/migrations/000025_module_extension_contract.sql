@@ -6,7 +6,7 @@
 -- +goose StatementBegin
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'definition_versions_module_uuid_fk') THEN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'definition_versions_module_uuid_fk' AND conrelid = 'definition_versions'::regclass) THEN
         ALTER TABLE definition_versions
             ADD CONSTRAINT definition_versions_module_uuid_fk
             FOREIGN KEY (module_uuid) REFERENCES definitions(uuid) ON DELETE RESTRICT NOT VALID;
