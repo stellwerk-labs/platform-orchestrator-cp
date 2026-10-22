@@ -20,6 +20,13 @@ files and verifies that application source remains in the context.
 
 ## Compatibility and release checks
 
+The SDK retains its published authorization and Pin action constant names,
+including `Prepare` and `Begin`, as typed aliases of the generator's explicitly
+prefixed names. The former `UserIdHeaderScopes` constant remains available too.
+Existing Go consumers continue to compile, and the wire values do not change.
+The new prefixed names are preferred for new code; generated files remain
+managed by the normal generator.
+
 Existing published versions and artifacts remain immutable. Use a new patch
 version after the normal integration and artifact checks pass. Source builds
 following the supported release tooling require Go 1.26.10. Clients using the
