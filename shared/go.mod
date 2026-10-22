@@ -1,6 +1,6 @@
 module github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2
 
-go 1.26.2
+go 1.26.10
 
 require github.com/oapi-codegen/runtime v1.4.0
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/api/middleware"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 )
 
 const ordinaryDeploymentReadPermission = "deployment_read"
@@ -66,5 +67,5 @@ func (s *Server) GetPluginDeploymentMaterial(ctx context.Context, request GetPlu
 		}
 		return nil, pluginBoundaryError(status, "deployment_material_unavailable", "The authorized Deployment material could not be retrieved. Check its retention and encryption service state.")
 	}
-	return GetPluginDeploymentMaterial200TextResponse{Body: string(result.Body), Headers: GetPluginDeploymentMaterial200ResponseHeaders{ContentDisposition: fmt.Sprintf("attachment; filename=\"%s.%s\"", request.DeploymentId.String(), extension), CacheControl: "no-store", XContentTypeOptions: "nosniff"}}, nil
+	return GetPluginDeploymentMaterial200TextResponse{Body: string(result.Body), Headers: GetPluginDeploymentMaterial200ResponseHeaders{ContentDisposition: ref.Ref(fmt.Sprintf("attachment; filename=\"%s.%s\"", request.DeploymentId.String(), extension)), CacheControl: ref.Ref("no-store"), XContentTypeOptions: ref.Ref("nosniff")}}, nil
 }
