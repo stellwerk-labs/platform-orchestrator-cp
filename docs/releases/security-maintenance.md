@@ -14,6 +14,10 @@ Normal CI now checks source dependencies with pinned govulncheck 1.9.0 and fails
 on reachable known vulnerabilities. A passing source scan is not a guarantee
 against unknown vulnerabilities or a substitute for deployment qualification.
 
+Docker context filtering also excludes `.envrc` variants and direnv state. A
+network-disabled Docker COPY test checks these exclusions with public sentinel
+files and verifies that application source remains in the context.
+
 ## Compatibility and release checks
 
 Existing published versions and artifacts remain immutable. Use a new patch
