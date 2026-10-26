@@ -14,6 +14,11 @@ Normal CI now checks source dependencies with pinned govulncheck 1.9.0 and fails
 on reachable known vulnerabilities. A passing source scan is not a guarantee
 against unknown vulnerabilities or a substitute for deployment qualification.
 
+The image build also scans the compiled server before packaging it. Builds keep
+linker symbols so the scanner can distinguish included functions from unused
+module dependencies. DWARF debug information remains omitted. Stripped binaries
+are rejected by the binary check rather than treated as a successful scan.
+
 Docker context filtering also excludes `.envrc` variants and direnv state. A
 network-disabled Docker COPY test checks these exclusions with public sentinel
 files and verifies that application source remains in the context.
