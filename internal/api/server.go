@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	strictecho "github.com/oapi-codegen/runtime/strictmiddleware/echo"
 	"github.com/stellwerk-labs/golib/hecho"
 	"github.com/stellwerk-labs/golib/hmessaging"
 	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v2/genclient"
@@ -46,12 +47,12 @@ type Server struct {
 
 func (s *Server) MapRoutes(e *echo.Echo) {
 	apiHandler := NewStrictHandler(s, []StrictMiddlewareFunc{
-		hecho.OperationIdCollectorMiddleware,
-		hecho.BuildContextTimeoutMiddlewareWithDuration(time.Second * 30),
+		adaptStrictMiddleware(hecho.OperationIdCollectorMiddleware),
+		adaptStrictMiddleware(hecho.BuildContextTimeoutMiddlewareWithDuration(time.Second * 30)),
 		// don't assert authz for an internal APIs
-		middleware.NewAuthZAsserter(regexp.MustCompile("^.*Internal.*$")),
-		hecho.AuthMiddleware(UserIdHeaderScopes),
-		token.StrictEncryptionMiddleware(),
+		adaptStrictMiddleware(middleware.NewAuthZAsserter(regexp.MustCompile("^.*Internal.*$"))),
+		adaptStrictMiddleware(hecho.AuthMiddleware(string(UserIdHeaderScopes))),
+		adaptStrictMiddleware(token.StrictEncryptionMiddleware()),
 	})
 	RegisterHandlers(e, apiHandler)
 
@@ -66,6 +67,12 @@ func (s *Server) MapRoutes(e *echo.Echo) {
 			"status":  "OK",
 		})
 	})
+}
+
+func adaptStrictMiddleware(middleware strictecho.StrictEchoMiddlewareFunc) StrictMiddlewareFunc {
+	return func(handler StrictHandlerFunc, operationID string) StrictHandlerFunc {
+		return StrictHandlerFunc(middleware(strictecho.StrictEchoHandlerFunc(handler), operationID))
+	}
 }
 
 // StrictServerInterface is the interface that your Server implementation should generate methods for.

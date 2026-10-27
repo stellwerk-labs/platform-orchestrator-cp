@@ -6,5 +6,7 @@ generate:
   strict-server: true
   embedded-spec: true
 output: server.gen.go
+compatibility:
+  enable-auth-scopes-on-context: true
 output-options:
   skip-prune: true
