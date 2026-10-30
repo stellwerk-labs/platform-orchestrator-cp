@@ -11,7 +11,7 @@ import (
 	strictecho "github.com/oapi-codegen/runtime/strictmiddleware/echo"
 	"github.com/stellwerk-labs/golib/hecho"
 	"github.com/stellwerk-labs/golib/hmessaging"
-	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v2/genclient"
+	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v3/genclient"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"go.uber.org/zap"
 

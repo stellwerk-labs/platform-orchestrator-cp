@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"slices"
@@ -19,7 +20,7 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/opt"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/errcodes"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/errcodes"
 )
 
 const (
@@ -190,7 +191,7 @@ func (s *Server) getAllDefinitionsForRules(ctx context.Context, orgId string, de
 				missingDefinitions = append(missingDefinitions, definitionId)
 			}
 		}
-		return nil, nil, errors.New("failed to retrieve some modules: " + strings.Join(missingDefinitions, ", "))
+		return nil, nil, model.NewErrConflict("Module Rules require a published Default or an explicit Draft test selection: " + strings.Join(missingDefinitions, ", "))
 	}
 	return allDefinitions, seenProviders, nil
 }
@@ -213,9 +214,53 @@ func (s *Server) getPinnedDefinitions(ctx context.Context, orgId string, tx mode
 }
 
 func (s *Server) GenerateInternalModuleCatalogue(ctx context.Context, request GenerateInternalModuleCatalogueRequestObject) (GenerateInternalModuleCatalogueResponseObject, error) {
-	logger := hlogger.TraceScopedLoggerFromCtx(s.Logger, ctx)
 	if request.Body == nil {
 		request.Body = &InternalModuleCatalogueGenerateBody{}
+	}
+	response, err := s.generateInternalExecutionCatalogue(ctx, GenerateInternalExecutionCatalogueRequestObject{
+		OrgId: request.OrgId, ProjectId: request.ProjectId, EnvId: request.EnvId,
+		Params: GenerateInternalExecutionCatalogueParams(request.Params),
+		Body:   &InternalExecutionCatalogueGenerateBody{PinnedModuleVersions: request.Body.PinnedModuleVersions, PinnedProviders: request.Body.PinnedProviders, AreRulesIgnored: request.Body.AreRulesIgnored},
+	})
+	if err != nil {
+		return nil, err
+	}
+	switch value := response.(type) {
+	case GenerateInternalExecutionCatalogue200JSONResponse:
+		// Both schemas share the published wire representation. Decode through the
+		// generated legacy DTO to preserve the existing SDK interface and response.
+		raw, err := json.Marshal(value)
+		if err != nil {
+			return nil, err
+		}
+		var published InternalModuleCatalogue
+		if err := json.Unmarshal(raw, &published); err != nil {
+			return nil, err
+		}
+		return GenerateInternalModuleCatalogue200JSONResponse(published), nil
+	case GenerateInternalExecutionCatalogue404JSONResponse:
+		return GenerateInternalModuleCatalogue404JSONResponse(value), nil
+	case GenerateInternalExecutionCatalogue409JSONResponse:
+		return GenerateInternalModuleCatalogue409JSONResponse(value), nil
+	default:
+		return nil, errors.New("unexpected internal catalogue response")
+	}
+}
+
+func (s *Server) GenerateInternalExecutionCatalogue(ctx context.Context, request GenerateInternalExecutionCatalogueRequestObject) (GenerateInternalExecutionCatalogueResponseObject, error) {
+	if request.Body == nil {
+		request.Body = &InternalExecutionCatalogueGenerateBody{}
+	}
+	if err := s.deploymentAdmissionCaller(ctx, request.OrgId); err != nil {
+		return nil, err
+	}
+	return s.generateInternalExecutionCatalogue(ctx, request)
+}
+
+func (s *Server) generateInternalExecutionCatalogue(ctx context.Context, request GenerateInternalExecutionCatalogueRequestObject) (GenerateInternalExecutionCatalogueResponseObject, error) {
+	logger := hlogger.TraceScopedLoggerFromCtx(s.Logger, ctx)
+	if request.Body.MaterialOnly && (!request.Body.AreRulesIgnored || len(ref.DerefOr(request.Body.DraftTestSnapshots, nil)) > 0 || len(ref.DerefOr(request.Body.SelectedPublishedModuleVersions, nil)) > 0) {
+		return nil, moduleDraftError(model.NewErrBadRequest("material_only requires ignored rules and no fresh selections"))
 	}
 	activeModuleVersions := make(map[string]struct{})
 	if request.Params.XStellwerkActiveModuleVersions != nil {
@@ -224,6 +269,11 @@ func (s *Server) GenerateInternalModuleCatalogue(ctx context.Context, request Ge
 		}
 	}
 
+	var testDefinitions map[string]model.ModuleDefinitionVersion
+	testSnapshots := make(map[uuid.UUID]ModuleDraftTestSnapshot)
+	var retainedTests []model.ModuleDefinitionVersion
+	var publishedSelections map[string]model.ModuleDefinitionVersion
+	retainedCoordinates := make(map[string]bool)
 	var allRules []model.DefinitionRule
 	var allDefinitions []model.ModuleDefinitionVersion
 	var allProviders []model.ModuleProvider
@@ -240,12 +290,36 @@ func (s *Server) GenerateInternalModuleCatalogue(ctx context.Context, request Ge
 		env, err := s.Database.GetEnvironment(ctx, tx, request.OrgId, request.ProjectId, request.EnvId, model.GetModeDefault)
 		if err != nil {
 			if me, ok := model.IsErrNotFound(err); ok {
-				return GenerateInternalModuleCatalogue404JSONResponse{N404NotFoundJSONResponse: Generate404FromModelErr(me)}, nil
+				return GenerateInternalExecutionCatalogue404JSONResponse{N404NotFoundJSONResponse: Generate404FromModelErr(me)}, nil
 			}
 			return nil, errors.Wrap(err, "failed to get environment")
 		}
+		if request.Body.DraftTestSnapshots != nil {
+			testDefinitions, testSnapshots, err = s.resolveDraftTestCatalogue(ctx, tx, request.OrgId, env, *request.Body.DraftTestSnapshots)
+			if err != nil {
+				return nil, moduleDraftError(err)
+			}
+		}
+		if request.Body.SelectedPublishedModuleVersions != nil {
+			publishedSelections, err = s.resolvePublishedCatalogueSelections(ctx, tx, request.OrgId, *request.Body.SelectedPublishedModuleVersions)
+			if err != nil {
+				return nil, moduleDraftError(err)
+			}
+			for module := range publishedSelections {
+				if _, conflict := testDefinitions[module]; conflict {
+					return nil, moduleDraftError(model.NewErrBadRequest("one Module cannot select both a published Version and a Draft test"))
+				}
+			}
+		}
+		retainedTests, err = s.resolveRetainedDraftTestCatalogue(ctx, tx, request.OrgId, env, request.Body.RetainedDraftTestSnapshots, testSnapshots)
+		if err != nil {
+			return nil, moduleDraftError(err)
+		}
+		for _, definition := range retainedTests {
+			retainedCoordinates[definition.DefinitionId+"@"+definition.VersionId] = true
+		}
 		var corePins []model.EnvironmentModuleVersionPin
-		if !ref.DerefOr(request.Params.XStellwerkModuleOperationPlanning, false) {
+		if !request.Body.MaterialOnly && (len(testSnapshots) > 0 || !ref.DerefOr(request.Params.XStellwerkModuleOperationPlanning, false)) {
 			corePins, err = s.Database.ListEnvironmentModuleVersionPins(ctx, tx, request.OrgId, &env.Uuid, nil, false)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to resolve Environment Module Version Pins")
@@ -260,12 +334,29 @@ func (s *Server) GenerateInternalModuleCatalogue(ctx context.Context, request Ge
 			if pin.Status != moduleversions.PinActive && pin.Status != moduleversions.PinOverridePending {
 				continue
 			}
+			if request.Body.DraftTestSnapshots != nil {
+				if _, selected := (*request.Body.DraftTestSnapshots)[pin.ModuleUUID.String()]; selected {
+					return GenerateInternalExecutionCatalogue409JSONResponse{N409ConflictJSONResponse: Generate409Response("Draft tests cannot override Environment Module Pins")}, nil
+				}
+			}
 			versionUUID := resolvedPinVersionUUID(pin, request.Params.XStellwerkModuleOperationId)
+
 			pinAuthorizedVersions[versionUUID] = true
 			version, err := s.Database.GetCoreModuleVersion(ctx, tx, request.OrgId, pin.ModuleUUID.String(), versionUUID.String(), model.GetModeDefault)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to resolve pinned immutable Module Version")
 			}
+			if selected, found := publishedSelections[version.ModuleSlug]; found && selected.VersionUUID != versionUUID {
+				return nil, moduleDraftError(model.NewErrConflict("explicit published selection conflicts with the Environment Pin"))
+			}
+			definition, err := s.Database.GetModuleDefinitionVersion(ctx, tx, request.OrgId, version.ModuleSlug, versionUUID.String())
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to load pinned immutable definition")
+			}
+			if publishedSelections == nil {
+				publishedSelections = make(map[string]model.ModuleDefinitionVersion)
+			}
+			publishedSelections[version.ModuleSlug] = *definition
 			resolvedPins = append(resolvedPins, resolvedCorePin{moduleID: version.ModuleSlug, version: version.OpaqueVersionID})
 		}
 
@@ -278,7 +369,7 @@ func (s *Server) GenerateInternalModuleCatalogue(ctx context.Context, request Ge
 			allRules, seenDefinitions, archivedVersions, err = s.getAllModuleRulesAndDefinitionIds(ctx, request.OrgId, env.ProjectId, env.EnvTypeId, env.Id, tx, activeModuleVersions)
 			if err != nil {
 				if conflict, ok := model.IsErrConflict(err); ok {
-					return GenerateInternalModuleCatalogue409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(conflict)}, nil
+					return GenerateInternalExecutionCatalogue409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(conflict)}, nil
 				}
 				return nil, err
 			}
@@ -288,11 +379,17 @@ func (s *Server) GenerateInternalModuleCatalogue(ctx context.Context, request Ge
 				delete(seenDefinitions, moduleID)
 				request.Body.PinnedModuleVersions = append(request.Body.PinnedModuleVersions, moduleID+"@"+archivedVersions[moduleID])
 			}
+			for moduleID := range testDefinitions {
+				delete(seenDefinitions, moduleID)
+			}
+			for moduleID := range publishedSelections {
+				delete(seenDefinitions, moduleID)
+			}
 			seenProviders = make(map[string]bool)
 			if len(seenDefinitions) > 0 {
 				allDefinitions, seenProviders, err = s.getAllDefinitionsForRules(ctx, request.OrgId, slices.Sorted(maps.Keys(seenDefinitions)), tx)
 				if err != nil {
-					return nil, err
+					return nil, moduleDraftError(err)
 				}
 			}
 			// We need to make sure we don't pull extra definitions if we've already retrieved these
@@ -302,17 +399,40 @@ func (s *Server) GenerateInternalModuleCatalogue(ctx context.Context, request Ge
 		} else {
 			seenProviders = make(map[string]bool, len(request.Body.PinnedProviders))
 		}
+		for _, moduleID := range slices.Sorted(maps.Keys(publishedSelections)) {
+			definition := publishedSelections[moduleID]
+			allDefinitions = append(allDefinitions, definition)
+			definitionVersion[moduleID+"@"+definition.VersionId] = true
+			for _, provider := range definition.ProviderMapping {
+				seenProviders[provider] = true
+			}
+		}
+		for _, moduleID := range slices.Sorted(maps.Keys(testDefinitions)) {
+			definition := testDefinitions[moduleID]
+			allDefinitions = append(allDefinitions, definition)
+			definitionVersion[moduleID+"@"+definition.VersionId] = true
+			for _, providerID := range definition.ProviderMapping {
+				seenProviders[providerID] = true
+			}
+		}
+		for _, definition := range retainedTests {
+			allDefinitions = append(allDefinitions, definition)
+			definitionVersion[definition.DefinitionId+"@"+definition.VersionId] = true
+			for _, provider := range definition.ProviderMapping {
+				seenProviders[provider] = true
+			}
+		}
 		for _, pin := range resolvedPins {
 			for _, requested := range request.Body.PinnedModuleVersions {
 				parts := strings.SplitN(requested, "@", 2)
-				if len(parts) == 2 && parts[0] == pin.moduleID && parts[1] != pin.version {
-					return GenerateInternalModuleCatalogue409JSONResponse{N409ConflictJSONResponse: Generate409Response(fmt.Sprintf(
+				if len(parts) == 2 && parts[0] == pin.moduleID && parts[1] != pin.version && !retainedCoordinates[requested] {
+					return GenerateInternalExecutionCatalogue409JSONResponse{N409ConflictJSONResponse: Generate409Response(fmt.Sprintf(
 						"active Environment Pin requires %s@%s, requested %s", pin.moduleID, pin.version, requested,
 					))}, nil
 				}
 			}
 			allDefinitions = slices.DeleteFunc(allDefinitions, func(definition model.ModuleDefinitionVersion) bool {
-				return definition.DefinitionId == pin.moduleID && definition.VersionId != pin.version
+				return definition.DefinitionId == pin.moduleID && definition.VersionId != pin.version && !retainedCoordinates[definition.DefinitionId+"@"+definition.VersionId]
 			})
 			request.Body.PinnedModuleVersions = append(request.Body.PinnedModuleVersions, pin.moduleID+"@"+pin.version)
 		}
@@ -378,7 +498,7 @@ func (s *Server) GenerateInternalModuleCatalogue(ctx context.Context, request Ge
 				}
 			}
 			slices.Sort(missingProviders)
-			return GenerateInternalModuleCatalogue409JSONResponse{N409ConflictJSONResponse{
+			return GenerateInternalExecutionCatalogue409JSONResponse{N409ConflictJSONResponse{
 				Error:   string(errcodes.PinnedModuleMissingProvider),
 				Message: "some providers were missing for requested modules",
 				Details: &map[string]interface{}{
@@ -388,8 +508,8 @@ func (s *Server) GenerateInternalModuleCatalogue(ctx context.Context, request Ge
 		}
 	}
 
-	out := InternalModuleCatalogue{
-		Modules:   make([]InternalModuleCatalogueModule, 0, len(allDefinitions)),
+	out := InternalExecutionCatalogue{
+		Modules:   make([]InternalExecutionCatalogueModule, 0, len(allDefinitions)),
 		Providers: make([]ModuleProvider, 0, len(allProviders)),
 	}
 	restrictedConfirmations := make(map[uuid.UUID]bool)
@@ -404,14 +524,17 @@ func (s *Server) GenerateInternalModuleCatalogue(ctx context.Context, request Ge
 			return nil, errors.Wrap(err, "failed to validate Module catalogue state")
 		}
 		coordinate := definition.DefinitionId + "@" + definition.VersionId
+		if request.Body.MaterialOnly || retainedCoordinates[coordinate] {
+			continue
+		}
 		if !permitsArchivedModuleVersion(module.Status, coordinate, activeModuleVersions, ref.DerefOr(request.Params.XStellwerkRollback, false)) {
-			return GenerateInternalModuleCatalogue409JSONResponse{N409ConflictJSONResponse: Generate409Response(fmt.Sprintf(
+			return GenerateInternalExecutionCatalogue409JSONResponse{N409ConflictJSONResponse: Generate409Response(fmt.Sprintf(
 				"module %s is archived and rejects new Environment adoption", definition.DefinitionId,
 			))}, nil
 		}
 		if !permitsRestrictedModuleVersion(definition.SemanticStatus, pinAuthorizedVersions[definition.VersionUUID],
 			ref.DerefOr(request.Params.XStellwerkRollback, false), restrictedConfirmations[definition.VersionUUID]) {
-			return GenerateInternalModuleCatalogue409JSONResponse{N409ConflictJSONResponse: Generate409Response(fmt.Sprintf("module %s@%s is %s and cannot be used for a normal deployment", definition.DefinitionId, definition.VersionId, definition.SemanticStatus))}, nil
+			return GenerateInternalExecutionCatalogue409JSONResponse{N409ConflictJSONResponse: Generate409Response(fmt.Sprintf("module %s@%s is %s and cannot be used for a normal deployment", definition.DefinitionId, definition.VersionId, definition.SemanticStatus))}, nil
 		}
 	}
 
@@ -466,36 +589,51 @@ func (s *Server) GenerateInternalModuleCatalogue(ctx context.Context, request Ge
 
 		// Once we've used the rules in the first copy of the definition, we can drop them and avoid any pinned versions
 		// for the same definition
-		rules, ok := rulesByDefinitionId[def.DefinitionId]
-		if ok {
+		var rules []InternalModuleCatalogueModuleRule
+		if !retainedCoordinates[def.DefinitionId+"@"+def.VersionId] {
+			rules = rulesByDefinitionId[def.DefinitionId]
+		}
+		_, ok := rulesByDefinitionId[def.DefinitionId]
+		if ok && !retainedCoordinates[def.DefinitionId+"@"+def.VersionId] {
 			delete(rulesByDefinitionId, def.DefinitionId)
 		}
 
-		out.Modules = append(out.Modules, InternalModuleCatalogueModule{
-			ArtifactDigest:      def.ArtifactDigest,
-			CreatedAt:           def.CreatedAt,
-			Dependencies:        deps,
-			Coprovisioned:       coprovisioned,
-			Description:         def.Description.Ref(),
-			Id:                  def.DefinitionId,
-			ModuleInputs:        def.ModuleInputs,
-			ModuleParams:        moduleParams,
-			ModuleSource:        def.ModuleSource,
-			ModuleSourceCode:    def.ModuleSourceCode.Ref(),
-			OrgId:               def.OrgId,
-			ProviderMapping:     def.ProviderMapping,
-			ResourceType:        def.ResourceType,
-			Rules:               rules,
-			UpdatedAt:           def.UpdatedAt,
-			VersionId:           def.VersionId,
-			SemanticStatus:      ModuleVersionSemanticStatus(def.SemanticStatus),
-			ModuleUuid:          def.ModuleUUID,
-			VersionUuid:         def.VersionUUID,
-			SemanticVersion:     def.SemanticVersion,
-			MigrationGeneration: InternalModuleCatalogueModuleMigrationGeneration(def.MigrationGeneration),
-			VerificationStatus:  ModuleVerificationStatus(def.VerificationStatus),
-		})
+		entry := InternalExecutionCatalogueModule{
+			ArtifactDigest:          def.ArtifactDigest,
+			CreatedAt:               def.CreatedAt,
+			Dependencies:            deps,
+			Coprovisioned:           coprovisioned,
+			Description:             def.Description.Ref(),
+			Id:                      def.DefinitionId,
+			ModuleInputs:            def.ModuleInputs,
+			ModuleParams:            moduleParams,
+			ModuleSource:            def.ModuleSource,
+			ModuleSourceCode:        def.ModuleSourceCode.Ref(),
+			OrgId:                   def.OrgId,
+			ProviderMapping:         def.ProviderMapping,
+			ResourceType:            def.ResourceType,
+			ResourceTypeVersion:     optionalContractNumber(def.ResourceTypeVersion),
+			ResourceTypeVersionUuid: optionalContractUUID(def.ResourceTypeVersionUUID),
+			OutputSchema:            optionalJSONObject[ModuleOutputSchema](def.OutputSchema),
+			Rules:                   rules,
+			UpdatedAt:               def.UpdatedAt,
+			VersionId:               def.VersionId,
+			SemanticStatus:          ref.Ref(ModuleVersionSemanticStatus(def.SemanticStatus)),
+			ModuleUuid:              def.ModuleUUID,
+			VersionUuid:             def.VersionUUID,
+			SemanticVersion:         ref.Ref(def.SemanticVersion),
+			MigrationGeneration:     ref.Ref(InternalExecutionCatalogueModuleMigrationGeneration(def.MigrationGeneration)),
+			VerificationStatus:      ref.Ref(ModuleVerificationStatus(def.VerificationStatus)),
+		}
+		if snapshot, found := testSnapshots[def.VersionUUID]; found {
+			entry.DraftTest = &snapshot
+			entry.SemanticStatus = nil
+			entry.SemanticVersion = nil
+			entry.MigrationGeneration = nil
+			entry.VerificationStatus = nil
+		}
+		out.Modules = append(out.Modules, entry)
 	}
 
-	return GenerateInternalModuleCatalogue200JSONResponse(out), nil
+	return GenerateInternalExecutionCatalogue200JSONResponse(out), nil
 }

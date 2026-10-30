@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genclient"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/genclient"
 	"github.com/stretchr/testify/require"
 )
 

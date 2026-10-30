@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/plugincontext"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/plugincontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

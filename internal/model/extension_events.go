@@ -15,7 +15,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/stellwerk-labs/golib/hstandardoutbox"
 
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genevents"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/genevents"
 )
 
 // ExtensionResourceEvent is a deliberately narrow metadata projection. Module

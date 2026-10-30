@@ -3,7 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -28,7 +28,7 @@ func TestRuleCreateBody_validate(t *testing.T) {
 		body          RuleCreateBody
 		expectedError string
 	}{
-		// unauthorized means it past the validation
+		// Valid syntax reaches catalogue storage; fail that lookup independently of Rule policy.
 		{name: "valid", body: RuleCreateBody{ModuleId: "my-definition"}},
 		{name: "valid with res id", body: RuleCreateBody{ModuleId: "my-definition", ResourceId: ref.Ref("workloads.my-workload.my-res")}},
 		{name: "bad definition", body: RuleCreateBody{}, expectedError: ": module id must be a valid identifier of alphanumerics and hyphens"},
@@ -38,8 +38,7 @@ func TestRuleCreateBody_validate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			db := s.Database.(*mockmodel.MockDatabaser)
 			db.EXPECT().GetModuleCatalogue(gomock.Any(), gomock.Any(), "my-org", gomock.Any(), model.GetModeForUpdate).
-				Return(&model.ModuleCatalogue{Status: "active"}, nil).AnyTimes()
-			db.EXPECT().GetModuleDefinition(gomock.Any(), gomock.Any(), "my-org", gomock.Any(), model.GetModeForUpdate).Return(nil, fmt.Errorf("here")).AnyTimes()
+				Return(nil, errors.New("catalogue unavailable")).AnyTimes()
 
 			userId := userid.NewHumanUserId()
 			mockIamClient := s.IamClient.(*mockorchestratoriam.MockClientWithResponsesInterface)

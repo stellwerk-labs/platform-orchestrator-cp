@@ -21,7 +21,7 @@ import (
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/api/middleware"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/plugincontext"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/plugincontext"
 )
 
 func TestPluginMaterialUsesIndependentCorePermissionAndNeverServiceIdentity(t *testing.T) {

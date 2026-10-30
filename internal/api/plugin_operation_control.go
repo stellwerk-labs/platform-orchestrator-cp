@@ -8,7 +8,7 @@ import (
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/plugincontext"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/plugincontext"
 )
 
 // ControlPluginOperationGrant can only reduce existing authority. The controller

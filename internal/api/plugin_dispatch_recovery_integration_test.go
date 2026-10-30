@@ -17,7 +17,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stellwerk-labs/golib/hecho"
-	dpapi "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v2/genclient"
+	dpapi "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v3/genclient"
 	iamapi "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/assert"
@@ -27,7 +27,7 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/api/middleware"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/plugincontext"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/plugincontext"
 )
 
 // Real Core routes, generated OpenAPI validation, signed HTTP and PostgreSQL.

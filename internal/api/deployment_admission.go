@@ -77,6 +77,9 @@ func deploymentAdmissionFromAPI(org string, admission uuid.UUID, body *Deploymen
 		OrgID: org, AdmissionID: admission, ProjectUUID: body.ProjectUuid, EnvironmentUUID: body.EnvironmentUuid,
 		ActorID: body.ActorId, RequestDigest: body.RequestDigest, Mode: string(body.Mode), ModuleVersions: body.ModuleVersions,
 	}
+	if body.DraftTestSnapshots != nil {
+		value.DraftTestSnapshots = *body.DraftTestSnapshots
+	}
 	if body.CarryForwardModuleVersions != nil {
 		value.CarryForwardModuleVersions = *body.CarryForwardModuleVersions
 	}
@@ -103,6 +106,22 @@ func (s *Server) deploymentAdmissionAuthorizationChecks(ctx context.Context, org
 	}
 	for _, module := range slices.Sorted(maps.Keys(body.ModuleVersions)) {
 		versionUUID := body.ModuleVersions[module]
+		if body.DraftTestSnapshots != nil {
+			if snapshotUUID, selected := (*body.DraftTestSnapshots)[module]; selected {
+				if snapshotUUID != versionUUID {
+					return nil, false, model.NewErrBadRequest("Draft test snapshots must match resolved Module targets")
+				}
+				if _, err := s.Database.GetModuleDraftTestSnapshot(ctx, nil, org, module, body.EnvironmentUuid, snapshotUUID); err != nil {
+					return nil, false, err
+				}
+				if body.Mode != AdmissionModeRollback && carryForward[module] != snapshotUUID {
+					if err := s.checkOrgAuthorization(ctx, body.ActorId, org, PermissionModuleVersionPublish); err != nil {
+						return nil, false, err
+					}
+				}
+				continue
+			}
+		}
 		version, err := s.Database.GetCoreModuleVersion(ctx, nil, org, module, versionUUID.String(), model.GetModeDefault)
 		if err != nil {
 			return nil, false, err
@@ -160,7 +179,7 @@ func (s *Server) AuthorizeDeploymentAdmission(ctx context.Context, request Autho
 				return nil, err
 			}
 		}
-		receipt, err := model.AuthorizeDeploymentAdmission(ctx, s.Database, deploymentAdmissionFromAPI(request.OrgId, request.AdmissionId, body), model.DeploymentAdmissionPolicy{AllowFreshProposed: allowFreshProposed})
+		receipt, err := model.AuthorizeDeploymentAdmission(ctx, s.Database, deploymentAdmissionFromAPI(request.OrgId, request.AdmissionId, body), model.DeploymentAdmissionPolicy{AllowFreshProposed: allowFreshProposed, AllowFreshDraftTests: true})
 		if err != nil {
 			return nil, deploymentAdmissionModelError(err)
 		}

@@ -14,7 +14,7 @@ import (
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/events"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genevents"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/genevents"
 )
 
 const (
@@ -61,22 +61,24 @@ type ModuleCatalogue struct {
 }
 
 type CoreModuleVersion struct {
-	OrgID               string
-	ModuleUUID          uuid.UUID
-	ModuleSlug          string
-	UUID                uuid.UUID
-	SemanticVersion     *string
-	OpaqueVersionID     string
-	MigrationGeneration string
-	ArtifactDigest      string
-	VerificationStatus  moduleversions.VerificationStatus
-	LifecycleStatus     moduleversions.LifecycleStatus
-	SourceRevision      string
-	ReleaseNotes        *string
-	ResourceVersion     int64
-	PublishedBy         *uuid.UUID
-	CreatedAt           time.Time
-	Definition          ModuleDefinitionVersion
+	OrgID                   string
+	ModuleUUID              uuid.UUID
+	ModuleSlug              string
+	UUID                    uuid.UUID
+	SemanticVersion         *string
+	OpaqueVersionID         string
+	MigrationGeneration     string
+	ArtifactDigest          string
+	VerificationStatus      moduleversions.VerificationStatus
+	LifecycleStatus         moduleversions.LifecycleStatus
+	SourceRevision          string
+	ReleaseNotes            *string
+	ResourceVersion         int64
+	PublishedBy             *uuid.UUID
+	CreatedAt               time.Time
+	ResourceTypeVersion     int64
+	ResourceTypeVersionUUID uuid.UUID
+	Definition              ModuleDefinitionVersion
 }
 
 type ModuleLifecycleEvent struct {
@@ -414,7 +416,7 @@ func scanCoreModuleVersion(row interface{ Scan(...any) error }) (*CoreModuleVers
 	var publishedBy uuid.NullUUID
 	err := row.Scan(&result.OrgID, &result.ModuleUUID, &result.ModuleSlug, &result.UUID, &semanticVersion,
 		&result.OpaqueVersionID, &result.MigrationGeneration, &result.ArtifactDigest, &result.VerificationStatus,
-		&result.LifecycleStatus, &sourceRevision, &releaseNotes, &result.ResourceVersion, &publishedBy, &result.CreatedAt)
+		&result.LifecycleStatus, &sourceRevision, &releaseNotes, &result.ResourceVersion, &publishedBy, &result.CreatedAt, &result.ResourceTypeVersionUUID, &result.ResourceTypeVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -436,7 +438,7 @@ func scanCoreModuleVersion(row interface{ Scan(...any) error }) (*CoreModuleVers
 
 const coreModuleVersionColumns = `v.org_id, v.module_uuid, v.definition_id, v.uuid, v.semantic_version,
 	v.version_id, v.migration_generation, COALESCE(v.artifact_digest, ''), v.verification_status,
-	v.semantic_status, v.source_revision, v.release_notes, v.resource_version, v.published_by, v.created_at`
+	v.semantic_status, v.source_revision, v.release_notes, v.resource_version, v.published_by, v.created_at, v.resource_type_version_uuid, (SELECT version FROM resource_type_versions WHERE uuid = v.resource_type_version_uuid)`
 
 func (d *databaser) GetCoreModuleVersion(ctx context.Context, optionalTx Tx, orgID, moduleRef, versionRef string, mode GetMode) (*CoreModuleVersion, error) {
 	version, err := scanCoreModuleVersion(d.txOrDb(optionalTx).QueryRowContext(ctx, `SELECT `+coreModuleVersionColumns+`

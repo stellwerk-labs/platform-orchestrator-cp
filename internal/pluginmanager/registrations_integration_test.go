@@ -20,8 +20,8 @@ import (
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/plugincontext"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/pluginstatus"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/plugincontext"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/pluginstatus"
 )
 
 // edited returns raw changed by edit, with its digest.

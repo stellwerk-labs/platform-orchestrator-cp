@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"github.com/google/uuid"
 	"net/http"
 	"testing"
 
@@ -52,4 +53,15 @@ func TestPluginDispatchConflictsExposeOnlyEnvironmentBusy(t *testing.T) {
 	require.ErrorAs(t, pluginModelError(model.ErrConflict{Code: model.PinProtection, Message: "secret detail"}), &boundary)
 	require.Equal(t, "plugin_operation_conflict", boundary.Code)
 	require.NotContains(t, boundary.Message, "secret detail")
+}
+
+func TestDraftTestAdmissionConversionPreservesExplicitSelection(t *testing.T) {
+	module, snapshot := uuid.NewString(), uuid.New()
+	selection := map[string]uuid.UUID{module: snapshot}
+	body := DeploymentAdmissionRequest{ModuleVersions: selection, DraftTestSnapshots: &selection}
+	converted := deploymentAdmissionFromAPI("example", uuid.New(), &body)
+	require.Equal(t, selection, converted.DraftTestSnapshots)
+	body.DraftTestSnapshots = nil
+	converted = deploymentAdmissionFromAPI("example", uuid.New(), &body)
+	require.Nil(t, converted.DraftTestSnapshots, "ordinary requests cannot acquire implicit Draft test provenance")
 }

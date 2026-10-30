@@ -29,7 +29,7 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pgtest"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginentitlements"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/pluginstatus"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/pluginstatus"
 )
 
 var operator = userid.NewHumanUserId()

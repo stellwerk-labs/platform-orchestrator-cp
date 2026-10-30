@@ -23,7 +23,7 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginentitlements"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginmanager"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/pluginstatus"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/pluginstatus"
 )
 
 // pluginOperator holds both Plugin Manager permissions in every test IAM peer.

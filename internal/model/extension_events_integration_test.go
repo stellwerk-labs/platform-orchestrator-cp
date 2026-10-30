@@ -17,7 +17,7 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pgtest"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genevents"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/genevents"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
@@ -569,11 +569,13 @@ func TestExtensionEventMigrationDownGuardAndEmptyRoundTrip(t *testing.T) {
 			}
 			require.NoError(t, err)
 			provider := extensionMigrationProvider(t, db)
-			_, err = provider.DownTo(t.Context(), 36)
+			initialVersion, versionErr := provider.GetDBVersion(t.Context())
+			require.NoError(t, versionErr)
+			err = exerciseSQLMigrationDown(t, db, 37, false)
 			require.ErrorContains(t, err, "cannot discard extension event history")
 			version, versionErr := provider.GetDBVersion(t.Context())
 			require.NoError(t, versionErr)
-			require.Equal(t, int64(37), version)
+			require.Equal(t, initialVersion, version)
 		})
 	}
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genclient"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/genclient"
 )
 
 func TestResourceTypeConformanceRejectsBeforePublishingOrGraduating(t *testing.T) {

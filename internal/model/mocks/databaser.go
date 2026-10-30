@@ -166,6 +166,21 @@ func (mr *MockDatabaserMockRecorder) BulkGetResourceTypes(ctx, optionalTx, orgId
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BulkGetResourceTypes", reflect.TypeOf((*MockDatabaser)(nil).BulkGetResourceTypes), ctx, optionalTx, orgId, ids)
 }
 
+// CaptureModuleDraftTestSnapshot mocks base method.
+func (m *MockDatabaser) CaptureModuleDraftTestSnapshot(ctx context.Context, tx model.Tx, orgID, moduleRef string, request model.ModuleDraftTestCapture) (*model.ModuleDraftTestSnapshot, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CaptureModuleDraftTestSnapshot", ctx, tx, orgID, moduleRef, request)
+	ret0, _ := ret[0].(*model.ModuleDraftTestSnapshot)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CaptureModuleDraftTestSnapshot indicates an expected call of CaptureModuleDraftTestSnapshot.
+func (mr *MockDatabaserMockRecorder) CaptureModuleDraftTestSnapshot(ctx, tx, orgID, moduleRef, request any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CaptureModuleDraftTestSnapshot", reflect.TypeOf((*MockDatabaser)(nil).CaptureModuleDraftTestSnapshot), ctx, tx, orgID, moduleRef, request)
+}
+
 // Close mocks base method.
 func (m *MockDatabaser) Close() error {
 	m.ctrl.T.Helper()
@@ -178,6 +193,21 @@ func (m *MockDatabaser) Close() error {
 func (mr *MockDatabaserMockRecorder) Close() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockDatabaser)(nil).Close))
+}
+
+// CloseModuleDraft mocks base method.
+func (m *MockDatabaser) CloseModuleDraft(ctx context.Context, tx model.Tx, orgID, moduleRef string, id uuid.UUID, expected int64, published *uuid.UUID, actor uuid.UUID, reason string) (*model.ModuleDraft, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CloseModuleDraft", ctx, tx, orgID, moduleRef, id, expected, published, actor, reason)
+	ret0, _ := ret[0].(*model.ModuleDraft)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CloseModuleDraft indicates an expected call of CloseModuleDraft.
+func (mr *MockDatabaserMockRecorder) CloseModuleDraft(ctx, tx, orgID, moduleRef, id, expected, published, actor, reason any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CloseModuleDraft", reflect.TypeOf((*MockDatabaser)(nil).CloseModuleDraft), ctx, tx, orgID, moduleRef, id, expected, published, actor, reason)
 }
 
 // CreateEmptyModule mocks base method.
@@ -268,6 +298,21 @@ func (m *MockDatabaser) CreateModuleDefinitionVersion(ctx context.Context, tx mo
 func (mr *MockDatabaserMockRecorder) CreateModuleDefinitionVersion(ctx, tx, request any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateModuleDefinitionVersion", reflect.TypeOf((*MockDatabaser)(nil).CreateModuleDefinitionVersion), ctx, tx, request)
+}
+
+// CreateModuleDraft mocks base method.
+func (m *MockDatabaser) CreateModuleDraft(ctx context.Context, tx model.Tx, orgID, moduleRef string, content json.RawMessage, actor uuid.UUID, reason string) (*model.ModuleDraft, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateModuleDraft", ctx, tx, orgID, moduleRef, content, actor, reason)
+	ret0, _ := ret[0].(*model.ModuleDraft)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateModuleDraft indicates an expected call of CreateModuleDraft.
+func (mr *MockDatabaserMockRecorder) CreateModuleDraft(ctx, tx, orgID, moduleRef, content, actor, reason any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateModuleDraft", reflect.TypeOf((*MockDatabaser)(nil).CreateModuleDraft), ctx, tx, orgID, moduleRef, content, actor, reason)
 }
 
 // CreateModuleProvider mocks base method.
@@ -666,6 +711,51 @@ func (mr *MockDatabaserMockRecorder) GetModuleDefinitionVersion(ctx, optionalTx,
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetModuleDefinitionVersion", reflect.TypeOf((*MockDatabaser)(nil).GetModuleDefinitionVersion), ctx, optionalTx, orgId, defId, versionId)
 }
 
+// GetModuleDraft mocks base method.
+func (m *MockDatabaser) GetModuleDraft(ctx context.Context, tx model.Tx, orgID, moduleRef string, id uuid.UUID, mode model.GetMode) (*model.ModuleDraft, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetModuleDraft", ctx, tx, orgID, moduleRef, id, mode)
+	ret0, _ := ret[0].(*model.ModuleDraft)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetModuleDraft indicates an expected call of GetModuleDraft.
+func (mr *MockDatabaserMockRecorder) GetModuleDraft(ctx, tx, orgID, moduleRef, id, mode any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetModuleDraft", reflect.TypeOf((*MockDatabaser)(nil).GetModuleDraft), ctx, tx, orgID, moduleRef, id, mode)
+}
+
+// GetModuleDraftRevision mocks base method.
+func (m *MockDatabaser) GetModuleDraftRevision(ctx context.Context, tx model.Tx, orgID, moduleRef string, id uuid.UUID, revision int64) (*model.ModuleDraftRevision, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetModuleDraftRevision", ctx, tx, orgID, moduleRef, id, revision)
+	ret0, _ := ret[0].(*model.ModuleDraftRevision)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetModuleDraftRevision indicates an expected call of GetModuleDraftRevision.
+func (mr *MockDatabaserMockRecorder) GetModuleDraftRevision(ctx, tx, orgID, moduleRef, id, revision any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetModuleDraftRevision", reflect.TypeOf((*MockDatabaser)(nil).GetModuleDraftRevision), ctx, tx, orgID, moduleRef, id, revision)
+}
+
+// GetModuleDraftTestSnapshot mocks base method.
+func (m *MockDatabaser) GetModuleDraftTestSnapshot(ctx context.Context, tx model.Tx, orgID, moduleRef string, environment, id uuid.UUID) (*model.ModuleDraftTestSnapshot, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetModuleDraftTestSnapshot", ctx, tx, orgID, moduleRef, environment, id)
+	ret0, _ := ret[0].(*model.ModuleDraftTestSnapshot)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetModuleDraftTestSnapshot indicates an expected call of GetModuleDraftTestSnapshot.
+func (mr *MockDatabaserMockRecorder) GetModuleDraftTestSnapshot(ctx, tx, orgID, moduleRef, environment, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetModuleDraftTestSnapshot", reflect.TypeOf((*MockDatabaser)(nil).GetModuleDraftTestSnapshot), ctx, tx, orgID, moduleRef, environment, id)
+}
+
 // GetModuleOperationReservation mocks base method.
 func (m *MockDatabaser) GetModuleOperationReservation(ctx context.Context, optionalTx model.Tx, orgID string, reservationID uuid.UUID, mode model.GetMode) (*model.ModuleOperationReservation, error) {
 	m.ctrl.T.Helper()
@@ -769,6 +859,21 @@ func (m *MockDatabaser) GetResourceType(ctx context.Context, optionalTx model.Tx
 func (mr *MockDatabaserMockRecorder) GetResourceType(ctx, optionalTx, orgId, id any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResourceType", reflect.TypeOf((*MockDatabaser)(nil).GetResourceType), ctx, optionalTx, orgId, id)
+}
+
+// GetResourceTypeVersion mocks base method.
+func (m *MockDatabaser) GetResourceTypeVersion(ctx context.Context, tx model.Tx, orgID, id string, version int64) (*model.ResourceTypeVersion, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetResourceTypeVersion", ctx, tx, orgID, id, version)
+	ret0, _ := ret[0].(*model.ResourceTypeVersion)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetResourceTypeVersion indicates an expected call of GetResourceTypeVersion.
+func (mr *MockDatabaserMockRecorder) GetResourceTypeVersion(ctx, tx, orgID, id, version any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResourceTypeVersion", reflect.TypeOf((*MockDatabaser)(nil).GetResourceTypeVersion), ctx, tx, orgID, id, version)
 }
 
 // GetRunner mocks base method.
@@ -989,6 +1094,21 @@ func (mr *MockDatabaserMockRecorder) ListModuleDefinitions(ctx, optionalTx, orgI
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListModuleDefinitions", reflect.TypeOf((*MockDatabaser)(nil).ListModuleDefinitions), ctx, optionalTx, orgId, pageToken, perPage, params)
 }
 
+// ListModuleDrafts mocks base method.
+func (m *MockDatabaser) ListModuleDrafts(ctx context.Context, tx model.Tx, orgID, moduleRef string, after uuid.UUID, limit int) ([]model.ModuleDraft, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListModuleDrafts", ctx, tx, orgID, moduleRef, after, limit)
+	ret0, _ := ret[0].([]model.ModuleDraft)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListModuleDrafts indicates an expected call of ListModuleDrafts.
+func (mr *MockDatabaserMockRecorder) ListModuleDrafts(ctx, tx, orgID, moduleRef, after, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListModuleDrafts", reflect.TypeOf((*MockDatabaser)(nil).ListModuleDrafts), ctx, tx, orgID, moduleRef, after, limit)
+}
+
 // ListModuleExtensionContributions mocks base method.
 func (m *MockDatabaser) ListModuleExtensionContributions(ctx context.Context, optionalTx model.Tx, orgID string, moduleUUID uuid.UUID, includeDraft, includeTerminal bool) ([]model.ModuleExtensionContribution, error) {
 	m.ctrl.T.Helper()
@@ -1128,6 +1248,21 @@ func (mr *MockDatabaserMockRecorder) ListProjects(ctx, optionalTx, orgId, pageTo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjects", reflect.TypeOf((*MockDatabaser)(nil).ListProjects), ctx, optionalTx, orgId, pageToken, perPage)
 }
 
+// ListResourceTypeVersions mocks base method.
+func (m *MockDatabaser) ListResourceTypeVersions(ctx context.Context, tx model.Tx, orgID, id string, after int64, limit int) ([]model.ResourceTypeVersion, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListResourceTypeVersions", ctx, tx, orgID, id, after, limit)
+	ret0, _ := ret[0].([]model.ResourceTypeVersion)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListResourceTypeVersions indicates an expected call of ListResourceTypeVersions.
+func (mr *MockDatabaserMockRecorder) ListResourceTypeVersions(ctx, tx, orgID, id, after, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListResourceTypeVersions", reflect.TypeOf((*MockDatabaser)(nil).ListResourceTypeVersions), ctx, tx, orgID, id, after, limit)
+}
+
 // ListResourceTypes mocks base method.
 func (m *MockDatabaser) ListResourceTypes(ctx context.Context, optionalTx model.Tx, orgId *string, pageToken string, perPage int) ([]model.ResourceType, string, error) {
 	m.ctrl.T.Helper()
@@ -1189,6 +1324,21 @@ func (m *MockDatabaser) PublishCoreModuleVersion(ctx context.Context, tx model.T
 func (mr *MockDatabaserMockRecorder) PublishCoreModuleVersion(ctx, tx, request, actor any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishCoreModuleVersion", reflect.TypeOf((*MockDatabaser)(nil).PublishCoreModuleVersion), ctx, tx, request, actor)
+}
+
+// PublishResourceTypeVersion mocks base method.
+func (m *MockDatabaser) PublishResourceTypeVersion(ctx context.Context, tx model.Tx, orgID, id string, request model.ResourceTypeVersionPublication) (*model.ResourceTypeVersion, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PublishResourceTypeVersion", ctx, tx, orgID, id, request)
+	ret0, _ := ret[0].(*model.ResourceTypeVersion)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PublishResourceTypeVersion indicates an expected call of PublishResourceTypeVersion.
+func (mr *MockDatabaserMockRecorder) PublishResourceTypeVersion(ctx, tx, orgID, id, request any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishResourceTypeVersion", reflect.TypeOf((*MockDatabaser)(nil).PublishResourceTypeVersion), ctx, tx, orgID, id, request)
 }
 
 // PublishStableModuleVersionSuccessor mocks base method.
@@ -1353,6 +1503,21 @@ func (m *MockDatabaser) UpdateModuleCatalogueMetadata(ctx context.Context, tx mo
 func (mr *MockDatabaserMockRecorder) UpdateModuleCatalogueMetadata(ctx, tx, orgID, moduleRef, displayName, description, tags, expectedVersion any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateModuleCatalogueMetadata", reflect.TypeOf((*MockDatabaser)(nil).UpdateModuleCatalogueMetadata), ctx, tx, orgID, moduleRef, displayName, description, tags, expectedVersion)
+}
+
+// UpdateModuleDraft mocks base method.
+func (m *MockDatabaser) UpdateModuleDraft(ctx context.Context, tx model.Tx, orgID, moduleRef string, id uuid.UUID, expected int64, content json.RawMessage, actor uuid.UUID, reason string) (*model.ModuleDraft, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateModuleDraft", ctx, tx, orgID, moduleRef, id, expected, content, actor, reason)
+	ret0, _ := ret[0].(*model.ModuleDraft)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateModuleDraft indicates an expected call of UpdateModuleDraft.
+func (mr *MockDatabaserMockRecorder) UpdateModuleDraft(ctx, tx, orgID, moduleRef, id, expected, content, actor, reason any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateModuleDraft", reflect.TypeOf((*MockDatabaser)(nil).UpdateModuleDraft), ctx, tx, orgID, moduleRef, id, expected, content, actor, reason)
 }
 
 // UpdateModuleProvider mocks base method.

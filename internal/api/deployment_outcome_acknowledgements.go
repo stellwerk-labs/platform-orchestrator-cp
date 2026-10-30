@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/stellwerk-labs/golib/hlogger"
-	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v2/genclient"
+	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v3/genclient"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"go.uber.org/zap"
 

@@ -106,21 +106,15 @@ func (s *Server) CreateModuleRuleInOrg(ctx context.Context, request CreateModule
 		if catalogue.Status == moduleversions.CatalogueArchived {
 			return CreateModuleRuleInOrg409JSONResponse{N409ConflictJSONResponse: Generate409Response("archived Modules reject new Module Rules")}, nil
 		}
-
-		definition, err := s.Database.GetModuleDefinition(ctx, tx, request.OrgId, request.Body.ModuleId, model.GetModeForUpdate)
-		if err != nil {
-			if me, ok := model.IsErrNotFound(err); ok {
-				return CreateModuleRuleInOrg400JSONResponse{N400BadRequestJSONResponse: Generate400FromModelErr(model.NewErrBadRequest(me.Message))}, nil
-			}
-			return nil, errors.Wrap(err, "failed to get module definition")
+		if catalogue.CurrentDefaultVersionUUID == nil && request.Body.EnvId == nil {
+			return CreateModuleRuleInOrg400JSONResponse{N400BadRequestJSONResponse: Generate400Response("Modules without a Default require an Environment-scoped test Rule; set project_id and env_id")}, nil
 		}
 
-		// getting the definition id and resource type happens within this db method
 		if res, err := s.Database.CreateModuleRule(ctx, tx, request.OrgId, &model.DefinitionRule{
 			OrgId:         request.OrgId,
-			DefinitionId:  definition.DefinitionId,
+			DefinitionId:  catalogue.Slug,
 			CreatedAt:     time.Now().UTC(),
-			ResourceType:  definition.ResourceType,
+			ResourceType:  catalogue.ResourceType,
 			ResourceClass: ref.DerefOr(request.Body.ResourceClass, DefaultResourceClass),
 			ResourceId:    opt.OfRef(request.Body.ResourceId),
 			EnvTypeId:     opt.OfRef(request.Body.EnvTypeId),

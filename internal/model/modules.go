@@ -20,11 +20,13 @@ import (
 )
 
 type ModuleDefinitionVersion struct {
-	OrgId        string
-	DefinitionId string
-	ModuleUUID   uuid.UUID
-	CreatedAt    time.Time
-	ResourceType string
+	OrgId                   string
+	DefinitionId            string
+	ModuleUUID              uuid.UUID
+	CreatedAt               time.Time
+	ResourceType            string
+	ResourceTypeVersion     int64
+	ResourceTypeVersionUUID uuid.UUID
 
 	VersionId           string
 	VersionUUID         uuid.UUID
@@ -104,7 +106,7 @@ func (d *databaser) ListModuleDefinitions(ctx context.Context, optionalTx Tx, or
 		        v.uuid, COALESCE(v.semantic_version, ''), v.migration_generation, v.verification_status,
 		        COALESCE(v.source_revision, ''), v.resource_version, v.published_by, v.created_at,
 		        COALESCE(d.description, v.description), v.module_source, v.module_source_code, v.module_inputs, v.module_params,
-		        v.dependencies, v.coprovisioned, v.provider_mapping, COALESCE(v.artifact_digest, ''), v.semantic_status, v.output_schema
+		        v.dependencies, v.coprovisioned, v.provider_mapping, COALESCE(v.artifact_digest, ''), v.semantic_status, v.output_schema, v.resource_type_version_uuid, (SELECT version FROM resource_type_versions WHERE uuid = v.resource_type_version_uuid)
 		 FROM org_check
          LEFT JOIN definitions d ON org_check.org_exists AND d.org_id = $1 
 		 INNER JOIN definition_versions v ON d.org_id = v.org_id AND d.id = v.definition_id AND d.latest_version_id = v.version_id
@@ -129,7 +131,7 @@ func (d *databaser) ListModuleDefinitions(ctx context.Context, optionalTx Tx, or
 				&next.UpdatedAt, opt.Scan(&next.Description), &next.ModuleSource, opt.Scan(&next.ModuleSourceCode),
 				asJson(&next.ModuleInputs), asJson(&next.ModuleParams), asJson(&next.Dependencies),
 				asJson(&next.CoProvisioned), asJson(&next.ProviderMapping), &next.ArtifactDigest,
-				&next.SemanticStatus, asJson(&next.OutputSchema)); err != nil {
+				&next.SemanticStatus, asJson(&next.OutputSchema), &next.ResourceTypeVersionUUID, &next.ResourceTypeVersion); err != nil {
 				return nil, "", errors.Wrap(err, "failed to scan row")
 			}
 			if !orgExists {
@@ -167,7 +169,7 @@ func (d *databaser) ListModuleDefinitionVersions(ctx context.Context, optionalTx
 		        v.migration_generation, v.verification_status, COALESCE(v.source_revision, ''), v.release_notes,
 		        v.resource_version, v.published_by, v.created_at, v.description, v.module_source,
 		        v.module_source_code, v.module_inputs, v.module_params, v.dependencies, v.coprovisioned,
-		        v.provider_mapping, COALESCE(v.artifact_digest, ''), v.semantic_status, v.output_schema
+		        v.provider_mapping, COALESCE(v.artifact_digest, ''), v.semantic_status, v.output_schema, v.resource_type_version_uuid, (SELECT version FROM resource_type_versions WHERE uuid = v.resource_type_version_uuid)
          FROM definitions d INNER JOIN definition_versions v ON d.org_id = v.org_id AND d.id = v.definition_id
 		 WHERE d.org_id = $1 AND (d.id = $2 OR d.uuid::text = $2) AND v.created_at < $3
 		 AND ($4 OR v.semantic_status <> 'deprecated')
@@ -191,7 +193,7 @@ func (d *databaser) ListModuleDefinitionVersions(ctx context.Context, optionalTx
 				&next.UpdatedAt, opt.Scan(&next.Description), &next.ModuleSource, opt.Scan(&next.ModuleSourceCode),
 				asJson(&next.ModuleInputs), asJson(&next.ModuleParams), asJson(&next.Dependencies),
 				asJson(&next.CoProvisioned), asJson(&next.ProviderMapping), &next.ArtifactDigest,
-				&next.SemanticStatus, asJson(&next.OutputSchema)); err != nil {
+				&next.SemanticStatus, asJson(&next.OutputSchema), &next.ResourceTypeVersionUUID, &next.ResourceTypeVersion); err != nil {
 				return nil, "", errors.Wrap(err, "failed to scan row")
 			}
 			if len(out) >= limitPlusOne-1 {
@@ -213,11 +215,11 @@ func (d *databaser) GetModuleDefinition(ctx context.Context, optionalTx Tx, orgI
 		DefinitionId: defId,
 	}
 	if err := d.txOrDb(optionalTx).QueryRowContext(
-		ctx, `SELECT d.latest_version_id, d.created_at, d.resource_type, v.created_at, COALESCE(d.description, v.description), v.module_source, v.module_source_code, v.module_inputs, v.module_params, v.dependencies, v.coprovisioned, v.provider_mapping, v.output_schema
+		ctx, `SELECT d.latest_version_id, d.created_at, d.resource_type, v.created_at, COALESCE(d.description, v.description), v.module_source, v.module_source_code, v.module_inputs, v.module_params, v.dependencies, v.coprovisioned, v.provider_mapping, v.output_schema, v.resource_type_version_uuid, (SELECT version FROM resource_type_versions WHERE uuid = v.resource_type_version_uuid)
 FROM definitions d INNER JOIN definition_versions v ON d.org_id = v.org_id AND d.id = v.definition_id AND d.latest_version_id = v.version_id
 WHERE d.org_id = $1 AND d.id = $2`+GetModeSuffix(mode),
 		orgId, defId,
-	).Scan(&res.VersionId, &res.CreatedAt, &res.ResourceType, &res.UpdatedAt, opt.Scan(&res.Description), &res.ModuleSource, opt.Scan(&res.ModuleSourceCode), asJson(&res.ModuleInputs), asJson(&res.ModuleParams), asJson(&res.Dependencies), asJson(&res.CoProvisioned), asJson(&res.ProviderMapping), asJson(&res.OutputSchema)); err != nil {
+	).Scan(&res.VersionId, &res.CreatedAt, &res.ResourceType, &res.UpdatedAt, opt.Scan(&res.Description), &res.ModuleSource, opt.Scan(&res.ModuleSourceCode), asJson(&res.ModuleInputs), asJson(&res.ModuleParams), asJson(&res.Dependencies), asJson(&res.CoProvisioned), asJson(&res.ProviderMapping), asJson(&res.OutputSchema), &res.ResourceTypeVersionUUID, &res.ResourceTypeVersion); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, NewErrNotFound("module not found")
 		}
@@ -237,7 +239,7 @@ func (d *databaser) GetModuleDefinitionVersion(ctx context.Context, optionalTx T
 		v.migration_generation, v.verification_status, COALESCE(v.source_revision, ''), v.release_notes,
 		v.resource_version, v.published_by, v.created_at, v.description, v.module_source,
 		v.module_source_code, v.module_inputs, v.module_params, v.dependencies, v.coprovisioned,
-		v.provider_mapping, COALESCE(v.artifact_digest, ''), v.semantic_status, v.version_id, v.output_schema
+		v.provider_mapping, COALESCE(v.artifact_digest, ''), v.semantic_status, v.version_id, v.output_schema, v.resource_type_version_uuid, (SELECT version FROM resource_type_versions WHERE uuid = v.resource_type_version_uuid)
 FROM definitions d INNER JOIN definition_versions v ON d.org_id = v.org_id AND d.id = v.definition_id
 WHERE d.org_id = $1 AND (d.id = $2 OR d.uuid::text = $2)
 AND (v.version_id = $3 OR v.uuid::text = $3 OR v.semantic_version = $3)`,
@@ -247,7 +249,7 @@ AND (v.version_id = $3 OR v.uuid::text = $3 OR v.semantic_version = $3)`,
 		&res.ResourceVersion, &res.PublishedBy, &res.UpdatedAt, opt.Scan(&res.Description), &res.ModuleSource,
 		opt.Scan(&res.ModuleSourceCode), asJson(&res.ModuleInputs), asJson(&res.ModuleParams),
 		asJson(&res.Dependencies), asJson(&res.CoProvisioned), asJson(&res.ProviderMapping),
-		&res.ArtifactDigest, &res.SemanticStatus, &res.VersionId, asJson(&res.OutputSchema)); err != nil {
+		&res.ArtifactDigest, &res.SemanticStatus, &res.VersionId, asJson(&res.OutputSchema), &res.ResourceTypeVersionUUID, &res.ResourceTypeVersion); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, NewErrNotFound("definition version not found")
 		}
@@ -271,7 +273,7 @@ func (d *databaser) BulkGetModuleDefinitionVersions(ctx context.Context, optiona
 		        v.migration_generation, v.verification_status, COALESCE(v.source_revision, ''),
 		        v.resource_version, v.published_by, d.created_at, d.resource_type, v.created_at,
 		        v.description, v.module_source, v.module_source_code, v.module_inputs, v.module_params,
-		        v.dependencies, v.coprovisioned, v.provider_mapping, COALESCE(v.artifact_digest, ''), v.semantic_status, v.output_schema
+		        v.dependencies, v.coprovisioned, v.provider_mapping, COALESCE(v.artifact_digest, ''), v.semantic_status, v.output_schema, v.resource_type_version_uuid, (SELECT version FROM resource_type_versions WHERE uuid = v.resource_type_version_uuid)
 FROM definitions d INNER JOIN definition_versions v ON d.org_id = v.org_id AND d.id = v.definition_id
 WHERE d.org_id = $1 AND d.id || v.version_id = ANY($2::text[])`,
 		orgId, pq.Array(concatIds),
@@ -291,7 +293,7 @@ WHERE d.org_id = $1 AND d.id || v.version_id = ANY($2::text[])`,
 				opt.Scan(&item.Description), &item.ModuleSource, opt.Scan(&item.ModuleSourceCode),
 				asJson(&item.ModuleInputs), asJson(&item.ModuleParams), asJson(&item.Dependencies),
 				asJson(&item.CoProvisioned), asJson(&item.ProviderMapping), &item.ArtifactDigest,
-				&item.SemanticStatus, asJson(&item.OutputSchema)); err != nil {
+				&item.SemanticStatus, asJson(&item.OutputSchema), &item.ResourceTypeVersionUUID, &item.ResourceTypeVersion); err != nil {
 				return nil, errors.Wrap(err, "failed to scan row")
 			}
 			out = append(out, item)
@@ -364,6 +366,8 @@ func (d *databaser) CreateModuleDefinition(ctx context.Context, tx Tx, request *
 		return nil, err
 	}
 
+	ret.ResourceTypeVersion = request.ResourceTypeVersion
+	ret.ResourceTypeVersionUUID = request.ResourceTypeVersionUUID
 	if userErr, err := validateProviders(ctx, tx, request.OrgId, request.ProviderMapping); err != nil {
 		return nil, errors.Wrap(err, "error validating providers")
 	} else if userErr != nil {
@@ -393,11 +397,11 @@ func (d *databaser) CreateModuleDefinition(ctx context.Context, tx Tx, request *
 
 	if err := tx.QueryRowContext(
 		ctx,
-		`INSERT INTO definition_versions (org_id, definition_id, module_uuid, version_id, created_at, description, module_source, module_source_code, module_inputs, module_params, dependencies, coprovisioned, provider_mapping, provider_values, artifact_digest, semantic_status, semantic_version, migration_generation, verification_status, source_revision, release_notes, published_by, output_schema)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NULLIF($17, ''), COALESCE(NULLIF($18, ''), 'v0'), COALESCE(NULLIF($19, ''), 'unverified'), NULLIF($20, ''), $21, $22, $23)
+		`INSERT INTO definition_versions (org_id, definition_id, module_uuid, version_id, created_at, description, module_source, module_source_code, module_inputs, module_params, dependencies, coprovisioned, provider_mapping, provider_values, artifact_digest, semantic_status, semantic_version, migration_generation, verification_status, source_revision, release_notes, published_by, output_schema, resource_type_version_uuid)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NULLIF($17, ''), COALESCE(NULLIF($18, ''), 'v0'), COALESCE(NULLIF($19, ''), 'unverified'), NULLIF($20, ''), $21, $22, $23, $24)
 		 RETURNING created_at, uuid, resource_version`,
 		request.OrgId, request.DefinitionId, ret.ModuleUUID, request.VersionId, request.UpdatedAt, request.Description, request.ModuleSource, request.ModuleSourceCode, asJson(&request.ModuleInputs), asJson(&request.ModuleParams), asJson(&request.Dependencies), asJson(&request.CoProvisioned), asJson(&request.ProviderMapping),
-		pq.Array(providersToStableList(request.ProviderMapping)), request.ArtifactDigest, status, request.SemanticVersion, request.MigrationGeneration, request.VerificationStatus, request.SourceRevision, request.ReleaseNotes, request.PublishedBy, asJson(&request.OutputSchema),
+		pq.Array(providersToStableList(request.ProviderMapping)), request.ArtifactDigest, status, request.SemanticVersion, request.MigrationGeneration, request.VerificationStatus, request.SourceRevision, request.ReleaseNotes, request.PublishedBy, asJson(&request.OutputSchema), request.ResourceTypeVersionUUID,
 	).Scan(&ret.UpdatedAt, &ret.VersionUUID, &ret.ResourceVersion); err != nil {
 		return nil, errors.Wrap(err, "failed to insert definition version")
 	}
@@ -442,6 +446,8 @@ func (d *databaser) CreateModuleDefinitionVersion(ctx context.Context, tx Tx, re
 		return nil, err
 	}
 
+	ret.ResourceTypeVersion = request.ResourceTypeVersion
+	ret.ResourceTypeVersionUUID = request.ResourceTypeVersionUUID
 	if userErr, err := validateProviders(ctx, tx, request.OrgId, request.ProviderMapping); err != nil {
 		return nil, errors.Wrap(err, "error validating providers")
 	} else if userErr != nil {
@@ -457,11 +463,11 @@ func (d *databaser) CreateModuleDefinitionVersion(ctx context.Context, tx Tx, re
 
 	if err := tx.QueryRowContext(
 		ctx,
-		`INSERT INTO definition_versions (org_id, definition_id, module_uuid, version_id, created_at, description, module_source, module_source_code, module_inputs, module_params, dependencies, coprovisioned, provider_mapping, provider_values, artifact_digest, semantic_status, semantic_version, migration_generation, verification_status, source_revision, release_notes, published_by, output_schema)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NULLIF($17, ''), COALESCE(NULLIF($18, ''), 'managed'), COALESCE(NULLIF($19, ''), 'unverified'), NULLIF($20, ''), $21, $22, $23)
+		`INSERT INTO definition_versions (org_id, definition_id, module_uuid, version_id, created_at, description, module_source, module_source_code, module_inputs, module_params, dependencies, coprovisioned, provider_mapping, provider_values, artifact_digest, semantic_status, semantic_version, migration_generation, verification_status, source_revision, release_notes, published_by, output_schema, resource_type_version_uuid)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NULLIF($17, ''), COALESCE(NULLIF($18, ''), 'managed'), COALESCE(NULLIF($19, ''), 'unverified'), NULLIF($20, ''), $21, $22, $23, $24)
 		 RETURNING created_at, uuid, resource_version`,
 		request.OrgId, request.DefinitionId, module.UUID, request.VersionId, request.UpdatedAt, &request.Description, request.ModuleSource, request.ModuleSourceCode, asJson(&request.ModuleInputs), asJson(&request.ModuleParams), asJson(&request.Dependencies), asJson(&request.CoProvisioned), asJson(&request.ProviderMapping),
-		pq.Array(providersToStableList(request.ProviderMapping)), request.ArtifactDigest, status, request.SemanticVersion, request.MigrationGeneration, request.VerificationStatus, request.SourceRevision, request.ReleaseNotes, request.PublishedBy, asJson(&request.OutputSchema),
+		pq.Array(providersToStableList(request.ProviderMapping)), request.ArtifactDigest, status, request.SemanticVersion, request.MigrationGeneration, request.VerificationStatus, request.SourceRevision, request.ReleaseNotes, request.PublishedBy, asJson(&request.OutputSchema), request.ResourceTypeVersionUUID,
 	).Scan(&ret.UpdatedAt, &ret.VersionUUID, &ret.ResourceVersion); err != nil {
 		return nil, err
 	}
@@ -512,7 +518,8 @@ func (d *databaser) DeleteModuleDefinition(ctx context.Context, optionalTx Tx, o
 	if err := d.txOrDb(optionalTx).QueryRowContext(ctx, `SELECT
 		(SELECT count(*) FROM definition_versions WHERE org_id = $1 AND definition_id = $2),
 		(SELECT count(*) FROM definition_rules WHERE org_id = $1 AND definition_id = $2),
-		(SELECT count(*) FROM module_catalogue_events WHERE org_id = $1 AND module_uuid = d.uuid),
+		(SELECT count(*) FROM module_catalogue_events WHERE org_id = $1 AND module_uuid = d.uuid)
+		+ (SELECT count(*) FROM module_drafts WHERE org_id = $1 AND module_uuid = d.uuid),
 		(SELECT count(*) FROM module_operation_reservations WHERE org_id = $1 AND module_uuid = d.uuid),
 		(SELECT count(*) FROM module_extension_contributions WHERE org_id = $1 AND module_uuid = d.uuid)
 		FROM definitions d WHERE d.org_id = $1 AND d.id = $2 FOR UPDATE`, orgId, defId).
@@ -526,7 +533,7 @@ func (d *databaser) DeleteModuleDefinition(ctx context.Context, optionalTx Tx, o
 		return ErrConflict{Code: ModuleHistoryRetained, Message: "published Module Versions are permanently retained; archive the catalogue entry with a reason instead of deleting its history"}
 	}
 	if ruleCount != 0 || catalogueEventCount != 0 || reservationCount != 0 || extensionCount != 0 {
-		return NewErrConflict("only an unused empty Module shell without version, rule, audit, reservation or add-on history can be deleted")
+		return NewErrConflict("only an unused empty Module shell without version, Draft, rule, audit, reservation or add-on history can be deleted")
 	}
 	if _, err := d.txOrDb(optionalTx).ExecContext(ctx,
 		`DELETE FROM module_core_commands WHERE org_id = $1 AND command_scope = $2`,

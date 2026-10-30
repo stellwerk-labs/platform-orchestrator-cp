@@ -14,7 +14,7 @@ import (
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/opt"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genclient"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/genclient"
 )
 
 func TestRules(t *testing.T) {

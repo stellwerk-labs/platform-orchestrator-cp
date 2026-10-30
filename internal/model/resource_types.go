@@ -191,7 +191,7 @@ func (d *databaser) UpdateResourceType(ctx context.Context, optionalTx Tx, orgId
 	if _, err := d.GetResourceType(ctx, optionalTx, orgId, id); err != nil {
 		return nil, err
 	}
-	return nil, NewErrConflict("resource types are immutable; create a new resource type identity for a changed contract")
+	return nil, NewErrConflict("resource types are immutable; publish a new interface version for a changed contract")
 }
 
 func scanResourceType(row interface{ Scan(...any) error }, result *ResourceType) error {
@@ -279,6 +279,15 @@ func (d *databaser) DeleteResourceType(ctx context.Context, optionalTx Tx, orgId
 	}
 	if err := lockResourceTypeIdentity(ctx, optionalTx, id); err != nil {
 		return err
+	}
+	var retainedContract bool
+	if err := optionalTx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM resource_type_versions v
+		JOIN resource_types r ON r.uuid=v.resource_type_uuid
+		WHERE r.id=$2 AND r.org_id IS NOT DISTINCT FROM $1::text AND v.version>1)`, orgId, id).Scan(&retainedContract); err != nil {
+		return errors.Wrap(err, "failed to inspect immutable Resource Type interface history")
+	}
+	if retainedContract {
+		return NewErrConflict("published Resource Type interface history is retained; archive the catalogue entry instead")
 	}
 	if orgId == nil {
 		var used bool

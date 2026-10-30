@@ -14,7 +14,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stellwerk-labs/golib/hecho"
-	dpapi "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v2/genclient"
+	dpapi "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v3/genclient"
 	iamapi "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"github.com/stretchr/testify/assert"

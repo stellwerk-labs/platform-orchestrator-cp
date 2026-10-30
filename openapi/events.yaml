@@ -24,7 +24,9 @@ components:
         - io.platform-orchestrator.module.version.lifecycle-changed
         - io.platform-orchestrator.module.version.pin-lifecycle-changed
         - io.platform-orchestrator.module.catalogue.changed
+        - io.platform-orchestrator.module.draft.changed
         - io.platform-orchestrator.resource-type.catalogue.changed
+        - io.platform-orchestrator.resource-type.version.published
     OrgId:
       type: string
     OrgUuid:

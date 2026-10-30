@@ -113,9 +113,11 @@ func TestExtensionResourceJournalStateMigrationRefusesDowngradeAfterAPause(t *te
 	journalEnvironmentEvents(t, db, consumer, 1)
 	require.NoError(t, ReconcileExtensionResourceJournal(t.Context(), db, false))
 	provider := extensionMigrationProvider(t, db)
-	_, err := provider.DownTo(t.Context(), 39)
+	initialVersion, err := provider.GetDBVersion(t.Context())
+	require.NoError(t, err)
+	err = exerciseSQLMigrationDown(t, db, 40, false)
 	require.ErrorContains(t, err, "cannot remove recorded extension journal pauses or gaps")
 	version, err := provider.GetDBVersion(t.Context())
 	require.NoError(t, err)
-	require.Equal(t, int64(40), version)
+	require.Equal(t, initialVersion, version)
 }

@@ -25,7 +25,7 @@ import (
 	"github.com/stellwerk-labs/golib/hretrier"
 	"github.com/stellwerk-labs/golib/hstandardoutbox"
 	"github.com/stellwerk-labs/golib/hvaultapi"
-	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v2/genclient"
+	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v3/genclient"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"go.uber.org/zap"

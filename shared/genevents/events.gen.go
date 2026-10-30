@@ -16,6 +16,7 @@ const (
 	IoPlatformOrchestratorEnvironmentTypeUpdated           EventType = "io.platform-orchestrator.environment_type.updated"
 	IoPlatformOrchestratorEnvironmentUpdated               EventType = "io.platform-orchestrator.environment.updated"
 	IoPlatformOrchestratorModuleCatalogueChanged           EventType = "io.platform-orchestrator.module.catalogue.changed"
+	IoPlatformOrchestratorModuleDraftChanged               EventType = "io.platform-orchestrator.module.draft.changed"
 	IoPlatformOrchestratorModuleVersionLifecycleChanged    EventType = "io.platform-orchestrator.module.version.lifecycle-changed"
 	IoPlatformOrchestratorModuleVersionPinLifecycleChanged EventType = "io.platform-orchestrator.module.version.pin-lifecycle-changed"
 	IoPlatformOrchestratorModuleVersionPublished           EventType = "io.platform-orchestrator.module.version.published"
@@ -26,6 +27,7 @@ const (
 	IoPlatformOrchestratorProjectDeleted                   EventType = "io.platform-orchestrator.project.deleted"
 	IoPlatformOrchestratorProjectUpdated                   EventType = "io.platform-orchestrator.project.updated"
 	IoPlatformOrchestratorResourceTypeCatalogueChanged     EventType = "io.platform-orchestrator.resource-type.catalogue.changed"
+	IoPlatformOrchestratorResourceTypeVersionPublished     EventType = "io.platform-orchestrator.resource-type.version.published"
 )
 
 // Valid indicates whether the value is a known member of the EventType enum.
@@ -44,6 +46,8 @@ func (e EventType) Valid() bool {
 	case IoPlatformOrchestratorEnvironmentUpdated:
 		return true
 	case IoPlatformOrchestratorModuleCatalogueChanged:
+		return true
+	case IoPlatformOrchestratorModuleDraftChanged:
 		return true
 	case IoPlatformOrchestratorModuleVersionLifecycleChanged:
 		return true
@@ -64,6 +68,8 @@ func (e EventType) Valid() bool {
 	case IoPlatformOrchestratorProjectUpdated:
 		return true
 	case IoPlatformOrchestratorResourceTypeCatalogueChanged:
+		return true
+	case IoPlatformOrchestratorResourceTypeVersionPublished:
 		return true
 	default:
 		return false
