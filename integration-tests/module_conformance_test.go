@@ -193,7 +193,7 @@ func TestOptionalDigestAndOutputDeclarationRoundTrip(t *testing.T) {
 }
 
 func TestModuleConformanceMigrationPreservesHistoricalAbsence(t *testing.T) {
-	database := MustDatabaser(t)
+	database := migrationDatabaseAt(t, 26)
 	migration, err := os.ReadFile("../internal/model/migrations/000026_resource_type_module_contract.sql")
 	require.NoError(t, err)
 	up, down := migrationSections(t, string(migration))
