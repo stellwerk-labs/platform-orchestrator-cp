@@ -39,6 +39,7 @@ type DeploymentAdmission struct {
 	ModuleVersions                  map[string]uuid.UUID `json:"module_versions"`
 	CarryForwardModuleVersions      map[string]uuid.UUID `json:"carry_forward_module_versions"`
 	ConfirmedRestrictedVersionUUIDs []uuid.UUID          `json:"confirmed_restricted_version_uuids"`
+	DraftTestSnapshots              map[string]uuid.UUID `json:"draft_test_snapshots,omitempty"`
 }
 
 type DeploymentAdmissionReceipt struct {
@@ -53,7 +54,8 @@ type DeploymentAdmissionReceipt struct {
 }
 
 type DeploymentAdmissionPolicy struct {
-	AllowFreshProposed bool
+	AllowFreshProposed   bool
+	AllowFreshDraftTests bool
 }
 
 // ReadEnvironmentAdmissionEpoch must precede ALL remote evidence reads used to
@@ -116,6 +118,14 @@ func validateDeploymentAdmission(value DeploymentAdmission) error {
 			return NewErrBadRequest("carry-forward evidence must be an exact subset of resolved Module Versions")
 		}
 	}
+	if len(value.DraftTestSnapshots) > 1000 {
+		return NewErrBadRequest("Draft test selection must be bounded")
+	}
+	for module, snapshot := range value.DraftTestSnapshots {
+		if target, found := value.ModuleVersions[module]; !found || snapshot != target {
+			return NewErrBadRequest("Draft test snapshots must be an exact subset of resolved Module targets")
+		}
+	}
 	seenConfirmations := make(map[uuid.UUID]struct{}, len(value.ConfirmedRestrictedVersionUUIDs))
 	for _, version := range value.ConfirmedRestrictedVersionUUIDs {
 		if version == uuid.Nil {
@@ -140,6 +150,10 @@ func canonicalDeploymentAdmission(value DeploymentAdmission) DeploymentAdmission
 	value.CarryForwardModuleVersions = maps.Clone(value.CarryForwardModuleVersions)
 	if value.CarryForwardModuleVersions == nil {
 		value.CarryForwardModuleVersions = map[string]uuid.UUID{}
+	}
+	value.DraftTestSnapshots = maps.Clone(value.DraftTestSnapshots)
+	if len(value.DraftTestSnapshots) == 0 {
+		value.DraftTestSnapshots = nil
 	}
 	value.ConfirmedRestrictedVersionUUIDs = slices.Clone(value.ConfirmedRestrictedVersionUUIDs)
 	if value.ConfirmedRestrictedVersionUUIDs == nil {
@@ -240,6 +254,36 @@ func AuthorizeDeploymentAdmission(ctx context.Context, db Databaser, value Deplo
 		catalogue, err := db.GetModuleCatalogue(ctx, tx, value.OrgID, module, GetModeForUpdate)
 		if err != nil {
 			return nil, err
+		}
+		if snapshotUUID, selected := value.DraftTestSnapshots[module]; selected {
+			snapshot, err := db.GetModuleDraftTestSnapshot(ctx, tx, value.OrgID, module, value.EnvironmentUUID, snapshotUUID)
+			if err != nil {
+				return nil, err
+			}
+			if snapshot.ProjectUUID != value.ProjectUUID {
+				return nil, NewErrBadRequest("Draft test snapshot Project does not match admission scope")
+			}
+			retained := value.CarryForwardModuleVersions[module] == snapshotUUID
+			if retained || value.Mode == deploymentModeRollback {
+				var executed bool
+				err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM deployment_admission_guards
+     WHERE org_id=$1 AND environment_uuid=$2 AND outcome='succeeded'
+       AND intent->'module_versions'->>$3=$4
+       AND intent->'draft_test_snapshots'->>$3=$4)`, value.OrgID, value.EnvironmentUUID, module, snapshotUUID.String()).Scan(&executed)
+				if err != nil {
+					return nil, err
+				}
+				if !executed {
+					return nil, ErrConflict{Code: ModuleVersionLifecycle, Message: "retained Draft tests require a successful prior admission in this Environment"}
+				}
+			}
+			if catalogue.Status == moduleversions.CatalogueArchived && !retained && value.Mode != deploymentModeRollback {
+				return nil, ErrConflict{Code: ModuleVersionLifecycle, Message: "archived Modules permit only exact retained test material"}
+			}
+			if !retained && value.Mode != deploymentModeRollback && !policy.AllowFreshDraftTests {
+				return nil, ErrConflict{Code: ModuleVersionLifecycle, Message: "fresh Draft tests require current Module authoring authority"}
+			}
+			continue
 		}
 		version, err := db.GetCoreModuleVersion(ctx, tx, value.OrgID, module, versionUUID.String(), GetModeForUpdate)
 		if err != nil {

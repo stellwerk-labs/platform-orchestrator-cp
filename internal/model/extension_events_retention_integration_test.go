@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genevents"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/genevents"
 )
 
 var testRetention = ExtensionResourceRetention{Window: 30 * 24 * time.Hour, Batch: 1000}
@@ -191,9 +191,11 @@ func TestExtensionResourceRetentionMigrationRefusesDowngradeAfterPruning(t *test
 	require.NoError(t, err)
 	require.Equal(t, int64(1), prunedThrough(t, db, consumer.OrgID))
 	provider := extensionMigrationProvider(t, db)
-	_, err = provider.DownTo(t.Context(), 38)
+	initialVersion, err := provider.GetDBVersion(t.Context())
+	require.NoError(t, err)
+	err = exerciseSQLMigrationDown(t, db, 39, false)
 	require.ErrorContains(t, err, "cannot remove extension event retention evidence after pruning")
 	version, err := provider.GetDBVersion(t.Context())
 	require.NoError(t, err)
-	require.Equal(t, int64(39), version)
+	require.Equal(t, initialVersion, version)
 }

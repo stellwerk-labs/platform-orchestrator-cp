@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genevents"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/genevents"
 )
 
 func TestAsMessagePreservesCloudEventTypeAsSubject(t *testing.T) {

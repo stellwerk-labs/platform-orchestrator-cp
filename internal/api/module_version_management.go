@@ -19,7 +19,7 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/opt"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
-	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v2/genclient"
+	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v3/genclient"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 )
 
@@ -40,6 +40,7 @@ func coreModuleVersionToAPI(value model.CoreModuleVersion) CoreModuleVersion {
 		SemanticVersion: value.SemanticVersion, OpaqueVersionId: value.OpaqueVersionID,
 		MigrationGeneration: CoreModuleVersionMigrationGeneration(value.MigrationGeneration), ArtifactDigest: value.ArtifactDigest,
 		VerificationStatus: ModuleVerificationStatus(value.VerificationStatus), LifecycleStatus: ModuleVersionSemanticStatus(value.LifecycleStatus),
+		ResourceTypeVersion: optionalContractNumber(value.ResourceTypeVersion), ResourceTypeVersionUuid: optionalContractUUID(value.ResourceTypeVersionUUID),
 		SourceRevision: value.SourceRevision, ReleaseNotes: value.ReleaseNotes, ResourceVersion: value.ResourceVersion,
 		PublishedBy: value.PublishedBy, CreatedAt: value.CreatedAt,
 	}
@@ -250,7 +251,7 @@ func publicationModel(module *model.ModuleCatalogue, body ModuleVersionPublishBo
 		ResourceType: module.ResourceType, VersionId: body.SemanticVersion, SemanticVersion: body.SemanticVersion,
 		UpdatedAt: now, Description: opt.OfRef(body.Description), ModuleSource: body.ModuleSource,
 		ModuleSourceCode: opt.OfRef(body.ModuleSourceCode), ModuleInputs: body.ModuleInputs, ModuleParams: params,
-		OutputSchema: ref.DerefOr(body.OutputSchema, nil),
+		OutputSchema: ref.DerefOr(body.OutputSchema, nil), ResourceTypeVersion: ref.DerefOr(body.ResourceTypeVersion, 0),
 		Dependencies: dependencies, CoProvisioned: coprovisioned, ProviderMapping: body.ProviderMapping,
 		ArtifactDigest: ref.DerefOr(body.ArtifactDigest, ""), SourceRevision: ref.DerefOr(body.SourceRevision, ""),
 		ReleaseNotes: opt.OfRef(body.ReleaseNotes), PublishedBy: &actor,
@@ -258,6 +259,10 @@ func publicationModel(module *model.ModuleCatalogue, body ModuleVersionPublishBo
 }
 
 func validatePublicationBody(body ModuleVersionPublishBody) error {
+	return validateModuleAuthoringBody(body, true)
+}
+
+func validateModuleAuthoringBody(body ModuleVersionPublishBody, requireSourceRevision bool) error {
 	if _, err := moduleversions.ParseVersion(body.SemanticVersion); err != nil {
 		return err
 	}
@@ -274,7 +279,7 @@ func validatePublicationBody(body ModuleVersionPublishBody) error {
 				return err
 			}
 		}
-		if strings.TrimSpace(ref.DerefOr(body.SourceRevision, "")) == "" {
+		if requireSourceRevision && strings.TrimSpace(ref.DerefOr(body.SourceRevision, "")) == "" {
 			return fmt.Errorf("source_revision is required for an external module artifact")
 		}
 	}
@@ -642,17 +647,18 @@ func structuralKeyDiff(left, right any) (added, removed, changed []string) {
 func moduleVersionComparisonSnapshot(value model.ModuleDefinitionVersion) ModuleVersionComparisonSnapshot {
 	definition := apiMdFromDbMd(value)
 	return ModuleVersionComparisonSnapshot{
-		ModuleSource:     definition.ModuleSource,
-		ModuleSourceCode: definition.ModuleSourceCode,
-		ArtifactDigest:   value.ArtifactDigest,
-		SourceRevision:   value.SourceRevision,
-		ResourceType:     definition.ResourceType,
-		ModuleInputs:     definition.ModuleInputs,
-		ModuleParams:     definition.ModuleParams,
-		ProviderMapping:  definition.ProviderMapping,
-		Dependencies:     definition.Dependencies,
-		Coprovisioned:    definition.Coprovisioned,
-		OutputSchema:     optionalJSONObject[ModuleOutputSchema](value.OutputSchema),
+		ModuleSource:        definition.ModuleSource,
+		ModuleSourceCode:    definition.ModuleSourceCode,
+		ArtifactDigest:      value.ArtifactDigest,
+		SourceRevision:      value.SourceRevision,
+		ResourceType:        definition.ResourceType,
+		ResourceTypeVersion: definition.ResourceTypeVersion, ResourceTypeVersionUuid: definition.ResourceTypeVersionUuid,
+		ModuleInputs:    definition.ModuleInputs,
+		ModuleParams:    definition.ModuleParams,
+		ProviderMapping: definition.ProviderMapping,
+		Dependencies:    definition.Dependencies,
+		Coprovisioned:   definition.Coprovisioned,
+		OutputSchema:    optionalJSONObject[ModuleOutputSchema](value.OutputSchema),
 	}
 }
 
@@ -689,7 +695,7 @@ func (s *Server) CompareModuleVersions(ctx context.Context, request CompareModul
 		ModuleSourceCodeChanged: !reflect.DeepEqual(left.ModuleSourceCode.Ref(), right.ModuleSourceCode.Ref()),
 		ArtifactDigestChanged:   left.ArtifactDigest != right.ArtifactDigest,
 		SourceRevisionChanged:   left.SourceRevision != right.SourceRevision,
-		ResourceTypeChanged:     left.ResourceType != right.ResourceType,
+		ResourceTypeChanged:     left.ResourceType != right.ResourceType || left.ResourceTypeVersionUUID != right.ResourceTypeVersionUUID,
 		AddedModuleInputs:       addedInputs, RemovedModuleInputs: removedInputs, ChangedModuleInputs: changedInputs,
 		AddedModuleParams: addedParams, RemovedModuleParams: removedParams, ChangedModuleParams: changedParams,
 		AddedProviderMappings: addedProviders, RemovedProviderMappings: removedProviders, ChangedProviderMappings: changedProviders,
@@ -1763,4 +1769,17 @@ func readModuleCommand[T any](ctx context.Context, database model.Databaser, tx 
 		return zero, false, errors.Wrap(err, "failed to decode idempotent module command response")
 	}
 	return zero, true, nil
+}
+
+func optionalContractNumber(value int64) *int64 {
+	if value == 0 {
+		return nil
+	}
+	return &value
+}
+func optionalContractUUID(value uuid.UUID) *uuid.UUID {
+	if value == uuid.Nil {
+		return nil
+	}
+	return &value
 }

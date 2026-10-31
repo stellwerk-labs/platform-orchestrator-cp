@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/pluginstatus"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/pluginstatus"
 )
 
 func TestCoreReadsOnlyAValidStatusReport(t *testing.T) {

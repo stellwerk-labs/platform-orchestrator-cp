@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/pluginstatus"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/pluginstatus"
 	"github.com/stretchr/testify/require"
 )
 

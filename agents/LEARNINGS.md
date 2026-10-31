@@ -25,3 +25,16 @@
 - Scanner-only changes can be reviewed independently of unchanged production
   Go, schema, module, build and embedded inputs. Preserve that distinction in
   image source labels and qualification evidence.
+
+## Integration fixture coverage
+
+- The earlier API/internal release gates did not run `integration-tests/Makefile`
+  `test`, which exercises roughly 300 real server/client cases against the
+  compose fixture. A passing `internal/...` API suite cannot establish that
+  generated client response comparisons or legacy migration round trips still
+  match the fully migrated schema. Include this separate suite before treating
+  the source as CI-ready.
+- Migration round-trip tests must start from a disposable schema at the version
+  under test. Running an old Down script directly against the current schema
+  crosses later foreign keys and triggers; migration 49 also deliberately
+  refuses to discard retained Resource Type snapshots.

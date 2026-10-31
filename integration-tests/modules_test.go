@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genclient"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/genclient"
 )
 
 func TestDefinitions(t *testing.T) {
@@ -44,6 +44,10 @@ func TestDefinitions(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, res.StatusCode(), string(res.Body))
 	}
+	interfaceVersion, err := client.GetResourceTypeVersionWithResponse(t.Context(), orgId, orgResourceType, 1)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, interfaceVersion.StatusCode(), string(interfaceVersion.Body))
+	resourceTypeVersionUUID := interfaceVersion.JSON200.Uuid
 
 	t.Run("unknown resource-type", func(t *testing.T) {
 		res, err := client.CreateModuleWithResponse(t.Context(), orgId+orgId, genclient.CreateModuleJSONRequestBody{
@@ -150,10 +154,12 @@ func TestDefinitions(t *testing.T) {
 			res.JSON201.UpdatedAt = time.Time{}
 			res.JSON201.VersionId = ""
 			assert.Equal(t, genclient.Module{
-				OrgId:        orgId,
-				Id:           s3ModuleId,
-				ResourceType: "s3",
-				ModuleSource: "/modules/my-s3",
+				OrgId:                   orgId,
+				Id:                      s3ModuleId,
+				ResourceType:            "s3",
+				ResourceTypeVersion:     ref.Ref(int64(1)),
+				ResourceTypeVersionUuid: ref.Ref(resourceTypeVersionUUID),
+				ModuleSource:            "/modules/my-s3",
 				ProviderMapping: map[string]string{
 					provType: provType + "." + provId,
 				},
@@ -258,10 +264,12 @@ func TestDefinitions(t *testing.T) {
 			res.JSON200.VersionId = ""
 			res.JSON200.UpdatedAt = time.Time{}
 			assert.Equal(t, genclient.Module{
-				OrgId:        orgId,
-				Id:           s3ModuleId,
-				ResourceType: "s3",
-				ModuleSource: "/modules/my-s3",
+				OrgId:                   orgId,
+				Id:                      s3ModuleId,
+				ResourceType:            "s3",
+				ResourceTypeVersion:     ref.Ref(int64(1)),
+				ResourceTypeVersionUuid: ref.Ref(resourceTypeVersionUUID),
+				ModuleSource:            "/modules/my-s3",
 				ProviderMapping: map[string]string{
 					provType: provType + "." + provId,
 				},
@@ -347,12 +355,14 @@ func TestDefinitions(t *testing.T) {
 			res.JSON200.VersionId = ""
 			res.JSON200.UpdatedAt = time.Time{}
 			assert.Equal(t, genclient.Module{
-				OrgId:        orgId,
-				Id:           s3ModuleId,
-				ResourceType: "s3",
-				ModuleSource: "/modules/new/source",
-				Description:  ref.Ref("new description"),
-				CreatedAt:    createdRes.CreatedAt,
+				OrgId:                   orgId,
+				Id:                      s3ModuleId,
+				ResourceType:            "s3",
+				ResourceTypeVersion:     ref.Ref(int64(1)),
+				ResourceTypeVersionUuid: ref.Ref(resourceTypeVersionUUID),
+				ModuleSource:            "/modules/new/source",
+				Description:             ref.Ref("new description"),
+				CreatedAt:               createdRes.CreatedAt,
 				Dependencies: map[string]genclient.ModuleDependencyManifest{
 					"thing": {
 						Type:   "some-type",

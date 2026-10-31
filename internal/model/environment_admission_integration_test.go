@@ -4,15 +4,12 @@ package model
 
 import (
 	"context"
-	"io/fs"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/pressly/goose/v3"
-	"github.com/stellwerk-labs/golib/hstandardoutbox"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
 	"github.com/stretchr/testify/require"
 )
@@ -270,18 +267,10 @@ func TestEnvironmentAdmissionMigrationDownRequiresSettledOutcomes(t *testing.T) 
 	for _, path := range []string{"ordinary", "external"} {
 		t.Run(path, func(t *testing.T) {
 			db, grant, request := admissionFixture(t)
-			// Migration 37 deliberately refuses to discard extension history.
-			// The fixture's Module publication events are unrelated to this
-			// migration-36 guard test, so remove them before asking goose to
-			// traverse 37 and exercise the unresolved admission protection.
+			// Exercise this guard directly, independently of later retained-history guards.
 			resetExtensionEventFixtures(t, db)
-			source, err := fs.Sub(embedMigrations, "migrations")
-			require.NoError(t, err)
-			provider, err := goose.NewProvider(goose.DialectPostgres, db.(*databaser).DB, source,
-				goose.WithDisableGlobalRegistry(true),
-				goose.WithGoMigrations(goose.NewGoMigration(11,
-					&goose.GoFunc{RunTx: hstandardoutbox.MigrateUp01},
-					&goose.GoFunc{RunTx: hstandardoutbox.MigrateDown01})))
+			provider := extensionMigrationProvider(t, db)
+			initialVersion, err := provider.GetDBVersion(t.Context())
 			require.NoError(t, err)
 			dispatch := ExternalDispatch{OrgID: grant.OrgID, PluginID: grant.PluginID, OperationID: grant.OperationID, ActorID: grant.ActorID, Fence: grant.Revision, Action: "external-deployment.admit", DispatchID: "migration-pending", ProjectUUID: request.ProjectUUID, EnvironmentUUID: request.EnvironmentUUID, RequestDigest: grant.Intent.Fingerprint, TargetVersions: grant.Intent.TargetVersions}
 			if path == "ordinary" {
@@ -290,11 +279,11 @@ func TestEnvironmentAdmissionMigrationDownRequiresSettledOutcomes(t *testing.T) 
 				err = RecordExternalDispatch(t.Context(), db, dispatch)
 			}
 			require.NoError(t, err)
-			_, err = provider.DownTo(t.Context(), 35)
+			err = exerciseSQLMigrationDown(t, db, 36, false)
 			require.ErrorContains(t, err, "cannot remove unresolved Environment admission protection")
 			version, err := provider.GetDBVersion(t.Context())
 			require.NoError(t, err)
-			require.Equal(t, int64(36), version, "a refused downgrade must remain restartable at the current schema")
+			require.Equal(t, initialVersion, version, "a refused downgrade must preserve the migration journal")
 			epoch, err := ReadEnvironmentAdmissionEpoch(t.Context(), db, nil, request.OrgID, request.EnvironmentUUID)
 			require.NoError(t, err)
 			require.Equal(t, int64(1), epoch, "refused migration must preserve protection evidence")
@@ -304,9 +293,7 @@ func TestEnvironmentAdmissionMigrationDownRequiresSettledOutcomes(t *testing.T) 
 				err = CompleteExternalDispatch(t.Context(), db, grant.OrgID, grant.PluginID, grant.OperationID, dispatch.DispatchID, ExternalDispatchCompletion{DeploymentID: uuid.New(), EnvironmentUUID: request.EnvironmentUUID, ProjectUUID: request.ProjectUUID, RequestDigest: dispatch.RequestDigest, Status: "succeeded"})
 			}
 			require.NoError(t, err)
-			_, err = provider.DownTo(t.Context(), 35)
-			require.NoError(t, err)
-			_, err = provider.Up(t.Context())
+			err = exerciseSQLMigrationDown(t, db, 36, true)
 			require.NoError(t, err)
 			request.AdmissionID = uuid.New()
 			_, err = AuthorizeDeploymentAdmission(t.Context(), db, request)

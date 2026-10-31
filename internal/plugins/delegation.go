@@ -6,7 +6,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/plugincontext"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/plugincontext"
 )
 
 // DelegationProof retains exact body bytes (base64 in JSON), not a decoded JSON

@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genclient"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/genclient"
 )
 
 func TestConcurrentModulePublicationReplaysOneImmutableResult(t *testing.T) {

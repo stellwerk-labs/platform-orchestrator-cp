@@ -10,7 +10,7 @@ import (
 )
 
 func TestModuleVersionManagementMigrationRoundTrip(t *testing.T) {
-	database := MustDatabaser(t)
+	database := migrationDatabaseAt(t, 25)
 	migration, err := os.ReadFile("../internal/model/migrations/000024_module_version_management_core.sql")
 	require.NoError(t, err)
 	up, down := migrationSections(t, string(migration))

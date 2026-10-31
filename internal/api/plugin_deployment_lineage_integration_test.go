@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	dpapi "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v2/genclient"
+	dpapi "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v3/genclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/plugincontext"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/plugincontext"
 )
 
 // Real generated Core routes and PostgreSQL dispatches; the signed DP peer

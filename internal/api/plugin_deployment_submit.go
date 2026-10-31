@@ -10,12 +10,12 @@ import (
 	"slices"
 
 	"github.com/google/uuid"
-	dpapi "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v2/genclient"
+	dpapi "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v3/genclient"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/plugincontext"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/plugincontext"
 )
 
 const pluginDeploymentReadAction = "external-deployment.read"

@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/pluginstatus"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/pluginstatus"
 )
 
 // Stable diagnostics of a running plugin that does not prove the package Core

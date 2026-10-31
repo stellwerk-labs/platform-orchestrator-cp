@@ -18,7 +18,7 @@ func conformanceBadRequest(err error) error {
 }
 
 func (d *databaser) validateModuleConformance(ctx context.Context, tx Tx, definition *ModuleDefinitionVersion) error {
-	resourceType, err := d.GetResourceType(ctx, tx, &definition.OrgId, definition.ResourceType)
+	resourceType, err := d.resolveModuleResourceTypeContract(ctx, tx, definition)
 	if err != nil {
 		return err
 	}

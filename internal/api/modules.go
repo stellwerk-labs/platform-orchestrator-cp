@@ -17,7 +17,7 @@ import (
 	"github.com/hashicorp/hcl/v2/hclparse"
 	"github.com/pkg/errors"
 	"github.com/stellwerk-labs/golib/hlogger"
-	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v2/genclient"
+	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v3/genclient"
 	"go.uber.org/zap"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/logging"
@@ -68,38 +68,40 @@ func apiMdFromDbMd(mp model.ModuleDefinitionVersion) Module {
 		mp.ProviderMapping = make(map[string]string)
 	}
 	return Module{
-		CreatedAt:        mp.CreatedAt,
-		Dependencies:     deps,
-		Coprovisioned:    cops,
-		Description:      mp.Description.Ref(),
-		Id:               mp.DefinitionId,
-		ModuleInputs:     mp.ModuleInputs,
-		OutputSchema:     optionalJSONObject[ModuleOutputSchema](mp.OutputSchema),
-		ModuleParams:     mps,
-		ModuleSource:     mp.ModuleSource,
-		ModuleSourceCode: mp.ModuleSourceCode.Ref(),
-		OrgId:            mp.OrgId,
-		ProviderMapping:  mp.ProviderMapping,
-		ResourceType:     mp.ResourceType,
-		UpdatedAt:        mp.UpdatedAt,
-		VersionId:        mp.VersionId,
+		CreatedAt:           mp.CreatedAt,
+		Dependencies:        deps,
+		Coprovisioned:       cops,
+		Description:         mp.Description.Ref(),
+		Id:                  mp.DefinitionId,
+		ModuleInputs:        mp.ModuleInputs,
+		OutputSchema:        optionalJSONObject[ModuleOutputSchema](mp.OutputSchema),
+		ModuleParams:        mps,
+		ModuleSource:        mp.ModuleSource,
+		ModuleSourceCode:    mp.ModuleSourceCode.Ref(),
+		OrgId:               mp.OrgId,
+		ProviderMapping:     mp.ProviderMapping,
+		ResourceType:        mp.ResourceType,
+		ResourceTypeVersion: optionalContractNumber(mp.ResourceTypeVersion), ResourceTypeVersionUuid: optionalContractUUID(mp.ResourceTypeVersionUUID),
+		UpdatedAt: mp.UpdatedAt,
+		VersionId: mp.VersionId,
 	}
 }
 
 func apiMdvFromApiMd(md Module) ModuleVersion {
 	return ModuleVersion{
-		Coprovisioned:    md.Coprovisioned,
-		CreatedAt:        md.UpdatedAt,
-		Description:      md.Description,
-		Dependencies:     md.Dependencies,
-		ModuleInputs:     md.ModuleInputs,
-		OutputSchema:     md.OutputSchema,
-		ModuleParams:     md.ModuleParams,
-		ModuleSource:     md.ModuleSource,
-		ModuleSourceCode: md.ModuleSourceCode,
-		ProviderMapping:  md.ProviderMapping,
-		ResourceType:     md.ResourceType,
-		VersionId:        md.VersionId,
+		Coprovisioned:       md.Coprovisioned,
+		CreatedAt:           md.UpdatedAt,
+		Description:         md.Description,
+		Dependencies:        md.Dependencies,
+		ModuleInputs:        md.ModuleInputs,
+		OutputSchema:        md.OutputSchema,
+		ModuleParams:        md.ModuleParams,
+		ModuleSource:        md.ModuleSource,
+		ModuleSourceCode:    md.ModuleSourceCode,
+		ProviderMapping:     md.ProviderMapping,
+		ResourceType:        md.ResourceType,
+		ResourceTypeVersion: md.ResourceTypeVersion, ResourceTypeVersionUuid: md.ResourceTypeVersionUuid,
+		VersionId: md.VersionId,
 	}
 }
 
@@ -132,7 +134,7 @@ func coreModuleVersionDetailFromDB(mp model.ModuleDefinitionVersion) CoreModuleV
 		VerificationStatus: moduleversions.VerificationStatus(mp.VerificationStatus),
 		LifecycleStatus:    moduleversions.LifecycleStatus(mp.SemanticStatus), SourceRevision: mp.SourceRevision,
 		ReleaseNotes: mp.ReleaseNotes.Ref(), ResourceVersion: mp.ResourceVersion, PublishedBy: mp.PublishedBy,
-		CreatedAt: mp.UpdatedAt,
+		CreatedAt: mp.UpdatedAt, ResourceTypeVersion: mp.ResourceTypeVersion, ResourceTypeVersionUUID: mp.ResourceTypeVersionUUID,
 	}
 	definition := apiMdvFromApiMd(apiMdFromDbMd(mp))
 	return CoreModuleVersionDetail{
@@ -141,7 +143,7 @@ func coreModuleVersionDetailFromDB(mp model.ModuleDefinitionVersion) CoreModuleV
 		Dependencies: definition.Dependencies, Description: definition.Description,
 		ModuleInputs: definition.ModuleInputs, ModuleParams: definition.ModuleParams,
 		ModuleSource: definition.ModuleSource, ModuleSourceCode: definition.ModuleSourceCode,
-		ProviderMapping: definition.ProviderMapping, ResourceType: definition.ResourceType,
+		ProviderMapping: definition.ProviderMapping, ResourceType: definition.ResourceType, ResourceTypeVersion: definition.ResourceTypeVersion, ResourceTypeVersionUuid: definition.ResourceTypeVersionUuid,
 		VersionId:    definition.VersionId,
 		OutputSchema: definition.OutputSchema,
 	}
@@ -582,7 +584,7 @@ func (s *Server) UpdateModule(ctx context.Context, request UpdateModuleRequestOb
 	}
 }
 
-func (s *Server) checkTypesExist(ctx context.Context, tx model.TxWithCommit, orgId string, typesWithDuplicated []string) (missingTypes []string, err error) {
+func (s *Server) checkTypesExist(ctx context.Context, tx model.Tx, orgId string, typesWithDuplicated []string) (missingTypes []string, err error) {
 	slices.Sort(typesWithDuplicated)
 	uniqueReferencedTypes := slices.Compact(typesWithDuplicated)
 	if len(uniqueReferencedTypes) > 0 {

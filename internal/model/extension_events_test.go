@@ -10,7 +10,7 @@ import (
 	"github.com/stellwerk-labs/golib/hstandardoutbox"
 	"github.com/stretchr/testify/require"
 
-	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v2/genevents"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/genevents"
 )
 
 func TestExtensionEventTypeHasUnambiguousPluginOwnership(t *testing.T) {
