@@ -29,13 +29,15 @@ func (s *Server) deploymentAdmissionCaller(ctx context.Context, org string) erro
 	if s.DeploymentAdmissionIdentity == uuid.Nil || actor != s.DeploymentAdmissionIdentity {
 		return pluginBoundaryError(403, "deployment_admission_service_forbidden", "The Data Plane's admission identity is required.")
 	}
-	if s.PluginGateway != nil && s.PluginGateway.Registry != nil {
-		for _, descriptor := range s.PluginGateway.Registry.List(ctx, org) {
-			item, _, _ := s.PluginGateway.Registry.Installation(ctx, org, descriptor.ID)
-			if item.ServiceUserID == actor.String() {
-				return pluginBoundaryError(403, "deployment_admission_service_forbidden", "A plugin service cannot act as the Data Plane admission authority.")
-			}
-		}
+	if s.Database == nil {
+		return pluginBoundaryError(503, "authorization_unavailable", "The Data Plane identity could not be verified.")
+	}
+	pluginService, err := model.IsPluginInstallationServiceUser(ctx, s.Database, actor)
+	if err != nil {
+		return pluginBoundaryError(503, "authorization_unavailable", "The Data Plane identity could not be verified.")
+	}
+	if pluginService {
+		return pluginBoundaryError(403, "deployment_admission_service_forbidden", "A plugin service cannot act as the Data Plane admission authority.")
 	}
 	static, err := s.staticPlatformPrincipal(ctx, actor)
 	if err != nil {

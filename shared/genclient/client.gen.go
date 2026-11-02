@@ -2293,6 +2293,12 @@ type K8sAgentRunnerConfiguration struct {
 	// -----END PUBLIC KEY-----
 	Key K8sAgentRunnerKey `json:"key"`
 
+	// MaxParallelJobs Maximum concurrent jobs across all Environments using this Runner. Omission preserves unlimited legacy admission. Reducing the limit drains existing jobs before new admission.
+	MaxParallelJobs *int `json:"max_parallel_jobs,omitempty"`
+
+	// SupportedProtocols Protocols explicitly supported by the configured Runner image. Observation requires environment-observation/v1.
+	SupportedProtocols *[]string `json:"supported_protocols,omitempty"`
+
 	// Type The Runner type.
 	Type RunnerType `json:"type"`
 }
@@ -2308,6 +2314,12 @@ type K8sAgentRunnerConfigurationUpdateBody struct {
 	// MCowBQYDK2VwAyEAc5dgCx4ano39JT0XgTsHnts3jej+5xl7ZAwSIrKpef0=
 	// -----END PUBLIC KEY-----
 	Key *K8sAgentRunnerKey `json:"key,omitempty"`
+
+	// MaxParallelJobs Maximum concurrent jobs across all Environments using this Runner. Omission preserves the configured value. Explicit null clears the limit to unlimited. Reducing the limit drains existing jobs before new admission.
+	MaxParallelJobs *int `json:"max_parallel_jobs,omitempty"`
+
+	// SupportedProtocols Protocols explicitly supported by the configured Runner image. Omission preserves the configured value. Null clears the opt-in; an empty array declares no protocols. Observation requires environment-observation/v1.
+	SupportedProtocols *[]string `json:"supported_protocols,omitempty"`
 
 	// Type The Runner type.
 	Type RunnerType `json:"type"`
@@ -2328,6 +2340,12 @@ type K8sEksRunnerConfiguration struct {
 	// Job Properties of the Kubernetes Runner Job.
 	Job K8sRunnerJobConfig `json:"job"`
 
+	// MaxParallelJobs Maximum concurrent jobs across all Environments using this Runner. Omission preserves unlimited legacy admission. Reducing the limit drains existing jobs before new admission.
+	MaxParallelJobs *int `json:"max_parallel_jobs,omitempty"`
+
+	// SupportedProtocols Protocols explicitly supported by the configured Runner image. Observation requires environment-observation/v1.
+	SupportedProtocols *[]string `json:"supported_protocols,omitempty"`
+
 	// Type The Runner type.
 	Type RunnerType `json:"type"`
 }
@@ -2339,6 +2357,12 @@ type K8sEksRunnerConfigurationUpdateBody struct {
 
 	// Job Properties of the Kubernetes Runner Job.
 	Job *K8sRunnerJobConfig `json:"job,omitempty"`
+
+	// MaxParallelJobs Maximum concurrent jobs across all Environments using this Runner. Omission preserves the configured value. Explicit null clears the limit to unlimited. Reducing the limit drains existing jobs before new admission.
+	MaxParallelJobs *int `json:"max_parallel_jobs,omitempty"`
+
+	// SupportedProtocols Protocols explicitly supported by the configured Runner image. Omission preserves the configured value. Null clears the opt-in; an empty array declares no protocols. Observation requires environment-observation/v1.
+	SupportedProtocols *[]string `json:"supported_protocols,omitempty"`
 
 	// Type The Runner type.
 	Type RunnerType `json:"type"`
@@ -2352,6 +2376,12 @@ type K8sGkeRunnerConfiguration struct {
 	// Job Properties of the Kubernetes Runner Job.
 	Job K8sRunnerJobConfig `json:"job"`
 
+	// MaxParallelJobs Maximum concurrent jobs across all Environments using this Runner. Omission preserves unlimited legacy admission. Reducing the limit drains existing jobs before new admission.
+	MaxParallelJobs *int `json:"max_parallel_jobs,omitempty"`
+
+	// SupportedProtocols Protocols explicitly supported by the configured Runner image. Observation requires environment-observation/v1.
+	SupportedProtocols *[]string `json:"supported_protocols,omitempty"`
+
 	// Type The Runner type.
 	Type RunnerType `json:"type"`
 }
@@ -2363,6 +2393,12 @@ type K8sGkeRunnerConfigurationUpdateBody struct {
 
 	// Job Properties of the Kubernetes Runner Job.
 	Job *K8sRunnerJobConfig `json:"job,omitempty"`
+
+	// MaxParallelJobs Maximum concurrent jobs across all Environments using this Runner. Omission preserves the configured value. Explicit null clears the limit to unlimited. Reducing the limit drains existing jobs before new admission.
+	MaxParallelJobs *int `json:"max_parallel_jobs,omitempty"`
+
+	// SupportedProtocols Protocols explicitly supported by the configured Runner image. Omission preserves the configured value. Null clears the opt-in; an empty array declares no protocols. Observation requires environment-observation/v1.
+	SupportedProtocols *[]string `json:"supported_protocols,omitempty"`
 
 	// Type The Runner type.
 	Type RunnerType `json:"type"`
@@ -2376,6 +2412,12 @@ type K8sRunnerConfiguration struct {
 	// Job Properties of the Kubernetes Runner Job.
 	Job K8sRunnerJobConfig `json:"job"`
 
+	// MaxParallelJobs Maximum concurrent jobs across all Environments using this Runner. Omission preserves unlimited legacy admission. Reducing the limit drains existing jobs before new admission.
+	MaxParallelJobs *int `json:"max_parallel_jobs,omitempty"`
+
+	// SupportedProtocols Protocols explicitly supported by the configured Runner image. Observation requires environment-observation/v1.
+	SupportedProtocols *[]string `json:"supported_protocols,omitempty"`
+
 	// Type The Runner type.
 	Type RunnerType `json:"type"`
 }
@@ -2387,6 +2429,12 @@ type K8sRunnerConfigurationUpdateBody struct {
 
 	// Job Properties of the Kubernetes Runner Job.
 	Job *K8sRunnerJobConfig `json:"job,omitempty"`
+
+	// MaxParallelJobs Maximum concurrent jobs across all Environments using this Runner. Omission preserves the configured value. Explicit null clears the limit to unlimited. Reducing the limit drains existing jobs before new admission.
+	MaxParallelJobs *int `json:"max_parallel_jobs,omitempty"`
+
+	// SupportedProtocols Protocols explicitly supported by the configured Runner image. Omission preserves the configured value. Null clears the opt-in; an empty array declares no protocols. Observation requires environment-observation/v1.
+	SupportedProtocols *[]string `json:"supported_protocols,omitempty"`
 
 	// Type The Runner type.
 	Type RunnerType `json:"type"`
@@ -4758,6 +4806,12 @@ type RunnerConfiguration struct {
 
 // RunnerConfigurationSummary A summary of the runner configuration.
 type RunnerConfigurationSummary struct {
+	// MaxParallelJobs Configured concurrent job limit. Absent means legacy unlimited admission.
+	MaxParallelJobs *int `json:"max_parallel_jobs,omitempty"`
+
+	// SupportedProtocols Protocols explicitly declared by the configured Runner image.
+	SupportedProtocols *[]string `json:"supported_protocols,omitempty"`
+
 	// Type The Runner type.
 	Type RunnerType `json:"type"`
 }
@@ -4937,6 +4991,12 @@ type ServerlessEcsRunnerConfiguration struct {
 	// Job Job details for the AWS ECS Runner
 	Job ServerlessEcsRunnerJob `json:"job"`
 
+	// MaxParallelJobs Maximum concurrent jobs across all Environments using this Runner. Omission preserves unlimited legacy admission. Reducing the limit drains existing jobs before new admission.
+	MaxParallelJobs *int `json:"max_parallel_jobs,omitempty"`
+
+	// SupportedProtocols Protocols explicitly supported by the configured Runner image. Observation requires environment-observation/v1.
+	SupportedProtocols *[]string `json:"supported_protocols,omitempty"`
+
 	// Type The Runner type.
 	Type RunnerType `json:"type"`
 }
@@ -4948,6 +5008,12 @@ type ServerlessEcsRunnerConfigurationUpdateBody struct {
 
 	// Job Job details for the AWS ECS Runner
 	Job *ServerlessEcsRunnerJob `json:"job,omitempty"`
+
+	// MaxParallelJobs Maximum concurrent jobs across all Environments using this Runner. Omission preserves the configured value. Explicit null clears the limit to unlimited. Reducing the limit drains existing jobs before new admission.
+	MaxParallelJobs *int `json:"max_parallel_jobs,omitempty"`
+
+	// SupportedProtocols Protocols explicitly supported by the configured Runner image. Omission preserves the configured value. Null clears the opt-in; an empty array declares no protocols. Observation requires environment-observation/v1.
+	SupportedProtocols *[]string `json:"supported_protocols,omitempty"`
 
 	// Type The Runner type.
 	Type RunnerType `json:"type"`

@@ -48,7 +48,18 @@ type GatewayError struct {
 
 func (e *GatewayError) Error() string { return e.Message }
 
+// OrganizationAdminAuthorizer verifies membership in IAM's canonical organization
+// Admin role. A plugin capability or platform privilege cannot satisfy it.
+type OrganizationAdminAuthorizer interface {
+	IsOrganizationAdmin(context.Context, string, string) (bool, error)
+}
+
+const EnvironmentObservationProtocol = "environment-observation/v1"
+const EnvironmentObservationRecoveryProtocol = "environment-observation-recovery/v1"
+
 type Gateway struct {
+	OrganizationAdmins OrganizationAdminAuthorizer
+
 	Registry   *InstallationRegistry
 	SigningKey ed25519.PrivateKey
 	Issuer     string
@@ -78,6 +89,11 @@ func (g *Gateway) Invoke(ctx context.Context, org, pluginID, actor string, invoc
 	}
 	if operation == nil {
 		return nil, &GatewayError{"plugin_operation_unknown", "This operation is not registered by the installed plugin.", 400}
+	}
+	if operation.RequireOrgAdmin {
+		if err := g.RequireOrganizationAdmin(ctx, org, actor); err != nil {
+			return nil, err
+		}
 	}
 	allowed := descriptor.Allows(operation.RequiredFeature, operation.Mutating, operation.IsSafety(invocation.PathParameters))
 	if !allowed {
@@ -211,6 +227,21 @@ func transportFailure(err error) (string, error) {
 func (g *Gateway) Validate() error {
 	if g == nil || g.Registry == nil || len(g.SigningKey) != ed25519.PrivateKeySize || g.Issuer == "" {
 		return fmt.Errorf("plugin gateway needs registry, signing key and issuer")
+	}
+	return nil
+}
+
+// RequireOrganizationAdmin fails closed when canonical membership is unavailable.
+func (g *Gateway) RequireOrganizationAdmin(ctx context.Context, org, actor string) error {
+	if g == nil || g.OrganizationAdmins == nil {
+		return &GatewayError{"organization_admin_unavailable", "Canonical organization Admin membership cannot be verified.", 503}
+	}
+	allowed, err := g.OrganizationAdmins.IsOrganizationAdmin(ctx, org, actor)
+	if err != nil {
+		return &GatewayError{"organization_admin_unavailable", "Canonical organization Admin membership cannot be verified.", 503}
+	}
+	if !allowed {
+		return &GatewayError{"organization_admin_required", "Current membership in the organization Admin role is required.", 403}
 	}
 	return nil
 }

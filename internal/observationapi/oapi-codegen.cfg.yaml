@@ -1,0 +1,11 @@
+package: observationapi
+generate:
+  models: true
+  echo-server: true
+  strict-server: true
+  embedded-spec: true
+output: internal/observationapi/server.gen.go
+compatibility:
+  enable-auth-scopes-on-context: true
+output-options:
+  skip-prune: true

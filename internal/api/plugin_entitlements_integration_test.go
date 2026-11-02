@@ -88,6 +88,11 @@ func newPluginEntitlementAPIFixture(t *testing.T) *pluginEntitlementAPIFixture {
 // signs a grant for it without importing the grant.
 func newUnimportedPluginEntitlementAPIFixture(t *testing.T) *pluginEntitlementAPIFixture {
 	t.Helper()
+	return newUnimportedPluginEntitlementAPIFixtureWithManifest(t, nil)
+}
+
+func newUnimportedPluginEntitlementAPIFixtureWithManifest(t *testing.T, configure func(*plugins.Installation)) *pluginEntitlementAPIFixture {
+	t.Helper()
 	db, _ := pluginDeploymentBoundaryDatabase(t)
 	org, err := db.GetOrg(t.Context(), nil, "acme")
 	require.NoError(t, err)
@@ -105,9 +110,12 @@ func newUnimportedPluginEntitlementAPIFixture(t *testing.T) *pluginEntitlementAP
 		ServiceGrants: []plugins.ServiceGrant{{Action: "effect.commit", RequiredFeature: "feature-a", Permission: "plugin.dev.example.workflow.control", Scope: "organization"}},
 		Operations:    []plugins.Operation{{ID: "effect", Method: "POST", Path: "/orgs/{orgId}/effects", Mutating: true, RequiredFeature: "feature-a", ServiceActions: []string{"effect.commit"}}},
 	}
+	if configure != nil {
+		configure(&item)
+	}
 	item = installPlugin(t, db, item)
 	installationID := uuid.MustParse(item.InstallationID)
-	binding := entitlements.Binding{PluginID: item.ID, InstallationID: installationID, OrganizationID: org.Uuid, DeclaredFeatures: []string{"feature-a"}}
+	binding := entitlements.Binding{PluginID: item.ID, InstallationID: installationID, OrganizationID: org.Uuid, DeclaredFeatures: item.Entitlement.Features}
 	trust := entitlements.TrustStore{Class: entitlements.Development, Issuers: []entitlements.Issuer{{ID: "development.example", PluginIDs: []string{item.ID}, Keys: []entitlements.Key{{ID: []byte("development-key"), PublicKey: public, Purposes: []entitlements.Purpose{entitlements.GrantPurpose, entitlements.RevocationPurpose}}}}}}
 	trustJSON, err := json.Marshal(map[string]any{"schema_version": 1, "trust_class": "development", "issuers": []any{map[string]any{"id": "development.example", "plugin_ids": []string{item.ID}, "keys": []any{map[string]any{"kid": base64.RawURLEncoding.EncodeToString([]byte("development-key")), "public_key_pem": string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: keyDER})), "purposes": []string{"grant", "revocation"}, "valid_from": 0, "valid_until": 0}}}}})
 	require.NoError(t, err)

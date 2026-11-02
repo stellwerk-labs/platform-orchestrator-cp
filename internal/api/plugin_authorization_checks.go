@@ -62,7 +62,7 @@ func (s *Server) CheckPluginAuthorization(ctx context.Context, request CheckPlug
 		if err := pluginServiceAllowed(item, descriptor, pluginAuthorizationCheckAction, false, false); err != nil {
 			return nil, err
 		}
-		grant, err := model.GetExternalOperationGrant(ctx, s.Database, request.OrgId, request.PluginId, *body.OperationId)
+		grant, err := s.getPluginOperationGrant(ctx, request.OrgId, request.PluginId, *body.OperationId)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, pluginBoundaryError(404, "plugin_operation_not_found", "The operation grant does not exist in this scope.")
 		}

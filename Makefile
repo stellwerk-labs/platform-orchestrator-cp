@@ -35,6 +35,8 @@ generate:
 	$(YQ) 'del(.components.securitySchemes, (.. | select(has("security")).security) )' openapi/spec.yaml | $(YQ) --prettyPrint -o=json > openapi/spec.json
 	$(GO) generate -v ./...
 	$(GO) tool oapi-codegen --config=shared/genclient/oapi-codegen.cfg.yaml openapi/spec.yaml
+	$(GO) tool oapi-codegen --config=internal/observationapi/oapi-codegen.cfg.yaml openapi/observation.yaml
+	$(GO) tool oapi-codegen --config=shared/observationapi/oapi-codegen.cfg.yaml openapi/observation.yaml
 	$(GO) tool oapi-codegen --config=shared/genevents/oapi-codegen.cfg.yaml openapi/events.yaml
 	cd shared && $(GO) mod tidy
 

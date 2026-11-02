@@ -31,7 +31,7 @@ func (s *Server) pluginOperationServiceGrant(ctx context.Context, org, plugin st
 	if err != nil {
 		return nil, item, err
 	}
-	grant, err := model.GetExternalOperationGrant(ctx, s.Database, org, plugin, operation)
+	grant, err := s.getPluginOperationGrant(ctx, org, plugin, operation)
 	if err != nil {
 		return nil, item, pluginModelError(err)
 	}

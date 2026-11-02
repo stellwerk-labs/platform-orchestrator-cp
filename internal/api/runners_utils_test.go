@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -160,4 +161,83 @@ func TestValidateAndPrepareRunnerConfigurationPatch(t *testing.T) {
 		assert.Equal(t, "new-image:v2", *processedUpdateBody.Job.Image, "job image should be correct")
 		assert.Equal(t, "new_value", processedUpdateBody.Job.Environment["NEW_VAR"], "job environment should be correct")
 	})
+}
+
+func TestRunnerParallelJobConfigurationIsPositiveOptionalAndPreserved(t *testing.T) {
+	for _, runnerType := range []string{"kubernetes", "kubernetes-gke", "kubernetes-eks", "kubernetes-agent", "serverless-ecs"} {
+		t.Run(runnerType, func(t *testing.T) {
+			var legacy RunnerConfigurationUpdate
+			require.NoError(t, json.Unmarshal([]byte(`{"type":"`+runnerType+`"}`), &legacy))
+			_, patch, err := checkUpdateBodyRunnerConfigurationStrict(legacy)
+			require.NoError(t, err)
+			encoded, err := json.Marshal(patch)
+			require.NoError(t, err)
+			require.NotContains(t, string(encoded), "max_parallel_jobs")
+			for _, limit := range []int{0, -1} {
+				body := map[string]any{"type": runnerType, "max_parallel_jobs": limit}
+				raw, err := json.Marshal(body)
+				require.NoError(t, err)
+				var invalid RunnerConfigurationUpdate
+				require.NoError(t, json.Unmarshal(raw, &invalid))
+				_, _, err = checkUpdateBodyRunnerConfigurationStrict(invalid)
+				require.ErrorContains(t, err, "positive")
+			}
+			var config RunnerConfigurationUpdate
+			require.NoError(t, json.Unmarshal([]byte(`{"type":"`+runnerType+`","max_parallel_jobs":2,"supported_protocols":["environment-observation/v1"]}`), &config))
+			_, patch, err = checkUpdateBodyRunnerConfigurationStrict(config)
+			require.NoError(t, err)
+			merged := updateRunnerConfiguration(map[string]any{"job": map[string]any{"image": "runner:v1"}}, patch)
+			require.InDelta(t, 2, merged["max_parallel_jobs"], 0)
+			require.Equal(t, []any{"environment-observation/v1"}, merged["supported_protocols"])
+			internal := internalApiRunnerFromDbRunner(model.Runner{OrgId: "acme", Id: "runner", RunnerConfiguration: merged})
+			raw, err := json.Marshal(internal)
+			require.NoError(t, err)
+			require.Contains(t, string(raw), `"max_parallel_jobs":2`)
+		})
+	}
+}
+
+func TestRunnerCommonFieldsPreserveOmissionAndSupportExplicitNull(t *testing.T) {
+	for _, runnerType := range []string{"kubernetes", "kubernetes-gke", "kubernetes-eks", "kubernetes-agent", "serverless-ecs"} {
+		t.Run(runnerType, func(t *testing.T) {
+			existing := map[string]any{"type": runnerType, "max_parallel_jobs": float64(2), "supported_protocols": []any{"environment-observation/v1"}}
+			for _, body := range []string{`{"type":"` + runnerType + `"}`, `{"type":"` + runnerType + `","job":{}}`} {
+				var update RunnerConfigurationUpdate
+				require.NoError(t, json.Unmarshal([]byte(body), &update))
+				_, parsed, err := checkUpdateBodyRunnerConfigurationStrict(update)
+				require.NoError(t, err)
+				merged := updateRunnerConfiguration(existing, parsed)
+				require.NoError(t, applyRunnerConfigurationClears(merged, &update))
+				require.Equal(t, existing["max_parallel_jobs"], merged["max_parallel_jobs"])
+				require.Equal(t, existing["supported_protocols"], merged["supported_protocols"])
+			}
+			var clear RunnerConfigurationUpdate
+			require.NoError(t, json.Unmarshal([]byte(`{"type":"`+runnerType+`","max_parallel_jobs":null,"supported_protocols":null}`), &clear))
+			_, parsed, err := checkUpdateBodyRunnerConfigurationStrict(clear)
+			require.NoError(t, err)
+			merged := updateRunnerConfiguration(existing, parsed)
+			require.NoError(t, applyRunnerConfigurationClears(merged, &clear))
+			require.NotContains(t, merged, "max_parallel_jobs")
+			require.NotContains(t, merged, "supported_protocols")
+			require.Contains(t, existing, "max_parallel_jobs", "a patch must not mutate its input")
+			var empty RunnerConfigurationUpdate
+			require.NoError(t, json.Unmarshal([]byte(`{"type":"`+runnerType+`","supported_protocols":[]}`), &empty))
+			_, parsed, err = checkUpdateBodyRunnerConfigurationStrict(empty)
+			require.NoError(t, err)
+			merged = updateRunnerConfiguration(existing, parsed)
+			require.NoError(t, applyRunnerConfigurationClears(merged, &empty))
+			require.Equal(t, []any{}, merged["supported_protocols"])
+			require.Equal(t, existing["max_parallel_jobs"], merged["max_parallel_jobs"])
+			for _, field := range []string{"max_parallel_jobs", "supported_protocols"} {
+				var create RunnerConfiguration
+				require.NoError(t, json.Unmarshal([]byte(`{"type":"`+runnerType+`","`+field+`":null}`), &create))
+				_, _, err := checkCreateBodyRunnerConfigurationStrict(create)
+				require.ErrorContains(t, err, "cannot be null")
+			}
+			summary := apiRunnerSummaryFromDbRunner(model.Runner{RunnerType: runnerType, RunnerConfiguration: existing})
+			require.NotNil(t, summary.RunnerConfiguration.MaxParallelJobs)
+			require.Equal(t, 2, *summary.RunnerConfiguration.MaxParallelJobs)
+			require.Equal(t, []string{"environment-observation/v1"}, *summary.RunnerConfiguration.SupportedProtocols)
+		})
+	}
 }

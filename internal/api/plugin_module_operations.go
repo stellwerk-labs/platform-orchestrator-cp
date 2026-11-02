@@ -21,7 +21,7 @@ func (s *Server) ApplyPluginModuleOperation(ctx context.Context, request ApplyPl
 	if !ok || policy.Scope != pluginOrganizationScope {
 		return nil, pluginBoundaryError(403, "plugin_service_forbidden", "An organization-scoped Module service grant is required.")
 	}
-	grant, err := model.GetExternalOperationGrant(ctx, s.Database, request.OrgId, request.PluginId, request.OperationId)
+	grant, err := s.getPluginOperationGrant(ctx, request.OrgId, request.PluginId, request.OperationId)
 	if err != nil {
 		return nil, pluginModelError(err)
 	}

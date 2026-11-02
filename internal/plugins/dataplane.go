@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,7 +30,15 @@ type DeploymentMaterialResult struct {
 // operator's fixed DP origin. It does not accept caller URLs or credentials.
 // Callers authorize exact scopes before using it; mutation callers also record
 // their exact dispatch for DP's independent Core callback before Call.
+type protocolDecision struct {
+	allowed bool
+	until   time.Time
+}
+
 type DataPlanePort struct {
+	protocolMutex     sync.Mutex
+	protocolDecisions map[string]protocolDecision
+
 	Origin  string
 	Gateway *Gateway
 	Client  *http.Client
@@ -44,6 +53,7 @@ type DataPlaneRequest struct {
 	ProjectUUID     uuid.UUID
 	EnvironmentUUID uuid.UUID
 	DeploymentID    uuid.UUID
+	ObservationID   uuid.UUID
 	DispatchID      string
 	Body            json.RawMessage
 }
@@ -65,6 +75,41 @@ func dataPlaneRequestPath(request DataPlaneRequest) (string, string, error) {
 	}
 	base := "/orgs/" + url.PathEscape(request.OrgID) + "/plugins/" + url.PathEscape(request.PluginID)
 	switch request.Action {
+	case "observation.request.resolve", "observation.redeploy.resolve":
+		if request.ObservationID == uuid.Nil || len(request.Body) == 0 {
+			return "", "", invalid
+		}
+		collection := "requests"
+		if request.Action == "observation.redeploy.resolve" {
+			collection = "redeployments"
+		}
+		return http.MethodPost, base + "/observations/v1/" + collection + "/" + request.ObservationID.String() + "/resolve", nil
+	case "observation.capabilities":
+		if len(request.Body) != 0 {
+			return "", "", invalid
+		}
+		return http.MethodGet, base + "/observations/v1/capabilities", nil
+	case "observation.redeploy.get":
+		if request.ObservationID == uuid.Nil || len(request.Body) != 0 {
+			return "", "", invalid
+		}
+		return http.MethodGet, base + "/observations/v1/redeployments/" + request.ObservationID.String(), nil
+	case "observation.redeploy":
+		if request.ObservationID == uuid.Nil {
+			return "", "", invalid
+		}
+		return http.MethodPost, base + "/observations/v1/runs/" + request.ObservationID.String() + "/redeploy", nil
+	case "observation.try-start":
+		return http.MethodPost, base + "/observations/v1/runs", nil
+	case "observation.get", "observation.request.get":
+		if request.ObservationID == uuid.Nil || len(request.Body) != 0 {
+			return "", "", invalid
+		}
+		kind := "runs"
+		if request.Action == "observation.request.get" {
+			kind = "requests"
+		}
+		return http.MethodGet, base + "/observations/v1/" + kind + "/" + request.ObservationID.String(), nil
 	case "external-deployment.readiness":
 		return http.MethodPost, base + "/external-deployment-readiness", nil
 	case "external-deployment.plan":
@@ -195,4 +240,46 @@ func (p *DataPlanePort) do(ctx context.Context, request DataPlaneRequest) (*http
 		return nil, &GatewayError{pluginResponseInvalid, "The Data Plane returned an unsupported redirect.", 502}
 	}
 	return response, nil
+}
+
+// SupportsProtocol is a bounded no-effect capability probe, cached briefly to
+// avoid adding a round trip to every discovery/proof check. A missing/old or
+// incomplete DP never advertises the complete optional Core contract.
+func (p *DataPlanePort) SupportsProtocol(ctx context.Context, org string, item Installation, protocol string) bool {
+	if p == nil || protocol != EnvironmentObservationProtocol && protocol != EnvironmentObservationRecoveryProtocol {
+		return false
+	}
+	identity, err := uuid.Parse(item.ServiceUserID)
+	if err != nil {
+		return false
+	}
+	key := org + ":" + item.InstallationID + ":" + item.ManifestSHA256 + ":" + item.ServiceUserID + ":" + protocol
+	now := time.Now()
+	p.protocolMutex.Lock()
+	cached, exists := p.protocolDecisions[key]
+	p.protocolMutex.Unlock()
+	if exists && now.Before(cached.until) {
+		return cached.allowed
+	}
+	bounded, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	result, err := p.Call(bounded, DataPlaneRequest{OrgID: org, PluginID: item.ID, ActorID: identity, Action: "observation.capabilities", RequestID: uuid.NewString()})
+	supported := false
+	if err == nil && result.Status == http.StatusOK {
+		var capabilities struct {
+			Protocols []string `json:"protocols"`
+		}
+		if json.Unmarshal(result.Body, &capabilities) == nil {
+			for _, supportedProtocol := range capabilities.Protocols {
+				supported = supported || supportedProtocol == protocol
+			}
+		}
+	}
+	p.protocolMutex.Lock()
+	if p.protocolDecisions == nil || len(p.protocolDecisions) > 10000 {
+		p.protocolDecisions = map[string]protocolDecision{}
+	}
+	p.protocolDecisions[key] = protocolDecision{allowed: supported, until: time.Now().Add(2 * time.Second)}
+	p.protocolMutex.Unlock()
+	return supported
 }

@@ -25,6 +25,7 @@ const (
 )
 
 type UIContribution struct {
+	RequireOrgAdmin   bool               `json:"require_org_admin,omitempty"`
 	SDKVersion        string             `json:"sdk_version"`
 	Origin            string             `json:"origin"`
 	Entrypoint        string             `json:"entrypoint"`
@@ -63,6 +64,7 @@ type HostOperation struct {
 }
 
 type Operation struct {
+	RequireOrgAdmin         bool                           `json:"require_org_admin,omitempty"`
 	RequiredFeature         string                         `json:"required_feature,omitempty"`
 	ID                      string                         `json:"id"`
 	Method                  string                         `json:"method"`
@@ -79,6 +81,7 @@ type Operation struct {
 // Installation is operator-controlled configuration, not a signed
 // commercial entitlement. Entitlement verification belongs to a separate gate.
 type Installation struct {
+	RequiredProtocols     []string                     `json:"required_protocols,omitempty"`
 	InstallationID        string                       `json:"installation_id,omitempty"`
 	ManifestSHA256        string                       `json:"manifest_sha256,omitempty"`
 	Entitlement           *EntitlementDeclaration      `json:"entitlement,omitempty"`
@@ -106,7 +109,16 @@ type Installation struct {
 // refresh replaces the whole snapshot atomically; readers never see a mix.
 // The snapshot is never authority for a Core effect: effects re-verify the
 // installation and organization enablement in their own transaction.
+// ProtocolResolver checks the rest of Core's optional boundary. Only packages
+// explicitly requiring a protocol depend on it; ordinary Core and other plugins
+// keep their existing availability decisions.
+type ProtocolResolver interface {
+	SupportsProtocol(context.Context, string, Installation, string) bool
+}
+
 type InstallationRegistry struct {
+	Protocols ProtocolResolver
+
 	snapshot     atomic.Pointer[installationSnapshot]
 	Entitlements EntitlementResolver
 }
@@ -301,7 +313,7 @@ const InventoryReadAction = "inventory.read"
 func (item Installation) Manifest() Manifest {
 	manifest := Manifest{
 		ID: item.ID, DisplayName: item.DisplayName, Version: item.Version, Capabilities: item.Capabilities,
-		Operations: item.Operations, ServiceGrants: item.ServiceGrants, AuthorizationPolicies: item.AuthorizationPolicies, Entitlement: item.Entitlement,
+		RequiredProtocols: item.RequiredProtocols, Operations: item.Operations, ServiceGrants: item.ServiceGrants, AuthorizationPolicies: item.AuthorizationPolicies, Entitlement: item.Entitlement,
 	}
 	if item.UI != nil {
 		ui := *item.UI
@@ -359,6 +371,11 @@ func (r *InstallationRegistry) get(ctx context.Context, snapshot *installationSn
 	state, enabled := item.Organizations[orgID]
 	if !enabled {
 		return Descriptor{}, false
+	}
+	for _, protocol := range item.RequiredProtocols {
+		if protocol != EnvironmentObservationProtocol && protocol != EnvironmentObservationRecoveryProtocol || r.Protocols == nil || !r.Protocols.SupportsProtocol(ctx, orgID, item, protocol) {
+			state = StateIncompatible
+		}
 	}
 	descriptor := Descriptor{ID: item.ID, DisplayName: item.DisplayName, Version: item.Version, Capabilities: CapabilityIDs(item.Capabilities), State: state, Mode: accessMode(state)}
 	return r.applyEntitlement(ctx, orgID, item, descriptor), true

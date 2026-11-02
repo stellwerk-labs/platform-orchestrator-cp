@@ -48,3 +48,17 @@ func TestGeneratedRoutesPreserveAuthentication(t *testing.T) {
 		})
 	}
 }
+
+func TestOptionalObservationRoutesPreserveAuthenticatedContext(t *testing.T) {
+	server, err := hecho.DefaultEchoServerWithValidation(&hecho.ValidatedServerConfig{AppName: "observation-auth-test", Logger: zap.NewNop(), OpenAPIRawSchema: MustDecodeOpenApiSpec()})
+	require.NoError(t, err)
+	server.Use(middleware.EchoCtxMiddleware)
+	(&Server{Logger: zap.NewNop()}).MapRoutes(server)
+	for _, actor := range []string{"", "invalid"} {
+		request := httptest.NewRequest(http.MethodGet, "/orgs/acme/plugins/dev.example.observer/observations/v1/grants/0199a0c1-1d6e-72f1-8000-000000000001", nil)
+		request.Header.Set("From", actor)
+		response := httptest.NewRecorder()
+		server.ServeHTTP(response, request)
+		require.Equal(t, http.StatusUnauthorized, response.Code, response.Body.String())
+	}
+}

@@ -25,7 +25,7 @@ func (s *Server) ControlPluginOperationGrant(ctx context.Context, request Contro
 	if body.Action != PluginGrantControlSuspend && body.Action != PluginGrantControlRelease {
 		return nil, pluginBoundaryError(400, "plugin_request_invalid", "Service control may only suspend or release existing authority.")
 	}
-	grant, err := model.GetExternalOperationGrant(ctx, s.Database, request.OrgId, request.PluginId, request.OperationId)
+	grant, err := s.getPluginOperationGrant(ctx, request.OrgId, request.PluginId, request.OperationId)
 	if err != nil {
 		return nil, pluginModelError(err)
 	}

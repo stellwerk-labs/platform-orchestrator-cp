@@ -6513,6 +6513,14 @@ components:
       description: A summary of the runner configuration.
       type: object
       properties:
+        max_parallel_jobs:
+          type: integer
+          minimum: 1
+          description: Configured concurrent job limit. Absent means legacy unlimited admission.
+        supported_protocols:
+          type: array
+          items: {type: string}
+          description: Protocols explicitly declared by the configured Runner image.
         type:
           $ref: '#/components/schemas/RunnerType'
       required:
@@ -6521,6 +6529,18 @@ components:
       description: Runner configuration for a Kubernetes cluster.
       type: object
       properties:
+        max_parallel_jobs:
+          type: integer
+          minimum: 1
+          description: Maximum concurrent jobs across all Environments using this Runner. Omission preserves unlimited legacy admission. Reducing the limit drains existing jobs before new admission.
+        supported_protocols:
+          type: array
+          uniqueItems: true
+          maxItems: 16
+          items:
+            type: string
+            maxLength: 128
+          description: Protocols explicitly supported by the configured Runner image. Observation requires environment-observation/v1.
         type:
           $ref: '#/components/schemas/RunnerType'
         job:
@@ -6535,6 +6555,18 @@ components:
       description: Runner configuration for a GKE cluster.
       type: object
       properties:
+        max_parallel_jobs:
+          type: integer
+          minimum: 1
+          description: Maximum concurrent jobs across all Environments using this Runner. Omission preserves unlimited legacy admission. Reducing the limit drains existing jobs before new admission.
+        supported_protocols:
+          type: array
+          uniqueItems: true
+          maxItems: 16
+          items:
+            type: string
+            maxLength: 128
+          description: Protocols explicitly supported by the configured Runner image. Observation requires environment-observation/v1.
         type:
           $ref: '#/components/schemas/RunnerType'
         job:
@@ -6549,6 +6581,18 @@ components:
       description: Runner configuration for an EKS cluster.
       type: object
       properties:
+        max_parallel_jobs:
+          type: integer
+          minimum: 1
+          description: Maximum concurrent jobs across all Environments using this Runner. Omission preserves unlimited legacy admission. Reducing the limit drains existing jobs before new admission.
+        supported_protocols:
+          type: array
+          uniqueItems: true
+          maxItems: 16
+          items:
+            type: string
+            maxLength: 128
+          description: Protocols explicitly supported by the configured Runner image. Observation requires environment-observation/v1.
         type:
           $ref: '#/components/schemas/RunnerType'
         job:
@@ -6563,6 +6607,18 @@ components:
       description: Runner configuration for a Kubernetes Agent.
       type: object
       properties:
+        max_parallel_jobs:
+          type: integer
+          minimum: 1
+          description: Maximum concurrent jobs across all Environments using this Runner. Omission preserves unlimited legacy admission. Reducing the limit drains existing jobs before new admission.
+        supported_protocols:
+          type: array
+          uniqueItems: true
+          maxItems: 16
+          items:
+            type: string
+            maxLength: 128
+          description: Protocols explicitly supported by the configured Runner image. Observation requires environment-observation/v1.
         type:
           $ref: '#/components/schemas/RunnerType'
         job:
@@ -6577,6 +6633,18 @@ components:
       description: Runner configuration for executing on AWS ECS Fargate.
       type: object
       properties:
+        max_parallel_jobs:
+          type: integer
+          minimum: 1
+          description: Maximum concurrent jobs across all Environments using this Runner. Omission preserves unlimited legacy admission. Reducing the limit drains existing jobs before new admission.
+        supported_protocols:
+          type: array
+          uniqueItems: true
+          maxItems: 16
+          items:
+            type: string
+            maxLength: 128
+          description: Protocols explicitly supported by the configured Runner image. Observation requires environment-observation/v1.
         type:
           $ref: '#/components/schemas/RunnerType'
         auth:
@@ -6689,6 +6757,20 @@ components:
       description: Object to update an existing runner configuration for a Kubernetes cluster.
       type: object
       properties:
+        max_parallel_jobs:
+          nullable: true
+          type: integer
+          minimum: 1
+          description: Maximum concurrent jobs across all Environments using this Runner. Omission preserves the configured value. Explicit null clears the limit to unlimited. Reducing the limit drains existing jobs before new admission.
+        supported_protocols:
+          nullable: true
+          type: array
+          uniqueItems: true
+          maxItems: 16
+          items:
+            type: string
+            maxLength: 128
+          description: Protocols explicitly supported by the configured Runner image. Omission preserves the configured value. Null clears the opt-in; an empty array declares no protocols. Observation requires environment-observation/v1.
         job:
           $ref: '#/components/schemas/K8sRunnerJobConfig'
         cluster:
@@ -6701,6 +6783,20 @@ components:
       description: Object to update an existing runner configuration for a GKE cluster.
       type: object
       properties:
+        max_parallel_jobs:
+          nullable: true
+          type: integer
+          minimum: 1
+          description: Maximum concurrent jobs across all Environments using this Runner. Omission preserves the configured value. Explicit null clears the limit to unlimited. Reducing the limit drains existing jobs before new admission.
+        supported_protocols:
+          nullable: true
+          type: array
+          uniqueItems: true
+          maxItems: 16
+          items:
+            type: string
+            maxLength: 128
+          description: Protocols explicitly supported by the configured Runner image. Omission preserves the configured value. Null clears the opt-in; an empty array declares no protocols. Observation requires environment-observation/v1.
         job:
           $ref: '#/components/schemas/K8sRunnerJobConfig'
         cluster:
@@ -6713,6 +6809,20 @@ components:
       description: Object to update an existing runner configuration for an EKS cluster.
       type: object
       properties:
+        max_parallel_jobs:
+          nullable: true
+          type: integer
+          minimum: 1
+          description: Maximum concurrent jobs across all Environments using this Runner. Omission preserves the configured value. Explicit null clears the limit to unlimited. Reducing the limit drains existing jobs before new admission.
+        supported_protocols:
+          nullable: true
+          type: array
+          uniqueItems: true
+          maxItems: 16
+          items:
+            type: string
+            maxLength: 128
+          description: Protocols explicitly supported by the configured Runner image. Omission preserves the configured value. Null clears the opt-in; an empty array declares no protocols. Observation requires environment-observation/v1.
         job:
           $ref: '#/components/schemas/K8sRunnerJobConfig'
         cluster:
@@ -6725,6 +6835,20 @@ components:
       description: Object to update an existing runner configuration for a Kubernetes Agent.
       type: object
       properties:
+        max_parallel_jobs:
+          nullable: true
+          type: integer
+          minimum: 1
+          description: Maximum concurrent jobs across all Environments using this Runner. Omission preserves the configured value. Explicit null clears the limit to unlimited. Reducing the limit drains existing jobs before new admission.
+        supported_protocols:
+          nullable: true
+          type: array
+          uniqueItems: true
+          maxItems: 16
+          items:
+            type: string
+            maxLength: 128
+          description: Protocols explicitly supported by the configured Runner image. Omission preserves the configured value. Null clears the opt-in; an empty array declares no protocols. Observation requires environment-observation/v1.
         job:
           $ref: '#/components/schemas/K8sRunnerJobConfig'
         type:
@@ -6737,6 +6861,20 @@ components:
       description: Runner configuration for executing on AWS ECS Fargate.
       type: object
       properties:
+        max_parallel_jobs:
+          nullable: true
+          type: integer
+          minimum: 1
+          description: Maximum concurrent jobs across all Environments using this Runner. Omission preserves the configured value. Explicit null clears the limit to unlimited. Reducing the limit drains existing jobs before new admission.
+        supported_protocols:
+          nullable: true
+          type: array
+          uniqueItems: true
+          maxItems: 16
+          items:
+            type: string
+            maxLength: 128
+          description: Protocols explicitly supported by the configured Runner image. Omission preserves the configured value. Null clears the opt-in; an empty array declares no protocols. Observation requires environment-observation/v1.
         type:
           $ref: '#/components/schemas/RunnerType'
         auth:

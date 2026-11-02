@@ -666,6 +666,7 @@ func (m *Manager) packageManifest(ctx context.Context, tx model.Tx, digest strin
 // the package manifest.
 func (m *Manager) validateServed(installation model.PluginInstallation, manifest plugins.Manifest) error {
 	item := view(installation, manifest)
+	item.RequiredProtocols = manifest.RequiredProtocols
 	item.Capabilities, item.Operations, item.ServiceGrants, item.AuthorizationPolicies = manifest.Capabilities, manifest.Operations, manifest.ServiceGrants, manifest.AuthorizationPolicies
 	if manifest.UI != nil {
 		ui := *manifest.UI
