@@ -73,19 +73,24 @@ func (s *Server) getMatchingRunners(ctx context.Context, tx model.Tx, orgId, pro
 }
 
 func envFromDbModel(e *model.Environment) Environment {
+	var deletionPolicy *EnvironmentDeletionPolicy
+	if e.DeletionForce != nil && e.DeletionDeleteRules != nil {
+		deletionPolicy = &EnvironmentDeletionPolicy{Force: *e.DeletionForce, DeleteRules: *e.DeletionDeleteRules}
+	}
 	return Environment{
-		Id:            e.Id,
-		ProjectId:     e.ProjectId,
-		ProjectUuid:   ref.Ref(e.ProjectUuid),
-		EnvTypeId:     e.EnvTypeId,
-		Uuid:          e.Uuid,
-		DisplayName:   e.DisplayName,
-		CreatedAt:     e.CreatedAt,
-		UpdatedAt:     e.UpdatedAt,
-		RunnerId:      e.RunnerId.Ref(),
-		Status:        EnvironmentStatus(e.Status),
-		StatusMessage: e.StatusMessage.Ref(),
-		Labels:        e.Labels,
+		DeletionPolicy: deletionPolicy,
+		Id:             e.Id,
+		ProjectId:      e.ProjectId,
+		ProjectUuid:    ref.Ref(e.ProjectUuid),
+		EnvTypeId:      e.EnvTypeId,
+		Uuid:           e.Uuid,
+		DisplayName:    e.DisplayName,
+		CreatedAt:      e.CreatedAt,
+		UpdatedAt:      e.UpdatedAt,
+		RunnerId:       e.RunnerId.Ref(),
+		Status:         EnvironmentStatus(e.Status),
+		StatusMessage:  e.StatusMessage.Ref(),
+		Labels:         e.Labels,
 	}
 }
 
@@ -234,9 +239,10 @@ func DeleteEnvironmentAndCreateMessage(
 	}
 
 	env, err = db.UpdateEnvironment(ctx, tx, orgId, projectId, envId, &model.EnvironmentPatch{
-		UpdatedAt:     time.Now().UTC(),
-		Status:        opt.Of(model.EnvironmentStatusDeleting),
-		StatusMessage: opt.Of("Attempting to destroy environment"),
+		DeletionPolicy: &model.EnvironmentDeletionPolicy{Force: opts.Force, DeleteRules: ref.DerefOr(opts.DeleteRules, false)},
+		UpdatedAt:      time.Now().UTC(),
+		Status:         opt.Of(model.EnvironmentStatusDeleting),
+		StatusMessage:  opt.Of("Attempting to destroy environment"),
 	})
 	if err != nil {
 		return nil, nil, err
@@ -246,8 +252,8 @@ func DeleteEnvironmentAndCreateMessage(
 	// with the DP to execute a destroy deployment. Once the destroy deployment succeeds, the deployment completed event will
 	// cause the env to be fully deleted from the worker process.
 	event := envEventFromDbModel(env)
-	event.Force = ref.Ref(opts.Force)
-	event.DeleteRules = opts.DeleteRules
+	event.Force = env.DeletionForce
+	event.DeleteRules = env.DeletionDeleteRules
 
 	messages, err := db.InsertPendingEventMessages(ctx, tx, events.AsMessages(events.CloudEvent[any]{
 		Type: genevents.IoPlatformOrchestratorEnvironmentUpdated,
@@ -496,13 +502,23 @@ func (s *Server) InternalForceDeleteEnvironment(ctx context.Context, request Int
 		}
 		return nil, err
 	}
+	if request.Params.ExpectedEnvUuid != nil && *request.Params.ExpectedEnvUuid != env.Uuid {
+		return InternalForceDeleteEnvironment409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(model.NewErrConflict("Environment lifecycle no longer matches final deletion"))}, nil
+	}
+	deleteRules := request.Params.DeleteRules
+	if env.DeletionDeleteRules != nil {
+		deleteRules = env.DeletionDeleteRules
+	}
+	if env.DeletionDeleteRules == nil && (request.Params.ExpectedEnvUuid != nil || env.Status != model.EnvironmentStatusActive) {
+		return InternalForceDeleteEnvironment409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(model.NewErrConflict("Environment deletion policy is unknown; repeat explicit deletion"))}, nil
+	}
 	if _, err := s.Database.RemoveEnvironmentModuleVersionPinsForDeletion(ctx, tx, request.OrgId, env.Uuid, uid, "system"); err != nil {
 		if conflict, ok := model.IsErrConflict(err); ok {
 			return InternalForceDeleteEnvironment409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(conflict)}, nil
 		}
 		return nil, errors.Wrap(err, "failed to remove Environment Pins during deletion")
 	}
-	if request.Params.DeleteRules != nil && *request.Params.DeleteRules {
+	if deleteRules != nil && *deleteRules {
 		if deletedRuleIds, err := s.Database.BulkDeleteModuleRuleDefinitions(ctx, tx, request.OrgId, model.DeleteModuleRulesParams{
 			ByProjectId: &request.ProjectId,
 			ByEnvId:     &request.EnvId,
@@ -563,6 +579,8 @@ func (s *Server) InternalUpdateEnvironment(ctx context.Context, request Internal
 	if err != nil {
 		if me, ok := model.IsErrNotFound(err); ok {
 			return InternalUpdateEnvironment404JSONResponse{N404NotFoundJSONResponse: Generate404FromModelErr(me)}, nil
+		} else if me, ok := model.IsErrConflict(err); ok {
+			return InternalUpdateEnvironment409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(me)}, nil
 		} else if me, ok := model.IsErrBadRequest(err); ok {
 			return InternalUpdateEnvironment400JSONResponse{N400BadRequestJSONResponse: Generate400FromModelErr(me)}, nil
 		}

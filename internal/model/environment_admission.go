@@ -217,12 +217,16 @@ func AuthorizeDeploymentAdmission(ctx context.Context, db Databaser, value Deplo
 			return nil, err
 		}
 	}
-	environment, err := db.GetEnvironmentByUuid(ctx, tx, value.OrgID, value.EnvironmentUUID, GetModeDefault)
+	environmentMode := GetModeDefault
+	if value.Mode == admissionModeDestroy {
+		environmentMode = GetModeForUpdate
+	}
+	environment, err := db.GetEnvironmentByUuid(ctx, tx, value.OrgID, value.EnvironmentUUID, environmentMode)
 	if err != nil {
 		return nil, err
 	}
-	if environment.ProjectUuid != value.ProjectUUID || value.Mode == admissionModeDestroy && environment.Status != EnvironmentStatusDeleting {
-		return nil, NewErrConflict("admission requires the exact Environment scope and destroy requires confirmed deletion")
+	if environment.ProjectUuid != value.ProjectUUID || value.Mode == admissionModeDestroy && (environment.Status != EnvironmentStatusDeleting || environment.DeletionForce == nil || environment.DeletionDeleteRules == nil || *environment.DeletionForce) {
+		return nil, NewErrConflict("admission requires the exact Environment scope and destroy requires confirmed non-force deletion policy")
 	}
 	pins, err := db.ListEnvironmentModuleVersionPins(ctx, tx, value.OrgID, &value.EnvironmentUUID, nil, false)
 	if err != nil {

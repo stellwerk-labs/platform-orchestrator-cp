@@ -36,3 +36,16 @@ Runner capacity is an explicit operator choice. A positive limit bounds concurre
 jobs across Environments that share a Runner. Reducing a limit lets existing work
 drain before admitting additional work. Declaring a protocol must match the
 Runner executable actually installed.
+
+## Canonical deletion policy successor
+
+The successor candidate adds CP migration54 and a nullable canonical deletion
+policy, exposed through the additive shared SDK3.2.0 (publication pending).
+Explicit DELETE retries preserve accepted true flags. New and replayed Destroy
+admissions require a locked, known non-force policy. Previously authorized work
+may finish; force does not cancel it. Final deletion uses canonical rule-removal
+policy and the new optional expected lifecycle UUID. Legacy deleting rows with
+unknown policy require explicit re-deletion. Only the trusted active, unbound
+internal escape hatch keeps its previous fallback behavior. Preserve backups and
+recover forward with compatible writers; this does not change private plugins
+or their licences. Existing RC2 and SDK3.1.0 identities remain immutable.

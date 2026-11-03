@@ -119,3 +119,18 @@
   Go/schema/modules, Dockerfile, production build/notice helpers and the sole
   Go embed pattern (model migration SQL) are unchanged. Root decides image
   qualification and any later source/CI repin; no new source identity claimed.
+
+## CP54 force-deletion race correction, local qualification (2026-11-03)
+
+Prepared an isolated descendant of published RC2 05b16ecd, preserving that tag and
+SDK3.1.0. Added canonical nullable deletion policy, monotone retry semantics,
+Destroy row/replay fences, stale status protection, final UUID binding, all model
+projections, and generated optional DTO/query fields for proposed SDK3.2.0.
+Corrected outcome-acknowledgement API descriptions. Real isolated PostgreSQL race
+tests cover legacy unknown policy, monotone flags, rule choices, same-name UUID
+recreation, transaction rollback, admission/replay and stale UPDATE blocking.
+Ordinary unit tests, shared tests, pinned generation and CP2.14 lint passed.
+Fixture-only failures and final gate receipts are retained under the task's
+cp-force-deletion-fix directory. The owned PG fixture was removed; current Core
+services, databases, licences and private plugins were untouched. No commit or
+publication in this preparation phase. See LEARNINGS.md and DECISIONS.md.

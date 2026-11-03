@@ -1674,9 +1674,16 @@ paths:
         - $ref: '#/components/parameters/envIdPathParam'
         - name: deleteRules
           in: query
-          description: Whether to delete all rules associated with the environment
+          description: Legacy fallback when canonical deletion policy is unknown. Persisted deletion policy takes precedence.
           schema:
             type: boolean
+          required: false
+        - name: expectedEnvUuid
+          in: query
+          description: When supplied, final deletion requires this exact Environment lifecycle UUID and known canonical deletion policy. A mismatch returns 409 before any deletion. Legacy callers omitting it remain unbound; unknown policy is accepted only by the active-Environment internal escape hatch.
+          schema:
+            type: string
+            format: uuid
           required: false
       responses:
         '204':
@@ -1744,12 +1751,13 @@ paths:
   /orgs/{orgId}/projects/{projectId}/envs/{envId}/deployments/{deploymentId}/actions/acknowledge-outcome:
     post:
       operationId: acknowledgeDeploymentOutcome
-      summary: Acknowledge the unknown Runner outcome of a failed plugin-dispatched Deployment.
+      summary: Acknowledge an eligible retained Deployment with unknown Runner outcome.
       description: |
         Records, exactly once and attributed to the acting user, that an operator has confirmed the Runner attempt
-        of this failed plugin-dispatched Deployment of the Environment can no longer change it. The Data Plane
-        accepts only the current Environment head without Runner stop evidence after its Runner dispatch window
-        closed; the acknowledgement then lets the next Deployment of the Environment proceed. It does not change
+        of this eligible Deployment of the Environment can no longer change it. Eligibility includes retained
+        plugin-dispatched work and ordinary work retaining Runner capacity, including older non-head ownership,
+        only after the bounded Runner dispatch window has closed and without Runner stop evidence. The
+        acknowledgement releases that retained ownership and wakes Environment deletion. It does not change
         the Deployment's status or history. Requires the `deployment.outcome.acknowledge` permission on the
         Environment, with the organization as fallback. Organization tokens and the system user are rejected
         because the actor is the audit record. Repeating the identical request returns the stored acknowledgement
@@ -5076,6 +5084,16 @@ components:
         - active
         - deleting
         - delete_failed
+    EnvironmentDeletionPolicy:
+      type: object
+      required: [force, delete_rules]
+      properties:
+        force:
+          type: boolean
+          description: Skip new ordinary Destroy work. Previously authorized work may still finish.
+        delete_rules:
+          type: boolean
+          description: Remove associated rules when this lifecycle is finally deleted.
     Environment:
       type: object
       description: An environment.
@@ -5089,6 +5107,11 @@ components:
         - env_type_id
         - status
       properties:
+        deletion_policy:
+          readOnly: true
+          description: Canonical accepted deletion options for this lifecycle. Omitted for legacy unknown policy, which requires an explicit DELETE before new Destroy admission. True flags cannot be undone by retries.
+          allOf:
+            - $ref: '#/components/schemas/EnvironmentDeletionPolicy'
         id:
           description: Environment identifier
           type: string

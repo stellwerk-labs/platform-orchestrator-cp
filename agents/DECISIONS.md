@@ -22,3 +22,14 @@
 - This isolated scanner is an independently pinned qualification tool. The
   existing CP image retains its actual e8e5ace source identity; new scanner
   commits do not authorize relabeling or claiming a different public release.
+
+## Canonical Environment deletion policy, CP54 (2026-11-03)
+
+Persist a constrained nullable force/delete-rules pair without backfill. Public
+DTOs expose one optional read-only object. Explicit DELETE merges true flags by
+OR and writes status/outbox in one transaction. Destroy-only admissions lock the
+row and recheck current policy on new and replayed requests. Existing authorized
+work may finish after escalation. Final deletion uses canonical rule policy and
+can bind the lifecycle UUID. Unknown deleting/delete_failed rows require explicit
+re-deletion even for unbound internal callers; only active/unbound trusted direct
+force deletion retains its legacy fallback. No DP policy table or plugin change.
