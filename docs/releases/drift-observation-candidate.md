@@ -2,8 +2,8 @@
 
 This candidate adds the generic interfaces that native plugins need to request
 read-only Environment observations. It also adds optional Runner capacity and
-protocol declarations. Publication and the coordinated release versions are
-still pending.
+protocol declarations. Application image publication and the coordinated
+artifact set are still pending.
 
 ## Changes
 
@@ -40,7 +40,7 @@ Runner executable actually installed.
 ## Canonical deletion policy successor
 
 The successor candidate adds CP migration54 and a nullable canonical deletion
-policy, exposed through the additive shared SDK3.2.0 (publication pending).
+policy, exposed through the published additive shared SDK3.2.0.
 Explicit DELETE retries preserve accepted true flags. New and replayed Destroy
 admissions require a locked, known non-force policy. Previously authorized work
 may finish; force does not cancel it. Final deletion uses canonical rule-removal
