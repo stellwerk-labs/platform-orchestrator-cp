@@ -180,7 +180,7 @@ func (s *Server) pluginInspectionAuthority(ctx context.Context, org string, item
 	if err := pluginServiceAllowed(item, descriptor, action, false, false); err != nil {
 		return uuid.Nil, "", nil, err
 	}
-	grant, err := model.GetExternalOperationGrant(ctx, s.Database, org, item.ID, *body.OperationId)
+	grant, err := s.getPluginOperationGrant(ctx, org, item.ID, *body.OperationId)
 	if err != nil {
 		return uuid.Nil, "", nil, pluginModelError(err)
 	}

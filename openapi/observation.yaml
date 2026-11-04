@@ -1,0 +1,437 @@
+openapi: 3.0.3
+info:
+  title: Optional environment-observation/v1 API
+  version: 1.0.0
+security:
+  - userIdHeader: []
+paths:
+  /orgs/{orgId}/plugins/{pluginId}/observations/v1/runs:
+    parameters:
+      - $ref: '#/components/parameters/OrgID'
+      - $ref: '#/components/parameters/PluginID'
+    post:
+      operationId: TryStartObservation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservationRequest'
+      responses:
+        '200':
+          description: Immutable accepted or skipped receipt, including replay.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservationReceipt'
+  /orgs/{orgId}/plugins/{pluginId}/observations/v1/runs/{runId}:
+    parameters:
+      - $ref: '#/components/parameters/OrgID'
+      - $ref: '#/components/parameters/PluginID'
+      - in: path
+        name: runId
+        required: true
+        schema: {type: string, format: uuid}
+    get:
+      operationId: GetObservation
+      responses:
+        '200':
+          description: Retained sanitized outcome.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservationRun'
+  /orgs/{orgId}/plugins/{pluginId}/observations/v1/requests/{requestId}:
+    parameters:
+      - $ref: '#/components/parameters/OrgID'
+      - $ref: '#/components/parameters/PluginID'
+      - in: path
+        name: requestId
+        required: true
+        schema: {type: string, format: uuid}
+    get:
+      operationId: GetObservationRequest
+      responses:
+        '200':
+          description: Immutable request receipt.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservationReceipt'
+  /orgs/{orgId}/plugins/{pluginId}/observations/v1/grants/{grantId}:
+    parameters:
+      - $ref: '#/components/parameters/OrgID'
+      - $ref: '#/components/parameters/PluginID'
+      - in: path
+        name: grantId
+        required: true
+        schema: {type: string, format: uuid}
+    put:
+      operationId: AuthorizeObservationGrant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObservationGrantCommand'
+      responses:
+        '200':
+          description: Current exact observation authority.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ObservationGrant'}
+    get:
+      operationId: GetObservationGrant
+      responses:
+        '200':
+          description: Current exact observation authority.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ObservationGrant'}
+  /orgs/{orgId}/plugins/{pluginId}/observations/v1/runs/{runId}/redeploy:
+    parameters:
+      - $ref: '#/components/parameters/OrgID'
+      - $ref: '#/components/parameters/PluginID'
+      - in: path
+        name: runId
+        required: true
+        schema: {type: string, format: uuid}
+    post:
+      operationId: RedeployObservationBaseline
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ObservationRedeployRequest'}
+      responses:
+        '200':
+          description: Normal authorized replay of the exact observation baseline.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ObservationRedeployReceipt'}
+  /orgs/{orgId}/plugins/{pluginId}/observations/v1/targets/query:
+    parameters:
+      - $ref: '#/components/parameters/OrgID'
+      - $ref: '#/components/parameters/PluginID'
+    post:
+      operationId: QueryObservationTargets
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ObservationTargetsQuery'}
+      responses:
+        '200':
+          description: One bounded page of canonical Environment metadata.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ObservationTargetsPage'}
+  /orgs/{orgId}/plugins/{pluginId}/observations/v1/redeployments/{requestId}:
+    parameters:
+      - $ref: '#/components/parameters/OrgID'
+      - $ref: '#/components/parameters/PluginID'
+      - in: path
+        name: requestId
+        required: true
+        schema: {type: string, format: uuid}
+    get:
+      operationId: GetObservationRedeployment
+      responses:
+        '200':
+          description: Existing exact remedial Deployment receipt with current authoritative status.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ObservationRedeployReceipt'}
+  /orgs/{orgId}/plugins/{pluginId}/observations/v1/requests/{requestId}/resolve:
+    parameters:
+      - $ref: '#/components/parameters/OrgID'
+      - $ref: '#/components/parameters/PluginID'
+      - in: path
+        name: requestId
+        required: true
+        schema: {type: string, format: uuid}
+    post:
+      operationId: ResolveObservationRequest
+      description: Close an expired exact admission key, returning accepted work or immutable not_started. Never executes or cancels work.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ObservationRequest'}
+      responses:
+        '200':
+          description: Durable exact admission resolution.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ObservationResolution'}
+  /orgs/{orgId}/plugins/{pluginId}/observations/v1/redeployments/{requestId}/resolve:
+    parameters:
+      - $ref: '#/components/parameters/OrgID'
+      - $ref: '#/components/parameters/PluginID'
+      - in: path
+        name: requestId
+        required: true
+        schema: {type: string, format: uuid}
+    post:
+      operationId: ResolveObservationRedeployment
+      description: Close an exact ambiguous remedial admission key. This does not authorize execution or cancel accepted work.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ObservationRedeployResolveRequest'}
+      responses:
+        '200':
+          description: Durable exact remedial admission resolution.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ObservationRedeployResolution'}
+components:
+  securitySchemes:
+    userIdHeader:
+      type: apiKey
+      in: header
+      name: From
+  parameters:
+    OrgID:
+      in: path
+      name: orgId
+      required: true
+      schema: {type: string}
+    PluginID:
+      in: path
+      name: pluginId
+      required: true
+      schema: {type: string}
+  schemas:
+    ObservationChange:
+      type: object
+      additionalProperties: false
+      required: [id, resource_type, actions]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: '^[a-zA-Z0-9_-]+$'
+        resource_type:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: '^[a-zA-Z][a-zA-Z0-9_]*$'
+        actions:
+          type: array
+          minItems: 1
+          maxItems: 2
+          items:
+            type: string
+            enum: [create, read, update, delete, no-op, forget]
+    ObservationResult:
+      type: object
+      additionalProperties: false
+      required: [schema_version, complete, tool, tool_version, observed_changes, proposed_changes, output_change_count]
+      properties:
+        schema_version:
+          type: string
+          enum: ['1']
+        complete:
+          type: boolean
+          enum: [true]
+        tool:
+          type: string
+          enum: [terraform, opentofu]
+        tool_version:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: '^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][a-zA-Z0-9.-]+)?$'
+        observed_changes:
+          type: array
+          maxItems: 2000
+          items:
+            $ref: '#/components/schemas/ObservationChange'
+        proposed_changes:
+          type: array
+          maxItems: 2000
+          items:
+            $ref: '#/components/schemas/ObservationChange'
+        output_change_count:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+    ObservationRequest:
+      type: object
+      additionalProperties: false
+      required: [grant_id, grant_revision, project_id, env_id, project_uuid, environment_uuid, request_id, occurrence, admission_deadline]
+      properties:
+        grant_id: {type: string, format: uuid}
+        grant_revision: {type: integer, format: int64, minimum: 1}
+        project_id: {type: string, minLength: 1, maxLength: 63}
+        env_id: {type: string, minLength: 1, maxLength: 63}
+        project_uuid: {type: string, format: uuid}
+        environment_uuid: {type: string, format: uuid}
+        request_id: {type: string, format: uuid}
+        occurrence: {type: string, format: date-time}
+        admission_deadline: {type: string, format: date-time}
+    ObservationReceipt:
+      type: object
+      additionalProperties: false
+      required: [request_id, disposition, reason, recorded_at]
+      properties:
+        request_id: {type: string, format: uuid}
+        disposition: {type: string, enum: [accepted, skipped]}
+        reason: {type: string, enum: [accepted, busy, runner_full, unsupported, no_baseline, outcome_unreconciled, expired]}
+        recorded_at: {type: string, format: date-time}
+        run_id: {type: string, format: uuid}
+        baseline_id: {type: string, format: uuid}
+        baseline_fingerprint: {type: string}
+    ObservationRun:
+      type: object
+      additionalProperties: false
+      required: [receipt, status]
+      properties:
+        receipt:
+          $ref: '#/components/schemas/ObservationReceipt'
+        status: {type: string, enum: [executing, succeeded, failed, unavailable, expired, stale]}
+        completed_at: {type: string, format: date-time}
+        result:
+          $ref: '#/components/schemas/ObservationResult'
+    ObservationDelegationProof:
+      type: object
+      additionalProperties: false
+      required: [operation_id, idempotency_key, assertion]
+      properties:
+        operation_id: {type: string}
+        path_parameters: {type: object, additionalProperties: {type: string}}
+        query: {type: object, additionalProperties: {type: array, items: {type: string}}}
+        body: {type: string, format: byte}
+        idempotency_key: {type: string}
+        assertion: {type: string}
+    ObservationTarget:
+      type: object
+      additionalProperties: false
+      required: [project_id, environment_id]
+      properties:
+        project_id: {type: string, format: uuid}
+        environment_id: {type: string, format: uuid}
+    ObservationGrantCommand:
+      type: object
+      additionalProperties: false
+      required: [proof, expected_revision, action, reason, targets]
+      properties:
+        proof: {$ref: '#/components/schemas/ObservationDelegationProof'}
+        expected_revision: {type: integer, format: int64, minimum: 0}
+        action: {type: string, enum: [replace, revoke]}
+        reason: {type: string, minLength: 1, maxLength: 1024}
+        targets: {type: array, maxItems: 10000, items: {$ref: '#/components/schemas/ObservationTarget'}}
+        expires_at: {type: string, format: date-time}
+    ObservationGrant:
+      type: object
+      additionalProperties: false
+      required: [org_id, plugin_id, grant_id, actor_id, source_operation, last_effect_request_id, revision, state, targets, baseline_policy, execution_policy]
+      properties:
+        org_id: {type: string}
+        plugin_id: {type: string}
+        grant_id: {type: string, format: uuid}
+        actor_id: {type: string, format: uuid}
+        source_operation: {type: string}
+        last_effect_request_id: {type: string}
+        revision: {type: integer, format: int64}
+        state: {type: string, enum: [active, revoked]}
+        targets: {type: array, items: {$ref: '#/components/schemas/ObservationTarget'}}
+        expires_at: {type: string, format: date-time}
+        baseline_policy: {type: string, enum: [last-successful-ordinary-deployment]}
+        execution_policy: {type: string, enum: [full-plan-if-idle]}
+    ObservationRedeployRequest:
+      type: object
+      additionalProperties: false
+      required: [request_id, project_id, env_id, project_uuid, environment_uuid, baseline_id, baseline_fingerprint]
+      properties:
+        request_id: {type: string, format: uuid}
+        project_id: {type: string, minLength: 1, maxLength: 63}
+        env_id: {type: string, minLength: 1, maxLength: 63}
+        project_uuid: {type: string, format: uuid}
+        environment_uuid: {type: string, format: uuid}
+        baseline_id: {type: string, format: uuid}
+        baseline_fingerprint: {type: string, minLength: 71, maxLength: 71, pattern: '^sha256:[a-f0-9]{64}$'}
+        proof: {$ref: '#/components/schemas/ObservationDelegationProof'}
+    ObservationRedeployReceipt:
+      type: object
+      additionalProperties: false
+      required: [request_id, deployment_id, baseline_id, status]
+      properties:
+        request_id: {type: string, format: uuid}
+        deployment_id: {type: string, format: uuid}
+        baseline_id: {type: string, format: uuid}
+        status: {type: string, enum: [executing, succeeded, failed, unavailable]}
+    ObservationTargetsQuery:
+      type: object
+      additionalProperties: false
+      required: [proof]
+      properties:
+        proof: {$ref: '#/components/schemas/ObservationDelegationProof'}
+        project_ids:
+          type: array
+          maxItems: 1000
+          uniqueItems: true
+          items: {type: string, minLength: 1, maxLength: 63}
+        environment_types:
+          type: array
+          maxItems: 1000
+          uniqueItems: true
+          items: {type: string, minLength: 1, maxLength: 63}
+        production: {type: boolean}
+        environment_ids:
+          type: array
+          maxItems: 10000
+          uniqueItems: true
+          description: Omitted includes every matching Environment; an explicit empty array includes none.
+          items: {type: string, format: uuid}
+        exclude_environment_ids:
+          type: array
+          maxItems: 10000
+          uniqueItems: true
+          items: {type: string, format: uuid}
+        page: {type: string, maxLength: 2048}
+        limit: {type: integer, minimum: 1, maximum: 200, default: 100}
+    ObservationTargetMetadata:
+      type: object
+      additionalProperties: false
+      required: [project_uuid, environment_uuid, project_id, environment_id, environment_type, production]
+      properties:
+        project_uuid: {type: string, format: uuid}
+        environment_uuid: {type: string, format: uuid}
+        project_id: {type: string}
+        environment_id: {type: string}
+        environment_type: {type: string}
+        production: {type: boolean}
+    ObservationTargetsPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/ObservationTargetMetadata'}}
+        next_page_token: {type: string}
+    ObservationRedeployResolveRequest:
+      type: object
+      additionalProperties: false
+      required: [run_id, request]
+      properties:
+        run_id: {type: string, format: uuid}
+        request: {$ref: '#/components/schemas/ObservationRedeployRequest'}
+    ObservationResolution:
+      type: object
+      additionalProperties: false
+      required: [request_id, disposition]
+      properties:
+        request_id: {type: string, format: uuid}
+        disposition: {type: string, enum: [accepted, not_started]}
+        receipt: {$ref: '#/components/schemas/ObservationReceipt'}
+    ObservationRedeployResolution:
+      type: object
+      additionalProperties: false
+      required: [request_id, disposition]
+      properties:
+        request_id: {type: string, format: uuid}
+        disposition: {type: string, enum: [accepted, not_started]}
+        receipt: {$ref: '#/components/schemas/ObservationRedeployReceipt'}

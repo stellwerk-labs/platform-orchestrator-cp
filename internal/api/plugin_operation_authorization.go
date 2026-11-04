@@ -23,7 +23,7 @@ func (s *Server) GetPluginOperationGrant(ctx context.Context, request GetPluginO
 	if err != nil {
 		return nil, err
 	}
-	grant, err := model.GetExternalOperationGrant(ctx, s.Database, request.OrgId, request.PluginId, request.OperationId)
+	grant, err := s.getPluginOperationGrant(ctx, request.OrgId, request.PluginId, request.OperationId)
 	if err != nil {
 		return nil, pluginModelError(err)
 	}
@@ -83,7 +83,7 @@ func (s *Server) AuthorizePluginOperation(ctx context.Context, request Authorize
 		}
 		command.Intent = &intent
 	} else {
-		grant, err := model.GetExternalOperationGrant(ctx, s.Database, request.OrgId, request.PluginId, request.OperationId)
+		grant, err := s.getPluginOperationGrant(ctx, request.OrgId, request.PluginId, request.OperationId)
 		if err != nil {
 			return nil, pluginModelError(err)
 		}

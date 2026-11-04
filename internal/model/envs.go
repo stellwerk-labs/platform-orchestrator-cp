@@ -18,21 +18,23 @@ import (
 )
 
 type Environment struct {
-	Id            string
-	ProjectId     string
-	ProjectUuid   uuid.UUID
-	EnvTypeId     string
-	EnvTypeUuid   uuid.UUID
-	Uuid          uuid.UUID
-	DisplayName   string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	OrgId         string
-	OrgUuid       uuid.UUID
-	RunnerId      opt.Opt[string]
-	Status        EnvironmentStatus
-	StatusMessage opt.Opt[string]
-	Labels        map[string]string
+	Id                  string
+	ProjectId           string
+	ProjectUuid         uuid.UUID
+	EnvTypeId           string
+	EnvTypeUuid         uuid.UUID
+	Uuid                uuid.UUID
+	DisplayName         string
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	OrgId               string
+	OrgUuid             uuid.UUID
+	RunnerId            opt.Opt[string]
+	Status              EnvironmentStatus
+	StatusMessage       opt.Opt[string]
+	Labels              map[string]string
+	DeletionForce       *bool
+	DeletionDeleteRules *bool
 }
 
 type EnvironmentStatus string
@@ -49,13 +51,19 @@ var allowedStatuses = []EnvironmentStatus{
 	EnvironmentStatusDeleteFailed,
 }
 
+type EnvironmentDeletionPolicy struct {
+	Force       bool
+	DeleteRules bool
+}
+
 type EnvironmentPatch struct {
-	RunnerId      opt.Opt[string]
-	Status        opt.Opt[EnvironmentStatus]
-	StatusMessage opt.Opt[string]
-	DisplayName   opt.Opt[string]
-	Labels        *map[string]string
-	UpdatedAt     time.Time
+	DeletionPolicy *EnvironmentDeletionPolicy
+	RunnerId       opt.Opt[string]
+	Status         opt.Opt[EnvironmentStatus]
+	StatusMessage  opt.Opt[string]
+	DisplayName    opt.Opt[string]
+	Labels         *map[string]string
+	UpdatedAt      time.Time
 }
 
 type ListEnvironmentsParams struct {
@@ -74,7 +82,7 @@ func (d *databaser) ListEnvironments(ctx context.Context, optionalTx Tx, orgId, 
 	if rs, err := d.txOrDb(optionalTx).QueryContext(
 		ctx,
 		`WITH org_check AS (SELECT EXISTS (SELECT 1 FROM orgs WHERE id = $1) AS org_exists), project_check AS (SELECT EXISTS (SELECT 1 FROM projects WHERE id = $2) AS project_exists)
-		 SELECT org_check.org_exists, project_check.project_exists, e.org_uuid, e.id, e.env_type_id, e.env_type_uuid, e.project_uuid, e.uuid, e.display_name, e.created_at, e.updated_at,e.runner_id, e.status, e.status_message, e.labels
+		 SELECT org_check.org_exists, project_check.project_exists, e.org_uuid, e.id, e.env_type_id, e.env_type_uuid, e.project_uuid, e.uuid, e.display_name, e.created_at, e.updated_at,e.runner_id, e.status, e.status_message, e.labels, e.deletion_force, e.deletion_delete_rules
 		 FROM org_check
 		 CROSS JOIN project_check
 		 LEFT JOIN envs e ON org_check.org_exists AND e.org_id = $1 AND e.project_id = $2 AND e.id > $3 AND ($5::text[] IS NULL OR e.env_type_id = ANY($5))
@@ -97,7 +105,8 @@ func (d *databaser) ListEnvironments(ctx context.Context, optionalTx Tx, orgId, 
 			var createdAt, updatedAt sql.NullTime
 			var runnerId, statusMessage opt.Opt[string]
 			var labels map[string]string
-			if err := rs.Scan(&orgExists, &projExists, &orgUuid, &envId, &envTypeId, &envTypeUuid, &projectUuid, &envUuid, &displayName, &createdAt, &updatedAt, opt.Scan(&runnerId), &status, opt.Scan(&statusMessage), asJson(&labels)); err != nil {
+			var deletionForce, deletionDeleteRules *bool
+			if err := rs.Scan(&orgExists, &projExists, &orgUuid, &envId, &envTypeId, &envTypeUuid, &projectUuid, &envUuid, &displayName, &createdAt, &updatedAt, opt.Scan(&runnerId), &status, opt.Scan(&statusMessage), asJson(&labels), &deletionForce, &deletionDeleteRules); err != nil {
 				return nil, "", errors.Wrap(err, "failed to scan row")
 			}
 			if !orgExists {
@@ -110,21 +119,23 @@ func (d *databaser) ListEnvironments(ctx context.Context, optionalTx Tx, orgId, 
 				continue
 			}
 			next := Environment{
-				OrgId:         orgId,
-				ProjectId:     projectId,
-				OrgUuid:       orgUuid.UUID,
-				Id:            envId.String,
-				EnvTypeId:     envTypeId.String,
-				EnvTypeUuid:   envTypeUuid.UUID,
-				ProjectUuid:   projectUuid.UUID,
-				Uuid:          envUuid.UUID,
-				DisplayName:   displayName.String,
-				CreatedAt:     createdAt.Time,
-				UpdatedAt:     updatedAt.Time,
-				RunnerId:      runnerId,
-				Status:        EnvironmentStatus(status.String),
-				StatusMessage: statusMessage,
-				Labels:        labels,
+				OrgId:               orgId,
+				ProjectId:           projectId,
+				OrgUuid:             orgUuid.UUID,
+				Id:                  envId.String,
+				EnvTypeId:           envTypeId.String,
+				EnvTypeUuid:         envTypeUuid.UUID,
+				ProjectUuid:         projectUuid.UUID,
+				Uuid:                envUuid.UUID,
+				DisplayName:         displayName.String,
+				CreatedAt:           createdAt.Time,
+				UpdatedAt:           updatedAt.Time,
+				RunnerId:            runnerId,
+				Status:              EnvironmentStatus(status.String),
+				StatusMessage:       statusMessage,
+				Labels:              labels,
+				DeletionForce:       deletionForce,
+				DeletionDeleteRules: deletionDeleteRules,
 			}
 			if len(out) >= limitPlusOne-1 {
 				return out, out[len(out)-1].Id, nil
@@ -150,7 +161,7 @@ func (d *databaser) ListEnvironmentsInOrg(ctx context.Context, optionalTx Tx, or
 	if rs, err := d.txOrDb(optionalTx).QueryContext(
 		ctx,
 		`WITH org_check AS (SELECT EXISTS (SELECT 1 FROM orgs WHERE id = $1) AS org_exists)
-		 SELECT org_check.org_exists, e.org_uuid, e.id, e.env_type_id, e.env_type_uuid, e.project_id, e.project_uuid, e.uuid, e.display_name, e.created_at, e.updated_at,e.runner_id, e.status, e.status_message, e.labels
+		 SELECT org_check.org_exists, e.org_uuid, e.id, e.env_type_id, e.env_type_uuid, e.project_id, e.project_uuid, e.uuid, e.display_name, e.created_at, e.updated_at,e.runner_id, e.status, e.status_message, e.labels, e.deletion_force, e.deletion_delete_rules
 		 FROM org_check
 		 LEFT JOIN envs e ON org_check.org_exists AND e.org_id = $1 AND e.id > $2 AND ($4::text[] IS NULL OR e.env_type_id = ANY($4))
 		 ORDER BY e.id
@@ -172,7 +183,8 @@ func (d *databaser) ListEnvironmentsInOrg(ctx context.Context, optionalTx Tx, or
 			var createdAt, updatedAt sql.NullTime
 			var runnerId, statusMessage opt.Opt[string]
 			var labels map[string]string
-			if err := rs.Scan(&orgExists, &orgUuid, &envId, &envTypeId, &envTypeUuid, &projectId, &projectUuid, &envUuid, &displayName, &createdAt, &updatedAt, opt.Scan(&runnerId), &status, opt.Scan(&statusMessage), asJson(&labels)); err != nil {
+			var deletionForce, deletionDeleteRules *bool
+			if err := rs.Scan(&orgExists, &orgUuid, &envId, &envTypeId, &envTypeUuid, &projectId, &projectUuid, &envUuid, &displayName, &createdAt, &updatedAt, opt.Scan(&runnerId), &status, opt.Scan(&statusMessage), asJson(&labels), &deletionForce, &deletionDeleteRules); err != nil {
 				return nil, "", errors.Wrap(err, "failed to scan row")
 			}
 			if !orgExists {
@@ -182,21 +194,23 @@ func (d *databaser) ListEnvironmentsInOrg(ctx context.Context, optionalTx Tx, or
 				continue
 			}
 			next := Environment{
-				OrgId:         orgId,
-				ProjectId:     projectId.String,
-				OrgUuid:       orgUuid.UUID,
-				Id:            envId.String,
-				EnvTypeId:     envTypeId.String,
-				EnvTypeUuid:   envTypeUuid.UUID,
-				ProjectUuid:   projectUuid.UUID,
-				Uuid:          envUuid.UUID,
-				DisplayName:   displayName.String,
-				CreatedAt:     createdAt.Time,
-				UpdatedAt:     updatedAt.Time,
-				RunnerId:      runnerId,
-				Status:        EnvironmentStatus(status.String),
-				StatusMessage: statusMessage,
-				Labels:        labels,
+				OrgId:               orgId,
+				ProjectId:           projectId.String,
+				OrgUuid:             orgUuid.UUID,
+				Id:                  envId.String,
+				EnvTypeId:           envTypeId.String,
+				EnvTypeUuid:         envTypeUuid.UUID,
+				ProjectUuid:         projectUuid.UUID,
+				Uuid:                envUuid.UUID,
+				DisplayName:         displayName.String,
+				CreatedAt:           createdAt.Time,
+				UpdatedAt:           updatedAt.Time,
+				RunnerId:            runnerId,
+				Status:              EnvironmentStatus(status.String),
+				StatusMessage:       statusMessage,
+				Labels:              labels,
+				DeletionForce:       deletionForce,
+				DeletionDeleteRules: deletionDeleteRules,
 			}
 			if len(out) >= limitPlusOne-1 {
 				return out, out[len(out)-1].Id, nil
@@ -221,7 +235,7 @@ func (d *databaser) ListEnvironmentsByRunnerId(ctx context.Context, optionalTx T
 
 	if rs, err := d.txOrDb(optionalTx).QueryContext(
 		ctx,
-		`SELECT e.org_uuid, e.id, e.env_type_id, e.env_type_uuid, e.uuid, e.display_name, e.created_at, e.updated_at, e.project_id, e.project_uuid, e.runner_id, e.status, e.status_message, e.labels
+		`SELECT e.org_uuid, e.id, e.env_type_id, e.env_type_uuid, e.uuid, e.display_name, e.created_at, e.updated_at, e.project_id, e.project_uuid, e.runner_id, e.status, e.status_message, e.labels, e.deletion_force, e.deletion_delete_rules
 		 FROM envs e
 		 WHERE e.org_id = $1 AND e.runner_id = $2 AND e.id > $3
 		 ORDER BY e.id 
@@ -238,7 +252,7 @@ func (d *databaser) ListEnvironmentsByRunnerId(ctx context.Context, optionalTx T
 		out := make([]Environment, 0, limitPlusOne-1)
 		for rs.Next() {
 			next := Environment{OrgId: orgId, RunnerId: opt.Of(runnerId)}
-			if err := rs.Scan(&next.OrgUuid, &next.Id, &next.EnvTypeId, &next.EnvTypeUuid, &next.Uuid, &next.DisplayName, &next.CreatedAt, &next.UpdatedAt, &next.ProjectId, &next.ProjectUuid, opt.Scan(&next.RunnerId), &next.Status, opt.Scan(&next.StatusMessage), asJson(&next.Labels)); err != nil {
+			if err := rs.Scan(&next.OrgUuid, &next.Id, &next.EnvTypeId, &next.EnvTypeUuid, &next.Uuid, &next.DisplayName, &next.CreatedAt, &next.UpdatedAt, &next.ProjectId, &next.ProjectUuid, opt.Scan(&next.RunnerId), &next.Status, opt.Scan(&next.StatusMessage), asJson(&next.Labels), &next.DeletionForce, &next.DeletionDeleteRules); err != nil {
 				return nil, "", errors.Wrap(err, "failed to scan row")
 			}
 			if len(out) >= limitPlusOne-1 {
@@ -255,8 +269,8 @@ func (d *databaser) ListEnvironmentsByRunnerId(ctx context.Context, optionalTx T
 
 func (d *databaser) GetEnvironment(ctx context.Context, optionalTx Tx, orgId, projectId, id string, mode GetMode) (*Environment, error) {
 	ret := Environment{OrgId: orgId, ProjectId: projectId}
-	if err := d.txOrDb(optionalTx).QueryRowContext(ctx, `SELECT org_uuid, id, env_type_id, env_type_uuid, project_uuid, uuid, display_name, created_at, updated_at, runner_id, status, status_message, labels FROM envs WHERE org_id = $1 AND project_id = $2 AND id = $3`+GetModeSuffix(mode), orgId, projectId, id).
-		Scan(&ret.OrgUuid, &ret.Id, &ret.EnvTypeId, &ret.EnvTypeUuid, &ret.ProjectUuid, &ret.Uuid, &ret.DisplayName, &ret.CreatedAt, &ret.UpdatedAt, opt.Scan(&ret.RunnerId), &ret.Status, opt.Scan(&ret.StatusMessage), asJson(&ret.Labels)); err != nil {
+	if err := d.txOrDb(optionalTx).QueryRowContext(ctx, `SELECT org_uuid, id, env_type_id, env_type_uuid, project_uuid, uuid, display_name, created_at, updated_at, runner_id, status, status_message, labels, deletion_force, deletion_delete_rules FROM envs WHERE org_id = $1 AND project_id = $2 AND id = $3`+GetModeSuffix(mode), orgId, projectId, id).
+		Scan(&ret.OrgUuid, &ret.Id, &ret.EnvTypeId, &ret.EnvTypeUuid, &ret.ProjectUuid, &ret.Uuid, &ret.DisplayName, &ret.CreatedAt, &ret.UpdatedAt, opt.Scan(&ret.RunnerId), &ret.Status, opt.Scan(&ret.StatusMessage), asJson(&ret.Labels), &ret.DeletionForce, &ret.DeletionDeleteRules); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, NewErrNotFound("environment not found")
 		}
@@ -267,8 +281,8 @@ func (d *databaser) GetEnvironment(ctx context.Context, optionalTx Tx, orgId, pr
 
 func (d *databaser) GetEnvironmentByUuid(ctx context.Context, optionalTx Tx, orgId string, uuid uuid.UUID, mode GetMode) (*Environment, error) {
 	ret := Environment{OrgId: orgId}
-	if err := d.txOrDb(optionalTx).QueryRowContext(ctx, `SELECT org_uuid, project_id, project_uuid, id, env_type_id, env_type_uuid, uuid, display_name, created_at, updated_at, runner_id, status, status_message, labels FROM envs WHERE org_id = $1 AND uuid = $2`+GetModeSuffix(mode), orgId, uuid).
-		Scan(&ret.OrgUuid, &ret.ProjectId, &ret.ProjectUuid, &ret.Id, &ret.EnvTypeId, &ret.EnvTypeUuid, &ret.Uuid, &ret.DisplayName, &ret.CreatedAt, &ret.UpdatedAt, opt.Scan(&ret.RunnerId), &ret.Status, opt.Scan(&ret.StatusMessage), asJson(&ret.Labels)); err != nil {
+	if err := d.txOrDb(optionalTx).QueryRowContext(ctx, `SELECT org_uuid, project_id, project_uuid, id, env_type_id, env_type_uuid, uuid, display_name, created_at, updated_at, runner_id, status, status_message, labels, deletion_force, deletion_delete_rules FROM envs WHERE org_id = $1 AND uuid = $2`+GetModeSuffix(mode), orgId, uuid).
+		Scan(&ret.OrgUuid, &ret.ProjectId, &ret.ProjectUuid, &ret.Id, &ret.EnvTypeId, &ret.EnvTypeUuid, &ret.Uuid, &ret.DisplayName, &ret.CreatedAt, &ret.UpdatedAt, opt.Scan(&ret.RunnerId), &ret.Status, opt.Scan(&ret.StatusMessage), asJson(&ret.Labels), &ret.DeletionForce, &ret.DeletionDeleteRules); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, NewErrNotFound("environment not found")
 		}
@@ -283,8 +297,8 @@ func (d *databaser) CreateEnvironment(ctx context.Context, optionalTx Tx, reques
 	if request.Labels == nil {
 		request.Labels = map[string]string{}
 	}
-	if err := d.txOrDb(optionalTx).QueryRowContext(ctx, `INSERT INTO envs(id, project_id, project_uuid, env_type_id, env_type_uuid, display_name, org_id, org_uuid, created_at, updated_at, runner_id, status, labels) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING uuid, created_at, updated_at, status, labels`,
-		request.Id, request.ProjectId, request.ProjectUuid, request.EnvTypeId, request.EnvTypeUuid, request.DisplayName, request.OrgId, request.OrgUuid, request.CreatedAt, request.UpdatedAt, request.RunnerId.Ref(), request.Status, asJson(&request.Labels)).Scan(&ret.Uuid, &ret.CreatedAt, &ret.UpdatedAt, &ret.Status, asJson(&ret.Labels)); err != nil {
+	if err := d.txOrDb(optionalTx).QueryRowContext(ctx, `INSERT INTO envs(id, project_id, project_uuid, env_type_id, env_type_uuid, display_name, org_id, org_uuid, created_at, updated_at, runner_id, status, labels) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING uuid, created_at, updated_at, status, labels, deletion_force, deletion_delete_rules`,
+		request.Id, request.ProjectId, request.ProjectUuid, request.EnvTypeId, request.EnvTypeUuid, request.DisplayName, request.OrgId, request.OrgUuid, request.CreatedAt, request.UpdatedAt, request.RunnerId.Ref(), request.Status, asJson(&request.Labels)).Scan(&ret.Uuid, &ret.CreatedAt, &ret.UpdatedAt, &ret.Status, asJson(&ret.Labels), &ret.DeletionForce, &ret.DeletionDeleteRules); err != nil {
 		if pqe := new(pq.Error); errors.As(err, &pqe) {
 			if pqe.Code.Name() == UniqueViolationErrorCode {
 				return nil, NewErrConflict("environment already exists")
@@ -321,6 +335,10 @@ func (d *databaser) UpdateEnvironment(ctx context.Context, optionalTx Tx, orgId,
 	if s := request.Status.Ref(); s != nil && !slices.Contains(allowedStatuses, *s) {
 		return nil, NewErrBadRequest(fmt.Sprintf("unknown status '%s'", *s))
 	}
+	var deletionForce, deletionDeleteRules *bool
+	if request.DeletionPolicy != nil {
+		deletionForce, deletionDeleteRules = &request.DeletionPolicy.Force, &request.DeletionPolicy.DeleteRules
+	}
 	var labelsValue any
 	if request.Labels != nil {
 		labelsValue = asJson(request.Labels)
@@ -329,15 +347,24 @@ func (d *databaser) UpdateEnvironment(ctx context.Context, optionalTx Tx, orgId,
 		ctx, `UPDATE envs
 			  SET runner_id = COALESCE($4, runner_id), 
 			      status = COALESCE($5, status),
+			      deletion_force = CASE WHEN $10::boolean IS NULL THEN deletion_force ELSE COALESCE(deletion_force, false) OR $10 END,
+			      deletion_delete_rules = CASE WHEN $11::boolean IS NULL THEN deletion_delete_rules ELSE COALESCE(deletion_delete_rules, false) OR $11 END,
 				  display_name = COALESCE($8, display_name),
 				  labels = COALESCE($9, labels),
 			      -- Set the status message if not empty, otherwise clear it if the status has changed, otherwise leave it as is.
 			      status_message = CASE WHEN $6::text IS NOT NULL THEN $6 WHEN $5::text IS NULL THEN status_message ELSE '' END, 
 			      updated_at = $7
 			  WHERE org_id = $1 AND project_id = $2 AND id = $3
-			  RETURNING org_uuid, env_type_id, env_type_uuid, project_uuid, uuid, display_name, created_at, updated_at, runner_id, status, status_message, labels`,
-		orgId, projectId, id, request.RunnerId.Ref(), request.Status.Ref(), request.StatusMessage.Ref(), request.UpdatedAt, request.DisplayName.Ref(), labelsValue,
-	).Scan(&ret.OrgUuid, &ret.EnvTypeId, &ret.EnvTypeUuid, &ret.ProjectUuid, &ret.Uuid, &ret.DisplayName, &ret.CreatedAt, &ret.UpdatedAt, opt.Scan(&ret.RunnerId), &ret.Status, opt.Scan(&ret.StatusMessage), asJson(&ret.Labels)); err != nil {
+			    AND NOT (deletion_force IS TRUE AND status IN ('deleting', 'delete_failed') AND $5::text IS NOT NULL AND $5::text <> 'deleting')
+			  RETURNING org_uuid, env_type_id, env_type_uuid, project_uuid, uuid, display_name, created_at, updated_at, runner_id, status, status_message, labels, deletion_force, deletion_delete_rules`,
+		orgId, projectId, id, request.RunnerId.Ref(), request.Status.Ref(), request.StatusMessage.Ref(), request.UpdatedAt, request.DisplayName.Ref(), labelsValue, deletionForce, deletionDeleteRules,
+	).Scan(&ret.OrgUuid, &ret.EnvTypeId, &ret.EnvTypeUuid, &ret.ProjectUuid, &ret.Uuid, &ret.DisplayName, &ret.CreatedAt, &ret.UpdatedAt, opt.Scan(&ret.RunnerId), &ret.Status, opt.Scan(&ret.StatusMessage), asJson(&ret.Labels), &ret.DeletionForce, &ret.DeletionDeleteRules); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			if _, lookupErr := d.GetEnvironment(ctx, optionalTx, orgId, projectId, id, GetModeDefault); lookupErr != nil {
+				return nil, lookupErr
+			}
+			return nil, NewErrConflict("force deletion cannot be interrupted by a stale status update")
+		}
 		return nil, errors.Wrap(err, "failed to update environment")
 	} else if ret.UpdatedAt.IsZero() {
 		return nil, NewErrNotFound("environment not found")
@@ -358,7 +385,7 @@ func (d *databaser) ListEnvironmentsByProjectUuid(ctx context.Context, optionalT
 	if rs, err := d.txOrDb(optionalTx).QueryContext(
 		ctx,
 		`WITH org_check AS (SELECT EXISTS (SELECT 1 FROM orgs WHERE id = $1) AS org_exists), project_check AS (SELECT EXISTS (SELECT 1 FROM projects WHERE org_id = $1 AND uuid = $2) AS project_exists)
-		 SELECT org_check.org_exists, project_check.project_exists, e.org_uuid, e.id, e.env_type_id, e.env_type_uuid, e.project_id, e.project_uuid, e.uuid, e.display_name, e.created_at, e.updated_at,e.runner_id, e.status, e.status_message, e.labels
+		 SELECT org_check.org_exists, project_check.project_exists, e.org_uuid, e.id, e.env_type_id, e.env_type_uuid, e.project_id, e.project_uuid, e.uuid, e.display_name, e.created_at, e.updated_at,e.runner_id, e.status, e.status_message, e.labels, e.deletion_force, e.deletion_delete_rules
 		 FROM org_check
 		 CROSS JOIN project_check
 		 LEFT JOIN envs e ON org_check.org_exists AND e.org_id = $1 AND e.project_uuid = $2 AND e.id > $3
@@ -381,7 +408,8 @@ func (d *databaser) ListEnvironmentsByProjectUuid(ctx context.Context, optionalT
 			var createdAt, updatedAt sql.NullTime
 			var runnerId, statusMessage opt.Opt[string]
 			var labels map[string]string
-			if err := rs.Scan(&orgExists, &projExists, &orgUuid, &envId, &envTypeId, &envTypeUuid, &projectId, &projUuid, &envUuid, &displayName, &createdAt, &updatedAt, opt.Scan(&runnerId), &status, opt.Scan(&statusMessage), asJson(&labels)); err != nil {
+			var deletionForce, deletionDeleteRules *bool
+			if err := rs.Scan(&orgExists, &projExists, &orgUuid, &envId, &envTypeId, &envTypeUuid, &projectId, &projUuid, &envUuid, &displayName, &createdAt, &updatedAt, opt.Scan(&runnerId), &status, opt.Scan(&statusMessage), asJson(&labels), &deletionForce, &deletionDeleteRules); err != nil {
 				return nil, "", errors.Wrap(err, "failed to scan row")
 			}
 			if !orgExists {
@@ -394,21 +422,23 @@ func (d *databaser) ListEnvironmentsByProjectUuid(ctx context.Context, optionalT
 				continue
 			}
 			next := Environment{
-				OrgId:         orgId,
-				ProjectId:     projectId.String,
-				ProjectUuid:   projectUuid,
-				OrgUuid:       orgUuid.UUID,
-				Id:            envId.String,
-				EnvTypeId:     envTypeId.String,
-				EnvTypeUuid:   envTypeUuid.UUID,
-				Uuid:          envUuid.UUID,
-				DisplayName:   displayName.String,
-				CreatedAt:     createdAt.Time,
-				UpdatedAt:     updatedAt.Time,
-				RunnerId:      runnerId,
-				Status:        EnvironmentStatus(status.String),
-				StatusMessage: statusMessage,
-				Labels:        labels,
+				OrgId:               orgId,
+				ProjectId:           projectId.String,
+				ProjectUuid:         projectUuid,
+				OrgUuid:             orgUuid.UUID,
+				Id:                  envId.String,
+				EnvTypeId:           envTypeId.String,
+				EnvTypeUuid:         envTypeUuid.UUID,
+				Uuid:                envUuid.UUID,
+				DisplayName:         displayName.String,
+				CreatedAt:           createdAt.Time,
+				UpdatedAt:           updatedAt.Time,
+				RunnerId:            runnerId,
+				Status:              EnvironmentStatus(status.String),
+				StatusMessage:       statusMessage,
+				Labels:              labels,
+				DeletionForce:       deletionForce,
+				DeletionDeleteRules: deletionDeleteRules,
 			}
 			if len(out) >= limitPlusOne-1 {
 				return out, out[len(out)-1].Id, nil

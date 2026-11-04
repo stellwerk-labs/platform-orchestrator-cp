@@ -28,6 +28,20 @@ const (
 	PluginEnablementDisabled      = "disabled"
 )
 
+// IsPluginInstallationServiceUser classifies identity without resolving plugin
+// availability or acquiring entitlement fences. Persisted identities remain
+// plugin services across disablement, uninstall and invalid package metadata.
+func IsPluginInstallationServiceUser(ctx context.Context, db Databaser, actor uuid.UUID) (bool, error) {
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var found bool
+	err = tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM plugin_installations WHERE service_user_id=$1)`, actor).Scan(&found)
+	return found, err
+}
+
 // Organization modes of an installation. With selected the operator enables
 // each organization; with all Core enables every organization, existing and
 // created later, unless the operator disabled it.

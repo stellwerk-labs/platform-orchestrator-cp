@@ -65,11 +65,15 @@ func apiRunnerFromDbRunner(rn model.Runner) Runner {
 }
 
 func apiRunnerSummaryFromDbRunner(rn model.Runner) RunnerSummary {
+	encoded, _ := json.Marshal(rn.RunnerConfiguration)
+	configuration := RunnerConfigurationSummary{Type: RunnerType(rn.RunnerType)}
+	_ = json.Unmarshal(encoded, &configuration)
+	configuration.Type = RunnerType(rn.RunnerType)
 	return RunnerSummary{
 		CreatedAt:                 rn.CreatedAt,
 		Description:               rn.Description.Ref(),
 		Id:                        rn.Id,
-		RunnerConfiguration:       &RunnerConfigurationSummary{Type: RunnerType(rn.RunnerType)},
+		RunnerConfiguration:       &configuration,
 		OrgId:                     rn.OrgId,
 		StateStorageConfiguration: &StateStorageConfigurationSummary{Type: StateStorageType(rn.StateStorageType)},
 		UpdatedAt:                 rn.UpdatedAt,
@@ -339,6 +343,9 @@ func (s *Server) UpdateRunner(ctx context.Context, request UpdateRunnerRequestOb
 
 	// Construct updated runner configuration
 	updatedRunnerCfg := updateRunnerConfiguration(runner.RunnerConfiguration, patchRunnerCfg)
+	if err := applyRunnerConfigurationClears(updatedRunnerCfg, request.Body.RunnerConfiguration); err != nil {
+		return UpdateRunner400JSONResponse{Generate400Response(err.Error())}, nil
+	}
 
 	// Construct updated runner
 	patch := &model.RunnerPatch{

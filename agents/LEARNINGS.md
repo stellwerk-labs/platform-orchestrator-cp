@@ -38,3 +38,11 @@
   under test. Running an old Down script directly against the current schema
   crosses later foreign keys and triggers; migration 49 also deliberately
   refuses to discard retained Resource Type snapshots.
+
+## Canonical deletion authority (2026-11-03)
+
+An admission advisory lock does not serialize with an Environment row lock.
+Destroy authorization, including exact replay, must lock the same row as DELETE
+before reading accepted deletion options. A nullable legacy policy means unknown,
+not false. Retained true options must merge monotonically in the row UPDATE, and
+stale status writes must be rejected by that same atomic UPDATE predicate.

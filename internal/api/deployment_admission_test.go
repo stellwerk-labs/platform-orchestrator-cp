@@ -12,17 +12,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
-	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
 )
 
-func TestDeploymentAdmissionRejectsPluginServiceMisconfiguration(t *testing.T) {
+func TestDeploymentAdmissionFailsClosedWithoutIdentityDatabase(t *testing.T) {
 	service := userid.NewServiceUserTokenId()
-	item := plugins.Installation{ID: "dev.example.workflow", DisplayName: "Workflow", Version: "1.0.0", Backend: "https://workflow.test", ServiceUserID: service.String(), AdmissionCheckerID: userid.NewServiceUserTokenId().String(), Organizations: map[string]plugins.AvailabilityState{"acme": plugins.StateAvailable}, ServiceGrants: []plugins.ServiceGrant{{Action: "external-deployment.admit", Permission: "plugin.dev.example.workflow.control", Scope: "environment"}}}
-	registry, err := plugins.NewInstallationRegistry([]plugins.Installation{item}, false)
-	require.NoError(t, err)
-	s := &Server{DeploymentAdmissionIdentity: service, PluginGateway: &plugins.Gateway{Registry: registry}}
+	s := &Server{DeploymentAdmissionIdentity: service}
 	ctx := context.WithValue(t.Context(), hecho.ContextKeyUserID, service.String())
-	require.ErrorContains(t, s.deploymentAdmissionCaller(ctx, "acme"), "plugin service cannot act")
+	var boundary *herrors.PlatformOrchestratorError
+	require.ErrorAs(t, s.deploymentAdmissionCaller(ctx, "acme"), &boundary)
+	require.Equal(t, http.StatusServiceUnavailable, boundary.StatusCode)
+	require.Equal(t, "authorization_unavailable", boundary.Code)
 }
 
 func TestDeploymentAdmissionConflictsKeepTheirStableCode(t *testing.T) {

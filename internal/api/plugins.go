@@ -27,9 +27,22 @@ func (s *Server) ListPluginContributions(ctx context.Context, request ListPlugin
 	}
 	for _, descriptor := range s.PluginGateway.Registry.List(ctx, request.OrgId) {
 		installation, _, _ := s.PluginGateway.Registry.Installation(ctx, request.OrgId, descriptor.ID)
-		operations := []map[string]any{}
+		admin := false
+		needsAdmin := installation.UI != nil && installation.UI.RequireOrgAdmin
 		for _, op := range installation.Operations {
+			needsAdmin = needsAdmin || op.RequireOrgAdmin
+		}
+		if needsAdmin {
+			admin = s.PluginGateway.RequireOrganizationAdmin(ctx, request.OrgId, actor.String()) == nil
+		}
+		operations := []map[string]any{}
+		allowedOperations := map[string]bool{}
+		for _, op := range installation.Operations {
+			if op.RequireOrgAdmin && !admin {
+				continue
+			}
 			if descriptor.Allows(op.RequiredFeature, op.Mutating, op.Safety || len(op.SafetyPathValues) > 0) {
+				allowedOperations[op.ID] = true
 				operations = append(operations, map[string]any{"id": op.ID, "method": op.Method, "mutating": op.Mutating, "required_feature": op.RequiredFeature})
 			}
 		}
@@ -37,9 +50,11 @@ func (s *Server) ListPluginContributions(ctx context.Context, request ListPlugin
 		if descriptor.Entitlement != nil {
 			value["entitlement"] = descriptor.Entitlement
 		}
-		if descriptor.Mode != plugins.ModeHidden && installation.UI != nil {
+		if descriptor.Mode != plugins.ModeHidden && installation.UI != nil && (!installation.UI.RequireOrgAdmin || admin) {
 			if descriptor.Mode != plugins.ModeFull {
 				installation.UI.ContextualActions = nil
+			} else {
+				installation.UI.ContextualActions = slices.DeleteFunc(installation.UI.ContextualActions, func(action plugins.ContextualAction) bool { return !allowedOperations[action.RequiredOperationID] })
 			}
 			value["ui"] = installation.UI
 		}

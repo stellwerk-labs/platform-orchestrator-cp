@@ -73,6 +73,25 @@ func updateRunnerConfiguration(existingConfig map[string]interface{}, patchConfi
 	return result
 }
 
+// applyRunnerConfigurationClears distinguishes an omitted old-client field from
+// an explicit JSON null. Concrete generated pointers intentionally do not retain
+// that distinction; the generated union retains the original JSON bytes.
+func applyRunnerConfigurationClears(configuration map[string]interface{}, update *RunnerConfigurationUpdate) error {
+	if update == nil {
+		return nil
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(update.union, &fields); err != nil {
+		return err
+	}
+	for _, field := range []string{"max_parallel_jobs", "supported_protocols"} {
+		if raw, present := fields[field]; present && bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+			delete(configuration, field)
+		}
+	}
+	return nil
+}
+
 // RunnerConfigurationUnion represents any runner configuration type
 type RunnerConfigurationUnion interface {
 	*K8sRunnerConfiguration | *K8sGkeRunnerConfiguration | *K8sEksRunnerConfiguration | *K8sAgentRunnerConfiguration |
@@ -341,10 +360,39 @@ func checkRunnerConfigurationStrict[T discriminatorConfig](runnerConfiguration T
 	switch v := interface{}(runnerConfiguration).(type) {
 	case RunnerConfiguration:
 		union = v.union
+		var fields map[string]json.RawMessage
+		if err := json.Unmarshal(union, &fields); err != nil {
+			return runnerType, nil, err
+		}
+		for _, field := range []string{"max_parallel_jobs", "supported_protocols"} {
+			if raw, present := fields[field]; present && bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+				return runnerType, nil, errors.Errorf("%s cannot be null when creating a Runner", field)
+			}
+		}
 	case RunnerConfigurationUpdate:
 		union = v.union
 	}
 
+	var common struct {
+		MaxParallelJobs    *int     `json:"max_parallel_jobs"`
+		SupportedProtocols []string `json:"supported_protocols"`
+	}
+	if err := json.Unmarshal(union, &common); err != nil {
+		return runnerType, nil, err
+	}
+	if common.MaxParallelJobs != nil && *common.MaxParallelJobs < 1 {
+		return runnerType, nil, errors.New("max_parallel_jobs must be positive")
+	}
+	seen := map[string]bool{}
+	if len(common.SupportedProtocols) > 16 {
+		return runnerType, nil, errors.New("too many supported_protocols")
+	}
+	for _, protocol := range common.SupportedProtocols {
+		if protocol == "" || len(protocol) > 128 || seen[protocol] {
+			return runnerType, nil, errors.New("supported_protocols must be bounded unique names")
+		}
+		seen[protocol] = true
+	}
 	if parsedConfiguration, err = configParser(union); err != nil {
 		return runnerType, nil, errors.Wrapf(err, "the supplied runner configuration does not match the specified runner type %s", runnerType)
 	}

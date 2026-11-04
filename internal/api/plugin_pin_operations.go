@@ -96,7 +96,7 @@ func (s *Server) ApplyPluginPinOperation(ctx context.Context, request ApplyPlugi
 	if err := pluginFeatureAllowed(descriptor, policy.RequiredFeature, true, !begin); err != nil {
 		return nil, err
 	}
-	grant, err := model.GetExternalOperationGrant(ctx, s.Database, request.OrgId, item.ID, request.OperationId)
+	grant, err := s.getPluginOperationGrant(ctx, request.OrgId, item.ID, request.OperationId)
 	if err != nil {
 		return nil, pluginModelError(err)
 	}

@@ -87,7 +87,7 @@ func servedInstallation(served model.PluginSnapshotInstallation) (plugins.Instal
 // Every enablement keeps its own state, timezone and approval policies.
 func view(installation model.PluginInstallation, manifest plugins.Manifest) plugins.Installation {
 	item := plugins.Installation{
-		InstallationID: installation.InstallationID.String(), ManifestSHA256: installation.PackageSHA256, Entitlement: manifest.Entitlement,
+		RequiredProtocols: manifest.RequiredProtocols, InstallationID: installation.InstallationID.String(), ManifestSHA256: installation.PackageSHA256, Entitlement: manifest.Entitlement,
 		ID: installation.PluginID, DisplayName: manifest.DisplayName, Version: manifest.Version, Backend: installation.BackendURL,
 		ServiceUserID: installation.ServiceUserID, AdmissionCheckerID: installation.AdmissionCheckerID,
 		Organizations: map[string]plugins.AvailabilityState{}, OrganizationTimezones: map[string]string{},

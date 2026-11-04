@@ -19,9 +19,10 @@ const MaxManifestBytes = 1 << 20
 // policies and the entitlement declaration. Origins, service identities and
 // organization enablement are operator data and never part of it.
 type Manifest struct {
-	ID          string `json:"id"`
-	DisplayName string `json:"display_name"`
-	Version     string `json:"version"`
+	RequiredProtocols []string `json:"required_protocols,omitempty"`
+	ID                string   `json:"id"`
+	DisplayName       string   `json:"display_name"`
+	Version           string   `json:"version"`
 	// MigrationGeneration is the plugin-owned schema generation this package
 	// runs on; 0 while the plugin owns no schema. Core serves the package only
 	// once the running plugin reports its database at exactly this generation.
@@ -61,6 +62,7 @@ func CapabilityIDs(capabilities []Capability) []string {
 
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$`)
 var canonicalVersion = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$`)
+var protocolIdentifier = regexp.MustCompile(`^[a-z][a-z0-9-]*/v[1-9][0-9]*$`)
 var operationIdentifier = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$`)
 var pathParameter = regexp.MustCompile(`\{([a-zA-Z][a-zA-Z0-9_]*)\}`)
 
@@ -115,6 +117,16 @@ func (m Manifest) Validate() error {
 	}
 	if err := validateCapabilities(m); err != nil {
 		return err
+	}
+	protocols := map[string]bool{}
+	if len(m.RequiredProtocols) > 16 {
+		return fmt.Errorf("too many required protocols")
+	}
+	for _, protocol := range m.RequiredProtocols {
+		if !protocolIdentifier.MatchString(protocol) || protocols[protocol] || len(protocol) > 128 {
+			return fmt.Errorf("invalid or duplicate protocol")
+		}
+		protocols[protocol] = true
 	}
 	if m.MigrationGeneration < 0 {
 		return fmt.Errorf("the migration generation must not be negative")

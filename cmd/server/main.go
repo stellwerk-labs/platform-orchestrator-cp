@@ -26,6 +26,7 @@ import (
 	"github.com/stellwerk-labs/golib/hstandardoutbox"
 	"github.com/stellwerk-labs/golib/hvaultapi"
 	orchestratordp "github.com/stellwerk-labs/platform-orchestrator-dp/shared/v3/genclient"
+	iamadmin "github.com/stellwerk-labs/platform-orchestrator-iam/shared/adminapi"
 	orchestratoriam "github.com/stellwerk-labs/platform-orchestrator-iam/shared/genclient"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
 	"go.uber.org/zap"
@@ -219,7 +220,14 @@ func main() {
 			zap.L().Fatal("Failed to initialize plugin gateway", zap.Error(err))
 		}
 		registry := &plugins.InstallationRegistry{}
-		gateway = &plugins.Gateway{Registry: registry, SigningKey: signingKey, Issuer: cfg.PluginIssuer}
+		adminClient, err := iamadmin.NewClientWithResponses(cfg.IamUrl, iamadmin.WithHTTPClient(&http.Client{Timeout: 10 * time.Second}), iamadmin.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
+			req.Header.Set("From", userid.InternalSystemUuid.String())
+			return nil
+		}))
+		if err != nil {
+			zap.L().Fatal("Failed to initialize canonical IAM Admin client", zap.Error(err))
+		}
+		gateway = &plugins.Gateway{Registry: registry, SigningKey: signingKey, Issuer: cfg.PluginIssuer, OrganizationAdmins: &plugins.IAMOrganizationAdminAuthorizer{Client: adminClient}}
 		if err := gateway.Validate(); err != nil {
 			zap.L().Fatal("Failed to initialize plugin gateway", zap.Error(err))
 		}
@@ -265,6 +273,7 @@ func main() {
 			zap.L().Fatal("Failed to initialize the fixed Data Plane plugin port", zap.Error(err))
 		}
 		server.PluginDataPlane.Client = gateway.Client
+		registry.Protocols = server.PluginDataPlane
 	}
 
 	echoServer, err := hecho.DefaultEchoServerWithValidation(&hecho.ValidatedServerConfig{

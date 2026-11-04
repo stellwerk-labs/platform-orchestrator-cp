@@ -219,7 +219,7 @@ func (s *Server) authorizePluginEnvironmentOperation(ctx context.Context, org st
 	if err := pluginFeatureAllowed(descriptor, policy.RequiredFeature, true, safety); err != nil {
 		return nil, empty, err
 	}
-	grant, err := model.GetExternalOperationGrant(ctx, s.Database, org, item.ID, operation)
+	grant, err := s.getPluginOperationGrant(ctx, org, item.ID, operation)
 	if err != nil {
 		return nil, empty, pluginModelError(err)
 	}

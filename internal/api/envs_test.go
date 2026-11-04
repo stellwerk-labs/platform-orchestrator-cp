@@ -153,7 +153,7 @@ func TestDeleteEnvironment_default(t *testing.T) {
 			}, nil).Times(1)
 			db.EXPECT().ListEnvironmentModuleVersionPins(gomock.Any(), gomock.Not(nil), "org-id", &envUuid, nil, false).Return(nil, nil)
 			db.EXPECT().UpdateEnvironment(gomock.Any(), gomock.Not(nil), "org-id", "proj-id", "env-id", gomock.Any()).
-				Return(&model.Environment{}, nil)
+				Return(&model.Environment{DeletionForce: ref.Ref(tc.force), DeletionDeleteRules: ref.Ref(tc.deleteRules)}, nil)
 
 			ctx := context.WithValue(t.Context(), hecho.ContextKeyUserID, userId.String())
 			var params DeleteEnvironmentParams
@@ -260,7 +260,7 @@ func TestDeleteEnvironment_withDeleteRules(t *testing.T) {
 		ByEnvId:     ref.Ref("env-id"),
 	}).Return([]string{"rule-id-1", "rule-id-2"}, nil)
 	db.EXPECT().UpdateEnvironment(gomock.Any(), gomock.Not(nil), "org-id", "proj-id", "env-id", gomock.Any()).
-		Return(&model.Environment{}, nil)
+		Return(&model.Environment{DeletionForce: ref.Ref(false), DeletionDeleteRules: ref.Ref(true)}, nil)
 
 	ctx := context.WithValue(t.Context(), hecho.ContextKeyUserID, userId.String())
 	params := DeleteEnvironmentParams{DeleteRules: ref.Ref(true)}
