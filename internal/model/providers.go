@@ -3,7 +3,6 @@ package model
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"strings"
 	"time"
 
@@ -16,14 +15,15 @@ import (
 )
 
 type ModuleProvider struct {
-	OrgId             string
-	ProviderType      string
-	Id                string
-	CreatedAt         time.Time
-	Description       opt.Opt[string]
-	Source            string
-	VersionConstraint string
-	Config            map[string]interface{}
+	OrgId               string
+	ProviderType        string
+	Id                  string
+	CreatedAt           time.Time
+	Description         opt.Opt[string]
+	Source              string
+	VersionConstraint   string
+	DeletionRequestedAt opt.Opt[time.Time]
+	Config              map[string]interface{}
 }
 
 type ListModuleProvidersParams struct {
@@ -47,7 +47,7 @@ func (d *databaser) ListModuleProviders(ctx context.Context, optionalTx Tx, orgI
 	if rs, err := d.txOrDb(optionalTx).QueryContext(
 		ctx,
 		`WITH org_check AS (SELECT EXISTS (SELECT 1 FROM orgs WHERE id = $1) AS org_exists)
-		 SELECT org_check.org_exists, p.provider_type, p.id, p.description, p.created_at, p.source, p.version_constraint, p.configuration
+		 SELECT org_check.org_exists, p.provider_type, p.id, p.description, p.created_at, p.source, p.version_constraint, p.configuration, p.deletion_requested_at
 		 FROM org_check
 		 LEFT JOIN providers p ON org_check.org_exists AND p.org_id = $1
 		 WHERE (p.provider_type > $2 OR (p.provider_type = $2 AND p.id > $3)) AND ($4::text IS NULL OR p.provider_type = $4) AND ($6::text[] IS NULL OR concat(p.provider_type, '.', id) = ANY($6))
@@ -65,7 +65,7 @@ func (d *databaser) ListModuleProviders(ctx context.Context, optionalTx Tx, orgI
 		for rs.Next() {
 			var orgExists bool
 			next := ModuleProvider{OrgId: orgId}
-			if err := rs.Scan(&orgExists, &next.ProviderType, &next.Id, opt.Scan(&next.Description), &next.CreatedAt, &next.Source, &next.VersionConstraint, asJson(&next.Config)); err != nil {
+			if err := rs.Scan(&orgExists, &next.ProviderType, &next.Id, opt.Scan(&next.Description), &next.CreatedAt, &next.Source, &next.VersionConstraint, asJson(&next.Config), opt.Scan(&next.DeletionRequestedAt)); err != nil {
 				return nil, "", errors.Wrap(err, "failed to scan row")
 			}
 			if !orgExists {
@@ -106,8 +106,8 @@ func (d *databaser) GetModuleProvider(ctx context.Context, optionalTx Tx, orgId,
 		ProviderType: providerType,
 		Id:           id,
 	}
-	if err := d.txOrDb(optionalTx).QueryRowContext(ctx, `SELECT description, created_at, source, version_constraint, configuration FROM providers WHERE org_id = $1 AND provider_type = $2 AND id = $3`, orgId, providerType, id).
-		Scan(opt.Scan(&res.Description), &res.CreatedAt, &res.Source, &res.VersionConstraint, asJson(&res.Config)); err != nil {
+	if err := d.txOrDb(optionalTx).QueryRowContext(ctx, `SELECT description, created_at, source, version_constraint, configuration, deletion_requested_at FROM providers WHERE org_id = $1 AND provider_type = $2 AND id = $3`, orgId, providerType, id).
+		Scan(opt.Scan(&res.Description), &res.CreatedAt, &res.Source, &res.VersionConstraint, asJson(&res.Config), opt.Scan(&res.DeletionRequestedAt)); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, NewErrNotFound("provider not found")
 		}
@@ -116,47 +116,21 @@ func (d *databaser) GetModuleProvider(ctx context.Context, optionalTx Tx, orgId,
 	return res, nil
 }
 
-func (d *databaser) DeleteModuleProvider(ctx context.Context, optionalTx Tx, orgId, providerType, id string) error {
-	logger := hlogger.TraceScopedLoggerFromCtx(d.logger, ctx)
-	if optionalTx == nil {
-		return fmt.Errorf("transaction cannot be nil")
-	}
-
-	if rs, err := optionalTx.QueryContext(
-		ctx,
-		`SELECT d.id FROM definitions d INNER JOIN definition_versions v ON d.org_id = v.org_id AND d.id = v.definition_id AND d.latest_version_id = v.version_id
-            WHERE d.org_id = $1 AND $2 = ANY(v.provider_values)
-            LIMIT 5`,
-		orgId, providerType+"."+id,
-	); err != nil {
-		return errors.Wrap(err, "failed to query modules")
-	} else {
-		defer func() {
-			if err := rs.Close(); err != nil {
-				logger.Error("failed to close row set")
-			}
-		}()
-		blockingDefinitions := make([]string, 0)
-		for rs.Next() {
-			var definitionId string
-			if err := rs.Scan(&definitionId); err != nil {
-				return errors.Wrap(err, "failed to scan row")
-			}
-			blockingDefinitions = append(blockingDefinitions, definitionId)
-		}
-		if rs.Err() != nil {
-			return errors.Wrap(rs.Err(), "failed to iterate rows")
-		} else if len(blockingDefinitions) > 0 {
-			return NewErrConflict(fmt.Sprintf("module versions are still using this provider: %s", strings.Join(blockingDefinitions, ", ")))
-		}
-	}
-
-	if res, err := optionalTx.ExecContext(ctx, `DELETE FROM providers WHERE org_id = $1 AND provider_type = $2 AND id = $3`, orgId, providerType, id); err != nil {
+func (d *databaser) DeleteModuleProvider(ctx context.Context, tx Tx, orgId, providerType, id string) error {
+	if err := lockProviderLifecycle(ctx, tx, orgId); err != nil {
 		return err
-	} else if rc, _ := res.RowsAffected(); rc == 0 {
-		return NewErrNotFound("provider not found")
 	}
-	return nil
+	provider, err := d.GetModuleProvider(ctx, tx, orgId, providerType, id)
+	if err != nil {
+		return err
+	}
+	if provider.DeletionRequestedAt.IsSet() {
+		return nil
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE providers SET deletion_requested_at=clock_timestamp() WHERE org_id=$1 AND provider_type=$2 AND id=$3`, orgId, providerType, id); err != nil {
+		return err
+	}
+	return advanceProviderLifecycleEpoch(ctx, tx, orgId)
 }
 
 func (d *databaser) UpdateModuleProvider(ctx context.Context, optionalTx Tx, request *ModuleProvider) (*ModuleProvider, error) {

@@ -2141,7 +2141,11 @@ paths:
       operationId: deleteModuleProvider
       tags:
         - Providers
-      summary: Delete an existing module provider in the org if it is unused
+      summary: Request deletion of a module provider
+      description: |
+        Marks the Provider for deletion. Configuration remains available for
+        cleanup until state and admission checks prove it is unused.
+        Repeating this request preserves the original deletion timestamp.
       security:
         - userIdHeader: []
       parameters:
@@ -2149,8 +2153,12 @@ paths:
         - $ref: '#/components/parameters/providerTypePathParam'
         - $ref: '#/components/parameters/providerIdPathParam'
       responses:
+        '202':
+          description: Deletion requested; the Provider remains until safe cleanup completes.
+        '503':
+          description: Provider retirement has not been activated or its safety services are unavailable.
         '204':
-          description: Successful delete response.
+          description: Successful delete response from an older server.
         '404':
           $ref: '#/components/responses/404NotFound'
         '409':
@@ -5578,6 +5586,13 @@ components:
         - source
         - created_at
       properties:
+        deletion_requested_at:
+          description: |
+            When deletion was requested. Present while waiting for managed state
+            and in-flight operations to release this Provider. Omitted while active.
+          type: string
+          format: date-time
+          readOnly: true
         org_id:
           description: The Organization ID
           type: string

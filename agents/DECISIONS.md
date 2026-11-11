@@ -33,3 +33,7 @@ work may finish after escalation. Final deletion uses canonical rule policy and
 can bind the lifecycle UUID. Unknown deleting/delete_failed rows require explicit
 re-deletion even for unbound internal callers; only active/unbound trusted direct
 force deletion retains its legacy fallback. No DP policy table or plugin change.
+
+## Installation settings and Provider retirement
+
+- Retain the breaking Provider retirement DELETE202 contract and major application version. Require complete compatible managed-state proofs before physical deletion. Mirror installation maintenance inside effect transactions and admit only exact package upgrade operations while paused.

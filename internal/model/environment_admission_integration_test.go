@@ -415,3 +415,26 @@ func TestEnvironmentAdmissionConflictsCarryStableCodes(t *testing.T) {
 	_, err = AuthorizeDeploymentAdmission(t.Context(), db, second)
 	requireCode(t, err, PinProtection)
 }
+
+func TestEnvironmentDeletionWithoutPinsWaitsForAdmissionSettlement(t *testing.T) {
+	db, _, request := admissionFixture(t)
+	_, err := AuthorizeDeploymentAdmission(t.Context(), db, request)
+	require.NoError(t, err)
+	purge, err := db.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	pins, err := db.RemoveEnvironmentModuleVersionPinsForDeletion(t.Context(), purge, request.OrgID, request.EnvironmentUUID, request.ActorID, "system")
+	require.ErrorContains(t, err, "unresolved ordinary")
+	require.Empty(t, pins)
+	require.NoError(t, purge.Rollback())
+
+	_, err = SettleDeploymentAdmission(t.Context(), db, request.OrgID, request.AdmissionID, request.ProjectUUID, request.EnvironmentUUID, request.RequestDigest, "succeeded")
+	require.NoError(t, err)
+	purge, err = db.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	defer func() { _ = purge.Rollback() }()
+	pins, err = db.RemoveEnvironmentModuleVersionPinsForDeletion(t.Context(), purge, request.OrgID, request.EnvironmentUUID, request.ActorID, "system")
+	require.NoError(t, err)
+	require.Empty(t, pins)
+	require.NoError(t, db.DeleteEnvironment(t.Context(), purge, request.OrgID, "project", "development"))
+	require.NoError(t, purge.Commit())
+}

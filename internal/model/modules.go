@@ -324,7 +324,7 @@ func validateProviders(ctx context.Context, tx Tx, orgId string, providerMapping
 	var badType, badId string
 	if err := tx.QueryRowContext(
 		ctx,
-		`SELECT a, b FROM unnest($2::text[], $3::text[]) as x(a,b) WHERE NOT EXISTS (SELECT 1 FROM providers WHERE org_id = $1 AND provider_type = x.a AND id = x.b) LIMIT 1`,
+		`SELECT a, b FROM unnest($2::text[], $3::text[]) as x(a,b) WHERE NOT EXISTS (SELECT 1 FROM providers WHERE org_id = $1 AND provider_type = x.a AND id = x.b AND deletion_requested_at IS NULL) LIMIT 1`,
 		orgId, pq.Array(pTypes), pq.Array(pIds),
 	).Scan(&badType, &badId); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -332,7 +332,7 @@ func validateProviders(ctx context.Context, tx Tx, orgId string, providerMapping
 		}
 		return nil, err
 	}
-	return fmt.Errorf("invalid provider mapping: no provider exists with type %s and id %s", badType, badId), nil
+	return fmt.Errorf("invalid provider mapping: no active provider exists with type %s and id %s", badType, badId), nil
 }
 
 func providersToStableList(providerMapping map[string]string) []string {

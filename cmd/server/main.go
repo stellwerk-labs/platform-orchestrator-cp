@@ -203,12 +203,14 @@ func main() {
 	vaultApiClient := hvaultapiClient.Client()
 
 	server := api.Server{
-		Database:  db,
-		Logger:    zap.L(),
-		Vault:     vault.NewVaultClient(vaultApiClient, zap.L()),
-		Publisher: publisher,
-		DpClient:  dpClient,
-		IamClient: iamClient,
+		MaintenanceDataPlaneURL:   cfg.DataPlaneUrl,
+		Database:                  db,
+		Logger:                    zap.L(),
+		Vault:                     vault.NewVaultClient(vaultApiClient, zap.L()),
+		Publisher:                 publisher,
+		DpClient:                  dpClient,
+		ProviderRetirementEnabled: cfg.ProviderRetirementEnabled,
+		IamClient:                 iamClient,
 
 		DeploymentAdmissionIdentity: uuid.UUID(cfg.DeploymentAdmissionIdentity),
 	}
@@ -280,6 +282,7 @@ func main() {
 		AppName:          path.Base(buildInfo.Main.Path),
 		Logger:           server.Logger,
 		OpenAPIRawSchema: api.MustDecodeOpenApiSpec(),
+		OpenAPISkipperFn: api.SkipMaintenanceOpenAPIValidation,
 		Tracing:          hecho.TracingOTel,
 	})
 
@@ -299,8 +302,12 @@ func main() {
 
 	bgCtx, bgCancel := context.WithCancel(ctx)
 	defer bgCancel()
+	if cfg.ProviderRetirementEnabled {
+		go runEvery(bgCtx, 30*time.Second, 10*time.Second, server.Logger, "Provider deletion reconciliation", server.ReconcileProviderDeletions)
+	}
 	if gateway != nil {
 		go server.PluginManager.Run(bgCtx, cfg.PluginManagerRefreshInterval)
+		go runEvery(bgCtx, 2*time.Second, 10*time.Second, server.Logger, "installation maintenance", server.ReconcileInstallationMaintenance)
 		go runEvery(bgCtx, capabilityReconcileInterval, capabilityReconcileTimeout, server.Logger, "plugin capability reconciliation", server.PluginManager.ReconcileCapabilities)
 		go runEvery(bgCtx, entitlementSweepInterval, entitlementSweepTimeout, server.Logger, "entitlement boundary sweep", sweepPluginEntitlements(entitlementAdapter))
 		go runEvery(bgCtx, journalRetentionInterval, journalRetentionTimeout, server.Logger, "extension journal retention", pruneExtensionJournal(db, retention, server.Logger))

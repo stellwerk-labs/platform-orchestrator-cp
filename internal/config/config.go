@@ -4,6 +4,9 @@ import "time"
 
 // Configuration ...
 type Configuration struct {
+	// Enable only after every CP/DP writer has the Provider retirement protocol.
+	ProviderRetirementEnabled bool `env:"PROVIDER_RETIREMENT_ENABLED, default=false"`
+
 	Port int `env:"PORT, default=8080" validate:"required"`
 
 	DatabaseName     string `env:"DATABASE_NAME" validate:"required"`

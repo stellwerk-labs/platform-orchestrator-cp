@@ -45,7 +45,7 @@ func TestModuleProvidersCrud(t *testing.T) {
 
 		res4, err := client.DeleteModuleProviderWithResponse(t.Context(), orgId, "thing", "id")
 		if assert.NoError(t, err) {
-			assert.Equal(t, http.StatusNotFound, res4.StatusCode())
+			assert.Equal(t, http.StatusServiceUnavailable, res4.StatusCode())
 		}
 	})
 
@@ -172,13 +172,14 @@ func TestModuleProvidersCrud(t *testing.T) {
 			}
 		})
 
-		t.Run("can delete provider", func(t *testing.T) {
+		t.Run("retirement waits for explicit activation", func(t *testing.T) {
 			res2, err := client.DeleteModuleProviderWithResponse(t.Context(), orgId, res.JSON201.ProviderType, res.JSON201.Id)
 			if assert.NoError(t, err) {
-				assert.Equal(t, http.StatusNoContent, res2.StatusCode())
+				assert.Equal(t, http.StatusServiceUnavailable, res2.StatusCode())
 				res3, err := client.GetModuleProviderWithResponse(t.Context(), orgId, res.JSON201.ProviderType, res.JSON201.Id)
 				if assert.NoError(t, err) {
-					assert.Equal(t, http.StatusNotFound, res3.StatusCode())
+					assert.Equal(t, http.StatusOK, res3.StatusCode())
+					assert.NotContains(t, string(res3.Body), "deletion_requested_at")
 				}
 			}
 		})

@@ -297,7 +297,7 @@ func (d *databaser) CreateEnvironment(ctx context.Context, optionalTx Tx, reques
 	if request.Labels == nil {
 		request.Labels = map[string]string{}
 	}
-	if err := d.txOrDb(optionalTx).QueryRowContext(ctx, `INSERT INTO envs(id, project_id, project_uuid, env_type_id, env_type_uuid, display_name, org_id, org_uuid, created_at, updated_at, runner_id, status, labels) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING uuid, created_at, updated_at, status, labels, deletion_force, deletion_delete_rules`,
+	if err := d.txOrDb(optionalTx).QueryRowContext(ctx, `INSERT INTO envs(id, project_id, project_uuid, env_type_id, env_type_uuid, display_name, org_id, org_uuid, created_at, updated_at, runner_id, status, labels, provider_state_required) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, false) RETURNING uuid, created_at, updated_at, status, labels, deletion_force, deletion_delete_rules`,
 		request.Id, request.ProjectId, request.ProjectUuid, request.EnvTypeId, request.EnvTypeUuid, request.DisplayName, request.OrgId, request.OrgUuid, request.CreatedAt, request.UpdatedAt, request.RunnerId.Ref(), request.Status, asJson(&request.Labels)).Scan(&ret.Uuid, &ret.CreatedAt, &ret.UpdatedAt, &ret.Status, asJson(&ret.Labels), &ret.DeletionForce, &ret.DeletionDeleteRules); err != nil {
 		if pqe := new(pq.Error); errors.As(err, &pqe) {
 			if pqe.Code.Name() == UniqueViolationErrorCode {

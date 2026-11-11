@@ -149,3 +149,7 @@ findings. Exact app-pin receipts remain in cp-force-deletion-fix/application-pin
 No PG rerun was needed for the module pin and notes. Actual matching CP/DP local
 lifecycle integration, clean source signing and new candidate artifact proofs
 remain separate Root-controlled gates. No public mutation by this agent.
+
+## Installation settings and Provider retirement
+
+- Prepared Provider retirement and installation maintenance barriers, generated optional SDK metadata and coordinated v4.0.0 notes. Security/compiler maintenance remains a preceding separate commit. Root dependencies use independently published shared SDKs without sibling replacements; see DECISIONS.md and LEARNINGS.md.

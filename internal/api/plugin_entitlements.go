@@ -75,16 +75,17 @@ const (
 // Only explicit plugin-effect calls receive this wrapper. Ordinary Module
 // Management and deployment paths never acquire a plugin dependency.
 func (s *Server) pluginEffectDatabase(org string, item plugins.Installation, action string, safety bool) model.Databaser {
-	return &pluginEffectDatabase{Databaser: s.Database, guard: s.PluginEntitlements, org: org, item: item, action: action, safety: safety}
+	return &pluginEffectDatabase{Databaser: s.Database, guard: s.PluginEntitlements, org: org, item: item, action: action, safety: safety, maintenance: s.MaintenanceDataPlaneURL != ""}
 }
 
 type pluginEffectDatabase struct {
 	model.Databaser
-	guard  PluginEntitlementGuard
-	org    string
-	item   plugins.Installation
-	action string
-	safety bool
+	guard       PluginEntitlementGuard
+	org         string
+	item        plugins.Installation
+	action      string
+	safety      bool
+	maintenance bool
 }
 
 func (db *pluginEffectDatabase) BeginTx(ctx context.Context, options *sql.TxOptions) (model.TxWithCommit, error) {
@@ -103,10 +104,20 @@ func (db *pluginEffectDatabase) BeginTx(ctx context.Context, options *sql.TxOpti
 	if err != nil {
 		return nil, err
 	}
+	if db.maintenance {
+		if err := model.RequirePluginMaintenanceAdmission(ctx, tx, db.action); err != nil {
+			_ = tx.Rollback()
+			if errors.Is(err, model.ErrInstallationMaintenance) {
+				return nil, pluginBoundaryError(503, "system_maintenance", err.Error())
+			}
+			return nil, err
+		}
+	}
 	if err := model.RequirePluginEnablement(ctx, tx, model.PluginUse{OrgID: db.org, PluginID: db.item.ID, InstallationID: db.item.InstallationID, PackageSHA256: db.item.ManifestSHA256, Safety: db.safety}); err != nil {
 		_ = tx.Rollback()
 		return nil, pluginModelError(err)
 	}
+
 	if !licensed {
 		return tx, nil
 	}

@@ -533,3 +533,69 @@ func TestInterruptedLifecycleStepsResume(t *testing.T) {
 		require.Equal(t, id, resumed.InstallationID)
 	}
 }
+
+func TestUpgradeCompletesWhileMaintenanceStaysEnabled(t *testing.T) {
+	for _, disabled := range []bool{false, true} {
+		state := model.PluginInstallationActive
+		if disabled {
+			state = model.PluginInstallationDisabled
+		}
+		t.Run(state, func(t *testing.T) {
+			db := testDatabase(t)
+			process := startPlugin(t)
+			writer := newReplicaReading(t, db, process.Client())
+			ops := newSession(t, writer.manager)
+			ctx := t.Context()
+			const plugin = "dev.example.rollouts"
+			raw, digest := versionedPackage(t, plugin, "1.0.0", 2)
+			installation := ops.installed(plugin, process.URL, raw, digest)
+			id := installation.InstallationID
+			process.reports(id, digest, 2)
+			ops.installation(writer.manager.Transition(ctx, ops.command(""), id, ActionActivate))
+			if disabled {
+				ops.installation(writer.manager.Transition(ctx, ops.command(""), id, ActionDisable))
+			}
+			policy := model.InstallationMaintenance{Revision: 2, Enabled: true}
+			require.NoError(t, model.ApplyInstallationMaintenance(ctx, db, policy))
+			raw, successor := versionedPackage(t, plugin, "1.1.0", 3)
+			push := ops.command("")
+			pkg, err := writer.manager.PushPackage(ctx, push, successor, raw)
+			require.NoError(t, err)
+			ops.revision = pkg.Revision
+			replayed, err := writer.manager.PushPackage(ctx, push, successor, raw)
+			require.NoError(t, err)
+			require.Equal(t, pkg.Revision, replayed.Revision)
+			stale := ops.command("")
+			stale.ExpectedRevision--
+			_, err = writer.manager.Upgrade(ctx, stale, id, successor)
+			requireCode(t, err, "plugin_manager_revision_conflict")
+			upgrading := ops.installation(writer.manager.Upgrade(ctx, ops.command(""), id, successor))
+			require.Equal(t, digest, upgrading.PackageSHA256)
+			require.Equal(t, successor, upgrading.TargetPackageSHA256)
+			activate := ops.command("")
+			for _, mismatch := range []struct {
+				id         uuid.UUID
+				digest     string
+				generation int64
+				code       string
+			}{
+				{uuid.New(), successor, 3, DiagnosticInstallationMismatch},
+				{id, digest, 3, DiagnosticPackageMismatch},
+				{id, successor, 2, DiagnosticMigrationMismatch},
+			} {
+				process.reports(mismatch.id, mismatch.digest, mismatch.generation)
+				_, err := writer.manager.Transition(ctx, activate, id, ActionActivate)
+				requireCode(t, err, mismatch.code)
+			}
+			process.reports(id, successor, 3)
+			activated := ops.installation(writer.manager.Transition(ctx, activate, id, ActionActivate))
+			require.Equal(t, id, activated.InstallationID)
+			require.Equal(t, successor, activated.PackageSHA256)
+			require.Empty(t, activated.TargetPackageSHA256)
+			require.Equal(t, state, activated.State)
+			current, err := model.ReadInstallationMaintenance(ctx, db)
+			require.NoError(t, err)
+			require.Equal(t, policy, current)
+		})
+	}
+}

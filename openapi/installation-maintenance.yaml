@@ -1,0 +1,158 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Installation maintenance coordination",
+    "version": "unreleased"
+  },
+  "paths": {
+    "/plugins/{pluginId}/maintenance": {
+      "get": {
+        "operationId": "readPluginMaintenance",
+        "description": "Only the service principal of the active or disabled installation may read this policy. Installation identity and package digest must match the runtime configuration. No operator write authority is granted.",
+        "parameters": [
+          {
+            "name": "pluginId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Desired durable barrier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginMaintenanceReport"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Wrong installed service principal"
+          },
+          "503": {
+            "description": "Policy unavailable, pause new work"
+          }
+        }
+      }
+    },
+    "/platform-settings/maintenance-status": {
+      "get": {
+        "operationId": "readInstallationMaintenanceStatus",
+        "description": "Human platform_settings_read holders only. Counts overlap. Ready requires an enabled matching revision at Core and all installed plugins, no unknown report and no unresolved managed work.",
+        "responses": {
+          "200": {
+            "description": "Current readiness snapshot; unknown never means ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "revision",
+                    "enabled",
+                    "state",
+                    "plugins"
+                  ],
+                  "properties": {
+                    "revision": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "running",
+                        "resuming",
+                        "draining",
+                        "ready",
+                        "unknown"
+                      ]
+                    },
+                    "diagnostic": {
+                      "type": "string"
+                    },
+                    "plugins": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PluginMaintenanceReport"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Installation read permission required"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "MaintenanceState": {
+        "type": "object",
+        "required": [
+          "revision",
+          "enabled"
+        ],
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PluginMaintenanceReport": {
+        "type": "object",
+        "required": [
+          "installation_id",
+          "package_sha256",
+          "revision",
+          "enabled",
+          "unresolved",
+          "parked"
+        ],
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "installation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "package_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "unresolved": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "parked": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}

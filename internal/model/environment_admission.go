@@ -93,6 +93,9 @@ func CheckEnvironmentAdmissionEpoch(ctx context.Context, db Databaser, tx Tx, or
 }
 
 func advanceEnvironmentAdmissionEpoch(ctx context.Context, tx Tx, org string, environment uuid.UUID) (int64, error) {
+	if err := advanceProviderLifecycleEpoch(ctx, tx, org); err != nil {
+		return 0, err
+	}
 	var epoch int64
 	err := tx.QueryRowContext(ctx, `INSERT INTO environment_admission_epochs(org_id,environment_uuid,epoch) VALUES($1,$2,1)
         ON CONFLICT(org_id,environment_uuid) DO UPDATE SET epoch=environment_admission_epochs.epoch+1 RETURNING epoch`, org, environment).Scan(&epoch)
@@ -193,6 +196,9 @@ func AuthorizeDeploymentAdmission(ctx context.Context, db Databaser, value Deplo
 	if err := lockExternalDispatchEnvironment(ctx, tx, value.EnvironmentUUID); err != nil {
 		return nil, err
 	}
+	if err := lockProviderLifecycle(ctx, tx, value.OrgID); err != nil {
+		return nil, err
+	}
 	var raw []byte
 	var epoch int64
 	var outcome string
@@ -217,6 +223,16 @@ func AuthorizeDeploymentAdmission(ctx context.Context, db Databaser, value Deplo
 			return nil, err
 		}
 	}
+	if !replay {
+		versions := make([]string, 0, len(value.ModuleVersions))
+		for _, version := range value.ModuleVersions {
+			versions = append(versions, version.String())
+		}
+		if err := checkProviderRetirement(ctx, tx, value.OrgID, versions); err != nil {
+			return nil, err
+		}
+	}
+
 	environmentMode := GetModeDefault
 	if value.Mode == admissionModeDestroy {
 		environmentMode = GetModeForUpdate
@@ -319,6 +335,7 @@ func AuthorizeDeploymentAdmission(ctx context.Context, db Databaser, value Deplo
 	if replay {
 		return admissionReceipt(value, epoch, outcome), nil
 	}
+
 	epoch, err = advanceEnvironmentAdmissionEpoch(ctx, tx, value.OrgID, value.EnvironmentUUID)
 	if err != nil {
 		return nil, err
@@ -370,6 +387,16 @@ func SettleDeploymentAdmission(ctx context.Context, db Databaser, org string, ad
 		return nil, NewErrConflict("admission completion scope and outcome are immutable")
 	}
 	if previous == "" {
+		// Unresolved guards already block purge. Only conclusive evidence of a
+		// real Deployment creates a durable state-coverage requirement.
+		if outcome != deploymentOutcomeAbsent {
+			if _, err := tx.ExecContext(ctx, `UPDATE envs SET provider_state_required=true WHERE org_id=$1 AND uuid=$2`, org, environment); err != nil {
+				return nil, err
+			}
+		}
+		if err := advanceProviderLifecycleEpoch(ctx, tx, org); err != nil {
+			return nil, err
+		}
 		_, err = tx.ExecContext(ctx, `UPDATE deployment_admission_guards SET outcome=$3,settled_at=now() WHERE org_id=$1 AND admission_id=$2`, org, admission, outcome)
 		if err != nil {
 			return nil, err
@@ -411,6 +438,9 @@ func SealDeploymentAdmissionAbsence(ctx context.Context, db Databaser, value Dep
 			return nil, NewErrConflict("admission absence scope, intent and outcome are immutable")
 		}
 		if outcome == "" {
+			if err := advanceProviderLifecycleEpoch(ctx, tx, value.OrgID); err != nil {
+				return nil, err
+			}
 			_, err = tx.ExecContext(ctx, `UPDATE deployment_admission_guards SET outcome=$3,settled_at=now() WHERE org_id=$1 AND admission_id=$2`, value.OrgID, value.AdmissionID, deploymentOutcomeAbsent)
 		}
 	} else if errors.Is(err, sql.ErrNoRows) {

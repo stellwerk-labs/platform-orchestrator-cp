@@ -19,25 +19,27 @@ const maximumAllowedSerializedConfig = 5 * 1024
 
 func apiMpFromDbMp(mp model.ModuleProvider) ModuleProvider {
 	return ModuleProvider{
-		OrgId:             mp.OrgId,
-		Configuration:     mp.Config,
-		CreatedAt:         mp.CreatedAt,
-		Description:       mp.Description.Ref(),
-		Id:                mp.Id,
-		ProviderType:      mp.ProviderType,
-		Source:            mp.Source,
-		VersionConstraint: mp.VersionConstraint,
+		OrgId:               mp.OrgId,
+		Configuration:       mp.Config,
+		CreatedAt:           mp.CreatedAt,
+		Description:         mp.Description.Ref(),
+		Id:                  mp.Id,
+		ProviderType:        mp.ProviderType,
+		Source:              mp.Source,
+		VersionConstraint:   mp.VersionConstraint,
+		DeletionRequestedAt: mp.DeletionRequestedAt.Ref(),
 	}
 }
 
 func apiMpSummaryFromDbMp(mp model.ModuleProvider) ModuleProviderSummary {
 	return ModuleProviderSummary{
-		OrgId:        mp.OrgId,
-		CreatedAt:    mp.CreatedAt,
-		Description:  mp.Description.Ref(),
-		Id:           mp.Id,
-		ProviderType: mp.ProviderType,
-		Source:       mp.Source,
+		OrgId:               mp.OrgId,
+		CreatedAt:           mp.CreatedAt,
+		Description:         mp.Description.Ref(),
+		Id:                  mp.Id,
+		ProviderType:        mp.ProviderType,
+		Source:              mp.Source,
+		DeletionRequestedAt: mp.DeletionRequestedAt.Ref(),
 	}
 }
 
@@ -136,6 +138,10 @@ func (s *Server) DeleteModuleProvider(ctx context.Context, request DeleteModuleP
 	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionModuleProviderWrite); err != nil {
 		return nil, err
 	}
+	if !s.ProviderRetirementEnabled {
+		return nil, pluginBoundaryError(503, "provider_retirement_not_enabled", "Provider retirement requires activation after all Control Plane and Data Plane writers are upgraded.")
+	}
+
 	ids, ctx := hlogger.EnsurePlatformOrchestratorIdsOnCtx(ctx)
 	logger := hlogger.TraceScopedLoggerFromCtx(s.Logger, ctx).WithLazy(ids.AsLogField())
 
@@ -158,8 +164,8 @@ func (s *Server) DeleteModuleProvider(ctx context.Context, request DeleteModuleP
 			return nil, errors.Wrap(err, "failed to commit transaction")
 		}
 	}
-	logger.Info("deleted module provider")
-	return DeleteModuleProvider204Response{}, nil
+	logger.Info("requested module provider deletion")
+	return DeleteModuleProvider202Response{}, nil
 }
 
 func (s *Server) GetModuleProvider(ctx context.Context, request GetModuleProviderRequestObject) (GetModuleProviderResponseObject, error) {
