@@ -4247,7 +4247,8 @@
         "tags": [
           "Providers"
         ],
-        "summary": "Delete an existing module provider in the org if it is unused",
+        "summary": "Request deletion of a module provider",
+        "description": "Marks the Provider for deletion. Configuration remains available for\ncleanup until state and admission checks prove it is unused.\nRepeating this request preserves the original deletion timestamp.\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/orgIdPathParam"
@@ -4260,8 +4261,14 @@
           }
         ],
         "responses": {
+          "202": {
+            "description": "Deletion requested; the Provider remains until safe cleanup completes."
+          },
+          "503": {
+            "description": "Provider retirement has not been activated or its safety services are unavailable."
+          },
           "204": {
-            "description": "Successful delete response."
+            "description": "Successful delete response from an older server."
           },
           "404": {
             "$ref": "#/components/responses/404NotFound"
@@ -11226,6 +11233,12 @@
           "created_at"
         ],
         "properties": {
+          "deletion_requested_at": {
+            "description": "When deletion was requested. Present while waiting for managed state\nand in-flight operations to release this Provider. Omitted while active.\n",
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
           "org_id": {
             "description": "The Organization ID",
             "type": "string",

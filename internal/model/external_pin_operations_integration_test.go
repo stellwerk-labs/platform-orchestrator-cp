@@ -218,3 +218,56 @@ func TestExternalPinCancellationRequiresNoRecordedDispatch(t *testing.T) {
 	_, err = ApplyExternalPinCommand(t.Context(), db, command, nil)
 	require.ErrorContains(t, err, "active operation")
 }
+
+func TestCorePinRemovalProjectsToPluginResourceJournal(t *testing.T) {
+	db := externalOperationDatabase(t)
+	prepare := externalGrantFixture(t, db)
+	prepare.Intent.Actions = append(prepare.Intent.Actions, "resource-events.read")
+	grant, err := ApplyExternalGrantCommand(t.Context(), db, prepare)
+	require.NoError(t, err)
+	control := prepare
+	control.Intent = nil
+	control.Action, control.RequestID, control.ExpectedRevision = "activate", "start-resource-observation", grant.Revision
+	grant, err = ApplyExternalGrantCommand(t.Context(), db, control)
+	require.NoError(t, err)
+	_, cursor, err := ReadExtensionResourceEvents(t.Context(), db, *grant, nil, 200)
+	require.NoError(t, err)
+
+	environment := grant.Intent.Environments[0]
+	moduleID := grant.Intent.Modules[0]
+	baseline := grant.BaselineDefaults[moduleID.String()]
+	require.NotNil(t, baseline)
+	tx, err := db.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	pin, err := db.CreateEnvironmentModuleVersionPin(t.Context(), tx, grant.OrgID, environment.ProjectID,
+		"project", environment.EnvironmentID, "development", moduleID, *baseline, grant.ActorID, "user", "Protect the current deployment", nil, false)
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
+	removalReason := "Developer removed the blocking Pin"
+	tx, err = db.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	removed, err := db.TransitionEnvironmentModuleVersionPin(t.Context(), tx, grant.OrgID, pin.ID, pin.ResourceVersion,
+		moduleversions.PinRemoved, "removed", grant.ActorID, "user", removalReason, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
+	require.Equal(t, moduleversions.PinRemoved, removed.Status)
+
+	events, next, err := ReadExtensionResourceEvents(t.Context(), db, *grant, &cursor, 20)
+	require.NoError(t, err)
+	require.Equal(t, cursor+2, next)
+	require.Len(t, events, 2)
+	created, removedEvent := events[0], events[1]
+	require.Equal(t, "io.platform-orchestrator.module.version.pin-lifecycle-changed", created.Type)
+	require.Equal(t, "created", created.Transition)
+	require.Equal(t, pin.ID, *created.PinID)
+	require.Equal(t, "io.platform-orchestrator.module.version.pin-lifecycle-changed", removedEvent.Type)
+	require.Equal(t, "removed", removedEvent.Transition)
+	require.Equal(t, "active", removedEvent.FromStatus)
+	require.Equal(t, "removed", removedEvent.ToStatus)
+	require.Equal(t, pin.ID, *removedEvent.PinID)
+	require.Equal(t, moduleID, *removedEvent.ModuleUUID)
+	require.Equal(t, environment.EnvironmentID, *removedEvent.EnvironmentUUID)
+	require.Equal(t, environment.ProjectID, *removedEvent.ProjectUUID)
+	require.Equal(t, grant.ActorID, *removedEvent.ActorID)
+	require.Equal(t, removalReason, removedEvent.Reason)
+}

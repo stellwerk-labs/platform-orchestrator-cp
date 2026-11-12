@@ -141,6 +141,11 @@ func updateExternalDispatchRecovery(ctx context.Context, db Databaser, org, plug
 		} else if evidence.DeploymentID == uuid.Nil || !slices.Contains([]string{externalDeploymentSucceeded, deploymentOutcomeFailed, deploymentOutcomeCancelled, deploymentOutcomeTerminated}, evidence.Status) {
 			return NewErrConflict("dispatch has no authoritative terminal Deployment outcome")
 		}
+		if !evidence.NoEffect {
+			if _, err := tx.ExecContext(ctx, `UPDATE envs SET provider_state_required=true WHERE org_id=$1 AND uuid=$2`, org, dispatch.EnvironmentUUID); err != nil {
+				return err
+			}
+		}
 		completion, encodeErr := json.Marshal(evidence)
 		if encodeErr != nil {
 			return encodeErr
@@ -148,6 +153,9 @@ func updateExternalDispatchRecovery(ctx context.Context, db Databaser, org, plug
 		_, err = tx.ExecContext(ctx, `UPDATE external_operation_dispatches SET state='settled',settled_at=now(),completion=$5 WHERE org_id=$1 AND plugin_id=$2 AND operation_id=$3 AND dispatch_id=$4`, org, plugin, operation, dispatchID, completion)
 	}
 	if err != nil {
+		return err
+	}
+	if err := advanceProviderLifecycleEpoch(ctx, tx, org); err != nil {
 		return err
 	}
 	return tx.Commit()

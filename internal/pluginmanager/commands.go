@@ -144,7 +144,7 @@ func (m *Manager) execute(ctx context.Context, command Command, name string, pay
 		return err
 	}
 	response, err := model.ExecutePluginManagerCommand(ctx, m.db, model.PluginManagerCommand{
-		Actor: command.Actor, IdempotencyKey: command.IdempotencyKey, Fingerprint: fmt.Sprintf("%s:sha256:%x", name, sha256.Sum256(encoded)),
+		Actor: command.Actor, IdempotencyKey: command.IdempotencyKey, Action: name, Fingerprint: fmt.Sprintf("%s:sha256:%x", name, sha256.Sum256(encoded)),
 		ExpectedRevision: command.ExpectedRevision, Reason: command.Reason, RequestID: command.RequestID,
 	}, mutate, respond)
 	if err != nil {

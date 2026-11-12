@@ -261,8 +261,17 @@ func (s *Server) recordObservationResolution(ctx context.Context, tx model.Tx, o
 }
 
 func (s *Server) ResolveObservationRequest(ctx context.Context, request observation.ResolveObservationRequestRequestObject) (observation.ResolveObservationRequestResponseObject, error) {
-	if request.Body == nil || request.RequestId == uuid.Nil || request.Body.RequestId != request.RequestId || request.Body.GrantId == uuid.Nil || request.Body.GrantRevision < 1 || request.Body.ProjectUuid == uuid.Nil || request.Body.EnvironmentUuid == uuid.Nil || request.Body.Occurrence.IsZero() || request.Body.AdmissionDeadline.IsZero() || request.Body.AdmissionDeadline.Before(request.Body.Occurrence) || request.Body.AdmissionDeadline.Sub(request.Body.Occurrence) > 10*time.Minute || request.Body.AdmissionDeadline.After(time.Now().UTC()) {
+	if request.Body == nil || request.RequestId == uuid.Nil || request.Body.RequestId != request.RequestId || request.Body.GrantId == uuid.Nil || request.Body.GrantRevision < 1 || request.Body.ProjectUuid == uuid.Nil || request.Body.EnvironmentUuid == uuid.Nil || request.Body.Occurrence.IsZero() || request.Body.AdmissionDeadline.IsZero() || request.Body.AdmissionDeadline.Before(request.Body.Occurrence) || request.Body.AdmissionDeadline.Sub(request.Body.Occurrence) > 10*time.Minute {
 		return nil, pluginBoundaryError(400, "plugin_request_invalid", "Resolution requires an exact expired observation admission key.")
+	}
+	if request.Body.AdmissionDeadline.After(time.Now().UTC()) {
+		policy, err := model.ReadInstallationMaintenance(ctx, s.Database)
+		if err != nil {
+			return nil, err
+		}
+		if s.MaintenanceDataPlaneURL == "" || !policy.Enabled || policy.Revision < 1 {
+			return nil, pluginBoundaryError(400, "plugin_request_invalid", "Early closure requires an applied maintenance barrier.")
+		}
 	}
 	body, err := json.Marshal(request.Body)
 	if err != nil {

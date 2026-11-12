@@ -46,3 +46,7 @@ Destroy authorization, including exact replay, must lock the same row as DELETE
 before reading accepted deletion options. A nullable legacy policy means unknown,
 not false. Retained true options must merge monotonically in the row UPDATE, and
 stale status writes must be rejected by that same atomic UPDATE predicate.
+
+## Installation settings and Provider retirement
+
+- Accepted retirement is not completed deletion. Readiness requires current identities and revisions across Manager, Data Plane, Runner and plugin reports; overlapping counters cannot be summed into one drain proof.

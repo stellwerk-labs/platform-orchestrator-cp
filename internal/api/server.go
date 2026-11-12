@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"regexp"
 	"runtime/debug"
 	"time"
@@ -29,16 +30,19 @@ import (
 //go:generate go tool oapi-codegen --config=oapi-codegen.cfg.yaml --exclude-tags not-implemented ../../openapi/spec.yaml
 
 type Server struct {
-	Database           model.Databaser
-	Logger             *zap.Logger
-	Vault              vault.VaultClientInterface
-	Publisher          hmessaging.Publisher
-	DpClient           orchestratordp.ClientWithResponsesInterface
-	IamClient          orchestratoriam.ClientWithResponsesInterface
-	Plugins            plugins.Registry
-	PluginGateway      *plugins.Gateway
-	PluginDataPlane    *plugins.DataPlanePort
-	PluginEntitlements PluginEntitlementGuard
+	MaintenanceDataPlaneURL   string
+	MaintenanceHTTPClient     *http.Client
+	ProviderRetirementEnabled bool
+	Database                  model.Databaser
+	Logger                    *zap.Logger
+	Vault                     vault.VaultClientInterface
+	Publisher                 hmessaging.Publisher
+	DpClient                  orchestratordp.ClientWithResponsesInterface
+	IamClient                 orchestratoriam.ClientWithResponsesInterface
+	Plugins                   plugins.Registry
+	PluginGateway             *plugins.Gateway
+	PluginDataPlane           *plugins.DataPlanePort
+	PluginEntitlements        PluginEntitlementGuard
 	// PluginManager is nil while the plugin host is disabled.
 	PluginManager *pluginmanager.Manager
 	// PluginJournalRetention is how long released operations still reconcile.
@@ -58,6 +62,8 @@ func (s *Server) MapRoutes(e *echo.Echo) {
 		adaptStrictMiddleware(token.StrictEncryptionMiddleware()),
 	})
 	RegisterHandlers(e, apiHandler)
+	e.GET("/plugins/:pluginId/maintenance", s.getPluginMaintenance, echomiddleware.ContextTimeout(30*time.Second))
+	e.GET("/platform-settings/maintenance-status", s.getInstallationMaintenanceStatus, echomiddleware.ContextTimeout(30*time.Second))
 	observationapi.RegisterHandlers(e.Group("", echomiddleware.BodyLimit("8M")), observationapi.NewStrictHandler(s, []observationapi.StrictMiddlewareFunc{
 		func(handler observationapi.StrictHandlerFunc, operationID string) observationapi.StrictHandlerFunc {
 			return observationapi.StrictHandlerFunc(hecho.OperationIdCollectorMiddleware(strictecho.StrictEchoHandlerFunc(handler), operationID))

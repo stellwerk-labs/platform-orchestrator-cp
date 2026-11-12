@@ -96,3 +96,26 @@ them.
 ## License
 
 Licensed under the [European Union Public Licence 1.2](./LICENSE).
+
+
+## Installation maintenance
+
+The Data Plane owns the human-writable maintenance policy. Core mirrors its
+monotonic revision and fences plugin effects inside their committing transaction.
+`GET /platform-settings/maintenance-status` requires `platform_settings_read` and
+checks remaining Runner/admission/dispatch work and each served plugin's pause
+report before returning `ready`. A Manager revision change during that inspection
+invalidates the proof. Counts overlap and must not be summed.
+
+Maintenance permits normal package registration, upgrade staging and activation
+so existing installations can be upgraded without resuming business work. All
+other Manager mutations remain paused. Activation still requires the exact
+installation UUID, target package digest and migration generation; upgrading a
+disabled installation keeps it disabled. An upgraded runtime may report its
+pause state only after activation switches the served package.
+
+Installed plugin service principals can read `GET /plugins/{pluginId}/maintenance`.
+The plugin persists the policy in its shared database, pauses new work, and serves
+its exact installation/package identity, applied revision and unresolved/parked
+counts at `GET /v1/maintenance`. Missing or incompatible reports prevent readiness.
+The typed boundary is documented in `openapi/installation-maintenance.yaml`.

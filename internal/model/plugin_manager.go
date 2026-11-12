@@ -195,6 +195,7 @@ type PluginManagerAuditEvent struct {
 type PluginManagerCommand struct {
 	Actor            uuid.UUID
 	IdempotencyKey   string
+	Action           string // Set by Manager.execute, never by the operator request.
 	Fingerprint      string
 	ExpectedRevision int64
 	Reason           string
@@ -221,7 +222,7 @@ type PluginManagerChange struct {
 // respond builds the response from the committed state and revision.
 func ExecutePluginManagerCommand(ctx context.Context, db Databaser, command PluginManagerCommand, mutate func(context.Context, Tx) (*PluginManagerChange, error), respond func(context.Context, Tx, int64) (any, error)) (json.RawMessage, error) {
 	reason := strings.TrimSpace(command.Reason)
-	if command.Actor == uuid.Nil || command.IdempotencyKey == "" || command.Fingerprint == "" || reason == "" || len(reason) > 1000 || command.ExpectedRevision < 0 {
+	if command.Actor == uuid.Nil || command.IdempotencyKey == "" || command.Fingerprint == "" || reason == "" || len(reason) > 1000 || command.ExpectedRevision < 0 || (command.Action != "" && !strings.HasPrefix(command.Fingerprint, command.Action+":sha256:")) {
 		return nil, ErrBadRequest{Code: "plugin_manager_request_invalid", Message: "An actor, an idempotency key, the expected revision and a reason of at most 1000 characters are required."}
 	}
 	key := sha256.Sum256([]byte(command.IdempotencyKey))
@@ -230,7 +231,7 @@ func ExecutePluginManagerCommand(ctx context.Context, db Databaser, command Plug
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	revision, err := LockPluginManager(ctx, tx)
+	revision, err := lockPluginManager(ctx, tx, command.Action)
 	if err != nil {
 		return nil, err
 	}
@@ -305,6 +306,18 @@ func auditJSON(value any) (sql.NullString, error) {
 // LockPluginManager serialises a change Core makes on its own with every
 // operator command until the transaction ends, and returns the revision.
 func LockPluginManager(ctx context.Context, tx Tx) (int64, error) {
+	return lockPluginManager(ctx, tx, "")
+}
+
+func lockPluginManager(ctx context.Context, tx Tx, action string) (int64, error) {
+	var maintenance bool
+	if err := tx.QueryRowContext(ctx, `SELECT enabled AND revision>0 FROM installation_maintenance WHERE singleton FOR SHARE`).Scan(&maintenance); err != nil {
+		return 0, err
+	}
+	if maintenance && action != "plugin_package.push" && action != "plugin_installation.upgrade" && action != "plugin_installation.activate" {
+		return 0, ErrConflict{Code: "system_maintenance", Message: "Plugin installation changes are paused during maintenance."}
+	}
+
 	var revision int64
 	err := tx.QueryRowContext(ctx, `SELECT revision FROM plugin_manager_state FOR UPDATE`).Scan(&revision)
 	return revision, err

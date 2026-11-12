@@ -364,6 +364,12 @@ func (d *databaser) RemoveEnvironmentModuleVersionPinsForDeletion(ctx context.Co
 	if tx == nil {
 		return nil, errors.New("transaction required")
 	}
+	if err := lockExternalDispatchEnvironment(ctx, tx, environmentUUID); err != nil {
+		return nil, err
+	}
+	if err := checkExternalDispatchBarrier(ctx, tx, orgID, environmentUUID); err != nil {
+		return nil, err
+	}
 	rows, err := tx.QueryContext(ctx, `SELECT `+environmentModuleVersionPinColumns+`
 		FROM environment_module_version_pins WHERE org_id = $1 AND environment_uuid = $2
 		AND status <> 'removed' ORDER BY id FOR UPDATE`, orgID, environmentUUID)

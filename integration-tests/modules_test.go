@@ -124,7 +124,7 @@ func TestDefinitions(t *testing.T) {
 			},
 		})
 		if assert.NoError(t, err) && assert.Equal(t, http.StatusBadRequest, res.StatusCode(), string(res.Body)) {
-			assert.Equal(t, "invalid provider mapping: no provider exists with type aws and id unknown", res.JSON400.Message)
+			assert.Equal(t, "invalid provider mapping: no active provider exists with type aws and id unknown", res.JSON400.Message)
 		}
 	})
 
@@ -242,9 +242,8 @@ func TestDefinitions(t *testing.T) {
 
 	t.Run("can't delete provider", func(t *testing.T) {
 		res, err := client.DeleteModuleProviderWithResponse(t.Context(), orgId, provType, provId)
-		if assert.NoError(t, err) && assert.Equal(t, http.StatusConflict, res.StatusCode(), string(res.Body)) {
-			assert.Equal(t, "module versions are still using this provider: my-s3-module", res.JSON409.Message)
-		}
+		require.NoError(t, err)
+		require.Equal(t, http.StatusServiceUnavailable, res.StatusCode(), string(res.Body))
 	})
 
 	t.Run("update definition with no updates", func(t *testing.T) {

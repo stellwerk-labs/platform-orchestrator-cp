@@ -68,7 +68,7 @@ test-integration-postgres: build
 ## Run golang tests
 .PHONY: test-unit
 test-unit:
-	go tool gotestsum --format testname -- -coverprofile=cover.out ./internal/... ./cmd/...
+	go tool gotestsum --format testname -- -coverprofile=cover.out ./internal/... ./cmd/... ./scripts/gosecurity
 	cd shared && GOWORK=off go test -count=1 ./...
 
 ## Lint the code

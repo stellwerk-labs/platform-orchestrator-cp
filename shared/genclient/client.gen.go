@@ -3022,6 +3022,10 @@ type ModuleProvider struct {
 	// Example: 2023-01-01T00:00:00Z
 	CreatedAt time.Time `json:"created_at"`
 
+	// DeletionRequestedAt When deletion was requested. Present while waiting for managed state
+	// and in-flight operations to release this Provider. Omitted while active.
+	DeletionRequestedAt *time.Time `json:"deletion_requested_at,omitempty"`
+
 	// Description An optional text description for this module provider
 	//
 	// Example: Provider using default runner environment variables for AWS
@@ -3101,6 +3105,10 @@ type ModuleProviderSummary struct {
 	//
 	// Example: 2023-01-01T00:00:00Z
 	CreatedAt time.Time `json:"created_at"`
+
+	// DeletionRequestedAt When deletion was requested. Present while waiting for managed state
+	// and in-flight operations to release this Provider. Omitted while active.
+	DeletionRequestedAt *time.Time `json:"deletion_requested_at,omitempty"`
 
 	// Description An optional text description for this module provider
 	//
@@ -7003,7 +7011,11 @@ type ClientInterface interface {
 	// Corresponds with POST /orgs/{orgId}/module-providers (the `CreateModuleProvider` operationId).
 	CreateModuleProvider(ctx context.Context, orgId OrgIdPathParam, body CreateModuleProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteModuleProvider Delete an existing module provider in the org if it is unused
+	// DeleteModuleProvider Request deletion of a module provider
+	//
+	// Marks the Provider for deletion. Configuration remains available for
+	// cleanup until state and admission checks prove it is unused.
+	// Repeating this request preserves the original deletion timestamp.
 	//
 	// Corresponds with DELETE /orgs/{orgId}/module-providers/{providerType}/{providerId} (the `DeleteModuleProvider` operationId).
 	DeleteModuleProvider(ctx context.Context, orgId OrgIdPathParam, providerType ProviderTypePathParam, providerId ProviderIdPathParam, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -9046,7 +9058,11 @@ func (c *Client) CreateModuleProvider(ctx context.Context, orgId OrgIdPathParam,
 	return c.Client.Do(req)
 }
 
-// DeleteModuleProvider Delete an existing module provider in the org if it is unused
+// DeleteModuleProvider Request deletion of a module provider
+//
+// Marks the Provider for deletion. Configuration remains available for
+// cleanup until state and admission checks prove it is unused.
+// Repeating this request preserves the original deletion timestamp.
 //
 // Corresponds with DELETE /orgs/{orgId}/module-providers/{providerType}/{providerId} (the `DeleteModuleProvider` operationId).
 func (c *Client) DeleteModuleProvider(ctx context.Context, orgId OrgIdPathParam, providerType ProviderTypePathParam, providerId ProviderIdPathParam, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -21128,7 +21144,11 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /orgs/{orgId}/module-providers (the `CreateModuleProvider` operationId).
 	CreateModuleProviderWithResponse(ctx context.Context, orgId OrgIdPathParam, body CreateModuleProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateModuleProviderResponse, error)
 
-	// DeleteModuleProviderWithResponse Delete an existing module provider in the org if it is unused
+	// DeleteModuleProviderWithResponse Request deletion of a module provider
+	//
+	// Marks the Provider for deletion. Configuration remains available for
+	// cleanup until state and admission checks prove it is unused.
+	// Repeating this request preserves the original deletion timestamp.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -31927,7 +31947,11 @@ func (c *ClientWithResponses) CreateModuleProviderWithResponse(ctx context.Conte
 	return ParseCreateModuleProviderResponse(rsp)
 }
 
-// DeleteModuleProviderWithResponse Delete an existing module provider in the org if it is unused
+// DeleteModuleProviderWithResponse Request deletion of a module provider
+//
+// Marks the Provider for deletion. Configuration remains available for
+// cleanup until state and admission checks prove it is unused.
+// Repeating this request preserves the original deletion timestamp.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -35750,6 +35774,9 @@ func ParseDeleteModuleProviderResponse(rsp *http.Response) (*DeleteModuleProvide
 	}
 
 	switch {
+	case rsp.StatusCode == 202:
+		break // No content-type
+
 	case rsp.StatusCode == 204:
 		break // No content-type
 
@@ -35766,6 +35793,9 @@ func ParseDeleteModuleProviderResponse(rsp *http.Response) (*DeleteModuleProvide
 			return nil, err
 		}
 		response.JSON409 = &dest
+
+	case rsp.StatusCode == 503:
+		break // No content-type
 
 	}
 

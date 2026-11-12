@@ -37,3 +37,12 @@ version after the normal integration and artifact checks pass. Source builds
 following the supported release tooling require Go 1.26.10. Clients using the
 corrected vendored API documents must verify their exact published server source
 pins before release.
+
+## Installation maintenance upgrades
+
+Maintenance keeps business admission paused while authenticated operators register
+a package, stage an existing installation upgrade and activate the exact runtime
+UUID, package and migration generation. Other Manager mutations remain refused.
+Disabled installations remain disabled after upgrade. Readiness requires a stable
+Manager inventory revision across plugin report collection; a concurrent upgrade
+invalidates that inspection instead of returning `ready` from stale inventory.

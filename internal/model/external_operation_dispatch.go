@@ -130,6 +130,9 @@ func externalDispatchTransaction(ctx context.Context, db Databaser, dispatch Ext
 	if err := lockExternalDispatchEnvironment(ctx, tx, dispatch.EnvironmentUUID); err != nil {
 		return err
 	}
+	if err := lockProviderLifecycle(ctx, tx, dispatch.OrgID); err != nil {
+		return err
+	}
 	encoded, err := json.Marshal(dispatch)
 	if err != nil {
 		return err
@@ -166,12 +169,23 @@ func externalDispatchTransaction(ctx context.Context, db Databaser, dispatch Ext
 	if !create {
 		return NewErrConflict("dispatch was not authorized by Core")
 	}
+	versions := make([]string, 0, len(dispatch.TargetVersions))
+	for _, version := range dispatch.TargetVersions {
+		versions = append(versions, version.String())
+	}
+	if dispatch.Action == "external-deployment.admit" || dispatch.Action == "external-deployment.rollback" {
+		if err := checkProviderRetirement(ctx, tx, dispatch.OrgID, versions); err != nil {
+			return err
+		}
+	}
+
 	if err := checkExternalDispatchBarrier(ctx, tx, dispatch.OrgID, dispatch.EnvironmentUUID); err != nil {
 		return err
 	}
 	if err := validateExternalDispatchPins(ctx, db, tx, grant, dispatch); err != nil {
 		return err
 	}
+
 	if _, err := advanceEnvironmentAdmissionEpoch(ctx, tx, dispatch.OrgID, dispatch.EnvironmentUUID); err != nil {
 		return err
 	}

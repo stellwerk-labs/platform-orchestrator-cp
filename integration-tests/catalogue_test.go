@@ -151,7 +151,7 @@ func TestModuleCatalogueApi(t *testing.T) {
 		}
 	})
 
-	t.Run("provider referenced by immutable history cannot be deleted", func(t *testing.T) {
+	t.Run("disabled retirement retains immutable history material", func(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			r, err := client.UpdateModuleWithResponse(t.Context(), orgId, fmt.Sprintf("def-%d", i), genclient.UpdateModuleJSONRequestBody{
 				ProviderMapping: &map[string]string{}, SemanticVersion: ref.Ref("1.1.0"),
@@ -163,7 +163,7 @@ func TestModuleCatalogueApi(t *testing.T) {
 
 		r, err := client.DeleteModuleProviderWithResponse(t.Context(), orgId, provType, provId)
 		require.NoError(t, err)
-		require.Equal(t, http.StatusConflict, r.StatusCode(), string(r.Body))
+		require.Equal(t, http.StatusServiceUnavailable, r.StatusCode(), string(r.Body))
 		res, err := internalClient.GenerateInternalModuleCatalogueWithResponse(t.Context(), orgId, projectId, envId, nil, genclient.InternalModuleCatalogueGenerateBody{
 			PinnedModuleVersions: []string{egDefinition},
 		})
