@@ -153,3 +153,10 @@ remain separate Root-controlled gates. No public mutation by this agent.
 ## Installation settings and Provider retirement
 
 - Prepared Provider retirement and installation maintenance barriers, generated optional SDK metadata and coordinated v4.0.0 notes. Security/compiler maintenance remains a preceding separate commit. Root dependencies use independently published shared SDKs without sibling replacements; see DECISIONS.md and LEARNINGS.md.
+
+
+## 2026-11-12: local qualified artifact handoff preparation
+
+- Separated stable version admission, shared read-only OCI qualification and original-byte publication; added `make release-checks`, `make release-status RUN=...` and `docs/release-handoff.md`.
+- Local validation: 67 release contract tests, Bash syntax, ShellCheck, Python/YAML parsing, workflow DAG and whitespace checks passed. Independent planning, green and final clean-code reviews passed after correcting stale-version retry handling.
+- Actual hosted artifact transfer, publisher-only rerun and release behavior remain pending the next authorized release trial. No remote publication is claimed by these local checks.

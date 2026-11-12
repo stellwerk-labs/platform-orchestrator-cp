@@ -37,3 +37,10 @@ force deletion retains its legacy fallback. No DP policy table or plugin change.
 ## Installation settings and Provider retirement
 
 - Retain the breaking Provider retirement DELETE202 contract and major application version. Require complete compatible managed-state proofs before physical deletion. Mirror installation maintenance inside effect transactions and admit only exact package upgrade operations while paused.
+
+
+## 2026-11-12: qualified release handoff pilot
+
+- One read-only producer retains both complete builds and all artifact qualification, then seals the original OCI archive and evidence for the existing RC and stable publishers.
+- Preserve source, workflow, event and original producer-attempt identities across publisher-only reruns. Existing publication protections, collision refusal and cryptographic/anonymous checks remain.
+- Reject a stale stable publisher before reservation when a newer stable release is already latest. Preserve existing concurrency; no additional lifecycle lock or release framework.

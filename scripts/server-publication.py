@@ -34,6 +34,9 @@ def identity(env, module):
     if any(not re.fullmatch(r"[1-9][0-9]*", env.get(key, ""))
            for key in ("GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT")):
         raise ValueError("exact workflow run and attempt are required")
+    attempt = env.get("PRODUCER_RUN_ATTEMPT", env["GITHUB_RUN_ATTEMPT"])
+    if not re.fullmatch(r"[1-9][0-9]*", attempt) or int(attempt) > int(env["GITHUB_RUN_ATTEMPT"]):
+        raise ValueError("invalid original producer attempt")
     tag, source = env.get("RELEASE_VERSION", ""), env["RELEASE_SOURCE_SHA"]
     seed = env.get("RELEASE_KIND", "release") == "seed"
     if env.get("RELEASE_KIND", "release") not in ("release", "seed"):
@@ -69,7 +72,7 @@ def provenance(env, repository, seed):
              "digest": {"gitCommit": env["GITHUB_WORKFLOW_SHA"]}}]},
         "runDetails": {"builder": {"id": "https://github.com/" + env["GITHUB_WORKFLOW_REF"]},
                        "metadata": {"invocationId": "https://github.com/" + repository + "/actions/runs/"
-                                    + env["GITHUB_RUN_ID"] + "/attempts/" + env["GITHUB_RUN_ATTEMPT"]}}}
+                                    + env["GITHUB_RUN_ID"] + "/attempts/" + env.get("PRODUCER_RUN_ATTEMPT", env["GITHUB_RUN_ATTEMPT"])}}}
 
 
 def evidence(layout, output, env, source=ROOT):
@@ -102,11 +105,7 @@ def evidence(layout, output, env, source=ROOT):
 
 def stage(layout, output, env, source=ROOT):
     identity(env, (source / "go.mod").read_text().splitlines()[0])
-    if subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source, text=True).strip() != env["RELEASE_SOURCE_SHA"]:
-        raise ValueError("checkout differs from approved source")
-    workflow = subprocess.check_output(["git", "show", env["GITHUB_WORKFLOW_SHA"] + ":.github/workflows/ci.yaml"], cwd=source)
-    if workflow != (source / ".github/workflows/ci.yaml").read_bytes():
-        raise ValueError("checked-out workflow differs from producing workflow")
+    checkout(env, source)
     predicate = evidence(layout, output, env, source)
     destination = output / "source-provenance.json"
     if destination.exists() or destination.is_symlink():
@@ -122,6 +121,7 @@ def stage(layout, output, env, source=ROOT):
 def verify(layout, output, env, source=ROOT):
     if json.loads((output / "source-provenance.json").read_bytes()) != evidence(layout, output, env, source):
         raise ValueError("source provenance differs from exact producer")
+    checkout(env, source)
     records = (output / "SHA256SUMS").read_text().splitlines()
     names = set()
     for record in records:
@@ -135,6 +135,80 @@ def verify(layout, output, env, source=ROOT):
     actual = {path.name for path in output.iterdir()}
     if actual != names | {"SHA256SUMS"}:
         raise ValueError("unexpected or missing evidence file")
+
+
+def checkout(env, source):
+    if subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source, text=True).strip() != env["RELEASE_SOURCE_SHA"]:
+        raise ValueError("checkout differs from approved source")
+    workflow = subprocess.check_output(["git", "show", env["GITHUB_WORKFLOW_SHA"] + ":.github/workflows/ci.yaml"],
+                                       cwd=source, stderr=subprocess.DEVNULL)
+    if workflow != (source / ".github/workflows/ci.yaml").read_bytes():
+        raise ValueError("checked-out workflow differs from producing workflow")
+
+
+def handoff_identity(env, source=ROOT):
+    repository, seed = identity(env, (source / "go.mod").read_text().splitlines()[0])
+    if repository != "stellwerk-labs/platform-orchestrator-cp" or seed:
+        raise ValueError("qualified handoff is limited to CP releases")
+    return {"provenance": provenance(env, repository, seed), "event": env["GITHUB_EVENT_NAME"],
+            "event_sha": env["GITHUB_SHA"], "ref": env["GITHUB_REF"], "index": env["IMAGE_DIGEST"]}
+
+
+def checksum(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def inventory(directory):
+    records = []
+    for path in sorted(directory.rglob("*")):
+        relative = path.relative_to(directory).as_posix()
+        if path.is_symlink() or not re.fullmatch(r"[a-zA-Z0-9_./-]+", relative):
+            raise ValueError("unexpected handoff path")
+        if path.is_dir():
+            if relative != "server-evidence":
+                raise ValueError("unexpected handoff directory")
+        elif not path.is_file():
+            raise ValueError("handoff requires regular files")
+        elif relative != "SHA256SUMS":
+            records.append(checksum(path) + "  " + relative + "\n")
+    return "".join(records)
+
+
+def seal(directory, env, source=ROOT):
+    checkout(env, source)
+    if {path.name for path in directory.iterdir()} != {"server-image.tar", "server-evidence"}:
+        raise ValueError("handoff requires original archive and qualified evidence")
+    (directory / "handoff.json").write_text(json.dumps(handoff_identity(env, source), sort_keys=True, indent=2) + "\n")
+    (directory / "SHA256SUMS").write_text(inventory(directory))
+    return "inventory_sha=" + checksum(directory / "SHA256SUMS") + "\nproducer_attempt=" + env["GITHUB_RUN_ATTEMPT"]
+
+
+def check(directory, expected_sha, env, source=ROOT):
+    checkout(env, source)
+    if (not re.fullmatch(r"[0-9a-f]{64}", expected_sha)
+            or checksum(directory / "SHA256SUMS") != expected_sha
+            or (directory / "SHA256SUMS").read_text() != inventory(directory)):
+        raise ValueError("qualified artifact inventory changed")
+    if json.loads((directory / "handoff.json").read_bytes()) != handoff_identity(env, source):
+        raise ValueError("qualified artifact differs from original producer/source/workflow")
+
+
+def artifact(record, artifact_id, digest, env):
+    handoff_identity(env)
+    if not re.fullmatch(r"[1-9][0-9]*", artifact_id) or not re.fullmatch(r"(?:sha256:)?[0-9a-f]{64}", digest):
+        raise ValueError("invalid immutable artifact identity")
+    run = record.get("workflow_run", {})
+    if (record.get("id") != int(artifact_id) or record.get("expired") is not False
+            or record.get("digest") != "sha256:" + digest.removeprefix("sha256:")
+            or record.get("name") != "qualified-server-" + env["GITHUB_RUN_ID"] + "-" + env["PRODUCER_RUN_ATTEMPT"]
+            or run.get("id") != int(env["GITHUB_RUN_ID"])
+            or run.get("head_sha") != env["GITHUB_SHA"]
+            or run.get("head_branch") != env["GITHUB_REF"].removeprefix("refs/heads/")):
+        raise ValueError("immutable artifact is not from this exact producer run")
 
 
 def statement(path, digest, predicate_type, predicate_path):
@@ -169,6 +243,12 @@ if __name__ == "__main__":
             verify(Path(args[0]), Path(args[1]), os.environ)
         elif command == "statement":
             statement(Path(args[0]), args[1], args[2], Path(args[3]))
+        elif command == "seal":
+            print(seal(Path(args[0]), os.environ))
+        elif command == "check":
+            check(Path(args[0]), args[1], os.environ)
+        elif command == "artifact":
+            artifact(json.loads(Path(args[0]).read_bytes()), args[1], args[2], os.environ)
         else:
             raise ValueError("unknown command")
     except (ValueError, KeyError, OSError, json.JSONDecodeError, subprocess.CalledProcessError):

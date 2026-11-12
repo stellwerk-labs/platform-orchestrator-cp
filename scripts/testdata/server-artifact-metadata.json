@@ -1,0 +1,20 @@
+{
+  "id": 13909435986,
+  "node_id": "MDg6QXJ0aWZhY3QxMzkwOTQzNTk4Ng==",
+  "name": "server-verification-evidence-release",
+  "size_in_bytes": 2189030,
+  "url": "https://api.github.com/repos/stellwerk-labs/platform-orchestrator-cp/actions/artifacts/13909435986",
+  "archive_download_url": "https://api.github.com/repos/stellwerk-labs/platform-orchestrator-cp/actions/artifacts/13909435986/zip",
+  "expired": false,
+  "digest": "sha256:cd32d4981f568a5435b359531814be8de65bb28eceb0fba689dc96048124a00a",
+  "created_at": "2026-11-12T02:13:21Z",
+  "updated_at": "2026-11-12T02:13:21Z",
+  "expires_at": "2027-02-10T01:44:56Z",
+  "workflow_run": {
+    "id": 43136620336,
+    "repository_id": 1306245287,
+    "head_repository_id": 1306245287,
+    "head_branch": "main",
+    "head_sha": "0fc05e30b59e793b4427a98030ce572db2542b1d"
+  }
+}

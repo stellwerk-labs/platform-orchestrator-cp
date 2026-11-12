@@ -82,7 +82,7 @@ class CandidateReleaseTests(unittest.TestCase):
         text = Path(__file__).parents[1].joinpath(".github/workflows/ci.yaml").read_text()
         jobs = dict(re.findall(r"^  ([a-z-]+):\n(.*?)(?=^  [a-z-]+:\n|\Z)", text, re.M | re.S))
         publication = jobs["candidate-release"]
-        image_step = next(step for step in publication.split("\n      - ")
+        image_step = next(step for step in jobs["qualified-artifact"].split("\n      - ")
                           if "uses: docker/build-push-action@" in step)
         self.assertIn("\n          context: .\n", image_step,
                       "Build the checked-out approved SHA, not the workflow event's default Git context")
