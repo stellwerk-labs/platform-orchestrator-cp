@@ -14,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/stellwerk-labs/golib/herrors"
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
@@ -122,13 +123,24 @@ func (s *Server) ListModuleCatalogueEntries(ctx context.Context, request ListMod
 	if err := s.checkOrgAuthorization(ctx, userID, request.OrgId, PermissionModuleCoreRead); err != nil {
 		return nil, err
 	}
+	versionReadErr := s.checkOrgAuthorization(ctx, userID, request.OrgId, PermissionModuleVersionRead)
+	if versionReadErr != nil {
+		var denied *herrors.PlatformOrchestratorError
+		if !errors.As(versionReadErr, &denied) || denied.StatusCode != http.StatusForbidden {
+			return nil, versionReadErr
+		}
+	}
 	entries, err := s.Database.ListModuleCatalogues(ctx, nil, request.OrgId, ref.DerefOr(request.Params.IncludeArchived, false))
 	if err != nil {
 		return nil, err
 	}
 	response := make(ListModuleCatalogueEntries200JSONResponse, 0, len(entries))
 	for _, entry := range entries {
-		response = append(response, moduleCatalogueToAPI(entry))
+		item := moduleCatalogueToAPI(entry)
+		if versionReadErr == nil {
+			item.HasProposed, item.DefaultVerified = entry.HasProposed, entry.DefaultVerified
+		}
+		response = append(response, item)
 	}
 	return response, nil
 }

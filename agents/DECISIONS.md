@@ -44,3 +44,9 @@ force deletion retains its legacy fallback. No DP policy table or plugin change.
 - One read-only producer retains both complete builds and all artifact qualification, then seals the original OCI archive and evidence for the existing RC and stable publishers.
 - Preserve source, workflow, event and original producer-attempt identities across publisher-only reruns. Existing publication protections, collision refusal and cryptographic/anonymous checks remain.
 - Reject a stale stable publisher before reservation when a newer stable release is already latest. Preserve existing concurrency; no additional lifecycle lock or release framework.
+
+
+## 2026-11-12: CP catalogue summaries and database TLS
+
+- Preserve existing permissions, confirmation and default behavior. PostgreSQL TLS is opt-in through `DATABASE_SSLMODE`; use existing driver and certificate mechanisms.
+- Catalogue filters use complete optional summaries, omit version data for core-only readers, and keep unavailable distinct from false. Verification remains unimplemented; its filter is intentionally present with an explicit limitation.

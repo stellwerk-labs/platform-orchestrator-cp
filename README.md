@@ -119,3 +119,14 @@ The plugin persists the policy in its shared database, pauses new work, and serv
 its exact installation/package identity, applied revision and unresolved/parked
 counts at `GET /v1/maintenance`. Missing or incompatible reports prevent readiness.
 The typed boundary is documented in `openapi/installation-maintenance.yaml`.
+
+## PostgreSQL transport security
+
+Set `DATABASE_SSLMODE=require` to require an encrypted PostgreSQL connection.
+The default remains `disable` for compatibility.
+The driver also accepts `allow`, `prefer`, `verify-ca` and `verify-full`; `allow` and `prefer` permit plaintext fallback.
+`require` does not generally authenticate the server identity.
+Use `verify-full` and `PGSSLROOTCERT` for certificate and hostname verification.
+Invalid modes fail during database initialization, before the API starts.
+These are startup settings, so restart the component after changing them.
+See the [database TLS guide](https://docs.stellwerk.dev/platform-orchestrator/docs/configure/database-tls/) for Helm examples and certificate handling.

@@ -13343,6 +13343,14 @@
           },
           "archive_reason": {
             "type": "string"
+          },
+          "has_proposed": {
+            "type": "boolean",
+            "description": "Whether any version is Proposed. Only returned by catalogue listing with module.version.read; absent means unknown."
+          },
+          "default_verified": {
+            "type": "boolean",
+            "description": "Whether the current Default version is verified. False when there is no Default. Only returned by catalogue listing with module.version.read; absent means unknown. Current verification status only supports unverified, so this is currently always false."
           }
         }
       },

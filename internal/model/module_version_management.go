@@ -58,6 +58,8 @@ type ModuleCatalogue struct {
 	ArchivedAt                 *time.Time
 	ArchivedBy                 *uuid.UUID
 	ArchiveReason              string
+	HasProposed                *bool
+	DefaultVerified            *bool
 }
 
 type CoreModuleVersion struct {
@@ -238,14 +240,15 @@ func (d *databaser) PublishStableModuleVersionSuccessor(ctx context.Context, tx 
 	return &StableModuleVersionSuccessor{Prerelease: *updatedPrerelease, Stable: *published, CorrelationID: correlationID}, nil
 }
 
-func scanModuleCatalogue(row interface{ Scan(...any) error }) (*ModuleCatalogue, error) {
+func scanModuleCatalogue(row interface{ Scan(...any) error }, extra ...any) (*ModuleCatalogue, error) {
 	var result ModuleCatalogue
 	var currentDefault, previousDefault, archivedBy uuid.NullUUID
 	var archivedAt sql.NullTime
-	err := row.Scan(&result.OrgID, &result.UUID, &result.Slug, &result.DisplayName, &result.Description,
+	destinations := []any{&result.OrgID, &result.UUID, &result.Slug, &result.DisplayName, &result.Description,
 		&result.ResourceType, asJson(&result.Tags), &result.Status, &result.ResourceVersion,
 		&currentDefault, &previousDefault, &result.ManagedDefaultGeneration, &result.CreatedAt,
-		&archivedAt, &archivedBy, &result.ArchiveReason)
+		&archivedAt, &archivedBy, &result.ArchiveReason}
+	err := row.Scan(append(destinations, extra...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +274,12 @@ func scanModuleCatalogue(row interface{ Scan(...any) error }) (*ModuleCatalogue,
 }
 
 func (d *databaser) ListModuleCatalogues(ctx context.Context, optionalTx Tx, orgID string, includeArchived bool) ([]ModuleCatalogue, error) {
-	rows, err := d.txOrDb(optionalTx).QueryContext(ctx, `SELECT `+moduleCatalogueColumns+`
+	rows, err := d.txOrDb(optionalTx).QueryContext(ctx, `SELECT `+moduleCatalogueColumns+`,
+		EXISTS (SELECT 1 FROM definition_versions v WHERE v.org_id = definitions.org_id
+			AND v.module_uuid = definitions.uuid AND v.semantic_status = 'proposed'),
+		EXISTS (SELECT 1 FROM definition_versions v WHERE v.org_id = definitions.org_id
+			AND v.module_uuid = definitions.uuid AND v.uuid = definitions.current_default_version_uuid
+			AND v.verification_status = 'verified')
 		FROM definitions WHERE org_id = $1 AND ($2 OR catalogue_status = 'active')
 		ORDER BY lower(display_name), id`, orgID, includeArchived)
 	if err != nil {
@@ -280,10 +288,12 @@ func (d *databaser) ListModuleCatalogues(ctx context.Context, optionalTx Tx, org
 	defer func() { _ = rows.Close() }()
 	result := make([]ModuleCatalogue, 0)
 	for rows.Next() {
-		entry, err := scanModuleCatalogue(rows)
+		var hasProposed, defaultVerified bool
+		entry, err := scanModuleCatalogue(rows, &hasProposed, &defaultVerified)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to scan Module catalogue entry")
 		}
+		entry.HasProposed, entry.DefaultVerified = &hasProposed, &defaultVerified
 		result = append(result, *entry)
 	}
 	return result, errors.Wrap(rows.Err(), "failed to iterate Module catalogue")

@@ -7135,6 +7135,12 @@ components:
         archived_at: {type: string, format: date-time}
         archived_by: {type: string, format: uuid}
         archive_reason: {type: string}
+        has_proposed:
+          type: boolean
+          description: Whether any version is Proposed. Only returned by catalogue listing with module.version.read; absent means unknown.
+        default_verified:
+          type: boolean
+          description: Whether the current Default version is verified. False when there is no Default. Only returned by catalogue listing with module.version.read; absent means unknown. Current verification status only supports unverified, so this is currently always false.
     ModuleCatalogueUpdateBody:
       type: object
       required: [display_name, description, tags, expected_resource_version]

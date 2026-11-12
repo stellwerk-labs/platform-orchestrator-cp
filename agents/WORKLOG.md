@@ -160,3 +160,9 @@ remain separate Root-controlled gates. No public mutation by this agent.
 - Separated stable version admission, shared read-only OCI qualification and original-byte publication; added `make release-checks`, `make release-status RUN=...` and `docs/release-handoff.md`.
 - Local validation: 67 release contract tests, Bash syntax, ShellCheck, Python/YAML parsing, workflow DAG and whitespace checks passed. Independent planning, green and final clean-code reviews passed after correcting stale-version retry handling.
 - Actual hosted artifact transfer, publisher-only rerun and release behavior remain pending the next authorized release trial. No remote publication is claimed by these local checks.
+
+
+## 2026-11-12: CP catalogue summaries and database TLS
+
+- Implemented the requested local change with targeted tests and documentation. Independent planning, green and final clean-code reviews passed after correcting partial-summary availability and removing an unsupported mTLS mount example.
+- TLS configuration was exercised against real PostgreSQL; UI and complete-history/permission boundaries were tested. Hosted release qualification and immutable public schema/image pins remain pending. No public publication or live deployment is established by this local checkpoint.

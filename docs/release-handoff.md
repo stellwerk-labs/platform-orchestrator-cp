@@ -34,3 +34,5 @@ Confirm the producer does not rerun, its original archive and provenance remain 
 Also confirm a rerun after a reserved draft or image refuses and requires read-only reconciliation.
 No hosted dispatch or publication is part of local preparation.
 The first run still performs 2 full builds; expected savings are in safe resumption and repeated orchestration work, not reduced release qualification.
+
+The repository commit analyzer includes a wildcard patch rule, so even a CI-only landing can assign a release. Land this pilot with the intended reviewed application change and matching release notes; do not assume that a `ci:` commit is a no-release bootstrap.
