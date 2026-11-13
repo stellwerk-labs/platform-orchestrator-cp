@@ -50,3 +50,20 @@ stale status writes must be rejected by that same atomic UPDATE predicate.
 ## Installation settings and Provider retirement
 
 - Accepted retirement is not completed deletion. Readiness requires current identities and revisions across Manager, Data Plane, Runner and plugin reports; overlapping counters cannot be summed into one drain proof.
+
+
+## 2026-11-12: original producer identity survives partial reruns
+
+- Successful Actions jobs retain their outputs when only failed jobs rerun. The producer attempt can differ from the publisher attempt, so provenance must use the former.
+- Artifact API metadata binds the event commit, which can differ from the checked-out candidate source. Validate both identities and the complete sealed file inventory.
+- A retained old version needs a latest-version preflight before publishing. Ordinary workflow serialization alone does not cover a delayed publisher rerun.
+
+
+## 2026-11-12: qualification boundaries
+
+- A paginated first page cannot prove version absence. Complete catalogue summaries require version-read permission, not just catalogue read access.
+- `require` prevents plaintext fallback but does not generally authenticate server identity. CA verification uses existing driver settings; a private-key mount needs its own restrictive permissions.
+
+## 2026-11-13
+
+The material endpoint serves logs and outputs, so authorization must select a permission from material kind before checking IAM. Regenerate the server schema when its OpenAPI description changes; the embedded compressed schema produces a large generated-only diff.

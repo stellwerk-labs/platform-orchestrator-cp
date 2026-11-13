@@ -20,8 +20,8 @@ def component(directory):
 class WorkflowTests(unittest.TestCase):
     def assert_publisher_buildx_policy(self, workflow):
         publishers = [job for job in re.split(r"(?m)^  [a-z][a-z0-9-]*:\n", workflow)[1:]
-                      if "oras cp --no-tty --from-oci-layout" in job]
-        self.assertEqual(len(publishers), 2)
+                      if "uses: docker/build-push-action@" in job]
+        self.assertEqual(len(publishers), 1)
         for job in publishers:
             steps = re.split(r"(?m)^      - name: ", job)[1:]
             setup = [step for step in steps if "uses: docker/setup-buildx-action@" in step]
@@ -85,45 +85,51 @@ class WorkflowTests(unittest.TestCase):
 
     def test_every_image_publisher_validates_complete_local_layout_first(self):
         workflow = (ROOT / ".github/workflows/ci.yaml").read_text()
-        publishers = 0
-        for job in re.split(r"(?m)^  [a-z][a-z0-9-]+:\n", workflow)[1:]:
-            if "oras cp --no-tty --from-oci-layout" not in job:
-                continue
-            publishers += 1
+        jobs = dict(re.findall(r"^  ([a-z-]+):\n(.*?)(?=^  [a-z-]+:\n|\Z)", workflow, re.M | re.S))
+        producer = jobs["qualified-artifact"]
+        self.assertNotIn(": write", producer)
+        self.assertNotIn("environment:", producer)
+        self.assertNotIn("continue-on-error:", producer)
+        self.assertIn("artifact_id: ${{ steps.upload.outputs.artifact-id }}", producer)
+        self.assertIn("artifact_digest: ${{ steps.upload.outputs.artifact-digest }}", producer)
+        self.assertEqual(producer.count("          push: false"), 2)
+        self.assertEqual(producer.count("rewrite-timestamp=true"), 2)
+        self.assertEqual(producer.count("SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}"), 2)
+        self.assertIn("no-cache: true", producer)
+        gates = ("check-server-artifact.sh", "release_content.py compare", "generate-server-sbom.sh",
+                 "server-publication.py stage", 'scan-release-content.sh "$RUNNER_TEMP/server-evidence"',
+                 "server-publication.py seal", "uses: actions/upload-artifact@")
+        for earlier, later in zip(gates, gates[1:]):
+            self.assertLess(producer.index(earlier), producer.index(later))
+        self.assertIn('mv "$RUNNER_TEMP/server-image.tar" "$RUNNER_TEMP/server-evidence"', producer)
+        self.assertNotIn("path: ${{ runner.temp }}/server-image-repro.tar", producer)
+        for name in ("candidate-release", "release"):
+            job = jobs[name]
             self.assertIn("github.repository == 'stellwerk-labs/", job)
             self.assertIn("persist-credentials: false", job)
-            self.assertNotIn("          push: true", job)
-            self.assertEqual(job.count("          push: false"), 2)
-            self.assertEqual(job.count("          sbom: generator=docker/buildkit-syft-scanner@sha256:ae4f3b554449e7e25548e7d8ccc029d17357348e30c6e3df01b92bc93654d6a9"), 2)
-            self.assertNotIn("          sbom: true", job)
-            self.assertEqual(job.count("          provenance: mode=max"), 2)
-            self.assertEqual(job.count("rewrite-timestamp=true"), 2)
-            self.assertEqual(job.count("SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}"), 2)
-            self.assertIn("no-cache: true", job)
-            gate = job.index("bash scripts/check-server-artifact.sh")
-            sbom = job.index("bash scripts/generate-server-sbom.sh")
-            comparison = job.index("python3 scripts/release_content.py compare")
-            publication = job.index("oras cp --no-tty --from-oci-layout")
-            self.assertLess(gate, comparison)
-            self.assertLess(comparison, sbom)
-            self.assertLess(sbom, publication)
-            evidence_scan = job.index('bash scripts/scan-release-content.sh "$RUNNER_TEMP/server-evidence"')
-            self.assertLess(sbom, evidence_scan)
-            self.assertLess(evidence_scan, publication)
-            reinspection = job.index('bash scripts/check-server-artifact.sh "$RUNNER_TEMP/server-layout" "$RUNNER_TEMP/server-publication-inspection"')
-            exact_report = job.index('cmp "$RUNNER_TEMP/server-inspection/report.json" "$RUNNER_TEMP/server-publication-inspection/report.json"')
-            self.assertLess(evidence_scan, reinspection)
-            self.assertLess(reinspection, exact_report)
-            self.assertLess(exact_report, publication)
-            self.assertEqual(job.count("server-publication-inspection/report.json"), 1)
-            self.assertIn("server-evidence/", job)
+            self.assertIn("needs.qualified-artifact.result == 'success'", job)
+            self.assertNotIn("uses: docker/build-push-action@", job)
+            self.assertNotIn("uses: actions/setup-go@", job)
+            self.assertNotIn("go install", job)
+            self.assertNotIn("go build", job)
+            self.assertIn("GOTOOLCHAIN: local", job)
+            self.assertIn('--scan-only', job)
+            self.assertIn("PRODUCER_RUN_ATTEMPT: ${{ needs.qualified-artifact.outputs.producer_attempt }}", job)
+            self.assertIn("artifact-ids: ${{ needs.qualified-artifact.outputs.artifact_id }}", job)
+            self.assertIn("ARTIFACT_DIGEST: ${{ needs.qualified-artifact.outputs.artifact_digest }}", job)
+            self.assertIn("INVENTORY_SHA: ${{ needs.qualified-artifact.outputs.inventory_sha }}", job)
+            gates = ("server-publication.py artifact", "uses: actions/download-artifact@",
+                     "server-publication.py check", "server-publication.py verify", "gh release create",
+                     "check-server-artifact.sh", 'cmp "$RUNNER_TEMP/server-evidence/platforms.json"',
+                     "oras cp --no-tty --from-oci-layout", "authenticate-server-artifact.sh", "gh release edit")
+            for earlier, later in zip(gates, gates[1:]):
+                self.assertLess(job.index(earlier), job.index(later), name)
             self.assertIn('test "$(oras resolve "$IMAGE_TAG")" = "$IMAGE_DIGEST"', job)
             self.assertIn('python3 scripts/release_content.py oci-reference "$RUNNER_TEMP/server-layout" "$IMAGE_DIGEST"', job)
             self.assertIn('"$RUNNER_TEMP/server-layout:$OCI_REFERENCE" "$IMAGE_TAG"', job)
-            self.assertNotIn('"$RUNNER_TEMP/server-layout@$IMAGE_DIGEST"', job)
-            self.assertIn("moby/buildkit@sha256:cec9f139f45e93c5c69c60f8b07cfad9f43f4ef6b6a6cd917527fea5ff2e3dea", job)
-        expected = 3 if component(ROOT) == "dp" else 2
-        self.assertEqual(publishers, expected)
+        self.assertNotIn("gh release create", producer)
+        self.assertNotIn("environment:", jobs["stable-version"])
+        self.assertNotIn("gh release create", jobs["stable-version"])
 
     def test_production_dockerfile_carries_notices_and_all_executables(self):
         dockerfile = (ROOT / "Dockerfile").read_text()

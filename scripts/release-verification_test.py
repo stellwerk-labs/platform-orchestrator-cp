@@ -72,6 +72,8 @@ class VerificationWorkflowTests(unittest.TestCase):
             "inputs.tests_only": True, "cancelled()": False,
             "needs.candidate-preflight.result": "skipped",
             "needs.verification-preflight.result": "success",
+            "needs.qualified-artifact.result": "success", "needs.stable-version.result": "success",
+            "needs.stable-version.outputs.version": "v3.1.0",
             "needs.unit.result": "success", "needs.integration.result": "success",
             "needs.integration-postgres.result": "success", "needs.commitlint.result": "success",
         }
@@ -126,6 +128,26 @@ class VerificationWorkflowTests(unittest.TestCase):
                                 "needs.verification-preflight.result": "success"})
         for publisher in ("candidate-release", "release"):
             self.assertFalse(condition(publisher, values))
+        self.assertFalse(condition("qualified-artifact", values))
+
+    def test_qualified_producer_requires_all_source_gates_and_selected_preflight(self):
+        for event, preflight, unused in (("workflow_dispatch", "candidate-preflight", "stable-version"),
+                                         ("push", "stable-version", "candidate-preflight")):
+            values = self.values(**{"github.event_name": event, "inputs.tests_only": False,
+                                    "needs." + preflight + ".result": "success",
+                                    "needs." + unused + ".result": "skipped",
+                                    "needs.verification-preflight.result": "skipped"})
+            self.assertTrue(condition("qualified-artifact", values))
+            required = ("commitlint", "unit", "integration", "integration-postgres", preflight)
+            for dependency, result in itertools.product(required, ("failure", "skipped", "cancelled")):
+                with self.subTest(event=event, dependency=dependency, result=result):
+                    self.assertFalse(condition("qualified-artifact", {
+                        **values, "needs." + dependency + ".result": result}))
+            self.assertFalse(condition("qualified-artifact", {**values, "cancelled()": True}))
+            self.assertFalse(condition("qualified-artifact", {**values, "github.repository": "example/fork"}))
+            self.assertFalse(condition("qualified-artifact", {**values, "github.event_name": "pull_request"}))
+        self.assertFalse(condition("qualified-artifact", {**values, "needs.stable-version.outputs.version": ""}))
+        self.assertFalse(condition("release", {**values, "needs.stable-version.outputs.version": ""}))
 
     def test_stable_publisher_runs_after_both_manual_preflights_are_skipped(self):
         values = self.values(**{"github.event_name": "push", "inputs.tests_only": False,
@@ -138,9 +160,11 @@ class VerificationWorkflowTests(unittest.TestCase):
             values = self.values(**{"github.event_name": event, "inputs.tests_only": False,
                                     "needs.candidate-preflight.result": "success" if event == "workflow_dispatch" else "skipped",
                                     "needs.verification-preflight.result": "skipped"})
-            required = {"unit", "integration", "integration-postgres", "commitlint"}
+            required = {"unit", "integration", "integration-postgres", "commitlint", "qualified-artifact"}
             if publisher == "candidate-release":
                 required.add("candidate-preflight")
+            else:
+                required.add("stable-version")
             self.assertEqual(set(dependencies(publisher)), required)
             self.assertTrue(condition(publisher, values))
             for dependency, result in itertools.product(required, ("failure", "skipped", "cancelled")):

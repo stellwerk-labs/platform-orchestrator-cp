@@ -84,3 +84,18 @@ test-integration-logs:
 .PHONY: connect-to-integ-db
 connect-to-integ-db:
 	$(MAKE) -C integration-tests connect-to-integ-db
+
+## Check release handoff and publication contracts without building or publishing
+.PHONY: release-checks
+release-checks:
+	python3 scripts/candidate-release_test.py
+	python3 scripts/stable-release-preflight_test.py
+	python3 scripts/server-publication_test.py
+	python3 scripts/release_workflow_test.py
+	python3 scripts/release-verification_test.py
+
+## Show release job status, for example make release-status RUN=43136620336
+.PHONY: release-status
+release-status:
+	@test -n "$(RUN)" || { echo 'Set RUN to the GitHub Actions run ID' >&2; exit 1; }
+	gh run view "$(RUN)" --repo stellwerk-labs/platform-orchestrator-cp --json databaseId,headSha,attempt,url,status,conclusion,jobs --jq '{databaseId,headSha,attempt,url,status,conclusion,jobs:[.jobs[]|{name,status,conclusion}]}'

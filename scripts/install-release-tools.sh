@@ -4,17 +4,21 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=scripts/release-tools.sh
 source "$root/scripts/release-tools.sh"
 output="${1:?usage: install-release-tools.sh OUTPUT_DIRECTORY}"
+mode="${2:-all}"
+[[ "$mode" == all || "$mode" == --scan-only ]] || { echo "unknown release-tool mode" >&2; exit 1; }
 mkdir -p "$output"
 output="$(cd "$output" && pwd)"
 
 # The Go checksum database authenticates the module graph; additionally bind
 # this tool's source archive to the reviewed module checksum.
-export GOTOOLCHAIN="$release_go_version" GOWORK=off GOSUMDB=sum.golang.org GOENV=off
-unset GOFLAGS GOEXPERIMENT GOOS GOARCH GOPRIVATE GONOSUMDB GONOPROXY
-metadata="$(go mod download -json "$go_licenses_module@$go_licenses_version")"
-jq -e --arg sum "$go_licenses_sum" '.Sum == $sum' <<<"$metadata" >/dev/null
-GOBIN="$output" go install "$go_licenses_module@$go_licenses_version"
-go version -m "$output/go-licenses" | grep -F "$go_licenses_module" | grep -F "$go_licenses_version" >/dev/null
+if [[ "$mode" == all ]]; then
+  export GOTOOLCHAIN="$release_go_version" GOWORK=off GOSUMDB=sum.golang.org GOENV=off
+  unset GOFLAGS GOEXPERIMENT GOOS GOARCH GOPRIVATE GONOSUMDB GONOPROXY
+  metadata="$(go mod download -json "$go_licenses_module@$go_licenses_version")"
+  jq -e --arg sum "$go_licenses_sum" '.Sum == $sum' <<<"$metadata" >/dev/null
+  GOBIN="$output" go install "$go_licenses_module@$go_licenses_version"
+  go version -m "$output/go-licenses" | grep -F "$go_licenses_module" | grep -F "$go_licenses_version" >/dev/null
+fi
 
 case "$(uname -s)/$(uname -m)" in
   Linux/x86_64) platform=linux_x64; checksum=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb ;;

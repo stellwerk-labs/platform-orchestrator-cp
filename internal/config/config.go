@@ -14,6 +14,7 @@ type Configuration struct {
 	DatabasePassword string `env:"DATABASE_PASSWORD" validate:"required"`
 	DatabaseHost     string `env:"DATABASE_HOST"`
 	DatabasePort     string `env:"DATABASE_PORT"`
+	DatabaseSSLMode  string `env:"DATABASE_SSLMODE, default=disable"`
 
 	NatsURL              string `env:"NATS_URL, default=nats://localhost:4222" validate:"required,url"`
 	NatsToken            string `env:"NATS_TOKEN"`

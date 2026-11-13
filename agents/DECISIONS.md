@@ -37,3 +37,20 @@ force deletion retains its legacy fallback. No DP policy table or plugin change.
 ## Installation settings and Provider retirement
 
 - Retain the breaking Provider retirement DELETE202 contract and major application version. Require complete compatible managed-state proofs before physical deletion. Mirror installation maintenance inside effect transactions and admit only exact package upgrade operations while paused.
+
+
+## 2026-11-12: qualified release handoff pilot
+
+- One read-only producer retains both complete builds and all artifact qualification, then seals the original OCI archive and evidence for the existing RC and stable publishers.
+- Preserve source, workflow, event and original producer-attempt identities across publisher-only reruns. Existing publication protections, collision refusal and cryptographic/anonymous checks remain.
+- Reject a stale stable publisher before reservation when a newer stable release is already latest. Preserve existing concurrency; no additional lifecycle lock or release framework.
+
+
+## 2026-11-12: CP catalogue summaries and database TLS
+
+- Preserve existing permissions, confirmation and default behavior. PostgreSQL TLS is opt-in through `DATABASE_SSLMODE`; use existing driver and certificate mechanisms.
+- Catalogue filters use complete optional summaries, omit version data for core-only readers, and keep unavailable distinct from false. Verification remains unimplemented; its filter is intentionally present with an explicit limitation.
+
+## 2026-11-13: Plaintext deployment log privilege
+
+Plugin-owned Deployment logs require `deployment_logs_read`; outputs retain `deployment_read`. Both use the exact environment resource and independently held organization fallback for retained history after environment removal. Plugin service and admission-checker identities remain denied before IAM. IAM must ship the new exact-grant-only permission first; canonical Admin (`manage_all`) retains access, Viewer/Deployer require an explicit delegated role. No plugin capability or operation grant substitutes for Core permission.

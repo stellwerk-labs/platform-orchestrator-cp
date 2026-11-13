@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -127,4 +128,16 @@ func TestDeploymentAdmissionIsOneCanonicalServiceIdentity(t *testing.T) {
 			require.ErrorContains(t, err, "must be the canonical UUID of an IAM service identity")
 		})
 	}
+}
+
+func TestConfigurationDatabaseSSLMode(t *testing.T) {
+	setRequiredEnvironment(t)
+	t.Setenv("DATABASE_SSLMODE", "")
+	require.NoError(t, os.Unsetenv("DATABASE_SSLMODE"))
+	var cfg Configuration
+	require.NoError(t, hconfig.LoadConfigWithoutRetag(&cfg))
+	require.Equal(t, "disable", cfg.DatabaseSSLMode)
+	t.Setenv("DATABASE_SSLMODE", "require")
+	require.NoError(t, hconfig.LoadConfigWithoutRetag(&cfg))
+	require.Equal(t, "require", cfg.DatabaseSSLMode)
 }

@@ -83,10 +83,190 @@ jobs:
           python3 scripts/release-verification.py "$VERIFICATION_TAG" "$VERIFICATION_SHA" \
             "$VERIFICATION_BASE_SHA" "$VERIFICATION_WORKFLOW_SHA"
 
-  candidate-release:
-    if: ${{ !cancelled() && github.repository == 'stellwerk-labs/platform-orchestrator-cp' && github.event_name == 'workflow_dispatch' && !inputs.tests_only && needs.candidate-preflight.result == 'success' && needs.commitlint.result == 'success' && needs.unit.result == 'success' && needs.integration.result == 'success' && needs.integration-postgres.result == 'success' }}
+  stable-version:
+    if: ${{ !cancelled() && github.repository == 'stellwerk-labs/platform-orchestrator-cp' && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.commitlint.result == 'success' && needs.unit.result == 'success' && needs.integration.result == 'success' && needs.integration-postgres.result == 'success' }}
+    needs:
+      - commitlint
+      - unit
+      - integration
+      - integration-postgres
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: release-${{ github.repository }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Assign stable version and tag
+        id: release
+        uses: stellwerk-labs/semantic-release-action@b1269e93b486873118eef1646bfcd46a9d23d3a3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate stable source, notes, and unused destinations
+        if: steps.release.outputs.version != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.version }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python3 scripts/stable-release-preflight.py "$RELEASE_TAG" "$SOURCE_SHA"
+
+  qualified-artifact:
+    if: ${{ !cancelled() && github.repository == 'stellwerk-labs/platform-orchestrator-cp' && needs.commitlint.result == 'success' && needs.unit.result == 'success' && needs.integration.result == 'success' && needs.integration-postgres.result == 'success' && ((github.event_name == 'workflow_dispatch' && !inputs.tests_only && needs.candidate-preflight.result == 'success') || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.stable-version.result == 'success' && needs.stable-version.outputs.version != '')) }}
     needs:
       - candidate-preflight
+      - stable-version
+      - commitlint
+      - unit
+      - integration
+      - integration-postgres
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
+      inventory_sha: ${{ steps.seal.outputs.inventory_sha }}
+      producer_attempt: ${{ steps.seal.outputs.producer_attempt }}
+      image_digest: ${{ steps.image.outputs.digest }}
+    env:
+      RELEASE_SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.candidate_sha || github.sha }}
+      RELEASE_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.candidate_tag || needs.stable-version.outputs.version }}
+      RELEASE_KIND: release
+      IMAGE_TAG: ghcr.io/stellwerk-labs/platform-orchestrator-cp:${{ github.event_name == 'workflow_dispatch' && inputs.candidate_tag || needs.stable-version.outputs.version }}
+    steps:
+      - name: Checkout exact tested source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ env.RELEASE_SOURCE_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.0.0
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.0.0
+        with:
+          version: v0.38.0
+          driver-opts: |
+            image=moby/buildkit@sha256:cec9f139f45e93c5c69c60f8b07cfad9f43f4ef6b6a6cd917527fea5ff2e3dea
+            provenance-add-gha=false
+
+      - name: Setup pinned artifact Go toolchain
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: "1.26.11"
+          cache: false
+
+      - name: Install verified artifact tools and bind source epoch
+        run: |
+          set -euo pipefail
+          bash scripts/install-release-tools.sh "$RUNNER_TEMP/release-tools"
+          bash scripts/install-oras.sh "$RUNNER_TEMP/release-tools"
+          echo "$RUNNER_TEMP/release-tools" >> "$GITHUB_PATH"
+          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
+          test "$(git rev-parse HEAD)" = "${{ env.RELEASE_SOURCE_SHA }}"
+
+      - name: Build complete local OCI artifact before publication
+        id: image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.0.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: false
+          outputs: type=oci,dest=${{ runner.temp }}/server-image.tar,oci-mediatypes=true,compression=gzip,compression-level=6,force-compression=true,rewrite-timestamp=true
+          build-args: |
+            SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
+            BUILDKIT_CACHE_MOUNT_NS=server-cp-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-first
+          tags: ghcr.io/stellwerk-labs/platform-orchestrator-cp:${{ env.RELEASE_VERSION }}
+          sbom: generator=docker/buildkit-syft-scanner@sha256:ae4f3b554449e7e25548e7d8ccc029d17357348e30c6e3df01b92bc93654d6a9
+          provenance: mode=max
+          labels: |
+            org.opencontainers.image.version=${{ env.RELEASE_VERSION }}
+            org.opencontainers.image.revision=${{ env.RELEASE_SOURCE_SHA }}
+
+      - name: Rebuild platform payloads without instruction cache
+        id: image-repro
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.0.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: false
+          no-cache: true
+          outputs: type=oci,dest=${{ runner.temp }}/server-image-repro.tar,oci-mediatypes=true,compression=gzip,compression-level=6,force-compression=true,rewrite-timestamp=true
+          build-args: |
+            SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
+            BUILDKIT_CACHE_MOUNT_NS=server-cp-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-second
+          tags: ghcr.io/stellwerk-labs/platform-orchestrator-cp:${{ env.RELEASE_VERSION }}
+          sbom: generator=docker/buildkit-syft-scanner@sha256:ae4f3b554449e7e25548e7d8ccc029d17357348e30c6e3df01b92bc93654d6a9
+          provenance: mode=max
+          labels: |
+            org.opencontainers.image.version=${{ env.RELEASE_VERSION }}
+            org.opencontainers.image.revision=${{ env.RELEASE_SOURCE_SHA }}
+
+      - name: Validate and scan exact platform payloads, notices and SBOM
+        env:
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/server-layout" "$RUNNER_TEMP/server-layout-repro"
+          tar -xf "$RUNNER_TEMP/server-image.tar" -C "$RUNNER_TEMP/server-layout"
+          tar -xf "$RUNNER_TEMP/server-image-repro.tar" -C "$RUNNER_TEMP/server-layout-repro"
+          bash scripts/check-server-artifact.sh "$RUNNER_TEMP/server-layout" "$RUNNER_TEMP/server-inspection" "amd64,arm64"
+          bash scripts/check-server-artifact.sh "$RUNNER_TEMP/server-layout-repro" "$RUNNER_TEMP/server-inspection-repro" "amd64,arm64"
+          test "$(jq -er .index "$RUNNER_TEMP/server-inspection/report.json")" = "$IMAGE_DIGEST"
+          python3 scripts/release_content.py compare "$RUNNER_TEMP/server-inspection/report.json" \
+            "$RUNNER_TEMP/server-inspection-repro/report.json" > "$RUNNER_TEMP/server-reproducibility.json"
+          bash scripts/generate-server-sbom.sh "$RUNNER_TEMP/server-layout" "$RUNNER_TEMP/server-inspection" "$RUNNER_TEMP/server-sbom"
+          mkdir "$RUNNER_TEMP/server-evidence"
+          cp "$RUNNER_TEMP/server-inspection/report.json" "$RUNNER_TEMP/server-evidence/platforms.json"
+          cp "$RUNNER_TEMP/server-inspection-repro/report.json" "$RUNNER_TEMP/server-evidence/rebuild-platforms.json"
+          cp "$RUNNER_TEMP/server-reproducibility.json" "$RUNNER_TEMP/server-evidence/reproducibility.json"
+          cp "$RUNNER_TEMP/server-sbom/"*.spdx.json "$RUNNER_TEMP/server-evidence/"
+          python3 scripts/server-publication.py stage "$RUNNER_TEMP/server-layout" "$RUNNER_TEMP/server-evidence"
+          bash scripts/scan-release-content.sh "$RUNNER_TEMP/server-evidence"
+
+      - name: Seal original OCI archive and qualified evidence
+        id: seal
+        env:
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/server-handoff"
+          mv "$RUNNER_TEMP/server-image.tar" "$RUNNER_TEMP/server-evidence" "$RUNNER_TEMP/server-handoff/"
+          python3 scripts/server-publication.py seal "$RUNNER_TEMP/server-handoff" >> "$GITHUB_OUTPUT"
+
+      - name: Retain original qualified artifact
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: qualified-server-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/server-handoff/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  candidate-release:
+    if: ${{ !cancelled() && github.repository == 'stellwerk-labs/platform-orchestrator-cp' && github.event_name == 'workflow_dispatch' && !inputs.tests_only && needs.candidate-preflight.result == 'success' && needs.commitlint.result == 'success' && needs.unit.result == 'success' && needs.integration.result == 'success' && needs.integration-postgres.result == 'success' && needs.qualified-artifact.result == 'success' }}
+    needs:
+      - candidate-preflight
+      - qualified-artifact
       - commitlint
       - unit
       - integration
@@ -102,6 +282,14 @@ jobs:
       contents: write
       packages: write
       id-token: write
+    env:
+      RELEASE_SOURCE_SHA: ${{ inputs.candidate_sha }}
+      RELEASE_VERSION: ${{ inputs.candidate_tag }}
+      RELEASE_KIND: release
+      IMAGE_TAG: ghcr.io/stellwerk-labs/platform-orchestrator-cp:${{ inputs.candidate_tag }}
+      IMAGE_DIGEST: ${{ needs.qualified-artifact.outputs.image_digest }}
+      GOTOOLCHAIN: local
+      PRODUCER_RUN_ATTEMPT: ${{ needs.qualified-artifact.outputs.producer_attempt }}
     steps:
       - name: Checkout tested immutable candidate
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -109,6 +297,34 @@ jobs:
           ref: ${{ inputs.candidate_sha }}
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Validate immutable artifact metadata from the successful producer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARTIFACT_ID: ${{ needs.qualified-artifact.outputs.artifact_id }}
+          ARTIFACT_DIGEST: ${{ needs.qualified-artifact.outputs.artifact_digest }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID" > "$RUNNER_TEMP/server-artifact.json"
+          python3 scripts/server-publication.py artifact "$RUNNER_TEMP/server-artifact.json" "$ARTIFACT_ID" "$ARTIFACT_DIGEST"
+
+      - name: Download only the original qualified artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.qualified-artifact.outputs.artifact_id }}
+          path: ${{ runner.temp }}/server-handoff
+          merge-multiple: true
+
+      - name: Check sealed inventory and original source provenance
+        env:
+          INVENTORY_SHA: ${{ needs.qualified-artifact.outputs.inventory_sha }}
+        run: |
+          set -euo pipefail
+          python3 scripts/server-publication.py check "$RUNNER_TEMP/server-handoff" "$INVENTORY_SHA"
+          mkdir "$RUNNER_TEMP/server-layout"
+          tar -xf "$RUNNER_TEMP/server-handoff/server-image.tar" -C "$RUNNER_TEMP/server-layout"
+          mv "$RUNNER_TEMP/server-handoff/server-evidence" "$RUNNER_TEMP/server-evidence"
+          python3 scripts/server-publication.py verify "$RUNNER_TEMP/server-layout" "$RUNNER_TEMP/server-evidence"
 
       - name: Revalidate candidate and refuse an existing image tag
         env:
@@ -131,16 +347,18 @@ jobs:
           gh release create "$CANDIDATE_TAG" --verify-tag --draft --prerelease --latest=false \
             --title "$CANDIDATE_TAG" --notes-file "docs/releases/$CANDIDATE_TAG.md"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.0.0
-
-      - name: Setup Buildx
+      - name: Setup pinned image inspection client
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.0.0
         with:
           version: v0.38.0
-          driver-opts: |
-            image=moby/buildkit@sha256:cec9f139f45e93c5c69c60f8b07cfad9f43f4ef6b6a6cd917527fea5ff2e3dea
-            provenance-add-gha=false
+          driver: docker
+
+      - name: Install verified publication tools without compiling
+        run: |
+          set -euo pipefail
+          bash scripts/install-release-tools.sh "$RUNNER_TEMP/release-tools" --scan-only
+          bash scripts/install-oras.sh "$RUNNER_TEMP/release-tools"
+          echo "$RUNNER_TEMP/release-tools" >> "$GITHUB_PATH"
 
       - name: Login to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.0.0
@@ -149,107 +367,22 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup pinned artifact Go toolchain
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
-        with:
-          go-version: "1.26.11"
-          cache: false
-
-      - name: Install verified artifact tools and bind source epoch
-        run: |
-          set -euo pipefail
-          bash scripts/install-release-tools.sh "$RUNNER_TEMP/release-tools"
-          bash scripts/install-oras.sh "$RUNNER_TEMP/release-tools"
-          echo "$RUNNER_TEMP/release-tools" >> "$GITHUB_PATH"
-          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
-          test "$(git rev-parse HEAD)" = "${{ inputs.candidate_sha }}"
-
-      - name: Build complete local OCI artifact before publication
-        id: image
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.0.0
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: false
-          outputs: type=oci,dest=${{ runner.temp }}/server-image.tar,oci-mediatypes=true,compression=gzip,compression-level=6,force-compression=true,rewrite-timestamp=true
-          build-args: |
-            SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
-            BUILDKIT_CACHE_MOUNT_NS=server-cp-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-first
-          tags: ghcr.io/stellwerk-labs/platform-orchestrator-cp:${{ inputs.candidate_tag }}
-          sbom: generator=docker/buildkit-syft-scanner@sha256:ae4f3b554449e7e25548e7d8ccc029d17357348e30c6e3df01b92bc93654d6a9
-          provenance: mode=max
-          labels: |
-            org.opencontainers.image.version=${{ inputs.candidate_tag }}
-            org.opencontainers.image.revision=${{ inputs.candidate_sha }}
-
-      - name: Rebuild platform payloads without instruction cache
-        id: image-repro
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.0.0
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: false
-          no-cache: true
-          outputs: type=oci,dest=${{ runner.temp }}/server-image-repro.tar,oci-mediatypes=true,compression=gzip,compression-level=6,force-compression=true,rewrite-timestamp=true
-          build-args: |
-            SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
-            BUILDKIT_CACHE_MOUNT_NS=server-cp-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-second
-          tags: ghcr.io/stellwerk-labs/platform-orchestrator-cp:${{ inputs.candidate_tag }}
-          sbom: generator=docker/buildkit-syft-scanner@sha256:ae4f3b554449e7e25548e7d8ccc029d17357348e30c6e3df01b92bc93654d6a9
-          provenance: mode=max
-          labels: |
-            org.opencontainers.image.version=${{ inputs.candidate_tag }}
-            org.opencontainers.image.revision=${{ inputs.candidate_sha }}
-
-      - name: Validate and scan exact platform payloads, notices and SBOM
-        env:
-          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
-          RELEASE_SOURCE_SHA: ${{ inputs.candidate_sha }}
-          RELEASE_VERSION: ${{ inputs.candidate_tag }}
-          RELEASE_KIND: release
-          IMAGE_TAG: ghcr.io/stellwerk-labs/platform-orchestrator-cp:${{ inputs.candidate_tag }}
-        run: |
-          set -euo pipefail
-          mkdir "$RUNNER_TEMP/server-layout" "$RUNNER_TEMP/server-layout-repro"
-          tar -xf "$RUNNER_TEMP/server-image.tar" -C "$RUNNER_TEMP/server-layout"
-          tar -xf "$RUNNER_TEMP/server-image-repro.tar" -C "$RUNNER_TEMP/server-layout-repro"
-          bash scripts/check-server-artifact.sh "$RUNNER_TEMP/server-layout" "$RUNNER_TEMP/server-inspection" "amd64,arm64"
-          bash scripts/check-server-artifact.sh "$RUNNER_TEMP/server-layout-repro" "$RUNNER_TEMP/server-inspection-repro" "amd64,arm64"
-          test "$(jq -er .index "$RUNNER_TEMP/server-inspection/report.json")" = "$IMAGE_DIGEST"
-          python3 scripts/release_content.py compare "$RUNNER_TEMP/server-inspection/report.json" \
-            "$RUNNER_TEMP/server-inspection-repro/report.json" > "$RUNNER_TEMP/server-reproducibility.json"
-          bash scripts/generate-server-sbom.sh "$RUNNER_TEMP/server-layout" "$RUNNER_TEMP/server-inspection" "$RUNNER_TEMP/server-sbom"
-          mkdir "$RUNNER_TEMP/server-evidence"
-          cp "$RUNNER_TEMP/server-inspection/report.json" "$RUNNER_TEMP/server-evidence/platforms.json"
-          cp "$RUNNER_TEMP/server-inspection-repro/report.json" "$RUNNER_TEMP/server-evidence/rebuild-platforms.json"
-          cp "$RUNNER_TEMP/server-reproducibility.json" "$RUNNER_TEMP/server-evidence/reproducibility.json"
-          cp "$RUNNER_TEMP/server-sbom/"*.spdx.json "$RUNNER_TEMP/server-evidence/"
-          python3 scripts/server-publication.py stage "$RUNNER_TEMP/server-layout" "$RUNNER_TEMP/server-evidence"
-          bash scripts/scan-release-content.sh "$RUNNER_TEMP/server-evidence"
-
-      - name: Retain digest-bound artifact evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: server-artifact-evidence-${{ github.job }}
-          path: ${{ runner.temp }}/server-evidence/
-          if-no-files-found: error
-
       - name: Publish only the inspected OCI layout without changing attestations
         env:
-          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          IMAGE_DIGEST: ${{ needs.qualified-artifact.outputs.image_digest }}
           IMAGE_TAG: ghcr.io/stellwerk-labs/platform-orchestrator-cp:${{ inputs.candidate_tag }}
         run: |
           set -euo pipefail
           bash scripts/check-server-artifact.sh "$RUNNER_TEMP/server-layout" "$RUNNER_TEMP/server-publication-inspection" \
-            "$(jq -er '.payloads | keys | join(",")' "$RUNNER_TEMP/server-inspection/report.json")"
-          cmp "$RUNNER_TEMP/server-inspection/report.json" "$RUNNER_TEMP/server-publication-inspection/report.json"
+            "$(jq -er '.payloads | keys | join(",")' "$RUNNER_TEMP/server-evidence/platforms.json")"
+          cmp "$RUNNER_TEMP/server-evidence/platforms.json" "$RUNNER_TEMP/server-publication-inspection/report.json"
           OCI_REFERENCE="$(python3 scripts/release_content.py oci-reference "$RUNNER_TEMP/server-layout" "$IMAGE_DIGEST")"
           oras cp --no-tty --from-oci-layout "$RUNNER_TEMP/server-layout:$OCI_REFERENCE" "$IMAGE_TAG"
           test "$(oras resolve "$IMAGE_TAG")" = "$IMAGE_DIGEST"
 
       - name: Authenticate exact index, platforms, provenance and SBOMs
         env:
-          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          IMAGE_DIGEST: ${{ needs.qualified-artifact.outputs.image_digest }}
           RELEASE_SOURCE_SHA: ${{ inputs.candidate_sha }}
           RELEASE_VERSION: ${{ inputs.candidate_tag }}
           RELEASE_KIND: release
@@ -265,7 +398,7 @@ jobs:
 
       - name: Verify candidate image by immutable digest
         env:
-          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          IMAGE_DIGEST: ${{ needs.qualified-artifact.outputs.image_digest }}
         run: |
           set -euo pipefail
           [[ "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
@@ -498,8 +631,10 @@ jobs:
           bash scripts/check-release-commits.sh "$base" "$head"
 
   release:
-    if: ${{ !cancelled() && github.repository == 'stellwerk-labs/platform-orchestrator-cp' && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.commitlint.result == 'success' && needs.unit.result == 'success' && needs.integration.result == 'success' && needs.integration-postgres.result == 'success' }}
+    if: ${{ !cancelled() && github.repository == 'stellwerk-labs/platform-orchestrator-cp' && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.commitlint.result == 'success' && needs.unit.result == 'success' && needs.integration.result == 'success' && needs.integration-postgres.result == 'success' && needs.qualified-artifact.result == 'success' && needs.stable-version.result == 'success' && needs.stable-version.outputs.version != '' }}
     needs:
+      - qualified-artifact
+      - stable-version
       - commitlint
       - unit
       - integration
@@ -510,182 +645,117 @@ jobs:
       group: release-${{ github.repository }}
       cancel-in-progress: false
     permissions:
+      actions: read
       contents: write
       issues: write
       packages: write
       id-token: write
       pull-requests: write
+    env:
+      RELEASE_SOURCE_SHA: ${{ github.sha }}
+      RELEASE_VERSION: ${{ needs.stable-version.outputs.version }}
+      RELEASE_KIND: release
+      IMAGE_TAG: ghcr.io/stellwerk-labs/platform-orchestrator-cp:${{ needs.stable-version.outputs.version }}
+      IMAGE_DIGEST: ${{ needs.qualified-artifact.outputs.image_digest }}
+      GOTOOLCHAIN: local
+      PRODUCER_RUN_ATTEMPT: ${{ needs.qualified-artifact.outputs.producer_attempt }}
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Assign stable version and tag
-        id: release
-        uses: stellwerk-labs/semantic-release-action@b1269e93b486873118eef1646bfcd46a9d23d3a3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Validate stable source, notes, and unused destinations
-        if: steps.release.outputs.version != ''
+      - name: Validate immutable artifact metadata from the successful producer
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ steps.release.outputs.version }}
+          ARTIFACT_ID: ${{ needs.qualified-artifact.outputs.artifact_id }}
+          ARTIFACT_DIGEST: ${{ needs.qualified-artifact.outputs.artifact_digest }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID" > "$RUNNER_TEMP/server-artifact.json"
+          python3 scripts/server-publication.py artifact "$RUNNER_TEMP/server-artifact.json" "$ARTIFACT_ID" "$ARTIFACT_DIGEST"
+
+      - name: Download only the original qualified artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.qualified-artifact.outputs.artifact_id }}
+          path: ${{ runner.temp }}/server-handoff
+          merge-multiple: true
+
+      - name: Check sealed inventory and original source provenance
+        env:
+          INVENTORY_SHA: ${{ needs.qualified-artifact.outputs.inventory_sha }}
+        run: |
+          set -euo pipefail
+          python3 scripts/server-publication.py check "$RUNNER_TEMP/server-handoff" "$INVENTORY_SHA"
+          mkdir "$RUNNER_TEMP/server-layout"
+          tar -xf "$RUNNER_TEMP/server-handoff/server-image.tar" -C "$RUNNER_TEMP/server-layout"
+          mv "$RUNNER_TEMP/server-handoff/server-evidence" "$RUNNER_TEMP/server-evidence"
+          python3 scripts/server-publication.py verify "$RUNNER_TEMP/server-layout" "$RUNNER_TEMP/server-evidence"
+
+      - name: Validate stable source, notes, and unused destinations
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.stable-version.outputs.version }}
           SOURCE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           python3 scripts/stable-release-preflight.py "$RELEASE_TAG" "$SOURCE_SHA"
 
       - name: Reserve stable draft with reviewed notes
-        if: steps.release.outputs.version != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ steps.release.outputs.version }}
+          RELEASE_TAG: ${{ needs.stable-version.outputs.version }}
         run: |
           set -euo pipefail
           gh release create "$RELEASE_TAG" --verify-tag --draft --latest=false \
             --title "$RELEASE_TAG" --notes-file "docs/releases/$RELEASE_TAG.md"
 
-      - name: Set up QEMU
-        if: steps.release.outputs.version != ''
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.0.0
-
-      - name: Setup Buildx
-        if: steps.release.outputs.version != ''
+      - name: Setup pinned image inspection client
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.0.0
         with:
           version: v0.38.0
-          driver-opts: |
-            image=moby/buildkit@sha256:cec9f139f45e93c5c69c60f8b07cfad9f43f4ef6b6a6cd917527fea5ff2e3dea
-            provenance-add-gha=false
+          driver: docker
 
-      - name: Log in to GHCR
-        if: steps.release.outputs.version != ''
+      - name: Install verified publication tools without compiling
+        run: |
+          set -euo pipefail
+          bash scripts/install-release-tools.sh "$RUNNER_TEMP/release-tools" --scan-only
+          bash scripts/install-oras.sh "$RUNNER_TEMP/release-tools"
+          echo "$RUNNER_TEMP/release-tools" >> "$GITHUB_PATH"
+
+      - name: Login to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.0.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup pinned artifact Go toolchain
-        if: steps.release.outputs.version != ''
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
-        with:
-          go-version: "1.26.11"
-          cache: false
-
-      - name: Install verified artifact tools and bind source epoch
-        if: steps.release.outputs.version != ''
-        run: |
-          set -euo pipefail
-          bash scripts/install-release-tools.sh "$RUNNER_TEMP/release-tools"
-          bash scripts/install-oras.sh "$RUNNER_TEMP/release-tools"
-          echo "$RUNNER_TEMP/release-tools" >> "$GITHUB_PATH"
-          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
-          test "$(git rev-parse HEAD)" = "${{ github.sha }}"
-
-      - name: Build complete local OCI artifact before publication
-        if: steps.release.outputs.version != ''
-        id: image
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.0.0
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: false
-          outputs: type=oci,dest=${{ runner.temp }}/server-image.tar,oci-mediatypes=true,compression=gzip,compression-level=6,force-compression=true,rewrite-timestamp=true
-          build-args: |
-            SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
-            BUILDKIT_CACHE_MOUNT_NS=server-cp-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-first
-          tags: ghcr.io/stellwerk-labs/platform-orchestrator-cp:${{ steps.release.outputs.version }}
-          sbom: generator=docker/buildkit-syft-scanner@sha256:ae4f3b554449e7e25548e7d8ccc029d17357348e30c6e3df01b92bc93654d6a9
-          provenance: mode=max
-          labels: |
-            org.opencontainers.image.version=${{ steps.release.outputs.version }}
-            org.opencontainers.image.revision=${{ github.sha }}
-
-      - name: Rebuild platform payloads without instruction cache
-        if: steps.release.outputs.version != ''
-        id: image-repro
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.0.0
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: false
-          no-cache: true
-          outputs: type=oci,dest=${{ runner.temp }}/server-image-repro.tar,oci-mediatypes=true,compression=gzip,compression-level=6,force-compression=true,rewrite-timestamp=true
-          build-args: |
-            SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
-            BUILDKIT_CACHE_MOUNT_NS=server-cp-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-second
-          tags: ghcr.io/stellwerk-labs/platform-orchestrator-cp:${{ steps.release.outputs.version }}
-          sbom: generator=docker/buildkit-syft-scanner@sha256:ae4f3b554449e7e25548e7d8ccc029d17357348e30c6e3df01b92bc93654d6a9
-          provenance: mode=max
-          labels: |
-            org.opencontainers.image.version=${{ steps.release.outputs.version }}
-            org.opencontainers.image.revision=${{ github.sha }}
-
-      - name: Validate and scan exact platform payloads, notices and SBOM
-        if: steps.release.outputs.version != ''
-        env:
-          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
-          RELEASE_SOURCE_SHA: ${{ github.sha }}
-          RELEASE_VERSION: ${{ steps.release.outputs.version }}
-          RELEASE_KIND: release
-          IMAGE_TAG: ghcr.io/stellwerk-labs/platform-orchestrator-cp:${{ steps.release.outputs.version }}
-        run: |
-          set -euo pipefail
-          mkdir "$RUNNER_TEMP/server-layout" "$RUNNER_TEMP/server-layout-repro"
-          tar -xf "$RUNNER_TEMP/server-image.tar" -C "$RUNNER_TEMP/server-layout"
-          tar -xf "$RUNNER_TEMP/server-image-repro.tar" -C "$RUNNER_TEMP/server-layout-repro"
-          bash scripts/check-server-artifact.sh "$RUNNER_TEMP/server-layout" "$RUNNER_TEMP/server-inspection" "amd64,arm64"
-          bash scripts/check-server-artifact.sh "$RUNNER_TEMP/server-layout-repro" "$RUNNER_TEMP/server-inspection-repro" "amd64,arm64"
-          test "$(jq -er .index "$RUNNER_TEMP/server-inspection/report.json")" = "$IMAGE_DIGEST"
-          python3 scripts/release_content.py compare "$RUNNER_TEMP/server-inspection/report.json" \
-            "$RUNNER_TEMP/server-inspection-repro/report.json" > "$RUNNER_TEMP/server-reproducibility.json"
-          bash scripts/generate-server-sbom.sh "$RUNNER_TEMP/server-layout" "$RUNNER_TEMP/server-inspection" "$RUNNER_TEMP/server-sbom"
-          mkdir "$RUNNER_TEMP/server-evidence"
-          cp "$RUNNER_TEMP/server-inspection/report.json" "$RUNNER_TEMP/server-evidence/platforms.json"
-          cp "$RUNNER_TEMP/server-inspection-repro/report.json" "$RUNNER_TEMP/server-evidence/rebuild-platforms.json"
-          cp "$RUNNER_TEMP/server-reproducibility.json" "$RUNNER_TEMP/server-evidence/reproducibility.json"
-          cp "$RUNNER_TEMP/server-sbom/"*.spdx.json "$RUNNER_TEMP/server-evidence/"
-          python3 scripts/server-publication.py stage "$RUNNER_TEMP/server-layout" "$RUNNER_TEMP/server-evidence"
-          bash scripts/scan-release-content.sh "$RUNNER_TEMP/server-evidence"
-
-      - name: Retain digest-bound artifact evidence
-        if: steps.release.outputs.version != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: server-artifact-evidence-${{ github.job }}
-          path: ${{ runner.temp }}/server-evidence/
-          if-no-files-found: error
-
       - name: Publish only the inspected OCI layout without changing attestations
-        if: steps.release.outputs.version != ''
         env:
-          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
-          IMAGE_TAG: ghcr.io/stellwerk-labs/platform-orchestrator-cp:${{ steps.release.outputs.version }}
+          IMAGE_DIGEST: ${{ needs.qualified-artifact.outputs.image_digest }}
+          IMAGE_TAG: ghcr.io/stellwerk-labs/platform-orchestrator-cp:${{ needs.stable-version.outputs.version }}
         run: |
           set -euo pipefail
           bash scripts/check-server-artifact.sh "$RUNNER_TEMP/server-layout" "$RUNNER_TEMP/server-publication-inspection" \
-            "$(jq -er '.payloads | keys | join(",")' "$RUNNER_TEMP/server-inspection/report.json")"
-          cmp "$RUNNER_TEMP/server-inspection/report.json" "$RUNNER_TEMP/server-publication-inspection/report.json"
+            "$(jq -er '.payloads | keys | join(",")' "$RUNNER_TEMP/server-evidence/platforms.json")"
+          cmp "$RUNNER_TEMP/server-evidence/platforms.json" "$RUNNER_TEMP/server-publication-inspection/report.json"
           OCI_REFERENCE="$(python3 scripts/release_content.py oci-reference "$RUNNER_TEMP/server-layout" "$IMAGE_DIGEST")"
           oras cp --no-tty --from-oci-layout "$RUNNER_TEMP/server-layout:$OCI_REFERENCE" "$IMAGE_TAG"
           test "$(oras resolve "$IMAGE_TAG")" = "$IMAGE_DIGEST"
 
       - name: Authenticate exact index, platforms, provenance and SBOMs
-        if: steps.release.outputs.version != ''
         env:
-          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          IMAGE_DIGEST: ${{ needs.qualified-artifact.outputs.image_digest }}
           RELEASE_SOURCE_SHA: ${{ github.sha }}
-          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_VERSION: ${{ needs.stable-version.outputs.version }}
           RELEASE_KIND: release
-          IMAGE_TAG: ghcr.io/stellwerk-labs/platform-orchestrator-cp:${{ steps.release.outputs.version }}
+          IMAGE_TAG: ghcr.io/stellwerk-labs/platform-orchestrator-cp:${{ needs.stable-version.outputs.version }}
         run: timeout -k 5s 300s bash scripts/authenticate-server-artifact.sh "$RUNNER_TEMP/server-layout" "$RUNNER_TEMP/server-evidence" "$RUNNER_TEMP/server-verification"
 
       - name: Retain scanned cryptographic and anonymous verification evidence
-        if: steps.release.outputs.version != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: server-verification-evidence-${{ github.job }}
@@ -693,19 +763,17 @@ jobs:
           if-no-files-found: error
 
       - name: Verify published image
-        if: steps.release.outputs.version != ''
         env:
-          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          IMAGE_DIGEST: ${{ needs.qualified-artifact.outputs.image_digest }}
         run: |
           set -euo pipefail
           [[ "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
           docker buildx imagetools inspect "ghcr.io/stellwerk-labs/platform-orchestrator-cp@${IMAGE_DIGEST}"
 
       - name: Publish verified stable release
-        if: steps.release.outputs.version != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ steps.release.outputs.version }}
+          RELEASE_TAG: ${{ needs.stable-version.outputs.version }}
         run: |
           set -euo pipefail
           gh release edit "$RELEASE_TAG" --draft=false --latest

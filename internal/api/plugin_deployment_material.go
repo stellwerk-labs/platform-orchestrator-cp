@@ -13,7 +13,10 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 )
 
-const ordinaryDeploymentReadPermission = "deployment_read"
+const (
+	ordinaryDeploymentReadPermission = "deployment_read"
+	deploymentLogsReadPermission     = "deployment_logs_read"
+)
 
 func (s *Server) GetPluginDeploymentMaterial(ctx context.Context, request GetPluginDeploymentMaterialRequestObject) (GetPluginDeploymentMaterialResponseObject, error) {
 	actor, err := GetAuthenticatedUserIdOr401(ctx)
@@ -32,7 +35,16 @@ func (s *Server) GetPluginDeploymentMaterial(ctx context.Context, request GetPlu
 			return nil, pluginBoundaryError(403, "deployment_material_forbidden", "Plugin service identities cannot retrieve decrypted Deployment material.")
 		}
 	}
-	allowed, err := s.pluginAuthorizationDecision(ctx, actor, []iamapi.ResourcePermissionCheck{environmentCheck(request.EnvironmentUuid, ordinaryDeploymentReadPermission)})
+	permission, action, extension := ordinaryDeploymentReadPermission, "", ""
+	switch request.MaterialKind {
+	case PluginDeploymentMaterialLogs:
+		permission, action, extension = deploymentLogsReadPermission, plugins.DataPlaneLogsRead, "log"
+	case PluginDeploymentMaterialOutputs:
+		action, extension = plugins.DataPlaneOutputsRead, "json"
+	default:
+		return nil, pluginBoundaryError(400, "plugin_request_invalid", "Choose logs or outputs for an exact Deployment.")
+	}
+	allowed, err := s.pluginAuthorizationDecision(ctx, actor, []iamapi.ResourcePermissionCheck{environmentCheck(request.EnvironmentUuid, permission)})
 	if err != nil {
 		return nil, err
 	}
@@ -40,21 +52,12 @@ func (s *Server) GetPluginDeploymentMaterial(ctx context.Context, request GetPlu
 		// Historical Environment IAM relationships may have been removed. An
 		// independently held organization grant still authorizes retained data;
 		// a plugin grant or a lookup failure never substitutes for that grant.
-		if err := s.pluginAuthorize(ctx, actor, []iamapi.ResourcePermissionCheck{orgCheck(request.OrgId, ordinaryDeploymentReadPermission)}); err != nil {
+		if err := s.pluginAuthorize(ctx, actor, []iamapi.ResourcePermissionCheck{orgCheck(request.OrgId, permission)}); err != nil {
 			return nil, err
 		}
 	}
 	if _, _, found := s.PluginGateway.Registry.Installation(ctx, request.OrgId, request.PluginId); !found {
 		return nil, pluginBoundaryError(404, "plugin_not_installed", "The plugin's retained installation metadata is not available in this organization.")
-	}
-	action, extension := "", ""
-	switch request.MaterialKind {
-	case PluginDeploymentMaterialLogs:
-		action, extension = plugins.DataPlaneLogsRead, "log"
-	case PluginDeploymentMaterialOutputs:
-		action, extension = plugins.DataPlaneOutputsRead, "json"
-	default:
-		return nil, pluginBoundaryError(400, "plugin_request_invalid", "Choose logs or outputs for an exact Deployment.")
 	}
 	result, err := s.PluginDataPlane.ReadMaterial(ctx, plugins.DataPlaneRequest{OrgID: request.OrgId, PluginID: request.PluginId, ActorID: actor, Action: action, RequestID: "material-" + uuid.NewString(), ProjectUUID: request.ProjectUuid, EnvironmentUUID: request.EnvironmentUuid, DeploymentID: request.DeploymentId})
 	if err != nil {

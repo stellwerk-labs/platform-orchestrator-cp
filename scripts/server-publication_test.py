@@ -7,7 +7,9 @@ import importlib.util
 import json
 from pathlib import Path
 import re
+import shutil
 import subprocess
+import tarfile
 import tempfile
 import unittest
 
@@ -79,6 +81,78 @@ class PublicationTests(unittest.TestCase):
 
     def verify(self):
         publication.verify(self.layout, self.output, self.env, self.source)
+
+    def handoff(self):
+        self.stage()
+        directory = self.root / "handoff"
+        directory.mkdir()
+        with tarfile.open(directory / "server-image.tar", "w") as archive:
+            archive.add(self.layout, arcname=".")
+        shutil.move(str(self.output), directory / "server-evidence")
+        result = publication.seal(directory, self.env, self.source)
+        return directory, dict(line.split("=", 1) for line in result.splitlines())["inventory_sha"]
+
+    def test_original_qualified_archive_survives_publisher_only_rerun(self):
+        directory, checksum = self.handoff()
+        consumer = dict(self.env, GITHUB_RUN_ATTEMPT="2", PRODUCER_RUN_ATTEMPT="1")
+        publication.check(directory, checksum, consumer, self.source)
+        extracted = self.root / "downloaded-layout"
+        extracted.mkdir()
+        with tarfile.open(directory / "server-image.tar") as archive:
+            archive.extractall(extracted)
+        publication.verify(extracted, directory / "server-evidence", consumer, self.source)
+        for changed in (dict(consumer, PRODUCER_RUN_ATTEMPT="2"), dict(consumer, PRODUCER_RUN_ATTEMPT="3"),
+                        dict(consumer, GITHUB_RUN_ID="124"), dict(consumer, GITHUB_SHA="f" * 40),
+                        dict(consumer, RELEASE_SOURCE_SHA="f" * 40), dict(consumer, GITHUB_WORKFLOW_SHA="f" * 40),
+                        dict(consumer, IMAGE_DIGEST="sha256:" + "f" * 64)):
+            with self.subTest(changed=changed), self.assertRaises((ValueError, subprocess.CalledProcessError)):
+                publication.check(directory, checksum, changed, self.source)
+
+    def test_sealed_inventory_refuses_archive_evidence_and_inventory_tampering(self):
+        directory, checksum = self.handoff()
+        for name in ("server-image.tar", "handoff.json", "server-evidence/platforms.json", "SHA256SUMS"):
+            path = directory / name
+            original = path.read_bytes()
+            path.write_bytes(original + b"tampered")
+            with self.subTest(file=name), self.assertRaises(ValueError):
+                publication.check(directory, checksum, self.env, self.source)
+            path.write_bytes(original)
+        for name in ("extra.json", "server-evidence/extra.json"):
+            path = directory / name
+            path.write_text("{}")
+            with self.subTest(file=name), self.assertRaises(ValueError):
+                publication.check(directory, checksum, self.env, self.source)
+            path.unlink()
+        path = directory / "server-evidence/platforms.json"
+        original = path.read_bytes()
+        path.unlink()
+        outside = self.root / "outside.json"
+        outside.write_bytes(original)
+        path.symlink_to(outside)
+        with self.assertRaises(ValueError):
+            publication.check(directory, checksum, self.env, self.source)
+
+    def test_artifact_metadata_uses_captured_github_nested_run_shape(self):
+        # GET /actions/artifacts/13909435986, captured from successful CP run 43136620336.
+        record = json.loads((ROOT / "scripts/testdata/server-artifact-metadata.json").read_bytes())
+        env = dict(self.env, GITHUB_RUN_ID=str(record["workflow_run"]["id"]),
+                   GITHUB_SHA=record["workflow_run"]["head_sha"], GITHUB_RUN_ATTEMPT="2", PRODUCER_RUN_ATTEMPT="1")
+        record["name"] = "qualified-server-" + env["GITHUB_RUN_ID"] + "-1"
+        artifact_id, digest = str(record["id"]), record["digest"]
+        publication.artifact(record, artifact_id, digest, env)
+        changes = (("id", 1), ("expired", True), ("digest", "sha256:" + "f" * 64),
+                   ("name", record["name"][:-1] + "2"), ("workflow_run", {}),
+                   ("workflow_run.id", 1), ("workflow_run.head_sha", "f" * 40),
+                   ("workflow_run.head_branch", "other"))
+        for key, value in changes:
+            changed = copy.deepcopy(record)
+            parent, _, nested = key.partition(".")
+            if nested:
+                changed[parent][nested] = value
+            else:
+                changed[parent] = value
+            with self.subTest(field=key), self.assertRaises(ValueError):
+                publication.artifact(changed, artifact_id, digest, env)
 
     def test_real_git_staging_and_checksum_bound_evidence(self):
         self.stage()
@@ -351,11 +425,8 @@ class PublicationTests(unittest.TestCase):
                 continue
             publishers += 1
             self.assertIn("id-token: write", job)
-            namespaces = re.findall(r"BUILDKIT_CACHE_MOUNT_NS=(.+)", job)
-            prefix = "server-" + REPOSITORY.rsplit("-", 1)[1] + "-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-"
-            self.assertEqual(namespaces, [prefix + "first", prefix + "second"])
-            self.assertNotEqual(namespaces[0], namespaces[1])
-            self.assertLess(job.index("server-publication.py stage"), job.index("oras cp --no-tty"))
+            self.assertNotIn("BUILDKIT_CACHE_MOUNT_NS=", job)
+            self.assertLess(job.index("server-publication.py verify"), job.index("oras cp --no-tty"))
             self.assertLess(job.index("oras cp --no-tty"), job.index("bash scripts/authenticate-server-artifact.sh"))
             self.assertIn("server-verification-evidence-", job)
             if name in ("release", "candidate-release"):

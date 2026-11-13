@@ -125,9 +125,7 @@ func main() {
 		zap.L().Fatal("Failed to initialize iam client", zap.Error(err))
 	}
 
-	dbConnStr := fmt.Sprintf(
-		"dbname=%s user=%s password=%s host=%s port=%s connect_timeout=5 sslmode=disable",
-		cfg.DatabaseName, cfg.DatabaseUser, cfg.DatabasePassword, cfg.DatabaseHost, cfg.DatabasePort)
+	dbConnStr := cfg.DatabaseConnectionString()
 	// Only a plugin host keeps the extension resource journal. Which
 	// organizations it journals is Plugin Manager state in the database.
 	var dbOptions []model.DatabaserOption
