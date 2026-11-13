@@ -166,3 +166,7 @@ remain separate Root-controlled gates. No public mutation by this agent.
 
 - Implemented the requested local change with targeted tests and documentation. Independent planning, green and final clean-code reviews passed after correcting partial-summary availability and removing an unsupported mTLS mount example.
 - TLS configuration was exercised against real PostgreSQL; UI and complete-history/permission boundaries were tested. Hosted release qualification and immutable public schema/image pins remain pending. No public publication or live deployment is established by this local checkpoint.
+
+## 2026-11-13: Managed deployment logs, pending commit
+
+Split material authorization by logs/outputs, refreshed OpenAPI descriptions and embedded schema, and exercised both kinds through existing HTTP boundary coverage, including denied plugin identities and organization fallback. See DECISIONS.md for defaults and deployment ordering.

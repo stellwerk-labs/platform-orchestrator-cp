@@ -50,3 +50,7 @@ force deletion retains its legacy fallback. No DP policy table or plugin change.
 
 - Preserve existing permissions, confirmation and default behavior. PostgreSQL TLS is opt-in through `DATABASE_SSLMODE`; use existing driver and certificate mechanisms.
 - Catalogue filters use complete optional summaries, omit version data for core-only readers, and keep unavailable distinct from false. Verification remains unimplemented; its filter is intentionally present with an explicit limitation.
+
+## 2026-11-13: Plaintext deployment log privilege
+
+Plugin-owned Deployment logs require `deployment_logs_read`; outputs retain `deployment_read`. Both use the exact environment resource and independently held organization fallback for retained history after environment removal. Plugin service and admission-checker identities remain denied before IAM. IAM must ship the new exact-grant-only permission first; canonical Admin (`manage_all`) retains access, Viewer/Deployer require an explicit delegated role. No plugin capability or operation grant substitutes for Core permission.

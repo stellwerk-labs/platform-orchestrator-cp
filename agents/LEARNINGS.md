@@ -63,3 +63,7 @@ stale status writes must be rejected by that same atomic UPDATE predicate.
 
 - A paginated first page cannot prove version absence. Complete catalogue summaries require version-read permission, not just catalogue read access.
 - `require` prevents plaintext fallback but does not generally authenticate server identity. CA verification uses existing driver settings; a private-key mount needs its own restrictive permissions.
+
+## 2026-11-13
+
+The material endpoint serves logs and outputs, so authorization must select a permission from material kind before checking IAM. Regenerate the server schema when its OpenAPI description changes; the embedded compressed schema produces a large generated-only diff.

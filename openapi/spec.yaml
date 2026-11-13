@@ -436,7 +436,7 @@ paths:
     get:
       operationId: getPluginDeploymentMaterial
       summary: Retrieve plugin-owned Deployment material using the caller's independent Orchestrator permission.
-      description: Requires current ordinary deployment_read authorization. Plugin capabilities and operation grants never authorize this endpoint. Core signs an exact immutable-scope Data Plane request; DP decrypts retained material without exposing a private key. Plugin service and admission-checker principals are explicitly denied. Historical retrieval does not depend on a live Environment or the plugin's entitlement. No material is sent through the plugin backend or invocation envelope.
+      description: Requires current deployment_logs_read authorization for plaintext logs and deployment_read authorization for outputs. Plugin capabilities and operation grants never authorize this endpoint. Core signs an exact immutable-scope Data Plane request; DP decrypts retained material without exposing a private key. Plugin service and admission-checker principals are explicitly denied. Historical retrieval does not depend on a live Environment or the plugin's entitlement. No material is sent through the plugin backend or invocation envelope.
       tags: [Plugin]
       security: [{userIdHeader: []}]
       parameters:
