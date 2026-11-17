@@ -373,7 +373,7 @@ func (r *InstallationRegistry) get(ctx context.Context, snapshot *installationSn
 		return Descriptor{}, false
 	}
 	for _, protocol := range item.RequiredProtocols {
-		if protocol != EnvironmentObservationProtocol && protocol != EnvironmentObservationRecoveryProtocol || r.Protocols == nil || !r.Protocols.SupportsProtocol(ctx, orgID, item, protocol) {
+		if protocol != EnvironmentObservationProtocol && protocol != EnvironmentObservationRecoveryProtocol && protocol != EnvironmentObservationDeletionProtocol || r.Protocols == nil || !r.Protocols.SupportsProtocol(ctx, orgID, item, protocol) {
 			state = StateIncompatible
 		}
 	}

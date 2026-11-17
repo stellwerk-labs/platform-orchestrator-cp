@@ -139,7 +139,7 @@ protocol opt-in continues to use only the execution protocol.
 Two safety POST operations close an exact admission key:
 
 - `.../requests/{requestId}/resolve`, action `observation.request.resolve`,
-  accepts the original `ObservationRequest` after its admission deadline.
+  accepts the original `ObservationRequest` after its admission deadline, or early under an applied maintenance barrier or a confirmed deleted target.
 - `.../redeployments/{requestId}/resolve`, action `observation.redeploy.resolve`,
   accepts `{run_id, request: ObservationRedeployRequest}` with no proof. The
   caller explicitly abandons further submission of that exact remedial key;
@@ -220,3 +220,16 @@ gates remain blocked by the unavailable IAM admin client and must be rerun after
 that dependency is available. A passing private-workspace scan does not replace
 those release gates. Runtime, package trust and full recovery qualification are
 separate from local source preservation.
+
+
+## Deletion-aware membership
+
+A package that needs deletion-safe scheduling declares `environment-observation-deletion/v1` alongside `environment-observation/v1` and `environment-observation-recovery/v1`. Older Core rejects that unknown requirement. New Core provides it only when the Data Plane supports both base observation and recovery; no new Data Plane protocol is implied.
+
+For an explicitly selected UUID set, the first target-query page includes `deleted_environment_ids`. Existing `deleting` and `delete_failed` objects are not deletion evidence. Complete every page successfully before normalizing membership. A previously granted deleted tuple can be pruned atomically during grant replacement; its exact command response records `pruned_environment_ids`. A newly supplied missing tuple instead receives `observation_targets_unavailable` without committing a grant change.
+
+The requested membership is the disjoint union of effective and pruned targets. Preserve the original request body and digest for retries, and store the effective schedule without rewriting the frozen intent. A definitive rejected request may end locally; transport failures and generic conflicts remain uncertain until reconciled.
+
+A deleted target permits early admission closure using the existing historically issued scope and durable no-forward seal. Only an actual `not_started` resolution receives `reason: deleted_target`. Accepted execution keeps its real receipt, and completed closure bytes replay unchanged after maintenance or target state changes.
+
+Schema `57` records the persisted response-format boundary. Older Core refuses startup against it; its downgrade guard protects deletion reasons and pruned command receipts. Take a coordinated recovery point before upgrading and use restore-based rollback rather than dropping response metadata or replacing only the image.

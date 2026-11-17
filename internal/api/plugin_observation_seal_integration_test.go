@@ -308,3 +308,51 @@ func TestObservationSealBetweenIntentAndEffectPreventsForward(t *testing.T) {
 	require.ErrorContains(t, e, "plugin_operation_conflict")
 	require.Zero(t, forwards.Load())
 }
+
+func TestDeletedObservationTargetSealsBeforeDeadlineAndReplaysReason(t *testing.T) {
+	f := newObservationDispatchFixture(t)
+	_, err := sealObservation(t, f, f.server, f.body)
+	require.ErrorContains(t, err, "Early closure requires")
+	tx, err := f.db.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	_, err = tx.ExecContext(t.Context(), "DELETE FROM envs WHERE org_id='acme' AND uuid=$1", f.body.EnvironmentUuid)
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
+	resolution, err := sealObservation(t, f, f.server, f.body)
+	require.NoError(t, err)
+	require.EqualValues(t, "not_started", resolution.Disposition)
+	require.NotEmpty(t, resolution.Reason)
+	require.Equal(t, observation.DeletedTarget, resolution.Reason)
+	require.Nil(t, resolution.Receipt)
+	replay, err := sealObservation(t, f, f.server, f.body)
+	require.NoError(t, err)
+	require.Equal(t, resolution, replay)
+	var effects int
+	tx, err = f.db.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	require.NoError(t, tx.QueryRowContext(t.Context(), "SELECT count(*) FROM observation_fault_effects").Scan(&effects))
+	require.Zero(t, effects)
+	require.NoError(t, tx.Rollback())
+}
+
+func TestObservationCompletedClosureReplaysAcrossMaintenanceAndDeletion(t *testing.T) {
+	f := newObservationDispatchFixture(t)
+	f.server.MaintenanceDataPlaneURL = "https://dp.example.test"
+	require.NoError(t, model.ApplyInstallationMaintenance(t.Context(), f.db, model.InstallationMaintenance{Revision: 1, Enabled: true}))
+	original, err := sealObservation(t, f, f.server, f.body)
+	require.NoError(t, err)
+	require.EqualValues(t, "not_started", original.Disposition)
+	require.Empty(t, original.Reason)
+	require.NoError(t, model.ApplyInstallationMaintenance(t.Context(), f.db, model.InstallationMaintenance{Revision: 2, Enabled: false}))
+	replay, err := sealObservation(t, f, f.server, f.body)
+	require.NoError(t, err)
+	require.Equal(t, original, replay, "ending maintenance must not invalidate an exact completed closure")
+	tx, err := f.db.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	_, err = tx.ExecContext(t.Context(), "DELETE FROM envs WHERE org_id='acme' AND uuid=$1", f.body.EnvironmentUuid)
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
+	replay, err = sealObservation(t, f, f.server, f.body)
+	require.NoError(t, err)
+	require.Equal(t, original, replay, "later deletion must not relabel completed history")
+}

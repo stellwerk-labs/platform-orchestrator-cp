@@ -56,6 +56,13 @@ func (s *Server) QueryObservationTargets(ctx context.Context, request observatio
 	for _, item := range items {
 		response.Items = append(response.Items, observation.ObservationTargetMetadata{ProjectUuid: item.ProjectUUID, EnvironmentUuid: item.EnvironmentUUID, ProjectId: item.ProjectID, EnvironmentId: item.EnvironmentID, EnvironmentType: item.EnvironmentType, Production: item.Production})
 	}
+	if page == "" && body.EnvironmentIds != nil {
+		deleted, err := model.DeletedObservationTargetsTx(ctx, tx, request.OrgId, *body.EnvironmentIds)
+		if err != nil {
+			return nil, pluginModelError(err)
+		}
+		response.DeletedEnvironmentIds = &deleted
+	}
 	if next != "" {
 		response.NextPageToken = &next
 	}

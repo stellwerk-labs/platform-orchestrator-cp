@@ -8,6 +8,7 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -246,7 +247,7 @@ func (p *DataPlanePort) do(ctx context.Context, request DataPlaneRequest) (*http
 // avoid adding a round trip to every discovery/proof check. A missing/old or
 // incomplete DP never advertises the complete optional Core contract.
 func (p *DataPlanePort) SupportsProtocol(ctx context.Context, org string, item Installation, protocol string) bool {
-	if p == nil || protocol != EnvironmentObservationProtocol && protocol != EnvironmentObservationRecoveryProtocol {
+	if p == nil || protocol != EnvironmentObservationProtocol && protocol != EnvironmentObservationRecoveryProtocol && protocol != EnvironmentObservationDeletionProtocol {
 		return false
 	}
 	identity, err := uuid.Parse(item.ServiceUserID)
@@ -270,8 +271,10 @@ func (p *DataPlanePort) SupportsProtocol(ctx context.Context, org string, item I
 			Protocols []string `json:"protocols"`
 		}
 		if json.Unmarshal(result.Body, &capabilities) == nil {
-			for _, supportedProtocol := range capabilities.Protocols {
-				supported = supported || supportedProtocol == protocol
+			supported = slices.Contains(capabilities.Protocols, protocol)
+			if protocol == EnvironmentObservationDeletionProtocol {
+				// Core implements deletion handling using DP's existing recovery seal.
+				supported = slices.Contains(capabilities.Protocols, EnvironmentObservationProtocol) && slices.Contains(capabilities.Protocols, EnvironmentObservationRecoveryProtocol)
 			}
 		}
 	}
