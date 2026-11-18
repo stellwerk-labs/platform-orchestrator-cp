@@ -339,6 +339,12 @@ components:
         revision: {type: integer, format: int64}
         state: {type: string, enum: [active, revoked]}
         targets: {type: array, items: {$ref: '#/components/schemas/ObservationTarget'}}
+        pruned_environment_ids:
+          x-go-type-skip-optional-pointer: true
+          type: array
+          maxItems: 10000
+          description: Previously granted targets deleted before this exact command committed. Recorded with the command receipt.
+          items: {type: string, format: uuid}
         expires_at: {type: string, format: date-time}
         baseline_policy: {type: string, enum: [last-successful-ordinary-deployment]}
         execution_policy: {type: string, enum: [full-plan-if-idle]}
@@ -412,6 +418,11 @@ components:
       properties:
         items: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/ObservationTargetMetadata'}}
         next_page_token: {type: string}
+        deleted_environment_ids:
+          type: array
+          maxItems: 10000
+          description: On the first page only, explicitly requested UUIDs absent from this organization. Complete every page before reconciling saved membership; inactive but existing targets are not deleted.
+          items: {type: string, format: uuid}
     ObservationRedeployResolveRequest:
       type: object
       additionalProperties: false
@@ -427,6 +438,11 @@ components:
         request_id: {type: string, format: uuid}
         disposition: {type: string, enum: [accepted, not_started]}
         receipt: {$ref: '#/components/schemas/ObservationReceipt'}
+        reason:
+          x-go-type-skip-optional-pointer: true
+          type: string
+          enum: [deleted_target]
+          description: Only on not_started; recorded once with the terminal admission closure.
     ObservationRedeployResolution:
       type: object
       additionalProperties: false

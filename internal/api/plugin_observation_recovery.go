@@ -65,7 +65,7 @@ func observationRecoveryBody(kind string, raw []byte) ([]byte, error) {
 // closeObservationAdmission commits the no-forward decision before contacting DP.
 // A missing journal can be settled locally only after the caller's exact
 // historical scope is verified. Such a closure has no invented human actor.
-func (s *Server) closeObservationAdmission(ctx context.Context, org, plugin, kind string, id uuid.UUID, body []byte, run *uuid.UUID, validateMissing func(model.Tx) error) ([]byte, error) {
+func (s *Server) closeObservationAdmission(ctx context.Context, org, plugin, kind string, id uuid.UUID, body []byte, run *uuid.UUID, validateMissing func(model.Tx) error, validateNew func(model.Tx) error) ([]byte, error) {
 	digest := plugincontext.Digest(body)
 	tx, service, err := s.observationRecoveryTransaction(ctx, org, plugin, kind, id)
 	if err != nil {
@@ -110,12 +110,21 @@ func (s *Server) closeObservationAdmission(ctx context.Context, org, plugin, kin
 		if plugincontext.Digest(closure.Body) != digest {
 			return nil, pluginBoundaryError(409, "plugin_operation_conflict", "The retained request identity cannot be reconstructed exactly.")
 		}
+		if validateNew != nil {
+			if err := validateNew(tx); err != nil {
+				return nil, err
+			}
+		}
 		closure, err = model.RecordObservationClosureTx(ctx, tx, org, plugin, *closure)
 		if err != nil {
 			return nil, pluginModelError(err)
 		}
 		if closure.OriginalActorID == nil {
 			resolved, e := observationNotStarted(kind, id)
+			if e != nil {
+				return nil, e
+			}
+			resolved, e = deletedObservationResolution(ctx, tx, org, kind, closure.Body, resolved)
 			if e != nil {
 				return nil, e
 			}
@@ -182,6 +191,10 @@ func (s *Server) closeObservationAdmission(ctx context.Context, org, plugin, kin
 	if err != nil {
 		return nil, err
 	}
+	result.Body, err = deletedObservationResolution(ctx, effect, org, kind, closed.Body, result.Body)
+	if err != nil {
+		return nil, err
+	}
 	if err := model.CompleteObservationClosureTx(ctx, effect, org, plugin, kind, id, state, result.Body); err != nil {
 		return nil, err
 	}
@@ -199,6 +212,36 @@ func observationNotStarted(kind string, id uuid.UUID) ([]byte, error) {
 	}
 	return json.Marshal(observation.ObservationRedeployResolution{RequestId: id, Disposition: observation.ObservationRedeployResolutionDispositionNotStarted})
 }
+
+// A terminal closure is classified once, before its response is committed.
+// Completed closure bytes are replayed without rechecking current target state.
+func deletedObservationResolution(ctx context.Context, tx model.Tx, org, kind string, body, response []byte) ([]byte, error) {
+	if kind != model.ObservationAdmission {
+		return response, nil
+	}
+	var result observation.ObservationResolution
+	if err := json.Unmarshal(response, &result); err != nil {
+		return nil, err
+	}
+	if result.Disposition != observation.ObservationResolutionDispositionNotStarted {
+		return response, nil
+	}
+	var request observation.ObservationRequest
+	if err := json.Unmarshal(body, &request); err != nil {
+		return nil, err
+	}
+	deleted, err := model.DeletedObservationTargetsTx(ctx, tx, org, []uuid.UUID{request.EnvironmentUuid})
+	if err != nil {
+		return nil, err
+	}
+	if len(deleted) == 0 {
+		return response, nil
+	}
+	reason := observation.DeletedTarget
+	result.Reason = reason
+	return json.Marshal(result)
+}
+
 func (s *Server) recordObservationResolution(ctx context.Context, tx model.Tx, org, plugin, kind string, id uuid.UUID, raw []byte) (string, error) {
 	invalid := pluginBoundaryError(502, "plugin_response_invalid", "The Data Plane returned an invalid exact admission resolution.")
 	if kind == model.ObservationAdmission {
@@ -206,7 +249,7 @@ func (s *Server) recordObservationResolution(ctx context.Context, tx model.Tx, o
 		if err := decodeObservation(raw, &result); err != nil {
 			return "", err
 		}
-		if result.RequestId != id || !result.Disposition.Valid() || (result.Disposition == observation.ObservationResolutionDispositionAccepted) != (result.Receipt != nil) {
+		if result.RequestId != id || !result.Disposition.Valid() || result.Reason != "" || (result.Disposition == observation.ObservationResolutionDispositionAccepted) != (result.Receipt != nil) {
 			return "", invalid
 		}
 		if result.Receipt != nil {
@@ -262,17 +305,9 @@ func (s *Server) recordObservationResolution(ctx context.Context, tx model.Tx, o
 
 func (s *Server) ResolveObservationRequest(ctx context.Context, request observation.ResolveObservationRequestRequestObject) (observation.ResolveObservationRequestResponseObject, error) {
 	if request.Body == nil || request.RequestId == uuid.Nil || request.Body.RequestId != request.RequestId || request.Body.GrantId == uuid.Nil || request.Body.GrantRevision < 1 || request.Body.ProjectUuid == uuid.Nil || request.Body.EnvironmentUuid == uuid.Nil || request.Body.Occurrence.IsZero() || request.Body.AdmissionDeadline.IsZero() || request.Body.AdmissionDeadline.Before(request.Body.Occurrence) || request.Body.AdmissionDeadline.Sub(request.Body.Occurrence) > 10*time.Minute {
-		return nil, pluginBoundaryError(400, "plugin_request_invalid", "Resolution requires an exact expired observation admission key.")
+		return nil, pluginBoundaryError(400, "plugin_request_invalid", "Resolution requires an exact bounded observation admission key.")
 	}
-	if request.Body.AdmissionDeadline.After(time.Now().UTC()) {
-		policy, err := model.ReadInstallationMaintenance(ctx, s.Database)
-		if err != nil {
-			return nil, err
-		}
-		if s.MaintenanceDataPlaneURL == "" || !policy.Enabled || policy.Revision < 1 {
-			return nil, pluginBoundaryError(400, "plugin_request_invalid", "Early closure requires an applied maintenance barrier.")
-		}
-	}
+
 	body, err := json.Marshal(request.Body)
 	if err != nil {
 		return nil, err
@@ -283,7 +318,27 @@ func (s *Server) ResolveObservationRequest(ctx context.Context, request observat
 		}
 		return nil
 	}
-	result, err := s.closeObservationAdmission(ctx, request.OrgId, request.PluginId, model.ObservationAdmission, request.RequestId, body, nil, missing)
+	newClosure := func(tx model.Tx) error {
+		if !request.Body.AdmissionDeadline.After(time.Now().UTC()) {
+			return nil
+		}
+		deleted, err := model.DeletedObservationTargetsTx(ctx, tx, request.OrgId, []uuid.UUID{request.Body.EnvironmentUuid})
+		if err != nil {
+			return err
+		}
+		if len(deleted) == 1 {
+			return nil
+		}
+		policy, err := model.ReadInstallationMaintenance(ctx, s.Database)
+		if err != nil {
+			return err
+		}
+		if s.MaintenanceDataPlaneURL == "" || !policy.Enabled || policy.Revision < 1 {
+			return pluginBoundaryError(400, "plugin_request_invalid", "Early closure requires a deleted target or an applied maintenance barrier.")
+		}
+		return nil
+	}
+	result, err := s.closeObservationAdmission(ctx, request.OrgId, request.PluginId, model.ObservationAdmission, request.RequestId, body, nil, missing, newClosure)
 	if err != nil {
 		return nil, err
 	}
@@ -313,7 +368,7 @@ func (s *Server) ResolveObservationRedeployment(ctx context.Context, request obs
 		}
 		return nil
 	}
-	result, err := s.closeObservationAdmission(ctx, request.OrgId, request.PluginId, model.ObservationRedeploymentAdmission, request.RequestId, body, &request.Body.RunId, missing)
+	result, err := s.closeObservationAdmission(ctx, request.OrgId, request.PluginId, model.ObservationRedeploymentAdmission, request.RequestId, body, &request.Body.RunId, missing, nil)
 	if err != nil {
 		return nil, err
 	}

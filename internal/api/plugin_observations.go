@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"slices"
 	"time"
@@ -97,6 +98,9 @@ func (s *Server) AuthorizeObservationGrant(ctx context.Context, request observat
 		command.Targets = append(command.Targets, model.ExternalOperationEnvironment{ProjectID: target.ProjectId, EnvironmentID: target.EnvironmentId})
 	}
 	grant, err := model.ApplyObservationGrantCommandTx(ctx, tx, command, time.Now().UTC())
+	if errors.Is(err, model.ErrObservationTargetsUnavailable) {
+		return nil, pluginBoundaryError(409, "observation_targets_unavailable", "The selected Environments are no longer available. No grant change was committed.")
+	}
 	if err != nil {
 		return nil, pluginModelError(err)
 	}

@@ -225,6 +225,21 @@ func (e ObservationResolutionDisposition) Valid() bool {
 	}
 }
 
+// Defines values for ObservationResolutionReason.
+const (
+	DeletedTarget ObservationResolutionReason = "deleted_target"
+)
+
+// Valid indicates whether the value is a known member of the ObservationResolutionReason enum.
+func (e ObservationResolutionReason) Valid() bool {
+	switch e {
+	case DeletedTarget:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ObservationResultComplete.
 const (
 	True ObservationResultComplete = true
@@ -333,10 +348,13 @@ type ObservationGrant struct {
 	LastEffectRequestId string                          `json:"last_effect_request_id"`
 	OrgId               string                          `json:"org_id"`
 	PluginId            string                          `json:"plugin_id"`
-	Revision            int64                           `json:"revision"`
-	SourceOperation     string                          `json:"source_operation"`
-	State               ObservationGrantState           `json:"state"`
-	Targets             []ObservationTarget             `json:"targets"`
+
+	// PrunedEnvironmentIds Previously granted targets deleted before this exact command committed. Recorded with the command receipt.
+	PrunedEnvironmentIds []openapi_types.UUID  `json:"pruned_environment_ids,omitempty"`
+	Revision             int64                 `json:"revision"`
+	SourceOperation      string                `json:"source_operation"`
+	State                ObservationGrantState `json:"state"`
+	Targets              []ObservationTarget   `json:"targets"`
 }
 
 // ObservationGrantBaselinePolicy defines model for ObservationGrant.BaselinePolicy.
@@ -433,12 +451,18 @@ type ObservationRequest struct {
 // ObservationResolution defines model for ObservationResolution.
 type ObservationResolution struct {
 	Disposition ObservationResolutionDisposition `json:"disposition"`
-	Receipt     *ObservationReceipt              `json:"receipt,omitempty"`
-	RequestId   openapi_types.UUID               `json:"request_id"`
+
+	// Reason Only on not_started; recorded once with the terminal admission closure.
+	Reason    ObservationResolutionReason `json:"reason,omitempty"`
+	Receipt   *ObservationReceipt         `json:"receipt,omitempty"`
+	RequestId openapi_types.UUID          `json:"request_id"`
 }
 
 // ObservationResolutionDisposition defines model for ObservationResolution.Disposition.
 type ObservationResolutionDisposition string
+
+// ObservationResolutionReason Only on not_started; recorded once with the terminal admission closure.
+type ObservationResolutionReason string
 
 // ObservationResult defines model for ObservationResult.
 type ObservationResult struct {
@@ -489,8 +513,10 @@ type ObservationTargetMetadata struct {
 
 // ObservationTargetsPage defines model for ObservationTargetsPage.
 type ObservationTargetsPage struct {
-	Items         []ObservationTargetMetadata `json:"items"`
-	NextPageToken *string                     `json:"next_page_token,omitempty"`
+	// DeletedEnvironmentIds On the first page only, explicitly requested UUIDs absent from this organization. Complete every page before reconciling saved membership; inactive but existing targets are not deleted.
+	DeletedEnvironmentIds *[]openapi_types.UUID       `json:"deleted_environment_ids,omitempty"`
+	Items                 []ObservationTargetMetadata `json:"items"`
+	NextPageToken         *string                     `json:"next_page_token,omitempty"`
 }
 
 // ObservationTargetsQuery defines model for ObservationTargetsQuery.

@@ -23,19 +23,22 @@ const (
 
 // Observation authority has no Module or mutation scope and is independent of
 // frozen-version operation grants. Replacing any selection rotates its fence.
+var ErrObservationTargetsUnavailable = errors.New("selected observation targets are unavailable")
+
 type ObservationGrant struct {
-	LastEffectRequestID string                         `json:"last_effect_request_id"`
-	OrgID               string                         `json:"org_id"`
-	PluginID            string                         `json:"plugin_id"`
-	GrantID             uuid.UUID                      `json:"grant_id"`
-	ActorID             uuid.UUID                      `json:"actor_id"`
-	SourceOperation     string                         `json:"source_operation"`
-	Revision            int64                          `json:"revision"`
-	State               string                         `json:"state"`
-	Targets             []ExternalOperationEnvironment `json:"targets"`
-	ExpiresAt           *time.Time                     `json:"expires_at,omitempty"`
-	BaselinePolicy      string                         `json:"baseline_policy"`
-	ExecutionPolicy     string                         `json:"execution_policy"`
+	PrunedEnvironmentIDs []uuid.UUID                    `json:"pruned_environment_ids,omitempty"`
+	LastEffectRequestID  string                         `json:"last_effect_request_id"`
+	OrgID                string                         `json:"org_id"`
+	PluginID             string                         `json:"plugin_id"`
+	GrantID              uuid.UUID                      `json:"grant_id"`
+	ActorID              uuid.UUID                      `json:"actor_id"`
+	SourceOperation      string                         `json:"source_operation"`
+	Revision             int64                          `json:"revision"`
+	State                string                         `json:"state"`
+	Targets              []ExternalOperationEnvironment `json:"targets"`
+	ExpiresAt            *time.Time                     `json:"expires_at,omitempty"`
+	BaselinePolicy       string                         `json:"baseline_policy"`
+	ExecutionPolicy      string                         `json:"execution_policy"`
 }
 
 type ObservationGrantCommand struct {
@@ -65,6 +68,20 @@ func ReadObservationGrantTx(ctx context.Context, tx Tx, org, plugin string, id u
 	}
 	if err := json.Unmarshal(targets, &grant.Targets); err != nil {
 		return nil, err
+	}
+	var response []byte
+	err = tx.QueryRowContext(ctx, `SELECT response FROM environment_observation_grant_commands WHERE org_id=$1 AND plugin_id=$2 AND grant_id=$3 AND request_id=$4`, org, plugin, id, grant.LastEffectRequestID).Scan(&response)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+	if err == nil {
+		var receipt struct {
+			PrunedEnvironmentIDs []uuid.UUID `json:"pruned_environment_ids"`
+		}
+		if err := json.Unmarshal(response, &receipt); err != nil {
+			return nil, err
+		}
+		grant.PrunedEnvironmentIDs = receipt.PrunedEnvironmentIDs
 	}
 	return grant, nil
 }
@@ -116,37 +133,28 @@ func ApplyObservationGrantCommandTx(ctx context.Context, tx Tx, command Observat
 		return nil, NewErrConflict("observation grant revision changed")
 	}
 	seen := map[uuid.UUID]bool{}
-	projects := make([]string, 0, len(command.Targets))
 	environments := make([]string, 0, len(command.Targets))
 	for _, target := range command.Targets {
 		if target.ProjectID == uuid.Nil || target.EnvironmentID == uuid.Nil || seen[target.EnvironmentID] {
 			return nil, NewErrBadRequest("observation targets must be unique immutable identities")
 		}
 		seen[target.EnvironmentID] = true
-		projects = append(projects, target.ProjectID.String())
 		environments = append(environments, target.EnvironmentID.String())
 	}
-	if len(command.Targets) > 0 {
-		var missing, changed int
-		err := tx.QueryRowContext(ctx, `SELECT count(*) FILTER(WHERE e.uuid IS NULL),count(*) FILTER(WHERE e.uuid IS NOT NULL AND e.project_uuid<>t.project_uuid) FROM unnest($2::uuid[],$3::uuid[]) t(project_uuid,environment_uuid) LEFT JOIN envs e ON e.org_id=$1 AND e.uuid=t.environment_uuid`, command.OrgID, pq.Array(projects), pq.Array(environments)).Scan(&missing, &changed)
-		if err != nil {
-			return nil, err
-		}
-		if missing > 0 {
-			return nil, NewErrNotFound("observation target Environment not found")
-		}
-		if changed > 0 {
-			return nil, NewErrConflict("observation target project changed")
-		}
+	kept, pruned, err := normalizeObservationGrantTargetsTx(ctx, tx, command.OrgID, grant.Targets, command.Targets, environments)
+	if err != nil {
+		return nil, err
 	}
+	grant.PrunedEnvironmentIDs = pruned
+
 	grant.LastEffectRequestID = command.RequestID
 	grant.ActorID = command.ActorID
 	grant.SourceOperation = command.SourceOperation
 	grant.Revision++
 	grant.State = observationGrantActive
-	grant.Targets = command.Targets
+	grant.Targets = kept
 	grant.ExpiresAt = command.ExpiresAt
-	if command.Action == observationGrantRevoke {
+	if command.Action == observationGrantRevoke || len(kept) == 0 {
 		grant.State = observationGrantRevoked
 		grant.Targets = []ExternalOperationEnvironment{}
 		grant.ExpiresAt = nil
@@ -157,6 +165,12 @@ func ApplyObservationGrantCommandTx(ctx context.Context, tx Tx, command Observat
 		return nil, err
 	}
 	if grant.State == observationGrantActive {
+		projects := make([]string, 0, len(grant.Targets))
+		environments = make([]string, 0, len(grant.Targets))
+		for _, target := range grant.Targets {
+			projects = append(projects, target.ProjectID.String())
+			environments = append(environments, target.EnvironmentID.String())
+		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO environment_observation_grant_targets(org_id,plugin_id,grant_id,revision,project_uuid,environment_uuid) SELECT $1,$2,$3,$4,t.project_uuid,t.environment_uuid FROM unnest($5::uuid[],$6::uuid[]) t(project_uuid,environment_uuid)`, grant.OrgID, grant.PluginID, grant.GrantID, grant.Revision, pq.Array(projects), pq.Array(environments)); err != nil {
 			return nil, err
 		}

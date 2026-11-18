@@ -94,19 +94,20 @@ func TestRequiredObservationProtocolRejectsOldDPWithoutAffectingLegacyPlugin(t *
 }
 
 func TestObservationRecoveryRequiresSeparateCapabilityWithoutChangingOldProtocol(t *testing.T) {
-	for _, recovery := range []bool{false, true} {
-		name := "old-dp"
-		if recovery {
-			name = "recovery-dp"
-		}
-		t.Run(name, func(t *testing.T) {
+	for _, tc := range []struct {
+		name             string
+		protocols        []string
+		legacy, complete bool
+	}{
+		{"base-only", []string{EnvironmentObservationProtocol}, true, false},
+		{"base-and-recovery", []string{EnvironmentObservationProtocol, EnvironmentObservationRecoveryProtocol}, true, true},
+		{"recovery-only", []string{EnvironmentObservationRecoveryProtocol}, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			_, key, e := ed25519.GenerateKey(nil)
 			require.NoError(t, e)
 			peer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				protocols := []string{EnvironmentObservationProtocol}
-				if recovery {
-					protocols = append(protocols, EnvironmentObservationRecoveryProtocol)
-				}
+				protocols := tc.protocols
 				w.Header().Set("Content-Type", "application/json")
 				_ = json.NewEncoder(w).Encode(map[string]any{"protocols": protocols})
 			}))
@@ -116,13 +117,17 @@ func TestObservationRecoveryRequiresSeparateCapabilityWithoutChangingOldProtocol
 			current.ID = "dev.example.new-observer"
 			current.InstallationID = uuid.NewString()
 			current.RequiredProtocols = []string{EnvironmentObservationProtocol, EnvironmentObservationRecoveryProtocol}
-			for _, item := range []*Installation{&old, &current} {
+			deletion := current
+			deletion.ID = "dev.example.deletion-observer"
+			deletion.InstallationID = uuid.NewString()
+			deletion.RequiredProtocols = []string{EnvironmentObservationProtocol, EnvironmentObservationRecoveryProtocol, EnvironmentObservationDeletionProtocol}
+			for _, item := range []*Installation{&old, &current, &deletion} {
 				permission := "plugin." + item.ID + ".manage"
 				item.AdmissionCheckerID = userid.NewServiceUserTokenId().String()
 				item.ServiceGrants = []ServiceGrant{{Action: "observation.capabilities", Permission: permission, Scope: "organization"}}
 				item.Capabilities = []Capability{{ID: permission, DisplayName: "Manage", Description: "Manage observer", Category: "Observer", Level: "manage", Scopes: []string{"organization"}}}
 			}
-			registry, e := NewInstallationRegistry([]Installation{old, current}, true)
+			registry, e := NewInstallationRegistry([]Installation{old, current, deletion}, true)
 			require.NoError(t, e)
 			gateway := &Gateway{Registry: registry, SigningKey: key, Issuer: "cp"}
 			port, e := NewDataPlanePort(peer.URL, gateway, true)
@@ -130,13 +135,20 @@ func TestObservationRecoveryRequiresSeparateCapabilityWithoutChangingOldProtocol
 			registry.Protocols = port
 			descriptor, ok := registry.Get(t.Context(), "acme", old.ID)
 			require.True(t, ok)
-			require.Equal(t, StateAvailable, descriptor.State)
+			legacy := StateIncompatible
+			if tc.legacy {
+				legacy = StateAvailable
+			}
+			require.Equal(t, legacy, descriptor.State)
 			descriptor, ok = registry.Get(t.Context(), "acme", current.ID)
 			require.True(t, ok)
 			expected := StateIncompatible
-			if recovery {
+			if tc.complete {
 				expected = StateAvailable
 			}
+			require.Equal(t, expected, descriptor.State)
+			descriptor, ok = registry.Get(t.Context(), "acme", deletion.ID)
+			require.True(t, ok)
 			require.Equal(t, expected, descriptor.State)
 		})
 	}
