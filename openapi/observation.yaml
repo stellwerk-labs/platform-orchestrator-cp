@@ -5,6 +5,23 @@ info:
 security:
   - userIdHeader: []
 paths:
+  /orgs/{orgId}/plugins/{pluginId}/observations/v1/pipeline-choices:
+    parameters:
+      - $ref: '#/components/parameters/OrgID'
+      - $ref: '#/components/parameters/PluginID'
+    post:
+      operationId: QueryObservationPipelineChoices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ObservationPipelineChoicesRequest'}
+      responses:
+        '200':
+          description: Scoped current pipeline preferences and Runner eligibility, without authoring authority.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PluginPipelineChoices'}
   /orgs/{orgId}/plugins/{pluginId}/observations/v1/runs:
     parameters:
       - $ref: '#/components/parameters/OrgID'
@@ -204,6 +221,56 @@ components:
       required: true
       schema: {type: string}
   schemas:
+    PluginPipelineCompatibility:
+      type: object
+      required: [compatible]
+      properties:
+        compatible: {type: boolean}
+        reason: {type: string}
+    PluginPipelineChoice:
+      type: object
+      required: [reference, version, name, deploy, rollback]
+      properties:
+        reference: {$ref: '#/components/schemas/PipelineReference'}
+        pipeline_id: {type: string, format: uuid}
+        version: {type: integer, minimum: 1}
+        name: {type: string}
+        deploy: {$ref: '#/components/schemas/PluginPipelineCompatibility'}
+        rollback: {$ref: '#/components/schemas/PluginPipelineCompatibility'}
+    PluginPipelineChoices:
+      type: object
+      required: [protocol, versions, default_source]
+      properties:
+        protocol: {type: string, enum: [stellwerk.plugin-pipelines/v1]}
+        versions:
+          type: array
+          items: {$ref: '#/components/schemas/PluginPipelineChoice'}
+        effective_default: {$ref: '#/components/schemas/PipelineReference'}
+        default_source: {type: string, enum: [environment, project, none]}
+        effective_rollback_default: {$ref: '#/components/schemas/PipelineReference'}
+        rollback_default_source: {type: string, enum: [environment, project, none]}
+    PipelineReference:
+      type: object
+      additionalProperties: false
+      required: [digest]
+      properties:
+        version_id: {type: string, format: uuid}
+        builtin: {type: string, enum: [default]}
+        digest: {type: string, pattern: '^[a-f0-9]{64}$'}
+    DeploymentPipelineLifecycle:
+      type: object
+      additionalProperties: false
+      required: [reference, version, digest, phase, infrastructure_applied]
+      properties:
+        reference: {$ref: '#/components/schemas/PipelineReference'}
+        pipeline_id: {type: string, format: uuid}
+        version_id: {type: string, format: uuid}
+        version: {type: integer, minimum: 1}
+        digest: {type: string, pattern: '^[a-f0-9]{64}$'}
+        phase: {type: string}
+        infrastructure_applied: {type: boolean}
+        attention_reason: {type: string}
+        plan_subject: {type: string}
     ObservationChange:
       type: object
       additionalProperties: false
@@ -264,6 +331,8 @@ components:
       additionalProperties: false
       required: [grant_id, grant_revision, project_id, env_id, project_uuid, environment_uuid, request_id, occurrence, admission_deadline]
       properties:
+        expected_baseline_id: {type: string, format: uuid}
+        expected_baseline_fingerprint: {type: string, pattern: '^sha256:[a-f0-9]{64}$'}
         grant_id: {type: string, format: uuid}
         grant_revision: {type: integer, format: int64, minimum: 1}
         project_id: {type: string, minLength: 1, maxLength: 63}
@@ -280,7 +349,7 @@ components:
       properties:
         request_id: {type: string, format: uuid}
         disposition: {type: string, enum: [accepted, skipped]}
-        reason: {type: string, enum: [accepted, busy, runner_full, unsupported, no_baseline, outcome_unreconciled, expired]}
+        reason: {type: string, enum: [accepted, busy, runner_full, unsupported, no_baseline, outcome_unreconciled, expired, baseline_changed]}
         recorded_at: {type: string, format: date-time}
         run_id: {type: string, format: uuid}
         baseline_id: {type: string, format: uuid}
@@ -353,6 +422,7 @@ components:
       additionalProperties: false
       required: [request_id, project_id, env_id, project_uuid, environment_uuid, baseline_id, baseline_fingerprint]
       properties:
+        pipeline: {$ref: '#/components/schemas/PipelineReference'}
         request_id: {type: string, format: uuid}
         project_id: {type: string, minLength: 1, maxLength: 63}
         env_id: {type: string, minLength: 1, maxLength: 63}
@@ -366,6 +436,9 @@ components:
       additionalProperties: false
       required: [request_id, deployment_id, baseline_id, status]
       properties:
+        resulting_baseline_fingerprint: {type: string, pattern: '^sha256:[a-f0-9]{64}$'}
+        pipeline: {$ref: '#/components/schemas/DeploymentPipelineLifecycle'}
+        admission_closed: {type: boolean}
         request_id: {type: string, format: uuid}
         deployment_id: {type: string, format: uuid}
         baseline_id: {type: string, format: uuid}
@@ -376,6 +449,10 @@ components:
       required: [proof]
       properties:
         proof: {$ref: '#/components/schemas/ObservationDelegationProof'}
+        search:
+          type: string
+          maxLength: 200
+          description: Optional literal case-insensitive substring of Project or Environment identifiers and display names, trimmed and limited to 200 UTF-8 bytes. Applied before pagination and bound into the page cursor.
         project_ids:
           type: array
           maxItems: 1000
@@ -451,3 +528,11 @@ components:
         request_id: {type: string, format: uuid}
         disposition: {type: string, enum: [accepted, not_started]}
         receipt: {$ref: '#/components/schemas/ObservationRedeployReceipt'}
+    ObservationPipelineChoicesRequest:
+      type: object
+      additionalProperties: false
+      required: [project_id, env_id, proof]
+      properties:
+        project_id: {type: string}
+        env_id: {type: string}
+        proof: {$ref: '#/components/schemas/ObservationDelegationProof'}

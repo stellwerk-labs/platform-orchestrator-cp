@@ -7673,6 +7673,182 @@
       }
     },
     "schemas": {
+      "PluginPipelineCompatibility": {
+        "type": "object",
+        "required": [
+          "compatible"
+        ],
+        "properties": {
+          "compatible": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "PluginPipelineChoice": {
+        "type": "object",
+        "required": [
+          "reference",
+          "version",
+          "name",
+          "deploy",
+          "rollback"
+        ],
+        "properties": {
+          "reference": {
+            "$ref": "#/components/schemas/PipelineReference"
+          },
+          "pipeline_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string"
+          },
+          "deploy": {
+            "$ref": "#/components/schemas/PluginPipelineCompatibility"
+          },
+          "rollback": {
+            "$ref": "#/components/schemas/PluginPipelineCompatibility"
+          }
+        }
+      },
+      "PluginPipelineChoices": {
+        "type": "object",
+        "required": [
+          "protocol",
+          "versions",
+          "default_source"
+        ],
+        "properties": {
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "stellwerk.plugin-pipelines/v1"
+            ]
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PluginPipelineChoice"
+            }
+          },
+          "effective_default": {
+            "$ref": "#/components/schemas/PipelineReference"
+          },
+          "default_source": {
+            "type": "string",
+            "enum": [
+              "environment",
+              "project",
+              "none"
+            ]
+          },
+          "effective_rollback_default": {
+            "$ref": "#/components/schemas/PipelineReference"
+          },
+          "rollback_default_source": {
+            "type": "string",
+            "enum": [
+              "environment",
+              "project",
+              "none"
+            ]
+          }
+        }
+      },
+      "PipelineReference": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "digest"
+        ],
+        "properties": {
+          "version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "builtin": {
+            "type": "string",
+            "enum": [
+              "default"
+            ]
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "DeploymentPipelineLifecycle": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reference",
+          "version",
+          "digest",
+          "phase",
+          "infrastructure_applied"
+        ],
+        "properties": {
+          "reference": {
+            "$ref": "#/components/schemas/PipelineReference"
+          },
+          "pipeline_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "infrastructure_applied": {
+            "type": "boolean"
+          },
+          "attention_reason": {
+            "type": "string"
+          },
+          "plan_subject": {
+            "type": "string"
+          }
+        }
+      },
+      "DeploymentPipelineBindings": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "forward",
+          "forward_only"
+        ],
+        "properties": {
+          "forward": {
+            "$ref": "#/components/schemas/PipelineReference"
+          },
+          "rollback": {
+            "$ref": "#/components/schemas/PipelineReference"
+          },
+          "forward_only": {
+            "type": "boolean"
+          }
+        }
+      },
       "PluginManagerCommand": {
         "type": "object",
         "additionalProperties": false,
@@ -8559,6 +8735,9 @@
           "mode"
         ],
         "properties": {
+          "pipeline": {
+            "$ref": "#/components/schemas/PipelineReference"
+          },
           "grant_fence": {
             "type": "integer",
             "format": "int64",
@@ -8732,6 +8911,40 @@
           }
         }
       },
+      "DeploymentAdmissionExternalDispatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "plugin_id",
+          "operation_id",
+          "dispatch_id",
+          "fence",
+          "request_digest"
+        ],
+        "properties": {
+          "plugin_id": {
+            "type": "string"
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "dispatch_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "fence": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "request_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
       "DeploymentAdmissionRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -8744,6 +8957,43 @@
           "module_versions"
         ],
         "properties": {
+          "external_dispatch": {
+            "$ref": "#/components/schemas/DeploymentAdmissionExternalDispatch"
+          },
+          "native_target": {
+            "$ref": "#/components/schemas/NativeExecutionTargetReference"
+          },
+          "native_admission_watermark": {
+            "$ref": "#/components/schemas/NativeAdmissionWatermark"
+          },
+          "pipeline": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "pipeline_id",
+              "version_id",
+              "version",
+              "digest"
+            ],
+            "properties": {
+              "pipeline_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "version_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          },
           "actor_id": {
             "type": "string",
             "format": "uuid"
@@ -8765,12 +9015,16 @@
             "enum": [
               "deploy",
               "rollback",
-              "destroy"
+              "destroy",
+              "plan_only",
+              "rollback_plan"
             ],
             "x-enum-varnames": [
               "AdmissionModeDeploy",
               "AdmissionModeRollback",
-              "AdmissionModeDestroy"
+              "AdmissionModeDestroy",
+              "AdmissionModePlanOnly",
+              "AdmissionModeRollbackPlan"
             ]
           },
           "module_versions": {
@@ -8809,6 +9063,83 @@
               "type": "string",
               "format": "uuid"
             }
+          }
+        }
+      },
+      "NativeAdmissionWatermark": {
+        "description": "Latest Core-checked non-absent Native admission known by the Data Plane. Omitted only for the first Native admission or historical legacy requests; it is not a state-head identifier.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "admission_id",
+          "epoch"
+        ],
+        "properties": {
+          "admission_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          },
+          "epoch": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        }
+      },
+      "NativeExecutionTargetReference": {
+        "description": "Exact native Runner authority and typed state-configuration identity. The digest is not rendered backend HCL or retained artifact storage identity.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "runner_id",
+          "runner_uuid",
+          "runtime_version",
+          "pipeline_version",
+          "tools_digest",
+          "state_backend_type",
+          "state_configuration_digest"
+        ],
+        "properties": {
+          "runner_id": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 128,
+            "pattern": "^[a-z][a-z0-9_-]+$"
+          },
+          "runner_uuid": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          },
+          "runtime_version": {
+            "type": "string",
+            "enum": [
+              "stellwerk.runner.rollout/v2"
+            ],
+            "x-enum-varnames": [
+              "NativeTargetRuntimeV2"
+            ]
+          },
+          "pipeline_version": {
+            "type": "string",
+            "enum": [
+              "stellwerk.pipeline/v2"
+            ],
+            "x-enum-varnames": [
+              "NativeTargetPipelineV2"
+            ]
+          },
+          "tools_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "state_backend_type": {
+            "$ref": "#/components/schemas/StateStorageType"
+          },
+          "state_configuration_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
           }
         }
       },
@@ -8988,6 +9319,20 @@
           "environments"
         ],
         "properties": {
+          "pipeline": {
+            "$ref": "#/components/schemas/PipelineReference"
+          },
+          "rollback_pipeline": {
+            "$ref": "#/components/schemas/PipelineReference"
+          },
+          "forward_only": {
+            "type": "boolean"
+          },
+          "use_rollback_default": {
+            "x-go-type-skip-optional-pointer": true,
+            "type": "boolean",
+            "description": "Explicit opt-in during plan preparation to resolve a missing rollback pipeline from its own configured default. Absent or false retains legacy explicit rollback selection."
+          },
           "proof": {
             "$ref": "#/components/schemas/PluginDelegationProof"
           },
@@ -9013,13 +9358,15 @@
               "readiness",
               "plan",
               "deployment",
-              "dispatch"
+              "dispatch",
+              "pipeline_choices"
             ],
             "x-enum-varnames": [
               "PluginDeploymentReadRequestKindReadiness",
               "PluginDeploymentReadRequestKindPlan",
               "PluginDeploymentReadRequestKindDeployment",
-              "PluginDeploymentReadRequestKindDispatch"
+              "PluginDeploymentReadRequestKindDispatch",
+              "PluginDeploymentReadRequestKindPipelineChoices"
             ]
           },
           "environments": {
@@ -9659,6 +10006,39 @@
           "actions"
         ],
         "properties": {
+          "forward_only": {
+            "type": "boolean",
+            "description": "Explicit reviewed opt-out from rollback; absence identifies a retained legacy operation."
+          },
+          "pipelines": {
+            "type": "array",
+            "maxItems": 10000,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "project_uuid",
+                "environment_uuid",
+                "forward"
+              ],
+              "properties": {
+                "project_uuid": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "environment_uuid": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "forward": {
+                  "$ref": "#/components/schemas/PipelineReference"
+                },
+                "rollback": {
+                  "$ref": "#/components/schemas/PipelineReference"
+                }
+              }
+            }
+          },
           "fingerprint": {
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
@@ -10573,9 +10953,15 @@
           "updated_at",
           "project_id",
           "env_type_id",
-          "status"
+          "status",
+          "native_first_eligible"
         ],
         "properties": {
+          "native_first_eligible": {
+            "type": "boolean",
+            "readOnly": true,
+            "description": "Server-owned Native-first eligibility established only at Environment creation by its selected Native Runner rule. It is never enabled by refresh, labels or deployment input."
+          },
           "deletion_policy": {
             "readOnly": true,
             "description": "Canonical accepted deletion options for this lifecycle. Omitted for legacy unknown policy, which requires an explicit DELETE before new Destroy admission. True flags cannot be undone by retries.",
@@ -11445,7 +11831,8 @@
           "kubernetes-gke",
           "kubernetes-agent",
           "kubernetes-eks",
-          "serverless-ecs"
+          "serverless-ecs",
+          "native-agent"
         ]
       },
       "StateStorageType": {
@@ -11978,6 +12365,7 @@
         "required": [
           "org_id",
           "id",
+          "uuid",
           "created_at",
           "updated_at"
         ],
@@ -11991,6 +12379,12 @@
             "description": "The unique identifier for the runner under the organization.",
             "type": "string",
             "example": "my-k8s-runner"
+          },
+          "uuid": {
+            "description": "The server-issued immutable identity of this runner registration. Recreating a deleted runner creates a new identity.",
+            "type": "string",
+            "format": "uuid",
+            "readOnly": true
           },
           "description": {
             "description": "An optional text description for this runner.",
@@ -12059,6 +12453,9 @@
             "$ref": "#/components/schemas/K8sAgentRunnerConfiguration"
           },
           {
+            "$ref": "#/components/schemas/NativeAgentRunnerConfiguration"
+          },
+          {
             "$ref": "#/components/schemas/ServerlessEcsRunnerConfiguration"
           }
         ],
@@ -12069,6 +12466,7 @@
             "kubernetes-gke": "#/components/schemas/K8sGkeRunnerConfiguration",
             "kubernetes-eks": "#/components/schemas/K8sEksRunnerConfiguration",
             "kubernetes-agent": "#/components/schemas/K8sAgentRunnerConfiguration",
+            "native-agent": "#/components/schemas/NativeAgentRunnerConfiguration",
             "serverless-ecs": "#/components/schemas/ServerlessEcsRunnerConfiguration"
           }
         }
@@ -12089,6 +12487,9 @@
             "$ref": "#/components/schemas/K8sAgentRunnerConfigurationUpdateBody"
           },
           {
+            "$ref": "#/components/schemas/NativeAgentRunnerConfigurationUpdateBody"
+          },
+          {
             "$ref": "#/components/schemas/ServerlessEcsRunnerConfigurationUpdateBody"
           }
         ],
@@ -12099,6 +12500,7 @@
             "kubernetes-gke": "#/components/schemas/K8sGkeRunnerConfigurationUpdateBody",
             "kubernetes-eks": "#/components/schemas/K8sEksRunnerConfigurationUpdateBody",
             "kubernetes-agent": "#/components/schemas/K8sAgentRunnerConfigurationUpdateBody",
+            "native-agent": "#/components/schemas/NativeAgentRunnerConfigurationUpdateBody",
             "serverless-ecs": "#/components/schemas/ServerlessEcsRunnerConfigurationUpdateBody"
           }
         }
@@ -12509,6 +12911,95 @@
           }
         }
       },
+      "RunnerExecutionCatalogue": {
+        "description": "Operator-approved public inventory. The digest binds private local configuration and executable bytes; it cannot be reconstructed from this projection. This metadata does not enroll a site or enable native execution by itself.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "contract_version",
+          "runtime_version",
+          "tools_digest",
+          "tools"
+        ],
+        "properties": {
+          "contract_version": {
+            "type": "string",
+            "enum": [
+              "stellwerk.runner.catalogue/v1"
+            ]
+          },
+          "runtime_version": {
+            "type": "string",
+            "enum": [
+              "stellwerk.runner.rollout/v1",
+              "stellwerk.runner.rollout/v2"
+            ]
+          },
+          "tools_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "tools": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "$ref": "#/components/schemas/RunnerExecutionTool"
+            }
+          }
+        }
+      },
+      "RunnerExecutionTool": {
+        "description": "Public metadata for one installed approved tool. Contains no executable, environment, credential or local path.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "phase",
+          "retry",
+          "required_capabilities"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_.-]+$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "pre_plan",
+              "plan_check",
+              "post_apply"
+            ]
+          },
+          "retry": {
+            "type": "string",
+            "enum": [
+              "read_only",
+              "receipt",
+              "unsafe"
+            ]
+          },
+          "required_capabilities": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 32,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z][a-z0-9_.:/-]*$"
+            }
+          }
+        }
+      },
       "RunnerConfigurationSummary": {
         "description": "A summary of the runner configuration.",
         "type": "object",
@@ -12517,6 +13008,18 @@
             "type": "integer",
             "minimum": 1,
             "description": "Configured concurrent job limit. Absent means legacy unlimited admission."
+          },
+          "capabilities": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 32,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z][a-z0-9_.:/-]*$"
+            },
+            "description": "Operator-declared execution and connectivity capabilities of the configured Runner image and site. Omission preserves existing capabilities on update; null clears them on update only. Bundled software does not imply network access."
           },
           "supported_protocols": {
             "type": "array",
@@ -12537,10 +13040,26 @@
         "description": "Runner configuration for a Kubernetes cluster.",
         "type": "object",
         "properties": {
+          "native_execution": {
+            "description": "Approved native execution inventory, limited to 64 KiB. Omission preserves it on update; explicit null clears it on update only. Dependent protocols and capabilities must remain consistent.",
+            "$ref": "#/components/schemas/RunnerExecutionCatalogue"
+          },
           "max_parallel_jobs": {
             "type": "integer",
             "minimum": 1,
             "description": "Maximum concurrent jobs across all Environments using this Runner. Omission preserves unlimited legacy admission. Reducing the limit drains existing jobs before new admission."
+          },
+          "capabilities": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 32,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z][a-z0-9_.:/-]*$"
+            },
+            "description": "Operator-declared execution and connectivity capabilities of the configured Runner image and site. Omission preserves existing capabilities on update; null clears them on update only. Bundled software does not imply network access."
           },
           "supported_protocols": {
             "type": "array",
@@ -12572,10 +13091,26 @@
         "description": "Runner configuration for a GKE cluster.",
         "type": "object",
         "properties": {
+          "native_execution": {
+            "description": "Approved native execution inventory, limited to 64 KiB. Omission preserves it on update; explicit null clears it on update only. Dependent protocols and capabilities must remain consistent.",
+            "$ref": "#/components/schemas/RunnerExecutionCatalogue"
+          },
           "max_parallel_jobs": {
             "type": "integer",
             "minimum": 1,
             "description": "Maximum concurrent jobs across all Environments using this Runner. Omission preserves unlimited legacy admission. Reducing the limit drains existing jobs before new admission."
+          },
+          "capabilities": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 32,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z][a-z0-9_.:/-]*$"
+            },
+            "description": "Operator-declared execution and connectivity capabilities of the configured Runner image and site. Omission preserves existing capabilities on update; null clears them on update only. Bundled software does not imply network access."
           },
           "supported_protocols": {
             "type": "array",
@@ -12607,10 +13142,26 @@
         "description": "Runner configuration for an EKS cluster.",
         "type": "object",
         "properties": {
+          "native_execution": {
+            "description": "Approved native execution inventory, limited to 64 KiB. Omission preserves it on update; explicit null clears it on update only. Dependent protocols and capabilities must remain consistent.",
+            "$ref": "#/components/schemas/RunnerExecutionCatalogue"
+          },
           "max_parallel_jobs": {
             "type": "integer",
             "minimum": 1,
             "description": "Maximum concurrent jobs across all Environments using this Runner. Omission preserves unlimited legacy admission. Reducing the limit drains existing jobs before new admission."
+          },
+          "capabilities": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 32,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z][a-z0-9_.:/-]*$"
+            },
+            "description": "Operator-declared execution and connectivity capabilities of the configured Runner image and site. Omission preserves existing capabilities on update; null clears them on update only. Bundled software does not imply network access."
           },
           "supported_protocols": {
             "type": "array",
@@ -12638,14 +13189,129 @@
           "cluster"
         ]
       },
+      "NativeAgentRunnerConfiguration": {
+        "description": "A runtime-independent native pool registration. Create requires approved inventory, capabilities and v2 pipeline protocols. Responses preserve absence after explicit clears. The public key, capacity and registration identity remain retained; metadata alone does not activate execution.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "key",
+          "max_parallel_jobs"
+        ],
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/RunnerType"
+          },
+          "key": {
+            "$ref": "#/components/schemas/K8sAgentRunnerKey"
+          },
+          "max_parallel_jobs": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Explicit admission limit for the logical native pool. There is no unlimited native default. Updating this limit does not stop already admitted work."
+          },
+          "supported_protocols": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 16,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "description": "Create requires stellwerk.pipeline/v2 and stellwerk.pipeline.plan-apply/v2. Their legacy v1 variants are forbidden. This field may be absent after clearing a disabled registration."
+          },
+          "capabilities": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 32,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z][a-z0-9_.:/-]*$"
+            }
+          },
+          "native_execution": {
+            "$ref": "#/components/schemas/RunnerExecutionCatalogue"
+          }
+        }
+      },
+      "NativeAgentRunnerConfigurationUpdateBody": {
+        "description": "Updates a retained native registration. Omission preserves fields; clearing only native_execution disables new native admission. Key and capacity cannot be cleared.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/RunnerType"
+          },
+          "key": {
+            "$ref": "#/components/schemas/K8sAgentRunnerKey"
+          },
+          "max_parallel_jobs": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "supported_protocols": {
+            "nullable": true,
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 16,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "capabilities": {
+            "nullable": true,
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 32,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z][a-z0-9_.:/-]*$"
+            }
+          },
+          "native_execution": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RunnerExecutionCatalogue"
+              }
+            ]
+          }
+        }
+      },
       "K8sAgentRunnerConfiguration": {
         "description": "Runner configuration for a Kubernetes Agent.",
         "type": "object",
         "properties": {
+          "native_execution": {
+            "description": "Approved native execution inventory, limited to 64 KiB. Omission preserves it on update; explicit null clears it on update only. Dependent protocols and capabilities must remain consistent.",
+            "$ref": "#/components/schemas/RunnerExecutionCatalogue"
+          },
           "max_parallel_jobs": {
             "type": "integer",
             "minimum": 1,
             "description": "Maximum concurrent jobs across all Environments using this Runner. Omission preserves unlimited legacy admission. Reducing the limit drains existing jobs before new admission."
+          },
+          "capabilities": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 32,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z][a-z0-9_.:/-]*$"
+            },
+            "description": "Operator-declared execution and connectivity capabilities of the configured Runner image and site. Omission preserves existing capabilities on update; null clears them on update only. Bundled software does not imply network access."
           },
           "supported_protocols": {
             "type": "array",
@@ -12677,10 +13343,26 @@
         "description": "Runner configuration for executing on AWS ECS Fargate.",
         "type": "object",
         "properties": {
+          "native_execution": {
+            "description": "Approved native execution inventory, limited to 64 KiB. Omission preserves it on update; explicit null clears it on update only. Dependent protocols and capabilities must remain consistent.",
+            "$ref": "#/components/schemas/RunnerExecutionCatalogue"
+          },
           "max_parallel_jobs": {
             "type": "integer",
             "minimum": 1,
             "description": "Maximum concurrent jobs across all Environments using this Runner. Omission preserves unlimited legacy admission. Reducing the limit drains existing jobs before new admission."
+          },
+          "capabilities": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 32,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z][a-z0-9_.:/-]*$"
+            },
+            "description": "Operator-declared execution and connectivity capabilities of the configured Runner image and site. Omission preserves existing capabilities on update; null clears them on update only. Bundled software does not imply network access."
           },
           "supported_protocols": {
             "type": "array",
@@ -12830,11 +13512,33 @@
         "description": "Object to update an existing runner configuration for a Kubernetes cluster.",
         "type": "object",
         "properties": {
+          "native_execution": {
+            "description": "Approved native execution inventory, limited to 64 KiB. Omission preserves it on update; explicit null clears it on update only. Dependent protocols and capabilities must remain consistent.",
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RunnerExecutionCatalogue"
+              }
+            ]
+          },
           "max_parallel_jobs": {
             "nullable": true,
             "type": "integer",
             "minimum": 1,
             "description": "Maximum concurrent jobs across all Environments using this Runner. Omission preserves the configured value. Explicit null clears the limit to unlimited. Reducing the limit drains existing jobs before new admission."
+          },
+          "capabilities": {
+            "nullable": true,
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 32,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z][a-z0-9_.:/-]*$"
+            },
+            "description": "Operator-declared execution and connectivity capabilities of the configured Runner image and site. Omission preserves existing capabilities on update; null clears them on update only. Bundled software does not imply network access."
           },
           "supported_protocols": {
             "nullable": true,
@@ -12865,11 +13569,33 @@
         "description": "Object to update an existing runner configuration for a GKE cluster.",
         "type": "object",
         "properties": {
+          "native_execution": {
+            "description": "Approved native execution inventory, limited to 64 KiB. Omission preserves it on update; explicit null clears it on update only. Dependent protocols and capabilities must remain consistent.",
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RunnerExecutionCatalogue"
+              }
+            ]
+          },
           "max_parallel_jobs": {
             "nullable": true,
             "type": "integer",
             "minimum": 1,
             "description": "Maximum concurrent jobs across all Environments using this Runner. Omission preserves the configured value. Explicit null clears the limit to unlimited. Reducing the limit drains existing jobs before new admission."
+          },
+          "capabilities": {
+            "nullable": true,
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 32,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z][a-z0-9_.:/-]*$"
+            },
+            "description": "Operator-declared execution and connectivity capabilities of the configured Runner image and site. Omission preserves existing capabilities on update; null clears them on update only. Bundled software does not imply network access."
           },
           "supported_protocols": {
             "nullable": true,
@@ -12900,11 +13626,33 @@
         "description": "Object to update an existing runner configuration for an EKS cluster.",
         "type": "object",
         "properties": {
+          "native_execution": {
+            "description": "Approved native execution inventory, limited to 64 KiB. Omission preserves it on update; explicit null clears it on update only. Dependent protocols and capabilities must remain consistent.",
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RunnerExecutionCatalogue"
+              }
+            ]
+          },
           "max_parallel_jobs": {
             "nullable": true,
             "type": "integer",
             "minimum": 1,
             "description": "Maximum concurrent jobs across all Environments using this Runner. Omission preserves the configured value. Explicit null clears the limit to unlimited. Reducing the limit drains existing jobs before new admission."
+          },
+          "capabilities": {
+            "nullable": true,
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 32,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z][a-z0-9_.:/-]*$"
+            },
+            "description": "Operator-declared execution and connectivity capabilities of the configured Runner image and site. Omission preserves existing capabilities on update; null clears them on update only. Bundled software does not imply network access."
           },
           "supported_protocols": {
             "nullable": true,
@@ -12935,11 +13683,33 @@
         "description": "Object to update an existing runner configuration for a Kubernetes Agent.",
         "type": "object",
         "properties": {
+          "native_execution": {
+            "description": "Approved native execution inventory, limited to 64 KiB. Omission preserves it on update; explicit null clears it on update only. Dependent protocols and capabilities must remain consistent.",
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RunnerExecutionCatalogue"
+              }
+            ]
+          },
           "max_parallel_jobs": {
             "nullable": true,
             "type": "integer",
             "minimum": 1,
             "description": "Maximum concurrent jobs across all Environments using this Runner. Omission preserves the configured value. Explicit null clears the limit to unlimited. Reducing the limit drains existing jobs before new admission."
+          },
+          "capabilities": {
+            "nullable": true,
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 32,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z][a-z0-9_.:/-]*$"
+            },
+            "description": "Operator-declared execution and connectivity capabilities of the configured Runner image and site. Omission preserves existing capabilities on update; null clears them on update only. Bundled software does not imply network access."
           },
           "supported_protocols": {
             "nullable": true,
@@ -12970,11 +13740,33 @@
         "description": "Runner configuration for executing on AWS ECS Fargate.",
         "type": "object",
         "properties": {
+          "native_execution": {
+            "description": "Approved native execution inventory, limited to 64 KiB. Omission preserves it on update; explicit null clears it on update only. Dependent protocols and capabilities must remain consistent.",
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RunnerExecutionCatalogue"
+              }
+            ]
+          },
           "max_parallel_jobs": {
             "nullable": true,
             "type": "integer",
             "minimum": 1,
             "description": "Maximum concurrent jobs across all Environments using this Runner. Omission preserves the configured value. Explicit null clears the limit to unlimited. Reducing the limit drains existing jobs before new admission."
+          },
+          "capabilities": {
+            "nullable": true,
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 32,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z][a-z0-9_.:/-]*$"
+            },
+            "description": "Operator-declared execution and connectivity capabilities of the configured Runner image and site. Omission preserves existing capabilities on update; null clears them on update only. Bundled software does not imply network access."
           },
           "supported_protocols": {
             "nullable": true,

@@ -135,6 +135,7 @@ func (e ObservationReceiptDisposition) Valid() bool {
 // Defines values for ObservationReceiptReason.
 const (
 	ObservationReceiptReasonAccepted            ObservationReceiptReason = "accepted"
+	ObservationReceiptReasonBaselineChanged     ObservationReceiptReason = "baseline_changed"
 	ObservationReceiptReasonBusy                ObservationReceiptReason = "busy"
 	ObservationReceiptReasonExpired             ObservationReceiptReason = "expired"
 	ObservationReceiptReasonNoBaseline          ObservationReceiptReason = "no_baseline"
@@ -147,6 +148,8 @@ const (
 func (e ObservationReceiptReason) Valid() bool {
 	switch e {
 	case ObservationReceiptReasonAccepted:
+		return true
+	case ObservationReceiptReasonBaselineChanged:
 		return true
 	case ObservationReceiptReasonBusy:
 		return true
@@ -318,6 +321,91 @@ func (e ObservationRunStatus) Valid() bool {
 	}
 }
 
+// Defines values for PipelineReferenceBuiltin.
+const (
+	Default PipelineReferenceBuiltin = "default"
+)
+
+// Valid indicates whether the value is a known member of the PipelineReferenceBuiltin enum.
+func (e PipelineReferenceBuiltin) Valid() bool {
+	switch e {
+	case Default:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginPipelineChoicesDefaultSource.
+const (
+	PluginPipelineChoicesDefaultSourceEnvironment PluginPipelineChoicesDefaultSource = "environment"
+	PluginPipelineChoicesDefaultSourceNone        PluginPipelineChoicesDefaultSource = "none"
+	PluginPipelineChoicesDefaultSourceProject     PluginPipelineChoicesDefaultSource = "project"
+)
+
+// Valid indicates whether the value is a known member of the PluginPipelineChoicesDefaultSource enum.
+func (e PluginPipelineChoicesDefaultSource) Valid() bool {
+	switch e {
+	case PluginPipelineChoicesDefaultSourceEnvironment:
+		return true
+	case PluginPipelineChoicesDefaultSourceNone:
+		return true
+	case PluginPipelineChoicesDefaultSourceProject:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginPipelineChoicesProtocol.
+const (
+	StellwerkPluginPipelinesv1 PluginPipelineChoicesProtocol = "stellwerk.plugin-pipelines/v1"
+)
+
+// Valid indicates whether the value is a known member of the PluginPipelineChoicesProtocol enum.
+func (e PluginPipelineChoicesProtocol) Valid() bool {
+	switch e {
+	case StellwerkPluginPipelinesv1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginPipelineChoicesRollbackDefaultSource.
+const (
+	PluginPipelineChoicesRollbackDefaultSourceEnvironment PluginPipelineChoicesRollbackDefaultSource = "environment"
+	PluginPipelineChoicesRollbackDefaultSourceNone        PluginPipelineChoicesRollbackDefaultSource = "none"
+	PluginPipelineChoicesRollbackDefaultSourceProject     PluginPipelineChoicesRollbackDefaultSource = "project"
+)
+
+// Valid indicates whether the value is a known member of the PluginPipelineChoicesRollbackDefaultSource enum.
+func (e PluginPipelineChoicesRollbackDefaultSource) Valid() bool {
+	switch e {
+	case PluginPipelineChoicesRollbackDefaultSourceEnvironment:
+		return true
+	case PluginPipelineChoicesRollbackDefaultSourceNone:
+		return true
+	case PluginPipelineChoicesRollbackDefaultSourceProject:
+		return true
+	default:
+		return false
+	}
+}
+
+// DeploymentPipelineLifecycle defines model for DeploymentPipelineLifecycle.
+type DeploymentPipelineLifecycle struct {
+	AttentionReason       *string             `json:"attention_reason,omitempty"`
+	Digest                string              `json:"digest"`
+	InfrastructureApplied bool                `json:"infrastructure_applied"`
+	Phase                 string              `json:"phase"`
+	PipelineId            *openapi_types.UUID `json:"pipeline_id,omitempty"`
+	PlanSubject           *string             `json:"plan_subject,omitempty"`
+	Reference             PipelineReference   `json:"reference"`
+	Version               int                 `json:"version"`
+	VersionId             *openapi_types.UUID `json:"version_id,omitempty"`
+}
+
 // ObservationChange defines model for ObservationChange.
 type ObservationChange struct {
 	Actions      []ObservationChangeActions `json:"actions"`
@@ -379,6 +467,13 @@ type ObservationGrantCommand struct {
 // ObservationGrantCommandAction defines model for ObservationGrantCommand.Action.
 type ObservationGrantCommandAction string
 
+// ObservationPipelineChoicesRequest defines model for ObservationPipelineChoicesRequest.
+type ObservationPipelineChoicesRequest struct {
+	EnvId     string                     `json:"env_id"`
+	ProjectId string                     `json:"project_id"`
+	Proof     ObservationDelegationProof `json:"proof"`
+}
+
 // ObservationReceipt defines model for ObservationReceipt.
 type ObservationReceipt struct {
 	BaselineFingerprint *string                       `json:"baseline_fingerprint,omitempty"`
@@ -398,10 +493,13 @@ type ObservationReceiptReason string
 
 // ObservationRedeployReceipt defines model for ObservationRedeployReceipt.
 type ObservationRedeployReceipt struct {
-	BaselineId   openapi_types.UUID               `json:"baseline_id"`
-	DeploymentId openapi_types.UUID               `json:"deployment_id"`
-	RequestId    openapi_types.UUID               `json:"request_id"`
-	Status       ObservationRedeployReceiptStatus `json:"status"`
+	AdmissionClosed              *bool                            `json:"admission_closed,omitempty"`
+	BaselineId                   openapi_types.UUID               `json:"baseline_id"`
+	DeploymentId                 openapi_types.UUID               `json:"deployment_id"`
+	Pipeline                     *DeploymentPipelineLifecycle     `json:"pipeline,omitempty"`
+	RequestId                    openapi_types.UUID               `json:"request_id"`
+	ResultingBaselineFingerprint *string                          `json:"resulting_baseline_fingerprint,omitempty"`
+	Status                       ObservationRedeployReceiptStatus `json:"status"`
 }
 
 // ObservationRedeployReceiptStatus defines model for ObservationRedeployReceipt.Status.
@@ -413,6 +511,7 @@ type ObservationRedeployRequest struct {
 	BaselineId          openapi_types.UUID          `json:"baseline_id"`
 	EnvId               string                      `json:"env_id"`
 	EnvironmentUuid     openapi_types.UUID          `json:"environment_uuid"`
+	Pipeline            *PipelineReference          `json:"pipeline,omitempty"`
 	ProjectId           string                      `json:"project_id"`
 	ProjectUuid         openapi_types.UUID          `json:"project_uuid"`
 	Proof               *ObservationDelegationProof `json:"proof,omitempty"`
@@ -437,15 +536,17 @@ type ObservationRedeployResolveRequest struct {
 
 // ObservationRequest defines model for ObservationRequest.
 type ObservationRequest struct {
-	AdmissionDeadline time.Time          `json:"admission_deadline"`
-	EnvId             string             `json:"env_id"`
-	EnvironmentUuid   openapi_types.UUID `json:"environment_uuid"`
-	GrantId           openapi_types.UUID `json:"grant_id"`
-	GrantRevision     int64              `json:"grant_revision"`
-	Occurrence        time.Time          `json:"occurrence"`
-	ProjectId         string             `json:"project_id"`
-	ProjectUuid       openapi_types.UUID `json:"project_uuid"`
-	RequestId         openapi_types.UUID `json:"request_id"`
+	AdmissionDeadline           time.Time           `json:"admission_deadline"`
+	EnvId                       string              `json:"env_id"`
+	EnvironmentUuid             openapi_types.UUID  `json:"environment_uuid"`
+	ExpectedBaselineFingerprint *string             `json:"expected_baseline_fingerprint,omitempty"`
+	ExpectedBaselineId          *openapi_types.UUID `json:"expected_baseline_id,omitempty"`
+	GrantId                     openapi_types.UUID  `json:"grant_id"`
+	GrantRevision               int64               `json:"grant_revision"`
+	Occurrence                  time.Time           `json:"occurrence"`
+	ProjectId                   string              `json:"project_id"`
+	ProjectUuid                 openapi_types.UUID  `json:"project_uuid"`
+	RequestId                   openapi_types.UUID  `json:"request_id"`
 }
 
 // ObservationResolution defines model for ObservationResolution.
@@ -530,6 +631,54 @@ type ObservationTargetsQuery struct {
 	Production            *bool                      `json:"production,omitempty"`
 	ProjectIds            *[]string                  `json:"project_ids,omitempty"`
 	Proof                 ObservationDelegationProof `json:"proof"`
+
+	// Search Optional literal case-insensitive substring of Project or Environment identifiers and display names, trimmed and limited to 200 UTF-8 bytes. Applied before pagination and bound into the page cursor.
+	Search *string `json:"search,omitempty"`
+}
+
+// PipelineReference defines model for PipelineReference.
+type PipelineReference struct {
+	Builtin   *PipelineReferenceBuiltin `json:"builtin,omitempty"`
+	Digest    string                    `json:"digest"`
+	VersionId *openapi_types.UUID       `json:"version_id,omitempty"`
+}
+
+// PipelineReferenceBuiltin defines model for PipelineReference.Builtin.
+type PipelineReferenceBuiltin string
+
+// PluginPipelineChoice defines model for PluginPipelineChoice.
+type PluginPipelineChoice struct {
+	Deploy     PluginPipelineCompatibility `json:"deploy"`
+	Name       string                      `json:"name"`
+	PipelineId *openapi_types.UUID         `json:"pipeline_id,omitempty"`
+	Reference  PipelineReference           `json:"reference"`
+	Rollback   PluginPipelineCompatibility `json:"rollback"`
+	Version    int                         `json:"version"`
+}
+
+// PluginPipelineChoices defines model for PluginPipelineChoices.
+type PluginPipelineChoices struct {
+	DefaultSource            PluginPipelineChoicesDefaultSource          `json:"default_source"`
+	EffectiveDefault         *PipelineReference                          `json:"effective_default,omitempty"`
+	EffectiveRollbackDefault *PipelineReference                          `json:"effective_rollback_default,omitempty"`
+	Protocol                 PluginPipelineChoicesProtocol               `json:"protocol"`
+	RollbackDefaultSource    *PluginPipelineChoicesRollbackDefaultSource `json:"rollback_default_source,omitempty"`
+	Versions                 []PluginPipelineChoice                      `json:"versions"`
+}
+
+// PluginPipelineChoicesDefaultSource defines model for PluginPipelineChoices.DefaultSource.
+type PluginPipelineChoicesDefaultSource string
+
+// PluginPipelineChoicesProtocol defines model for PluginPipelineChoices.Protocol.
+type PluginPipelineChoicesProtocol string
+
+// PluginPipelineChoicesRollbackDefaultSource defines model for PluginPipelineChoices.RollbackDefaultSource.
+type PluginPipelineChoicesRollbackDefaultSource string
+
+// PluginPipelineCompatibility defines model for PluginPipelineCompatibility.
+type PluginPipelineCompatibility struct {
+	Compatible bool    `json:"compatible"`
+	Reason     *string `json:"reason,omitempty"`
 }
 
 // OrgID defines model for OrgID.
@@ -540,6 +689,9 @@ type PluginID = string
 
 // AuthorizeObservationGrantJSONRequestBody defines body for AuthorizeObservationGrant for application/json ContentType.
 type AuthorizeObservationGrantJSONRequestBody = ObservationGrantCommand
+
+// QueryObservationPipelineChoicesJSONRequestBody defines body for QueryObservationPipelineChoices for application/json ContentType.
+type QueryObservationPipelineChoicesJSONRequestBody = ObservationPipelineChoicesRequest
 
 // ResolveObservationRedeploymentJSONRequestBody defines body for ResolveObservationRedeployment for application/json ContentType.
 type ResolveObservationRedeploymentJSONRequestBody = ObservationRedeployResolveRequest
@@ -641,6 +793,14 @@ type ClientInterface interface {
 	// Takes a body of the `application/json` content type.
 	AuthorizeObservationGrant(ctx context.Context, orgId OrgID, pluginId PluginID, grantId openapi_types.UUID, body AuthorizeObservationGrantJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// QueryObservationPipelineChoicesWithBody performs a POST /orgs/{orgId}/plugins/{pluginId}/observations/v1/pipeline-choices (the `QueryObservationPipelineChoices` operationId) request,
+	// with any type of body and a specified content type.
+	QueryObservationPipelineChoicesWithBody(ctx context.Context, orgId OrgID, pluginId PluginID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// QueryObservationPipelineChoices performs a POST /orgs/{orgId}/plugins/{pluginId}/observations/v1/pipeline-choices (the `QueryObservationPipelineChoices` operationId) request.
+	// Takes a body of the `application/json` content type.
+	QueryObservationPipelineChoices(ctx context.Context, orgId OrgID, pluginId PluginID, body QueryObservationPipelineChoicesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetObservationRedeployment performs a GET /orgs/{orgId}/plugins/{pluginId}/observations/v1/redeployments/{requestId} (the `GetObservationRedeployment` operationId) request.
 	GetObservationRedeployment(ctx context.Context, orgId OrgID, pluginId PluginID, requestId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -730,6 +890,34 @@ func (c *Client) AuthorizeObservationGrantWithBody(ctx context.Context, orgId Or
 // Takes a body of the `application/json` content type.
 func (c *Client) AuthorizeObservationGrant(ctx context.Context, orgId OrgID, pluginId PluginID, grantId openapi_types.UUID, body AuthorizeObservationGrantJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewAuthorizeObservationGrantRequest(c.Server, orgId, pluginId, grantId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// QueryObservationPipelineChoicesWithBody performs a POST /orgs/{orgId}/plugins/{pluginId}/observations/v1/pipeline-choices (the `QueryObservationPipelineChoices` operationId) request,
+// with any type of body and a specified content type.
+func (c *Client) QueryObservationPipelineChoicesWithBody(ctx context.Context, orgId OrgID, pluginId PluginID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewQueryObservationPipelineChoicesRequestWithBody(c.Server, orgId, pluginId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// QueryObservationPipelineChoices performs a POST /orgs/{orgId}/plugins/{pluginId}/observations/v1/pipeline-choices (the `QueryObservationPipelineChoices` operationId) request.
+// Takes a body of the `application/json` content type.
+func (c *Client) QueryObservationPipelineChoices(ctx context.Context, orgId OrgID, pluginId PluginID, body QueryObservationPipelineChoicesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewQueryObservationPipelineChoicesRequest(c.Server, orgId, pluginId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1027,6 +1215,60 @@ func NewAuthorizeObservationGrantRequestWithBody(server string, orgId OrgID, plu
 	}
 
 	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewQueryObservationPipelineChoicesRequest calls the generic QueryObservationPipelineChoices builder with application/json body
+func NewQueryObservationPipelineChoicesRequest(server string, orgId OrgID, pluginId PluginID, body QueryObservationPipelineChoicesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewQueryObservationPipelineChoicesRequestWithBody(server, orgId, pluginId, "application/json", bodyReader)
+}
+
+// NewQueryObservationPipelineChoicesRequestWithBody constructs an http.Request for the QueryObservationPipelineChoices method, with any body, and a specified content type
+func NewQueryObservationPipelineChoicesRequestWithBody(server string, orgId OrgID, pluginId PluginID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "orgId", orgId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "pluginId", pluginId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/orgs/%s/plugins/%s/observations/v1/pipeline-choices", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -1530,6 +1772,16 @@ type ClientWithResponsesInterface interface {
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	AuthorizeObservationGrantWithResponse(ctx context.Context, orgId OrgID, pluginId PluginID, grantId openapi_types.UUID, body AuthorizeObservationGrantJSONRequestBody, reqEditors ...RequestEditorFn) (*AuthorizeObservationGrantResponse, error)
 
+	// QueryObservationPipelineChoicesWithBodyWithResponse performs a POST /orgs/{orgId}/plugins/{pluginId}/observations/v1/pipeline-choices (the `QueryObservationPipelineChoices` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	QueryObservationPipelineChoicesWithBodyWithResponse(ctx context.Context, orgId OrgID, pluginId PluginID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryObservationPipelineChoicesResponse, error)
+
+	// QueryObservationPipelineChoicesWithResponse performs a POST /orgs/{orgId}/plugins/{pluginId}/observations/v1/pipeline-choices (the `QueryObservationPipelineChoices` operationId) request.
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	QueryObservationPipelineChoicesWithResponse(ctx context.Context, orgId OrgID, pluginId PluginID, body QueryObservationPipelineChoicesJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryObservationPipelineChoicesResponse, error)
+
 	// GetObservationRedeploymentWithResponse performs a GET /orgs/{orgId}/plugins/{pluginId}/observations/v1/redeployments/{requestId} (the `GetObservationRedeployment` operationId) request.
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -1680,6 +1932,47 @@ func (r AuthorizeObservationGrantResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r AuthorizeObservationGrantResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type QueryObservationPipelineChoicesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PluginPipelineChoices
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r QueryObservationPipelineChoicesResponse) GetJSON200() *PluginPipelineChoices {
+	return r.JSON200
+}
+
+// GetBody returns the raw response body bytes
+func (r QueryObservationPipelineChoicesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r QueryObservationPipelineChoicesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r QueryObservationPipelineChoicesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r QueryObservationPipelineChoicesResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -2047,6 +2340,28 @@ func (c *ClientWithResponses) AuthorizeObservationGrantWithResponse(ctx context.
 	return ParseAuthorizeObservationGrantResponse(rsp)
 }
 
+// QueryObservationPipelineChoicesWithBodyWithResponse performs a POST /orgs/{orgId}/plugins/{pluginId}/observations/v1/pipeline-choices (the `QueryObservationPipelineChoices` operationId) request,
+// with any type of body and a specified content type.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) QueryObservationPipelineChoicesWithBodyWithResponse(ctx context.Context, orgId OrgID, pluginId PluginID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryObservationPipelineChoicesResponse, error) {
+	rsp, err := c.QueryObservationPipelineChoicesWithBody(ctx, orgId, pluginId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseQueryObservationPipelineChoicesResponse(rsp)
+}
+
+// QueryObservationPipelineChoicesWithResponse performs a POST /orgs/{orgId}/plugins/{pluginId}/observations/v1/pipeline-choices (the `QueryObservationPipelineChoices` operationId) request.
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) QueryObservationPipelineChoicesWithResponse(ctx context.Context, orgId OrgID, pluginId PluginID, body QueryObservationPipelineChoicesJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryObservationPipelineChoicesResponse, error) {
+	rsp, err := c.QueryObservationPipelineChoices(ctx, orgId, pluginId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseQueryObservationPipelineChoicesResponse(rsp)
+}
+
 // GetObservationRedeploymentWithResponse performs a GET /orgs/{orgId}/plugins/{pluginId}/observations/v1/redeployments/{requestId} (the `GetObservationRedeployment` operationId) request.
 //
 // Returns a wrapper object for the known response body format(s).
@@ -2240,6 +2555,32 @@ func ParseAuthorizeObservationGrantResponse(rsp *http.Response) (*AuthorizeObser
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest ObservationGrant
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseQueryObservationPipelineChoicesResponse parses an HTTP response from a QueryObservationPipelineChoicesWithResponse call
+func ParseQueryObservationPipelineChoicesResponse(rsp *http.Response) (*QueryObservationPipelineChoicesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &QueryObservationPipelineChoicesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PluginPipelineChoices
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
