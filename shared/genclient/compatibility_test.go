@@ -61,6 +61,31 @@ func TestPublishedActionNamesRemainSourceAndWireCompatible(t *testing.T) {
 	}
 }
 
+func TestPublishedContributionModeNamesRemainSourceAndWireCompatible(t *testing.T) {
+	if reflect.TypeOf(genclient.Full) != reflect.TypeOf(genclient.PluginContributionModeFull) ||
+		reflect.TypeOf(genclient.Hidden) != reflect.TypeOf(genclient.PluginContributionModeHidden) ||
+		reflect.TypeOf(genclient.ReadOnly) != reflect.TypeOf(genclient.PluginContributionModeReadOnly) ||
+		reflect.TypeOf(genclient.SafetyOnly) != reflect.TypeOf(genclient.PluginContributionModeSafetyOnly) {
+		t.Fatal("legacy contribution constants lost their enum types")
+	}
+	for _, mode := range []struct {
+		legacy, current genclient.PluginContributionMode
+		wire            string
+	}{
+		{genclient.Full, genclient.PluginContributionModeFull, "full"},
+		{genclient.Hidden, genclient.PluginContributionModeHidden, "hidden"},
+		{genclient.ReadOnly, genclient.PluginContributionModeReadOnly, "read_only"},
+		{genclient.SafetyOnly, genclient.PluginContributionModeSafetyOnly, "safety_only"},
+	} {
+		t.Run(mode.wire, func(t *testing.T) {
+			assertActionCompatibility(t, mode.legacy, mode.current, mode.wire)
+			if !mode.legacy.Valid() {
+				t.Fatal("published contribution mode is no longer valid")
+			}
+		})
+	}
+}
+
 func TestPublishedScopeKeyRemainsAvailable(t *testing.T) {
 	if genclient.UserIdHeaderScopes != "userIdHeader.Scopes" {
 		t.Fatal("published scope key changed")

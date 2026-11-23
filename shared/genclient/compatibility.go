@@ -13,6 +13,11 @@ const (
 	Reconcile = PluginPinOperationReceiptActionReconcile
 	Restore   = PluginPinOperationReceiptActionRestore
 
+	Full       = PluginContributionModeFull
+	Hidden     = PluginContributionModeHidden
+	ReadOnly   = PluginContributionModeReadOnly
+	SafetyOnly = PluginContributionModeSafetyOnly
+
 	// UserIdHeaderScopes retains the former generated scope key for SDK source
 	// compatibility. This constant does not provide authentication or authority.
 	UserIdHeaderScopes = "userIdHeader.Scopes"
