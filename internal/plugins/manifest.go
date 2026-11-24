@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/authz"
 )
 
 // MaxManifestBytes bounds one encoded registration manifest.
@@ -310,7 +312,7 @@ func validateServiceGrants(m Manifest) error {
 	}
 	seen := map[string]bool{}
 	for _, grant := range m.ServiceGrants {
-		if !operationIdentifier.MatchString(grant.Action) || seen[grant.Action] || !m.owns(grant.Permission) || (grant.Scope != "organization" && grant.Scope != environmentScope) {
+		if !operationIdentifier.MatchString(grant.Action) || seen[grant.Action] || !m.owns(grant.Permission) || (grant.Scope != string(authz.PermissionScopeOrganization) && grant.Scope != environmentScope) {
 			return fmt.Errorf("service grants require unique actions, owned capabilities and exact scope")
 		}
 		seen[grant.Action] = true

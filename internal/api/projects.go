@@ -133,7 +133,7 @@ func (s *Server) GetProject(ctx context.Context, request GetProjectRequestObject
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionProjectRead); err != nil {
+	} else if err := s.checkProjectAuthorization(ctx, uid, request.OrgId, request.ProjectId, PermissionProjectRead); err != nil {
 		return nil, err
 	}
 	if out, err := s.Database.GetProject(ctx, nil, request.OrgId, request.ProjectId, model.GetModeDefault); err != nil {
@@ -209,6 +209,14 @@ func (s *Server) DeleteProject(ctx context.Context, request DeleteProjectRequest
 			return DeleteProject404JSONResponse{N404NotFoundJSONResponse: Generate404FromModelErr(me)}, nil
 		}
 		return nil, errors.Wrap(err, "failed to get project")
+	}
+
+	environments, _, err := s.Database.ListEnvironments(ctx, tx, request.OrgId, request.ProjectId, "", 1, model.ListEnvironmentsParams{})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to inspect Project environments before deletion")
+	}
+	if len(environments) != 0 {
+		return DeleteProject409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(model.NewErrConflict("project contains environments"))}, nil
 	}
 
 	if request.Params.DeleteRules != nil && *request.Params.DeleteRules {

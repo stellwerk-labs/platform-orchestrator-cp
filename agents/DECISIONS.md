@@ -54,3 +54,7 @@ force deletion retains its legacy fallback. No DP policy table or plugin change.
 ## 2026-11-13: Plaintext deployment log privilege
 
 Plugin-owned Deployment logs require `deployment_logs_read`; outputs retain `deployment_read`. Both use the exact environment resource and independently held organization fallback for retained history after environment removal. Plugin service and admission-checker identities remain denied before IAM. IAM must ship the new exact-grant-only permission first; canonical Admin (`manage_all`) retains access, Viewer/Deployer require an explicit delegated role. No plugin capability or operation grant substitutes for Core permission.
+
+## Native pipeline source export
+
+Prepare Native pipeline application changes as a source export with all product code, tests, documentation and release controls retained.

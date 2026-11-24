@@ -10,17 +10,15 @@ import (
 	"unicode/utf8"
 )
 
-const localExecCapability = "local.exec"
-
 var recipeIdentifier = regexp.MustCompile(`^[a-z][a-z0-9-]{0,63}$`)
 
 // TrustedTools is an operator-owned catalogue. Recipes select handlers, never executables.
 func TrustedTools() []PipelineTool {
 	return []PipelineTool{
-		{Id: "validate-manifest", Name: "Validate manifest", Phase: "pre_plan", Description: "Validate the captured manifest before planning.", RequiredCapabilities: []string{localExecCapability}},
-		{Id: "resource-policy", Name: "Resource policy", Phase: "plan_check", Description: "Require a successful exact-plan resource-policy check.", RequiredCapabilities: []string{localExecCapability, "artifacts.read"}},
-		{Id: "bootstrap-database", Name: "Bootstrap database", Phase: "post_apply", Description: "Run the operator-approved local database bootstrap task with its durable receipt.", RequiredCapabilities: []string{localExecCapability, "database.local"}},
-		{Id: "bootstrap-lost-ack", Name: "Database bootstrap (recovery demo)", Phase: "post_apply", Description: "Demo task deliberately loses its acknowledgement; retry resumes only this task.", RequiredCapabilities: []string{localExecCapability, "database.local"}},
+		{Id: "validate-manifest", Name: "Validate manifest", Phase: "pre_plan", Description: "Validate the captured manifest before planning.", RequiredCapabilities: []string{"local.exec"}},
+		{Id: "resource-policy", Name: "Resource policy", Phase: "plan_check", Description: "Require a successful exact-plan resource-policy check.", RequiredCapabilities: []string{"local.exec", "artifacts.read"}},
+		{Id: "bootstrap-database", Name: "Bootstrap database", Phase: "post_apply", Description: "Run the operator-approved local database bootstrap task with its durable receipt.", RequiredCapabilities: []string{"local.exec", "database.local"}},
+		{Id: "bootstrap-lost-ack", Name: "Database bootstrap (recovery demo)", Phase: "post_apply", Description: "Demo task deliberately loses its acknowledgement; retry resumes only this task.", RequiredCapabilities: []string{"local.exec", "database.local"}},
 	}
 }
 

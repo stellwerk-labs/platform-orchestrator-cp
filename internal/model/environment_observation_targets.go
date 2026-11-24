@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
@@ -12,6 +13,7 @@ import (
 )
 
 type ObservationTargetSelector struct {
+	Search                string       `json:"search,omitempty"`
 	ProjectIDs            *[]string    `json:"project_ids,omitempty"`
 	EnvironmentTypes      *[]string    `json:"environment_types,omitempty"`
 	Production            *bool        `json:"production,omitempty"`
@@ -37,7 +39,8 @@ type observationTargetCursor struct {
 // authoritative store. Nil includes all matching resources; explicit empty
 // include lists remain empty and never widen into an organization-wide scan.
 func QueryObservationTargetsTx(ctx context.Context, tx Tx, org, plugin string, selector ObservationTargetSelector, page string, limit int) ([]ObservationTargetMetadata, string, error) {
-	if org == "" || !externalPluginIdentity.MatchString(plugin) || limit < 1 || limit > 200 || len(page) > 2048 {
+	selector.Search = strings.TrimSpace(selector.Search)
+	if org == "" || !externalPluginIdentity.MatchString(plugin) || limit < 1 || limit > 200 || len(page) > 2048 || !validObservationTargetSearch(selector.Search) {
 		return nil, "", NewErrBadRequest("bounded target query and page required")
 	}
 	projectIDs, projectFilter := observationStringFilter(selector.ProjectIDs)
@@ -95,7 +98,8 @@ func QueryObservationTargetsTx(ctx context.Context, tx Tx, org, plugin string, s
  AND (NOT $7 OR e.uuid=ANY($8::uuid[]))
  AND NOT (e.uuid=ANY($9::uuid[]))
  AND ($10::uuid IS NULL OR e.uuid>$10)
- ORDER BY e.uuid LIMIT $11`, org, projectFilter, pq.Array(projectIDs), typeFilter, pq.Array(envTypes), selector.Production, selector.EnvironmentIDs != nil, pq.Array(include), pq.Array(exclude), nullableObservationUUID(cursor.After), limit+1)
+ AND ($12='' OR strpos(lower(concat_ws(' ',p.id,p.display_name,e.id,e.display_name)),lower($12))>0)
+ ORDER BY e.uuid LIMIT $11`, org, projectFilter, pq.Array(projectIDs), typeFilter, pq.Array(envTypes), selector.Production, selector.EnvironmentIDs != nil, pq.Array(include), pq.Array(exclude), nullableObservationUUID(cursor.After), limit+1, selector.Search)
 	if err != nil {
 		return nil, "", err
 	}
@@ -122,6 +126,10 @@ func QueryObservationTargetsTx(ctx context.Context, tx Tx, org, plugin string, s
 		next = base64.RawURLEncoding.EncodeToString(raw)
 	}
 	return items, next, nil
+}
+
+func validObservationTargetSearch(search string) bool {
+	return len(search) <= 200 && utf8.ValidString(search) && !strings.ContainsRune(search, 0)
 }
 func observationStringFilter(values *[]string) ([]string, bool) {
 	if values == nil {

@@ -2,8 +2,10 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/google/uuid"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stellwerk-labs/golib/hecho"
@@ -63,4 +65,35 @@ func TestDraftTestAdmissionConversionPreservesExplicitSelection(t *testing.T) {
 	body.DraftTestSnapshots = nil
 	converted = deploymentAdmissionFromAPI("example", uuid.New(), &body)
 	require.Nil(t, converted.DraftTestSnapshots, "ordinary requests cannot acquire implicit Draft test provenance")
+}
+
+func TestNativeTargetAdmissionConversionPreservesExactReference(t *testing.T) {
+	target := &NativeExecutionTargetReference{RunnerId: "pool", RunnerUuid: uuid.New(), RuntimeVersion: NativeTargetRuntimeV2, PipelineVersion: NativeTargetPipelineV2, ToolsDigest: strings.Repeat("a", 64), StateBackendType: StateStorageTypeS3, StateConfigurationDigest: strings.Repeat("b", 64)}
+	body := DeploymentAdmissionRequest{NativeTarget: target}
+	converted := deploymentAdmissionFromAPI("example", uuid.New(), &body)
+	expected, err := json.Marshal(target)
+	require.NoError(t, err)
+	actual, err := json.Marshal(converted.NativeTarget)
+	require.NoError(t, err)
+	require.JSONEq(t, string(expected), string(actual))
+	body.NativeTarget = nil
+	converted = deploymentAdmissionFromAPI("example", uuid.New(), &body)
+	require.Nil(t, converted.NativeTarget)
+	encoded, err := json.Marshal(converted)
+	require.NoError(t, err)
+	require.NotContains(t, string(encoded), "native_target", "historical intent bytes must retain absence")
+}
+
+func TestNativeTargetIdentifierUsesRunnerGrammarAndRuntimeLimit(t *testing.T) {
+	spec, err := GetSwagger()
+	require.NoError(t, err)
+	created := spec.Components.Schemas["RunnerCreateBody"].Value.Properties["id"].Value
+	target := spec.Components.Schemas["NativeExecutionTargetReference"].Value.Properties["runner_id"].Value
+	require.Equal(t, created.Pattern, target.Pattern, "Runner and Resource/Module identifiers are different contracts")
+	for _, id := range []string{"np", "native_pool", "n-", "list", "new", "by-id", strings.Repeat("n", 128)} {
+		require.NoError(t, target.VisitJSON(id))
+	}
+	for _, id := range []string{"n", "native.pool", "Native", strings.Repeat("n", 129)} {
+		require.Error(t, target.VisitJSON(id))
+	}
 }

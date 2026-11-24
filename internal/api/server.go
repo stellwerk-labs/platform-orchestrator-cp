@@ -21,6 +21,7 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/api/middleware"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/observationapi"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pipelineapi"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/pluginmanager"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/token"
@@ -62,6 +63,7 @@ func (s *Server) MapRoutes(e *echo.Echo) {
 		adaptStrictMiddleware(token.StrictEncryptionMiddleware()),
 	})
 	RegisterHandlers(e, apiHandler)
+	s.registerPipelineRoutes(e)
 	e.GET("/plugins/:pluginId/maintenance", s.getPluginMaintenance, echomiddleware.ContextTimeout(30*time.Second))
 	e.GET("/platform-settings/maintenance-status", s.getInstallationMaintenanceStatus, echomiddleware.ContextTimeout(30*time.Second))
 	observationapi.RegisterHandlers(e.Group("", echomiddleware.BodyLimit("8M")), observationapi.NewStrictHandler(s, []observationapi.StrictMiddlewareFunc{
@@ -113,6 +115,19 @@ func MustDecodeOpenApiSpec() []byte {
 	optional, err := observationapi.GetSpec()
 	if err != nil {
 		panic(err)
+	}
+	pipelineSpec, err := pipelineapi.GetSpec()
+	if err != nil {
+		panic(err)
+	}
+	for path, item := range pipelineSpec.Paths.Map() {
+		optional.Paths.Set(path, item)
+	}
+	for name, item := range pipelineSpec.Components.Parameters {
+		optional.Components.Parameters[name] = item
+	}
+	for name, item := range pipelineSpec.Components.Schemas {
+		optional.Components.Schemas[name] = item
 	}
 	optionalRaw, err := json.Marshal(optional)
 	if err != nil {

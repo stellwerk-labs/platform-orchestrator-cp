@@ -24,6 +24,7 @@ import (
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/api/middleware"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/genclient"
 )
 
 func TestDeploymentAdmissionRequiresDataPlaneAndIndependentUserScope(t *testing.T) {
@@ -150,6 +151,65 @@ func TestDeploymentAdmissionRequiresDataPlaneAndIndependentUserScope(t *testing.
 		response = call(service.String(), "", body)
 		require.Equal(t, 409, response.Code, response.Body.String())
 	}
+	tx, err := db.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+	defer func() { _ = tx.Rollback() }()
+	runner, err := db.CreateRunner(t.Context(), tx, &model.Runner{OrgId: grant.OrgID, Id: "native_http", RunnerType: "native-agent", RunnerConfiguration: nativeAgentTestConfiguration(t), StateStorageType: "s3", StateStorageConfiguration: map[string]any{"type": "s3", "bucket": "owned-states"}, CreatedAt: time.Now(), UpdatedAt: time.Now()})
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
+	nativeEnv := nativeFirstCreatedEnvironment(t, db, runner, "native-http")
+	env.EnvironmentID = nativeEnv.Uuid
+	body.EnvironmentUuid = nativeEnv.Uuid
+	settle.EnvironmentUuid = nativeEnv.Uuid
+	state, err := json.Marshal(runner.StateStorageConfiguration)
+	require.NoError(t, err)
+	_, stateDigest, err := genclient.StateStorageConfigurationDigest(state)
+	require.NoError(t, err)
+	body.NativeTarget = &NativeExecutionTargetReference{RunnerId: runner.Id, RunnerUuid: runner.Uuid, RuntimeVersion: NativeTargetRuntimeV2, PipelineVersion: NativeTargetPipelineV2, ToolsDigest: strings.Repeat("a", 64), StateBackendType: StateStorageTypeS3, StateConfigurationDigest: stateDigest}
+	admission = uuid.New()
+	path = "/orgs/" + grant.OrgID + "/deployment-admissions/" + admission.String()
+	response = call(service.String(), "", body)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &receipt))
+	require.Equal(t, admission, receipt.AdmissionId)
+	settle.Outcome = AdmissionOutcomeSucceeded
+	response = call(service.String(), "/settle", settle)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	for _, mode := range []DeploymentAdmissionRequestMode{AdmissionModePlanOnly, AdmissionModeRollbackPlan} {
+		body.NativeAdmissionWatermark = &NativeAdmissionWatermark{AdmissionId: receipt.AdmissionId, Epoch: receipt.Epoch}
+		body.Mode, admission = mode, uuid.New()
+		path = "/orgs/" + grant.OrgID + "/deployment-admissions/" + admission.String()
+		response = call(service.String(), "", body)
+		require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &receipt))
+		response = call(service.String(), "/settle", settle)
+		require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	}
+	body.Mode, body.NativeAdmissionWatermark = AdmissionModeDeploy, nil
+	admission = uuid.New()
+	path = "/orgs/" + grant.OrgID + "/deployment-admissions/" + admission.String()
+	beforeNativeRefusal := admissionGuards(t, db, grant.OrgID)
+	body.NativeTarget.RuntimeVersion = "stellwerk.runner.rollout/v1"
+	response = call(service.String(), "", body)
+	require.Equal(t, http.StatusBadRequest, response.Code, response.Body.String())
+	body.NativeTarget.RuntimeVersion = NativeTargetRuntimeV2
+	for _, watermark := range []map[string]any{
+		{"admission_id": uuid.New()}, {"epoch": 1}, {"admission_id": uuid.Nil, "epoch": 1},
+		{"admission_id": uuid.New(), "epoch": 0}, {"admission_id": uuid.New(), "epoch": -1},
+		{"admission_id": uuid.New(), "epoch": 1, "extra": true},
+	} {
+		encoded, err := json.Marshal(body)
+		require.NoError(t, err)
+		var invalid map[string]any
+		require.NoError(t, json.Unmarshal(encoded, &invalid))
+		invalid["native_admission_watermark"] = watermark
+		response = call(service.String(), "", invalid)
+		require.Equal(t, http.StatusBadRequest, response.Code, response.Body.String())
+	}
+	body.NativeTarget = nil
+	response = call(service.String(), "", body)
+	require.Equal(t, http.StatusConflict, response.Code, response.Body.String())
+	require.Equal(t, beforeNativeRefusal, admissionGuards(t, db, grant.OrgID))
 }
 
 func TestDeploymentAdmissionDerivesCurrentLifecyclePermissions(t *testing.T) {

@@ -660,6 +660,8 @@ func TestDeleteProject_success(t *testing.T) {
 		Status:  model.ProjectStatusActive,
 	}, nil).Times(1)
 
+	db.EXPECT().ListEnvironments(gomock.Any(), gomock.Not(nil), orgId, projectId, "", 1, model.ListEnvironmentsParams{}).Return(nil, "", nil).Times(1)
+
 	db.EXPECT().DeleteProject(gomock.Any(), gomock.Not(nil), orgId, projectId).Return(nil).Times(1)
 
 	ctx := context.WithValue(t.Context(), hecho.ContextKeyUserID, userID.String())
@@ -718,6 +720,8 @@ func TestDeleteProject_withDeleteRules(t *testing.T) {
 	db.EXPECT().BulkDeleteRunnerRules(gomock.Any(), gomock.Not(nil), orgId, model.DeleteRunnerRulesParams{
 		ByProjectId: &projectIDPtr,
 	}).Return([]string{"runner-rule-id-1"}, nil).Times(1)
+
+	db.EXPECT().ListEnvironments(gomock.Any(), gomock.Not(nil), orgId, projectId, "", 1, model.ListEnvironmentsParams{}).Return(nil, "", nil).Times(1)
 
 	db.EXPECT().DeleteProject(gomock.Any(), gomock.Not(nil), orgId, projectId).Return(nil).Times(1)
 
@@ -840,6 +844,8 @@ func TestDeleteProject_conflict(t *testing.T) {
 		OrgUuid: orgUuid,
 		Status:  model.ProjectStatusActive,
 	}, nil).Times(1)
+
+	db.EXPECT().ListEnvironments(gomock.Any(), gomock.Not(nil), orgId, projectId, "", 1, model.ListEnvironmentsParams{}).Return(nil, "", nil).Times(1)
 
 	db.EXPECT().DeleteProject(gomock.Any(), gomock.Not(nil), orgId, projectId).Return(
 		model.NewErrConflict("project has active environments"),

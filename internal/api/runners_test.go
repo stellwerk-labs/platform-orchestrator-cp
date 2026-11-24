@@ -135,7 +135,7 @@ func TestCreateRunner_ImageValidation(t *testing.T) {
 			if tc.shouldFail {
 				assert.Equal(t, http.StatusBadRequest, rec.Code, "Expected validation failure for: %s", tc.description)
 				responseBody := rec.Body.String()
-				assert.Contains(t, responseBody, "image", "Error should mention image field for: %s", tc.description)
+				assert.Contains(t, responseBody, validationBadRequest, "Expected value-free validation error for: %s", tc.description)
 			} else {
 				assert.NotEqual(t, http.StatusBadRequest, rec.Code, "Valid image should not fail validation: %s", tc.description)
 			}
@@ -344,7 +344,7 @@ MCowBQYDK2VwAyEAc5dgCx4ano39JT0XgTsHnts3jej+5xl7ZAwSIrKpef0=
 				},
 				Type: RunnerTypeKubernetesGke,
 			},
-			expectedError: "/runner_configuration/cluster/auth/gcp_audience\\\": property \\\"gcp_audience\\\" is missing",
+			expectedError: validationBadRequest,
 		},
 		{
 			name: "bad configuration",
@@ -361,7 +361,7 @@ MCowBQYDK2VwAyEAc5dgCx4ano39JT0XgTsHnts3jej+5xl7ZAwSIrKpef0=
 				},
 				Type: RunnerTypeKubernetesGke,
 			},
-			expectedError: "/runner_configuration/cluster/auth/gcp_audience\\\": property \\\"gcp_audience\\\" is missing",
+			expectedError: validationBadRequest,
 		},
 		{
 			name: "GKE k8s valid runner with invalid job pod template",
@@ -573,7 +573,7 @@ MCowBQYDK2VwAyEAc5dgCx4ano39JT0XgTsHnts3jej+5xl7ZAwSIrKpef0=
 				},
 			},
 			stateStorage:  &S3StorageConfiguration{Type: StateStorageTypeS3, Bucket: "platform-orchestrator-runner"},
-			expectedError: `"role_arn is not a valid IAM Role ARN"`,
+			expectedError: validationBadRequest,
 		},
 		{
 			name: "ecs runner cannot have kubernetes state storage",
@@ -602,7 +602,7 @@ MCowBQYDK2VwAyEAc5dgCx4ano39JT0XgTsHnts3jej+5xl7ZAwSIrKpef0=
 				},
 			},
 			stateStorage:  &S3StorageConfiguration{Type: StateStorageTypeS3, Bucket: "platform-orchestrator-runner"},
-			expectedError: `"job secrets value is not a valid AWS Secret or Parameter ARN"`,
+			expectedError: validationBadRequest,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -700,6 +700,7 @@ MCowBQYDK2VwAyEAc5dgCx4ano39JT0XgTsHnts3jej+5xl7ZAwSIrKpef0=
 				}
 				require.Equal(t, expectedJob, actualJobCfg)
 			} else {
+				require.Equal(t, http.StatusBadRequest, resp.Code)
 				require.Contains(t, string(b), tc.expectedError)
 			}
 		})
@@ -926,7 +927,7 @@ func TestUpdateRunner(t *testing.T) {
 					union: gkeConfigUpdateMissingField,
 				},
 			},
-			expectedError: "property \\\"name\\\" is missing",
+			expectedError: validationBadRequest,
 		},
 		{
 			name:     "Unknown field in gke cluster patch",
@@ -1064,7 +1065,7 @@ func TestUpdateRunner(t *testing.T) {
 			}
 			db := s.Database.(*mockmodel.MockDatabaser)
 			db.EXPECT().
-				GetRunner(gomock.Any(), gomock.Any(), "my-org", tc.runnerId).
+				GetRunner(gomock.Any(), gomock.Any(), "my-org", tc.runnerId, model.GetModeForUpdate).
 				Return(getResp...).
 				MaxTimes(1)
 			if len(tc.expectedModelRunnerConfiguration) > 0 {
@@ -1095,6 +1096,9 @@ func TestUpdateRunner(t *testing.T) {
 			if tc.expectedError == "" {
 				require.Equal(t, http.StatusOK, resp.Result().StatusCode, string(b))
 			} else {
+				if tc.expectedError == validationBadRequest {
+					require.Equal(t, http.StatusBadRequest, resp.Code)
+				}
 				require.Contains(t, string(b), tc.expectedError)
 			}
 		})
@@ -1123,7 +1127,7 @@ func TestDeleteRunner(t *testing.T) {
 					OrgId:      orgId,
 					RunnerType: string(RunnerTypeKubernetes),
 				}
-				db.EXPECT().GetRunner(gomock.Any(), gomock.Any(), orgId, runnerId).Return(runner, nil).Times(1)
+				db.EXPECT().GetRunner(gomock.Any(), gomock.Any(), orgId, runnerId, model.GetModeDefault).Return(runner, nil).Times(1)
 				vlt.EXPECT().DeleteSecret(gomock.Any(), fmt.Sprintf("/platform-orchestrator/orgs/%s/runners/%s", orgId, runnerId)).Return(nil).Times(1)
 				db.EXPECT().ListEnvironmentsByRunnerId(gomock.Any(), gomock.Any(), orgId, runnerId, "", getEnvsByRunnerPaginationSize).Return([]model.Environment{}, "", nil).Times(1)
 				db.EXPECT().DeleteRunner(gomock.Any(), gomock.Any(), orgId, runnerId).Return(nil).Times(1)
@@ -1139,7 +1143,7 @@ func TestDeleteRunner(t *testing.T) {
 					OrgId:      orgId,
 					RunnerType: string(RunnerTypeKubernetesGke),
 				}
-				db.EXPECT().GetRunner(gomock.Any(), gomock.Any(), orgId, runnerId).Return(runner, nil).Times(1)
+				db.EXPECT().GetRunner(gomock.Any(), gomock.Any(), orgId, runnerId, model.GetModeDefault).Return(runner, nil).Times(1)
 				db.EXPECT().ListEnvironmentsByRunnerId(gomock.Any(), gomock.Any(), orgId, runnerId, "", getEnvsByRunnerPaginationSize).Return([]model.Environment{}, "", nil).Times(1)
 				db.EXPECT().DeleteRunner(gomock.Any(), gomock.Any(), orgId, runnerId).Return(nil).Times(1)
 			},
@@ -1149,7 +1153,7 @@ func TestDeleteRunner(t *testing.T) {
 			name:     "Runner not found - 404",
 			runnerId: "non-existent-runner",
 			setupMocks: func(db *mockmodel.MockDatabaser, vlt *mock_vault.MockVaultClientInterface) {
-				db.EXPECT().GetRunner(gomock.Any(), gomock.Any(), orgId, "non-existent-runner").Return(nil, model.NewErrNotFound("runner not found")).Times(1)
+				db.EXPECT().GetRunner(gomock.Any(), gomock.Any(), orgId, "non-existent-runner", model.GetModeDefault).Return(nil, model.NewErrNotFound("runner not found")).Times(1)
 			},
 			expectedStatus: 404,
 			expectedError:  "runner not found",
@@ -1167,7 +1171,7 @@ func TestDeleteRunner(t *testing.T) {
 					{Id: "env1", ProjectId: "project1"},
 					{Id: "env2", ProjectId: "project2"},
 				}
-				db.EXPECT().GetRunner(gomock.Any(), gomock.Any(), orgId, runnerId).Return(runner, nil)
+				db.EXPECT().GetRunner(gomock.Any(), gomock.Any(), orgId, runnerId, model.GetModeDefault).Return(runner, nil)
 				db.EXPECT().ListEnvironmentsByRunnerId(gomock.Any(), gomock.Any(), orgId, runnerId, "", getEnvsByRunnerPaginationSize).Return(environments, "", nil)
 				vlt.EXPECT().DeleteSecret(gomock.Any(), fmt.Sprintf("/platform-orchestrator/orgs/%s/runners/%s", orgId, runnerId)).Return(nil).Times(0)
 			},
@@ -1183,7 +1187,7 @@ func TestDeleteRunner(t *testing.T) {
 					OrgId:      orgId,
 					RunnerType: string(RunnerTypeKubernetesGke),
 				}
-				db.EXPECT().GetRunner(gomock.Any(), gomock.Any(), orgId, runnerId).Return(runner, nil).Times(1)
+				db.EXPECT().GetRunner(gomock.Any(), gomock.Any(), orgId, runnerId, model.GetModeDefault).Return(runner, nil).Times(1)
 				db.EXPECT().ListEnvironmentsByRunnerId(gomock.Any(), gomock.Any(), orgId, runnerId, "", getEnvsByRunnerPaginationSize).Return([]model.Environment{}, "", nil).Times(1)
 				db.EXPECT().DeleteRunner(gomock.Any(), gomock.Any(), orgId, runnerId).Return(model.NewErrNotFound("runner not found")).Times(1)
 			},
@@ -1199,7 +1203,7 @@ func TestDeleteRunner(t *testing.T) {
 					OrgId:      orgId,
 					RunnerType: string(RunnerTypeKubernetes),
 				}
-				db.EXPECT().GetRunner(gomock.Any(), gomock.Any(), orgId, runnerId).Return(runner, nil).Times(1)
+				db.EXPECT().GetRunner(gomock.Any(), gomock.Any(), orgId, runnerId, model.GetModeDefault).Return(runner, nil).Times(1)
 				db.EXPECT().ListEnvironmentsByRunnerId(gomock.Any(), gomock.Any(), orgId, runnerId, "", getEnvsByRunnerPaginationSize).Return([]model.Environment{}, "", nil).Times(1)
 				db.EXPECT().DeleteRunner(gomock.Any(), gomock.Any(), orgId, runnerId).Return(nil).Times(1)
 				vlt.EXPECT().DeleteSecret(gomock.Any(), fmt.Sprintf("/platform-orchestrator/orgs/%s/runners/%s", orgId, runnerId)).Return(vault.ErrSecretNotFound).Times(1)

@@ -458,6 +458,9 @@ func (s *Server) RedeployObservationBaseline(ctx context.Context, request observ
 		return nil, err
 	}
 	defer func() { _ = intentTx.Rollback() }()
+	if err := s.checkObservationPipelineForNewRequest(ctx, intentTx, request.OrgId, request.PluginId, body); err != nil {
+		return nil, err
+	}
 	attempt := model.ObservationRedeployment{RequestID: body.RequestId, ObservationRequestID: record.RequestID, RunID: request.RunId, ActorID: actor, RequestDigest: plugincontext.Digest(encoded), Body: encoded}
 	if err := model.RecordObservationRedeploymentTx(ctx, intentTx, request.OrgId, request.PluginId, attempt); err != nil {
 		return nil, pluginModelError(err)

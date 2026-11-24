@@ -31,9 +31,9 @@ func TestRuleCreateBody_validate(t *testing.T) {
 		// Valid syntax reaches catalogue storage; fail that lookup independently of Rule policy.
 		{name: "valid", body: RuleCreateBody{ModuleId: "my-definition"}},
 		{name: "valid with res id", body: RuleCreateBody{ModuleId: "my-definition", ResourceId: ref.Ref("workloads.my-workload.my-res")}},
-		{name: "bad definition", body: RuleCreateBody{}, expectedError: ": module id must be a valid identifier of alphanumerics and hyphens"},
-		{name: "bad class", body: RuleCreateBody{ModuleId: "my-definition", ResourceClass: ref.Ref("bad class")}, expectedError: ": resource class must be a valid identifier of alphanumerics and hyphens"},
-		{name: "bad id", body: RuleCreateBody{ModuleId: "my-definition", ResourceId: ref.Ref("bad id")}, expectedError: ": resource id must be a valid resource id with one or more dot-separated parts of lowercase alphanumerics and hyphens"},
+		{name: "bad definition", body: RuleCreateBody{}, expectedError: validationBadRequest},
+		{name: "bad class", body: RuleCreateBody{ModuleId: "my-definition", ResourceClass: ref.Ref("bad class")}, expectedError: validationBadRequest},
+		{name: "bad id", body: RuleCreateBody{ModuleId: "my-definition", ResourceId: ref.Ref("bad id")}, expectedError: validationBadRequest},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			db := s.Database.(*mockmodel.MockDatabaser)
@@ -58,6 +58,7 @@ func TestRuleCreateBody_validate(t *testing.T) {
 			if tc.expectedError == "" {
 				require.Equal(t, http.StatusInternalServerError, resp.Result().StatusCode, string(b))
 			} else {
+				require.Equal(t, http.StatusBadRequest, resp.Code)
 				require.Contains(t, string(b), tc.expectedError)
 			}
 		})

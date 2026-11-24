@@ -143,6 +143,7 @@ func (e ObservationReceiptDisposition) Valid() bool {
 // Defines values for ObservationReceiptReason.
 const (
 	ObservationReceiptReasonAccepted            ObservationReceiptReason = "accepted"
+	ObservationReceiptReasonBaselineChanged     ObservationReceiptReason = "baseline_changed"
 	ObservationReceiptReasonBusy                ObservationReceiptReason = "busy"
 	ObservationReceiptReasonExpired             ObservationReceiptReason = "expired"
 	ObservationReceiptReasonNoBaseline          ObservationReceiptReason = "no_baseline"
@@ -155,6 +156,8 @@ const (
 func (e ObservationReceiptReason) Valid() bool {
 	switch e {
 	case ObservationReceiptReasonAccepted:
+		return true
+	case ObservationReceiptReasonBaselineChanged:
 		return true
 	case ObservationReceiptReasonBusy:
 		return true
@@ -326,6 +329,91 @@ func (e ObservationRunStatus) Valid() bool {
 	}
 }
 
+// Defines values for PipelineReferenceBuiltin.
+const (
+	Default PipelineReferenceBuiltin = "default"
+)
+
+// Valid indicates whether the value is a known member of the PipelineReferenceBuiltin enum.
+func (e PipelineReferenceBuiltin) Valid() bool {
+	switch e {
+	case Default:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginPipelineChoicesDefaultSource.
+const (
+	PluginPipelineChoicesDefaultSourceEnvironment PluginPipelineChoicesDefaultSource = "environment"
+	PluginPipelineChoicesDefaultSourceNone        PluginPipelineChoicesDefaultSource = "none"
+	PluginPipelineChoicesDefaultSourceProject     PluginPipelineChoicesDefaultSource = "project"
+)
+
+// Valid indicates whether the value is a known member of the PluginPipelineChoicesDefaultSource enum.
+func (e PluginPipelineChoicesDefaultSource) Valid() bool {
+	switch e {
+	case PluginPipelineChoicesDefaultSourceEnvironment:
+		return true
+	case PluginPipelineChoicesDefaultSourceNone:
+		return true
+	case PluginPipelineChoicesDefaultSourceProject:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginPipelineChoicesProtocol.
+const (
+	StellwerkPluginPipelinesv1 PluginPipelineChoicesProtocol = "stellwerk.plugin-pipelines/v1"
+)
+
+// Valid indicates whether the value is a known member of the PluginPipelineChoicesProtocol enum.
+func (e PluginPipelineChoicesProtocol) Valid() bool {
+	switch e {
+	case StellwerkPluginPipelinesv1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PluginPipelineChoicesRollbackDefaultSource.
+const (
+	PluginPipelineChoicesRollbackDefaultSourceEnvironment PluginPipelineChoicesRollbackDefaultSource = "environment"
+	PluginPipelineChoicesRollbackDefaultSourceNone        PluginPipelineChoicesRollbackDefaultSource = "none"
+	PluginPipelineChoicesRollbackDefaultSourceProject     PluginPipelineChoicesRollbackDefaultSource = "project"
+)
+
+// Valid indicates whether the value is a known member of the PluginPipelineChoicesRollbackDefaultSource enum.
+func (e PluginPipelineChoicesRollbackDefaultSource) Valid() bool {
+	switch e {
+	case PluginPipelineChoicesRollbackDefaultSourceEnvironment:
+		return true
+	case PluginPipelineChoicesRollbackDefaultSourceNone:
+		return true
+	case PluginPipelineChoicesRollbackDefaultSourceProject:
+		return true
+	default:
+		return false
+	}
+}
+
+// DeploymentPipelineLifecycle defines model for DeploymentPipelineLifecycle.
+type DeploymentPipelineLifecycle struct {
+	AttentionReason       *string             `json:"attention_reason,omitempty"`
+	Digest                string              `json:"digest"`
+	InfrastructureApplied bool                `json:"infrastructure_applied"`
+	Phase                 string              `json:"phase"`
+	PipelineId            *openapi_types.UUID `json:"pipeline_id,omitempty"`
+	PlanSubject           *string             `json:"plan_subject,omitempty"`
+	Reference             PipelineReference   `json:"reference"`
+	Version               int                 `json:"version"`
+	VersionId             *openapi_types.UUID `json:"version_id,omitempty"`
+}
+
 // ObservationChange defines model for ObservationChange.
 type ObservationChange struct {
 	Actions      []ObservationChangeActions `json:"actions"`
@@ -387,6 +475,13 @@ type ObservationGrantCommand struct {
 // ObservationGrantCommandAction defines model for ObservationGrantCommand.Action.
 type ObservationGrantCommandAction string
 
+// ObservationPipelineChoicesRequest defines model for ObservationPipelineChoicesRequest.
+type ObservationPipelineChoicesRequest struct {
+	EnvId     string                     `json:"env_id"`
+	ProjectId string                     `json:"project_id"`
+	Proof     ObservationDelegationProof `json:"proof"`
+}
+
 // ObservationReceipt defines model for ObservationReceipt.
 type ObservationReceipt struct {
 	BaselineFingerprint *string                       `json:"baseline_fingerprint,omitempty"`
@@ -406,10 +501,13 @@ type ObservationReceiptReason string
 
 // ObservationRedeployReceipt defines model for ObservationRedeployReceipt.
 type ObservationRedeployReceipt struct {
-	BaselineId   openapi_types.UUID               `json:"baseline_id"`
-	DeploymentId openapi_types.UUID               `json:"deployment_id"`
-	RequestId    openapi_types.UUID               `json:"request_id"`
-	Status       ObservationRedeployReceiptStatus `json:"status"`
+	AdmissionClosed              *bool                            `json:"admission_closed,omitempty"`
+	BaselineId                   openapi_types.UUID               `json:"baseline_id"`
+	DeploymentId                 openapi_types.UUID               `json:"deployment_id"`
+	Pipeline                     *DeploymentPipelineLifecycle     `json:"pipeline,omitempty"`
+	RequestId                    openapi_types.UUID               `json:"request_id"`
+	ResultingBaselineFingerprint *string                          `json:"resulting_baseline_fingerprint,omitempty"`
+	Status                       ObservationRedeployReceiptStatus `json:"status"`
 }
 
 // ObservationRedeployReceiptStatus defines model for ObservationRedeployReceipt.Status.
@@ -421,6 +519,7 @@ type ObservationRedeployRequest struct {
 	BaselineId          openapi_types.UUID          `json:"baseline_id"`
 	EnvId               string                      `json:"env_id"`
 	EnvironmentUuid     openapi_types.UUID          `json:"environment_uuid"`
+	Pipeline            *PipelineReference          `json:"pipeline,omitempty"`
 	ProjectId           string                      `json:"project_id"`
 	ProjectUuid         openapi_types.UUID          `json:"project_uuid"`
 	Proof               *ObservationDelegationProof `json:"proof,omitempty"`
@@ -445,15 +544,17 @@ type ObservationRedeployResolveRequest struct {
 
 // ObservationRequest defines model for ObservationRequest.
 type ObservationRequest struct {
-	AdmissionDeadline time.Time          `json:"admission_deadline"`
-	EnvId             string             `json:"env_id"`
-	EnvironmentUuid   openapi_types.UUID `json:"environment_uuid"`
-	GrantId           openapi_types.UUID `json:"grant_id"`
-	GrantRevision     int64              `json:"grant_revision"`
-	Occurrence        time.Time          `json:"occurrence"`
-	ProjectId         string             `json:"project_id"`
-	ProjectUuid       openapi_types.UUID `json:"project_uuid"`
-	RequestId         openapi_types.UUID `json:"request_id"`
+	AdmissionDeadline           time.Time           `json:"admission_deadline"`
+	EnvId                       string              `json:"env_id"`
+	EnvironmentUuid             openapi_types.UUID  `json:"environment_uuid"`
+	ExpectedBaselineFingerprint *string             `json:"expected_baseline_fingerprint,omitempty"`
+	ExpectedBaselineId          *openapi_types.UUID `json:"expected_baseline_id,omitempty"`
+	GrantId                     openapi_types.UUID  `json:"grant_id"`
+	GrantRevision               int64               `json:"grant_revision"`
+	Occurrence                  time.Time           `json:"occurrence"`
+	ProjectId                   string              `json:"project_id"`
+	ProjectUuid                 openapi_types.UUID  `json:"project_uuid"`
+	RequestId                   openapi_types.UUID  `json:"request_id"`
 }
 
 // ObservationResolution defines model for ObservationResolution.
@@ -538,6 +639,54 @@ type ObservationTargetsQuery struct {
 	Production            *bool                      `json:"production,omitempty"`
 	ProjectIds            *[]string                  `json:"project_ids,omitempty"`
 	Proof                 ObservationDelegationProof `json:"proof"`
+
+	// Search Optional literal case-insensitive substring of Project or Environment identifiers and display names, trimmed and limited to 200 UTF-8 bytes. Applied before pagination and bound into the page cursor.
+	Search *string `json:"search,omitempty"`
+}
+
+// PipelineReference defines model for PipelineReference.
+type PipelineReference struct {
+	Builtin   *PipelineReferenceBuiltin `json:"builtin,omitempty"`
+	Digest    string                    `json:"digest"`
+	VersionId *openapi_types.UUID       `json:"version_id,omitempty"`
+}
+
+// PipelineReferenceBuiltin defines model for PipelineReference.Builtin.
+type PipelineReferenceBuiltin string
+
+// PluginPipelineChoice defines model for PluginPipelineChoice.
+type PluginPipelineChoice struct {
+	Deploy     PluginPipelineCompatibility `json:"deploy"`
+	Name       string                      `json:"name"`
+	PipelineId *openapi_types.UUID         `json:"pipeline_id,omitempty"`
+	Reference  PipelineReference           `json:"reference"`
+	Rollback   PluginPipelineCompatibility `json:"rollback"`
+	Version    int                         `json:"version"`
+}
+
+// PluginPipelineChoices defines model for PluginPipelineChoices.
+type PluginPipelineChoices struct {
+	DefaultSource            PluginPipelineChoicesDefaultSource          `json:"default_source"`
+	EffectiveDefault         *PipelineReference                          `json:"effective_default,omitempty"`
+	EffectiveRollbackDefault *PipelineReference                          `json:"effective_rollback_default,omitempty"`
+	Protocol                 PluginPipelineChoicesProtocol               `json:"protocol"`
+	RollbackDefaultSource    *PluginPipelineChoicesRollbackDefaultSource `json:"rollback_default_source,omitempty"`
+	Versions                 []PluginPipelineChoice                      `json:"versions"`
+}
+
+// PluginPipelineChoicesDefaultSource defines model for PluginPipelineChoices.DefaultSource.
+type PluginPipelineChoicesDefaultSource string
+
+// PluginPipelineChoicesProtocol defines model for PluginPipelineChoices.Protocol.
+type PluginPipelineChoicesProtocol string
+
+// PluginPipelineChoicesRollbackDefaultSource defines model for PluginPipelineChoices.RollbackDefaultSource.
+type PluginPipelineChoicesRollbackDefaultSource string
+
+// PluginPipelineCompatibility defines model for PluginPipelineCompatibility.
+type PluginPipelineCompatibility struct {
+	Compatible bool    `json:"compatible"`
+	Reason     *string `json:"reason,omitempty"`
 }
 
 // OrgID defines model for OrgID.
@@ -551,6 +700,9 @@ type userIdHeaderContextKey string
 
 // AuthorizeObservationGrantJSONRequestBody defines body for AuthorizeObservationGrant for application/json ContentType.
 type AuthorizeObservationGrantJSONRequestBody = ObservationGrantCommand
+
+// QueryObservationPipelineChoicesJSONRequestBody defines body for QueryObservationPipelineChoices for application/json ContentType.
+type QueryObservationPipelineChoicesJSONRequestBody = ObservationPipelineChoicesRequest
 
 // ResolveObservationRedeploymentJSONRequestBody defines body for ResolveObservationRedeployment for application/json ContentType.
 type ResolveObservationRedeploymentJSONRequestBody = ObservationRedeployResolveRequest
@@ -575,6 +727,9 @@ type ServerInterface interface {
 
 	// (PUT /orgs/{orgId}/plugins/{pluginId}/observations/v1/grants/{grantId})
 	AuthorizeObservationGrant(ctx echo.Context, orgId OrgID, pluginId PluginID, grantId openapi_types.UUID) error
+
+	// (POST /orgs/{orgId}/plugins/{pluginId}/observations/v1/pipeline-choices)
+	QueryObservationPipelineChoices(ctx echo.Context, orgId OrgID, pluginId PluginID) error
 
 	// (GET /orgs/{orgId}/plugins/{pluginId}/observations/v1/redeployments/{requestId})
 	GetObservationRedeployment(ctx echo.Context, orgId OrgID, pluginId PluginID, requestId openapi_types.UUID) error
@@ -671,6 +826,32 @@ func (w *ServerInterfaceWrapper) AuthorizeObservationGrant(ctx echo.Context) err
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.AuthorizeObservationGrant(ctx, orgId, pluginId, grantId)
+	return err
+}
+
+// QueryObservationPipelineChoices converts echo context to params.
+func (w *ServerInterfaceWrapper) QueryObservationPipelineChoices(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "orgId" -------------
+	var orgId OrgID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "orgId", ctx.Param("orgId"), &orgId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter orgId: %s", err))
+	}
+
+	// ------------- Path parameter "pluginId" -------------
+	var pluginId PluginID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pluginId", ctx.Param("pluginId"), &pluginId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: ctx.Request().URL.RawPath == ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter pluginId: %s", err))
+	}
+
+	ctx.Set(string(UserIdHeaderScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.QueryObservationPipelineChoices(ctx, orgId, pluginId)
 	return err
 }
 
@@ -977,6 +1158,7 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 		Handler: si,
 	}
 
+	router.POST(options.BaseURL+"/orgs/:orgId/plugins/:pluginId/observations/v1/pipeline-choices", wrapper.QueryObservationPipelineChoices, options.OperationMiddlewares["QueryObservationPipelineChoices"]...)
 	router.POST(options.BaseURL+"/orgs/:orgId/plugins/:pluginId/observations/v1/runs", wrapper.TryStartObservation, options.OperationMiddlewares["TryStartObservation"]...)
 	router.GET(options.BaseURL+"/orgs/:orgId/plugins/:pluginId/observations/v1/runs/:runId", wrapper.GetObservation, options.OperationMiddlewares["GetObservation"]...)
 	router.GET(options.BaseURL+"/orgs/:orgId/plugins/:pluginId/observations/v1/requests/:requestId", wrapper.GetObservationRequest, options.OperationMiddlewares["GetObservationRequest"]...)
@@ -1028,6 +1210,30 @@ type AuthorizeObservationGrantResponseObject interface {
 type AuthorizeObservationGrant200JSONResponse ObservationGrant
 
 func (response AuthorizeObservationGrant200JSONResponse) VisitAuthorizeObservationGrantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type QueryObservationPipelineChoicesRequestObject struct {
+	OrgId    OrgID    `json:"orgId"`
+	PluginId PluginID `json:"pluginId"`
+	Body     *QueryObservationPipelineChoicesJSONRequestBody
+}
+
+type QueryObservationPipelineChoicesResponseObject interface {
+	VisitQueryObservationPipelineChoicesResponse(w http.ResponseWriter) error
+}
+
+type QueryObservationPipelineChoices200JSONResponse PluginPipelineChoices
+
+func (response QueryObservationPipelineChoices200JSONResponse) VisitQueryObservationPipelineChoicesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1243,6 +1449,9 @@ type StrictServerInterface interface {
 	// (PUT /orgs/{orgId}/plugins/{pluginId}/observations/v1/grants/{grantId})
 	AuthorizeObservationGrant(ctx context.Context, request AuthorizeObservationGrantRequestObject) (AuthorizeObservationGrantResponseObject, error)
 
+	// (POST /orgs/{orgId}/plugins/{pluginId}/observations/v1/pipeline-choices)
+	QueryObservationPipelineChoices(ctx context.Context, request QueryObservationPipelineChoicesRequestObject) (QueryObservationPipelineChoicesResponseObject, error)
+
 	// (GET /orgs/{orgId}/plugins/{pluginId}/observations/v1/redeployments/{requestId})
 	GetObservationRedeployment(ctx context.Context, request GetObservationRedeploymentRequestObject) (GetObservationRedeploymentResponseObject, error)
 
@@ -1344,6 +1553,48 @@ func (sh *strictHandler) AuthorizeObservationGrant(ctx echo.Context, orgId OrgID
 		return err
 	} else if validResponse, ok := response.(AuthorizeObservationGrantResponseObject); ok {
 		return validResponse.VisitAuthorizeObservationGrantResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// QueryObservationPipelineChoices operation middleware
+func (sh *strictHandler) QueryObservationPipelineChoices(ctx echo.Context, orgId OrgID, pluginId PluginID) error {
+	var request QueryObservationPipelineChoicesRequestObject
+
+	request.OrgId = orgId
+	request.PluginId = pluginId
+
+	var body QueryObservationPipelineChoicesJSONRequestBody
+	var err error
+	if binder, ok := ctx.Echo().Binder.(*echo.DefaultBinder); ok {
+		// Bind only the request body, so that path and query parameters
+		// are not also bound into the body struct.
+		err = binder.BindBody(ctx, &body)
+	} else {
+		// A custom binder is installed on the Echo instance; defer to it
+		// entirely, since echo.Binder does not expose body-only binding.
+		err = ctx.Bind(&body)
+	}
+	if err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.QueryObservationPipelineChoices(ctx.Request().Context(), request.(QueryObservationPipelineChoicesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "QueryObservationPipelineChoices")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(QueryObservationPipelineChoicesResponseObject); ok {
+		return validResponse.VisitQueryObservationPipelineChoicesResponse(ctx.Response())
 	} else if response != nil {
 		return fmt.Errorf("unexpected response type: %T", response)
 	}
@@ -1649,49 +1900,59 @@ func (sh *strictHandler) QueryObservationTargets(ctx echo.Context, orgId OrgID, 
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"7KzofnGg8C4krEWbVxEfbje3m/8GAAD//w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

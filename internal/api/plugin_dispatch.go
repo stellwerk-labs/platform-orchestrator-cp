@@ -149,6 +149,7 @@ func (s *Server) CheckPluginOperationDispatch(ctx context.Context, request Check
 	if err != nil {
 		return nil, pluginModelError(err)
 	}
+	dispatch.Pipeline = recorded.Pipeline
 	if err := s.authorizePluginDispatchApproval(ctx, item, *recorded); err != nil {
 		return nil, err
 	}

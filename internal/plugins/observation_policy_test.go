@@ -3,9 +3,11 @@ package plugins
 import (
 	"crypto/ed25519"
 	"encoding/json"
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/plugincontext"
 	"github.com/stellwerk-labs/platform-orchestrator-iam/shared/userid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
@@ -161,5 +163,41 @@ func TestObservationRecoveryRequiresSeparateCapabilityWithoutChangingOldProtocol
 		request.Body = nil
 		_, _, e = dataPlaneRequestPath(request)
 		require.Error(t, e)
+	}
+}
+
+func TestPluginPipelineProtocolRequiresActualDataPlaneAdvertisement(t *testing.T) {
+	for _, advertised := range []bool{false, true} {
+		t.Run(fmt.Sprint(advertised), func(t *testing.T) {
+			_, key, err := ed25519.GenerateKey(nil)
+			require.NoError(t, err)
+			peer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, "/orgs/acme/plugins/"+testPluginID+"/observations/v1/capabilities", r.URL.Path)
+				protocols := []string{EnvironmentObservationProtocol, EnvironmentObservationRecoveryProtocol}
+				if advertised {
+					protocols = append(protocols, PluginPipelinesProtocol)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(map[string]any{"protocols": protocols})
+			}))
+			defer peer.Close()
+			item := Installation{ID: testPluginID, InstallationID: uuid.NewString(), ManifestSHA256: "pipeline-aware", DisplayName: "Pipeline caller", Version: "1.0.0", Backend: peer.URL, Organizations: map[string]AvailabilityState{"acme": StateAvailable}, RequiredProtocols: []string{PluginPipelinesProtocol}, ServiceUserID: userid.NewServiceUserTokenId().String(), AdmissionCheckerID: userid.NewServiceUserTokenId().String()}
+			permission := "plugin." + item.ID + ".manage"
+			item.Capabilities = []Capability{{ID: permission, DisplayName: "Manage", Description: "Manage pipeline caller", Category: "Pipelines", Level: "manage", Scopes: []string{"organization"}}}
+			item.ServiceGrants = []ServiceGrant{{Action: "observation.capabilities", Permission: permission, Scope: "organization"}}
+			registry, err := NewInstallationRegistry([]Installation{item}, true)
+			require.NoError(t, err)
+			gateway := &Gateway{Registry: registry, SigningKey: key, Issuer: "cp"}
+			port, err := NewDataPlanePort(peer.URL, gateway, true)
+			require.NoError(t, err)
+			registry.Protocols = port
+			descriptor, ok := registry.Get(t.Context(), "acme", item.ID)
+			require.True(t, ok)
+			expected := StateIncompatible
+			if advertised {
+				expected = StateAvailable
+			}
+			require.Equal(t, expected, descriptor.State)
+		})
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"maps"
 	"reflect"
 	"slices"
+	"strings"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -20,11 +21,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+const runnerCapacityField = "max_parallel_jobs"
+
 func (s *Server) tryMakeRunnerConfigurationUpdate(
 	ctx context.Context,
 	orgId,
-	runnerId,
-	existingRunnerType string,
+	runnerId string,
+	existingRunner *model.Runner,
 	patchRequest *RunnerConfigurationUpdate,
 ) (RunnerConfigurationAny, *model.RunnerConfigurationSecret, error) {
 	if patchRequest == nil {
@@ -38,8 +41,15 @@ func (s *Server) tryMakeRunnerConfigurationUpdate(
 	}
 
 	// Verify runner type matches existing
-	if runnerType != existingRunnerType {
-		return nil, nil, errors.Errorf("runner type %s does not match existing runner type %s", runnerType, existingRunnerType)
+	if runnerType != existingRunner.RunnerType {
+		return nil, nil, errors.Errorf("runner type %s does not match existing runner type %s", runnerType, existingRunner.RunnerType)
+	}
+	updated := updateRunnerConfiguration(existingRunner.RunnerConfiguration, patchRunnerCfg)
+	if err := applyRunnerConfigurationClears(updated, patchRequest); err != nil {
+		return nil, nil, err
+	}
+	if err := validateRunnerNativeExecution(updated); err != nil {
+		return nil, nil, err
 	}
 
 	// Purge secrets from configuration
@@ -84,7 +94,7 @@ func applyRunnerConfigurationClears(configuration map[string]interface{}, update
 	if err := json.Unmarshal(update.union, &fields); err != nil {
 		return err
 	}
-	for _, field := range []string{"max_parallel_jobs", "supported_protocols"} {
+	for _, field := range []string{runnerCapacityField, "supported_protocols", "capabilities", "native_execution"} {
 		if raw, present := fields[field]; present && bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
 			delete(configuration, field)
 		}
@@ -104,6 +114,22 @@ type RunnerConfigurationAny interface {
 	GetJobConfiguration() K8sRunnerJobConfig
 	// GetSecretConfiguration returns any secrets that need to be stored in vault for the runner
 	GetSecretConfiguration() map[string]interface{}
+}
+
+func (r *NativeAgentRunnerConfiguration) GetJobConfiguration() K8sRunnerJobConfig {
+	return K8sRunnerJobConfig{}
+}
+
+func (r *NativeAgentRunnerConfigurationUpdateBody) GetJobConfiguration() K8sRunnerJobConfig {
+	return K8sRunnerJobConfig{}
+}
+
+func (r *NativeAgentRunnerConfiguration) GetSecretConfiguration() map[string]interface{} {
+	return nil
+}
+
+func (r *NativeAgentRunnerConfigurationUpdateBody) GetSecretConfiguration() map[string]interface{} {
+	return nil
 }
 
 func getJobConfiguration(runnerCfg RunnerConfigurationAny) K8sRunnerJobConfig {
@@ -253,6 +279,9 @@ type discriminatorConfig interface {
 
 var (
 	createTypeMap = map[string]func(json.RawMessage) (RunnerConfigurationAny, error){
+		string(RunnerTypeNativeAgent): func(union json.RawMessage) (RunnerConfigurationAny, error) {
+			return asTStrictConfiguration[NativeAgentRunnerConfiguration](union)
+		},
 		string(RunnerTypeKubernetesGke): func(union json.RawMessage) (RunnerConfigurationAny, error) {
 			return asTStrictConfiguration[K8sGkeRunnerConfiguration](union)
 		},
@@ -285,6 +314,9 @@ var (
 	}
 
 	updateTypeMap = map[string]func(json.RawMessage) (RunnerConfigurationAny, error){
+		string(RunnerTypeNativeAgent): func(union json.RawMessage) (RunnerConfigurationAny, error) {
+			return asTStrictConfiguration[NativeAgentRunnerConfigurationUpdateBody](union)
+		},
 		string(RunnerTypeKubernetesGke): func(union json.RawMessage) (RunnerConfigurationAny, error) {
 			return asTStrictConfiguration[K8sGkeRunnerConfigurationUpdateBody](union)
 		},
@@ -364,7 +396,7 @@ func checkRunnerConfigurationStrict[T discriminatorConfig](runnerConfiguration T
 		if err := json.Unmarshal(union, &fields); err != nil {
 			return runnerType, nil, err
 		}
-		for _, field := range []string{"max_parallel_jobs", "supported_protocols"} {
+		for _, field := range []string{runnerCapacityField, "supported_protocols", "capabilities", "native_execution"} {
 			if raw, present := fields[field]; present && bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
 				return runnerType, nil, errors.Errorf("%s cannot be null when creating a Runner", field)
 			}
@@ -376,6 +408,7 @@ func checkRunnerConfigurationStrict[T discriminatorConfig](runnerConfiguration T
 	var common struct {
 		MaxParallelJobs    *int     `json:"max_parallel_jobs"`
 		SupportedProtocols []string `json:"supported_protocols"`
+		Capabilities       []string `json:"capabilities"`
 	}
 	if err := json.Unmarshal(union, &common); err != nil {
 		return runnerType, nil, err
@@ -393,6 +426,9 @@ func checkRunnerConfigurationStrict[T discriminatorConfig](runnerConfiguration T
 		}
 		seen[protocol] = true
 	}
+	if err := validateRunnerCapabilities(common.Capabilities); err != nil {
+		return runnerType, nil, err
+	}
 	if parsedConfiguration, err = configParser(union); err != nil {
 		return runnerType, nil, errors.Wrapf(err, "the supplied runner configuration does not match the specified runner type %s", runnerType)
 	}
@@ -401,15 +437,38 @@ func checkRunnerConfigurationStrict[T discriminatorConfig](runnerConfiguration T
 }
 
 func checkCreateBodyRunnerConfigurationStrict(runnerConfiguration RunnerConfiguration) (runnerType string, parsedConfiguration RunnerConfigurationAny, err error) {
-	return checkRunnerConfigurationStrict(runnerConfiguration, createTypeMap)
+	runnerType, parsedConfiguration, err = checkRunnerConfigurationStrict(runnerConfiguration, createTypeMap)
+	if err != nil {
+		return runnerType, nil, err
+	}
+	if native, ok := parsedConfiguration.(*NativeAgentRunnerConfiguration); ok && (native.NativeExecution == nil || native.Capabilities == nil || native.SupportedProtocols == nil) {
+		return runnerType, nil, errors.New("native Runner Create requires inventory, capabilities and supported_protocols")
+	}
+	if err := validateRunnerNativeExecution(parsedConfiguration); err != nil {
+		return runnerType, nil, err
+	}
+	return runnerType, parsedConfiguration, nil
 }
 
 func checkUpdateBodyRunnerConfigurationStrict(runnerConfiguration RunnerConfigurationUpdate) (runnerType string, parsedConfiguration RunnerConfigurationAny, err error) {
+	if kind, _ := runnerConfiguration.Discriminator(); kind == string(RunnerTypeNativeAgent) {
+		var fields map[string]json.RawMessage
+		if err := json.Unmarshal(runnerConfiguration.union, &fields); err != nil {
+			return kind, nil, err
+		}
+		for _, field := range []string{"key", runnerCapacityField} {
+			if raw, present := fields[field]; present && bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+				return kind, nil, errors.Errorf("native Runner %s cannot be cleared", field)
+			}
+		}
+	}
 	return checkRunnerConfigurationStrict(runnerConfiguration, updateTypeMap)
 }
 
 func (s *Server) purgeConfigurationFromSecretsAndStoreSecrets(ctx context.Context, orgId, runnerId, runnerType string, runnerCfg RunnerConfigurationAny) (RunnerConfigurationAny, *model.RunnerConfigurationSecret, error) {
 	switch runnerType {
+	case string(RunnerTypeNativeAgent):
+		return runnerCfg, nil, nil
 	case string(RunnerTypeServerlessEcs):
 		return runnerCfg, nil, nil
 	case string(RunnerTypeKubernetesGke):
@@ -482,4 +541,25 @@ func validatePodTemplate(podTemplate map[string]interface{}) error {
 		}
 		return nil
 	}
+}
+
+func validateRunnerCapabilities(capabilities []string) error {
+	const maxCapabilities = 32
+	const maxCapabilityName = 128
+	if len(capabilities) > maxCapabilities {
+		return errors.New("too many Runner capabilities")
+	}
+	seen := map[string]bool{}
+	for _, capability := range capabilities {
+		if capability == "" || len(capability) > maxCapabilityName || seen[capability] || capability[0] < 'a' || capability[0] > 'z' {
+			return errors.New("capabilities must be bounded unique names")
+		}
+		for _, character := range capability {
+			if !strings.ContainsRune("abcdefghijklmnopqrstuvwxyz0123456789_.:/-", character) {
+				return errors.New("capability names must contain lowercase letters, digits or separators")
+			}
+		}
+		seen[capability] = true
+	}
+	return nil
 }

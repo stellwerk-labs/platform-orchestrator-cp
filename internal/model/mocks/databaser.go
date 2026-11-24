@@ -619,6 +619,21 @@ func (mr *MockDatabaserMockRecorder) GetEnvironmentByUuid(ctx, optionalTx, orgId
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEnvironmentByUuid", reflect.TypeOf((*MockDatabaser)(nil).GetEnvironmentByUuid), ctx, optionalTx, orgId, arg3, mode)
 }
 
+// GetEnvironmentForFinalDeletion mocks base method.
+func (m *MockDatabaser) GetEnvironmentForFinalDeletion(ctx context.Context, tx model.Tx, orgId, projectId, id string) (*model.Environment, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEnvironmentForFinalDeletion", ctx, tx, orgId, projectId, id)
+	ret0, _ := ret[0].(*model.Environment)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetEnvironmentForFinalDeletion indicates an expected call of GetEnvironmentForFinalDeletion.
+func (mr *MockDatabaserMockRecorder) GetEnvironmentForFinalDeletion(ctx, tx, orgId, projectId, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEnvironmentForFinalDeletion", reflect.TypeOf((*MockDatabaser)(nil).GetEnvironmentForFinalDeletion), ctx, tx, orgId, projectId, id)
+}
+
 // GetEnvironmentModuleVersionPin mocks base method.
 func (m *MockDatabaser) GetEnvironmentModuleVersionPin(ctx context.Context, optionalTx model.Tx, orgID string, pinID uuid.UUID, mode model.GetMode) (*model.EnvironmentModuleVersionPin, error) {
 	m.ctrl.T.Helper()
@@ -877,18 +892,18 @@ func (mr *MockDatabaserMockRecorder) GetResourceTypeVersion(ctx, tx, orgID, id, 
 }
 
 // GetRunner mocks base method.
-func (m *MockDatabaser) GetRunner(ctx context.Context, optionalTx model.Tx, orgId, id string) (*model.Runner, error) {
+func (m *MockDatabaser) GetRunner(ctx context.Context, optionalTx model.Tx, orgId, id string, mode model.GetMode) (*model.Runner, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRunner", ctx, optionalTx, orgId, id)
+	ret := m.ctrl.Call(m, "GetRunner", ctx, optionalTx, orgId, id, mode)
 	ret0, _ := ret[0].(*model.Runner)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetRunner indicates an expected call of GetRunner.
-func (mr *MockDatabaserMockRecorder) GetRunner(ctx, optionalTx, orgId, id any) *gomock.Call {
+func (mr *MockDatabaserMockRecorder) GetRunner(ctx, optionalTx, orgId, id, mode any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRunner", reflect.TypeOf((*MockDatabaser)(nil).GetRunner), ctx, optionalTx, orgId, id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRunner", reflect.TypeOf((*MockDatabaser)(nil).GetRunner), ctx, optionalTx, orgId, id, mode)
 }
 
 // GetRunnerRule mocks base method.

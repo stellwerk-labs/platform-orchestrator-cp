@@ -37,6 +37,9 @@ generate:
 	$(GO) tool oapi-codegen --config=shared/genclient/oapi-codegen.cfg.yaml openapi/spec.yaml
 	$(GO) tool oapi-codegen --config=internal/observationapi/oapi-codegen.cfg.yaml openapi/observation.yaml
 	$(GO) tool oapi-codegen --config=shared/observationapi/oapi-codegen.cfg.yaml openapi/observation.yaml
+	$(GO) tool oapi-codegen --config=internal/pipelineapi/oapi-codegen.cfg.yaml openapi/pipelines.yaml
+	$(GO) tool oapi-codegen --config=shared/pipelineapi/oapi-codegen.cfg.yaml openapi/pipelines.yaml
+	$(GO) run ./scripts/generate-pipeline-schema
 	$(GO) tool oapi-codegen --config=shared/genevents/oapi-codegen.cfg.yaml openapi/events.yaml
 	cd shared && $(GO) mod tidy
 
@@ -70,6 +73,7 @@ test-integration-postgres: build
 test-unit:
 	go tool gotestsum --format testname -- -coverprofile=cover.out ./internal/... ./cmd/... ./scripts/gosecurity
 	cd shared && GOWORK=off go test -count=1 ./...
+	GOWORK=off go test -mod=readonly -count=1 github.com/stellwerk-labs/golib/htelemetry -run '^TestStartOTel_DefaultConfig$$'
 
 ## Lint the code
 .PHONY: lint

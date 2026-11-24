@@ -78,6 +78,12 @@ func deploymentAdmissionFromAPI(org string, admission uuid.UUID, body *Deploymen
 	value := model.DeploymentAdmission{
 		OrgID: org, AdmissionID: admission, ProjectUUID: body.ProjectUuid, EnvironmentUUID: body.EnvironmentUuid,
 		ActorID: body.ActorId, RequestDigest: body.RequestDigest, Mode: string(body.Mode), ModuleVersions: body.ModuleVersions,
+		ExternalDispatch:         pipelineJSON[*model.ExternalAdmissionDispatch](body.ExternalDispatch),
+		NativeTarget:             pipelineJSON[*model.NativeExecutionTargetReference](body.NativeTarget),
+		NativeAdmissionWatermark: pipelineJSON[*model.NativeAdmissionWatermark](body.NativeAdmissionWatermark),
+	}
+	if body.Pipeline != nil {
+		value.Pipeline = &model.PipelineAdmissionReference{PipelineID: body.Pipeline.PipelineId, VersionID: body.Pipeline.VersionId, Version: body.Pipeline.Version, Digest: body.Pipeline.Digest}
 	}
 	if body.DraftTestSnapshots != nil {
 		value.DraftTestSnapshots = *body.DraftTestSnapshots
@@ -92,6 +98,7 @@ func deploymentAdmissionFromAPI(org string, admission uuid.UUID, body *Deploymen
 }
 
 func (s *Server) deploymentAdmissionAuthorizationChecks(ctx context.Context, org string, body *DeploymentAdmissionRequest) ([]iamapi.ResourcePermissionCheck, bool, error) {
+	rollback := body.Mode == AdmissionModeRollback || body.Mode == AdmissionModeRollbackPlan
 	checks := []iamapi.ResourcePermissionCheck{environmentCheck(body.EnvironmentUuid, "deployment_write")}
 	carryForward := map[string]uuid.UUID{}
 	if body.CarryForwardModuleVersions != nil {
@@ -101,7 +108,7 @@ func (s *Server) deploymentAdmissionAuthorizationChecks(ctx context.Context, org
 	requiresFreshProposedDecision := false
 	if body.ConfirmedRestrictedVersionUuids != nil && len(*body.ConfirmedRestrictedVersionUuids) > 0 {
 		permission := PermissionModuleVersionPinDefective
-		if body.Mode == AdmissionModeRollback {
+		if rollback {
 			permission = PermissionModuleRollbackRestricted
 		}
 		required[permission] = struct{}{}
@@ -116,7 +123,7 @@ func (s *Server) deploymentAdmissionAuthorizationChecks(ctx context.Context, org
 				if _, err := s.Database.GetModuleDraftTestSnapshot(ctx, nil, org, module, body.EnvironmentUuid, snapshotUUID); err != nil {
 					return nil, false, err
 				}
-				if body.Mode != AdmissionModeRollback && carryForward[module] != snapshotUUID {
+				if !rollback && carryForward[module] != snapshotUUID {
 					if err := s.checkOrgAuthorization(ctx, body.ActorId, org, PermissionModuleVersionPublish); err != nil {
 						return nil, false, err
 					}
@@ -130,7 +137,7 @@ func (s *Server) deploymentAdmissionAuthorizationChecks(ctx context.Context, org
 		}
 		switch version.LifecycleStatus {
 		case moduleversions.LifecycleProposed:
-			if body.Mode != AdmissionModeRollback && carryForward[module] != versionUUID {
+			if !rollback && carryForward[module] != versionUUID {
 				requiresFreshProposedDecision = true
 			}
 		}

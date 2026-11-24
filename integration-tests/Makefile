@@ -57,6 +57,7 @@ test-integration-postgres: compose.yaml test-startup
 	PLUGIN_TEST_DATABASE_URL="$$(score-compose resources get-outputs 'postgres.default#platform-orchestrator-cp.postgres' | \
 	  jq -r '"host=127.0.0.1 port=5432 user=\(.username) password=\(.password) dbname=\(.name) sslmode=disable"')"; \
 	PLUGIN_TEST_DATABASE_URL="$$PLUGIN_TEST_DATABASE_URL" \
+	RUNNER_TEST_VAULT_ADDR=http://127.0.0.1:8200 RUNNER_TEST_VAULT_TOKEN=mytoken \
 	PLUGIN_EVENTS_TEST_NATS_URL=nats://127.0.0.1:14222 \
 	PLUGIN_EVENTS_TEST_DISPOSABLE=1 \
 	go test -tags=integration -count=1 -p 1 -timeout 5m \

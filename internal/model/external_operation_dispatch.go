@@ -10,12 +10,19 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
+	p "github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/pipelineapi"
+)
+
+const (
+	externalDeploymentAdmitAction    = "external-deployment.admit"
+	externalDeploymentRollbackAction = "external-deployment.rollback"
 )
 
 // ExternalDispatch binds one remote effect to an exact, currently authorized
 // grant generation. The digest covers the complete downstream request bytes.
 // Its receipt is not permission to bypass current IAM, enablement or fencing.
 type ExternalDispatch struct {
+	Pipeline        *p.PipelineReference      `json:"pipeline,omitempty"`
 	OrgID           string                    `json:"org_id"`
 	PluginID        string                    `json:"plugin_id"`
 	OperationID     uuid.UUID                 `json:"operation_id"`
@@ -81,7 +88,8 @@ func validateExternalDispatchScope(grant *ExternalOperationGrant, dispatch Exter
 			return NewErrBadRequest("request digest must be lowercase SHA256")
 		}
 	}
-	return nil
+	return validateExternalDispatchPipeline(grant, dispatch)
+
 }
 
 func validateExternalDispatchTargets(grant *ExternalOperationGrant, dispatch ExternalDispatch) error {
@@ -93,7 +101,7 @@ func validateExternalDispatchTargets(grant *ExternalOperationGrant, dispatch Ext
 		if err != nil || module == uuid.Nil || version == uuid.Nil || !slices.Contains(grant.Intent.Modules, module) {
 			return NewErrConflict("dispatch Module is outside the frozen grant")
 		}
-		if dispatch.Action == "external-deployment.admit" && grant.Intent.TargetVersions[moduleRef] != version {
+		if dispatch.Action == externalDeploymentAdmitAction && grant.Intent.TargetVersions[moduleRef] != version {
 			return NewErrConflict("dispatch target differs from the frozen Module Version")
 		}
 	}
@@ -173,7 +181,7 @@ func externalDispatchTransaction(ctx context.Context, db Databaser, dispatch Ext
 	for _, version := range dispatch.TargetVersions {
 		versions = append(versions, version.String())
 	}
-	if dispatch.Action == "external-deployment.admit" || dispatch.Action == "external-deployment.rollback" {
+	if dispatch.Action == externalDeploymentAdmitAction || dispatch.Action == externalDeploymentRollbackAction {
 		if err := checkProviderRetirement(ctx, tx, dispatch.OrgID, versions); err != nil {
 			return err
 		}
@@ -219,8 +227,10 @@ func checkExternalDispatchBarrier(ctx context.Context, tx Tx, org string, enviro
 }
 
 func validateExternalDispatchPins(ctx context.Context, db Databaser, tx Tx, grant *ExternalOperationGrant, dispatch ExternalDispatch) error {
-	if err := validateExternalDispatchTargets(grant, dispatch); err != nil {
-		return err
+	if grant != nil {
+		if err := validateExternalDispatchTargets(grant, dispatch); err != nil {
+			return err
+		}
 	}
 	pins, err := db.ListEnvironmentModuleVersionPins(ctx, tx, dispatch.OrgID, &dispatch.EnvironmentUUID, nil, false)
 	if err != nil {
@@ -270,4 +280,27 @@ func validateExternalDispatchPins(ctx context.Context, db Databaser, tx Tx, gran
 		}
 	}
 	return nil
+}
+
+func validateExternalDispatchPipeline(grant *ExternalOperationGrant, dispatch ExternalDispatch) error {
+	if grant.Intent.ForwardOnly == nil {
+		if dispatch.Pipeline != nil {
+			return NewErrConflict("legacy operation requires a newly prepared pipeline-aware business approval")
+		}
+		return nil
+	}
+	for _, binding := range grant.Intent.Pipelines {
+		if binding.ProjectUUID != dispatch.ProjectUUID || binding.EnvironmentUUID != dispatch.EnvironmentUUID {
+			continue
+		}
+		expected := &binding.Forward
+		if dispatch.Action == externalDeploymentRollbackAction {
+			expected = binding.Rollback
+		}
+		if expected != nil && dispatch.Pipeline != nil && reflect.DeepEqual(expected, dispatch.Pipeline) {
+			return nil
+		}
+		break
+	}
+	return NewErrConflict("pipeline dispatch differs from the frozen operation binding")
 }

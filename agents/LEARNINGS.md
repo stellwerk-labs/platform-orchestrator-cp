@@ -67,3 +67,7 @@ stale status writes must be rejected by that same atomic UPDATE predicate.
 ## 2026-11-13
 
 The material endpoint serves logs and outputs, so authorization must select a permission from material kind before checking IAM. Regenerate the server schema when its OpenAPI description changes; the embedded compressed schema produces a large generated-only diff.
+
+## Native pipeline source export
+
+Keep the released application source and its public SDK contracts aligned; preserve existing compatibility exports.

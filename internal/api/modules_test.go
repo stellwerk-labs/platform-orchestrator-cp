@@ -93,6 +93,8 @@ func TestValidateModuleSource_invalid(t *testing.T) {
 	}
 }
 
+const validationBadRequest = `"error":"HTTP-400","message":"Bad Request"`
+
 func TestDefinitionsValidation_create(t *testing.T) {
 	var inlineTF = `variable "foo" {
   type = string
@@ -115,9 +117,9 @@ output "bar" {
 		{name: "valid with module source code", body: createModuleDef(func(m *ModuleCreateBody) {
 			m.ModuleSource, m.ModuleSourceCode, m.ArtifactDigest = "inline", ref.Ref(inlineTF), nil
 		})},
-		{name: "bad id", body: createModuleDef(func(m *ModuleCreateBody) { m.Id = "BAD Value" }), expectedError: ": module id must be a valid identifier of alphanumerics and hyphens"},
-		{name: "missing resource type", body: createModuleDef(func(m *ModuleCreateBody) { m.ResourceType = "" }), expectedError: `\"/resource_type\": minimum string length is 2"`},
-		{name: "empty module source", body: createModuleDef(func(m *ModuleCreateBody) { m.ModuleSource = "" }), expectedError: `\"/module_source\": minimum string length is 2"`},
+		{name: "bad id", body: createModuleDef(func(m *ModuleCreateBody) { m.Id = "BAD Value" }), expectedError: validationBadRequest},
+		{name: "missing resource type", body: createModuleDef(func(m *ModuleCreateBody) { m.ResourceType = "" }), expectedError: validationBadRequest},
+		{name: "empty module source", body: createModuleDef(func(m *ModuleCreateBody) { m.ModuleSource = "" }), expectedError: validationBadRequest},
 		{name: "both module source and source code defined", body: createModuleDef(func(m *ModuleCreateBody) { m.ModuleSourceCode = ref.Ref(inlineTF) }), expectedError: `module source code must not be defined when module source is not 'inline'`},
 		{name: "bad module source", body: createModuleDef(func(m *ModuleCreateBody) { m.ModuleSource = "£@%£@" }), expectedError: `module source must either be a module registry reference, a git:: repository, or an absolute path available in the runner`},
 		{name: "bad module source code", body: createModuleDef(func(m *ModuleCreateBody) { m.ModuleSource, m.ModuleSourceCode = "inline", ref.Ref("{}") }), expectedError: `module source code must have valid hcl syntax`},
@@ -144,6 +146,7 @@ output "bar" {
 			if tc.expectedError == "" {
 				require.Equal(t, http.StatusInternalServerError, resp.Result().StatusCode, string(b))
 			} else {
+				require.Equal(t, http.StatusBadRequest, resp.Code)
 				require.Contains(t, string(b), tc.expectedError)
 			}
 		})
@@ -199,7 +202,7 @@ func TestDefinitionsValidation_update(t *testing.T) {
 			name:          "missing module source",
 			body:          updateModuleDef(func(m *ModuleUpdateBody) { m.ModuleSource = ref.Ref("a") }),
 			existing:      model.ModuleDefinitionVersion{ModuleSource: "git::https://github.com/stellwerk-labs/old-tf-module"},
-			expectedError: `\"/module_source\": minimum string length is 2"`,
+			expectedError: validationBadRequest,
 		},
 		{
 			name:          "bad module source",
@@ -256,6 +259,7 @@ func TestDefinitionsValidation_update(t *testing.T) {
 			if tc.expectedError == "" {
 				require.Equal(t, http.StatusInternalServerError, resp.Result().StatusCode, string(b))
 			} else {
+				require.Equal(t, http.StatusBadRequest, resp.Code)
 				require.Contains(t, string(b), tc.expectedError)
 			}
 		})

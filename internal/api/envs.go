@@ -78,19 +78,20 @@ func envFromDbModel(e *model.Environment) Environment {
 		deletionPolicy = &EnvironmentDeletionPolicy{Force: *e.DeletionForce, DeleteRules: *e.DeletionDeleteRules}
 	}
 	return Environment{
-		DeletionPolicy: deletionPolicy,
-		Id:             e.Id,
-		ProjectId:      e.ProjectId,
-		ProjectUuid:    ref.Ref(e.ProjectUuid),
-		EnvTypeId:      e.EnvTypeId,
-		Uuid:           e.Uuid,
-		DisplayName:    e.DisplayName,
-		CreatedAt:      e.CreatedAt,
-		UpdatedAt:      e.UpdatedAt,
-		RunnerId:       e.RunnerId.Ref(),
-		Status:         EnvironmentStatus(e.Status),
-		StatusMessage:  e.StatusMessage.Ref(),
-		Labels:         e.Labels,
+		NativeFirstEligible: ref.Ref(e.NativeFirstEligible),
+		DeletionPolicy:      deletionPolicy,
+		Id:                  e.Id,
+		ProjectId:           e.ProjectId,
+		ProjectUuid:         ref.Ref(e.ProjectUuid),
+		EnvTypeId:           e.EnvTypeId,
+		Uuid:                e.Uuid,
+		DisplayName:         e.DisplayName,
+		CreatedAt:           e.CreatedAt,
+		UpdatedAt:           e.UpdatedAt,
+		RunnerId:            e.RunnerId.Ref(),
+		Status:              EnvironmentStatus(e.Status),
+		StatusMessage:       e.StatusMessage.Ref(),
+		Labels:              e.Labels,
 	}
 }
 
@@ -114,7 +115,7 @@ func (s *Server) ListEnvironments(ctx context.Context, request ListEnvironmentsR
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionEnvironmentRead); err != nil {
+	} else if err := s.checkProjectAuthorization(ctx, uid, request.OrgId, request.ProjectId, PermissionEnvironmentRead); err != nil {
 		return nil, err
 	}
 	page, next, err := s.Database.ListEnvironments(
@@ -177,13 +178,21 @@ func (s *Server) createEnvAndMessageInDatabase(
 ) (*model.Environment, []*hstandardoutbox.PendingEventMessage, error) {
 
 	timeNow := time.Now().UTC()
+	runner, err := s.nativeFirstEnvironmentRunner(ctx, tx, proj.OrgId, proj.Id, envType.Id)
+	if err != nil {
+		return nil, nil, err
+	}
+	var runnerID opt.Opt[string]
+	if runner != nil {
+		runnerID = opt.Of(runner.Id)
+	}
 
 	env, err := s.Database.CreateEnvironment(ctx, tx, &model.Environment{
 		OrgId: proj.OrgId, OrgUuid: proj.OrgUuid,
 		ProjectId: proj.Id, ProjectUuid: proj.Uuid,
 		EnvTypeId: envType.Id, EnvTypeUuid: envType.Uuid,
 		Id: envId, DisplayName: displayName, CreatedAt: timeNow, UpdatedAt: timeNow,
-		Status: model.EnvironmentStatusActive, Labels: labels,
+		Status: model.EnvironmentStatusActive, Labels: labels, RunnerId: runnerID, NativeFirstEligible: runner != nil,
 	})
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to create environment")
@@ -366,7 +375,7 @@ func (s *Server) GetEnvironment(ctx context.Context, request GetEnvironmentReque
 	uid, herr := GetAuthenticatedUserIdOr401(ctx)
 	if herr != nil {
 		return nil, herr
-	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionEnvironmentRead); err != nil {
+	} else if err := s.checkEnvAuthorization(ctx, uid, request.OrgId, request.ProjectId, request.EnvId, PermissionEnvironmentRead); err != nil {
 		return nil, err
 	}
 	if out, err := s.Database.GetEnvironment(ctx, nil, request.OrgId, request.ProjectId, request.EnvId, model.GetModeDefault); err != nil {
@@ -495,10 +504,13 @@ func (s *Server) InternalForceDeleteEnvironment(ctx context.Context, request Int
 		}
 	}()
 
-	env, err := s.Database.GetEnvironment(ctx, tx, request.OrgId, request.ProjectId, request.EnvId, model.GetModeForUpdate)
+	env, err := s.Database.GetEnvironmentForFinalDeletion(ctx, tx, request.OrgId, request.ProjectId, request.EnvId)
 	if err != nil {
 		if me, ok := model.IsErrNotFound(err); ok {
 			return InternalForceDeleteEnvironment404JSONResponse{N404NotFoundJSONResponse: Generate404FromModelErr(me)}, nil
+		}
+		if conflict, ok := model.IsErrConflict(err); ok {
+			return InternalForceDeleteEnvironment409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(conflict)}, nil
 		}
 		return nil, err
 	}
@@ -629,7 +641,7 @@ func (s *Server) UpdateRunnerInAnEnvironment(ctx context.Context, request Update
 		}
 	}()
 
-	env, err := s.Database.GetEnvironment(ctx, tx, request.OrgId, request.ProjectId, request.EnvId, model.GetModeForUpdate)
+	env, err := model.GetEnvironmentForRunnerAssignment(ctx, s.Database, tx, request.OrgId, request.ProjectId, request.EnvId)
 	if err != nil {
 		if me, ok := model.IsErrNotFound(err); ok {
 			return UpdateRunnerInAnEnvironment404JSONResponse{N404NotFoundJSONResponse: Generate404FromModelErr(me)}, nil
@@ -644,6 +656,22 @@ func (s *Server) UpdateRunnerInAnEnvironment(ctx context.Context, request Update
 		return UpdateRunnerInAnEnvironment409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(model.NewErrConflict("no matching runner found for the supplied environment"))}, nil
 	}
 	refreshedRunnerId := runners[0].Rule.RunnerId
+	if env.NativeFirstEligible {
+		selected, selectionErr := s.nativeFirstEnvironmentRunner(ctx, tx, request.OrgId, request.ProjectId, env.EnvTypeId)
+		if selectionErr == nil && selected == nil {
+			selectionErr = model.NewErrConflict("Native-first Environment requires a Native Runner; explicit custody handoff is required")
+		}
+		if selectionErr == nil {
+			selectionErr = model.CheckNativeFirstRunnerAssignment(ctx, tx, env, selected)
+		}
+		if selectionErr != nil {
+			if conflict, ok := model.IsErrConflict(selectionErr); ok {
+				return UpdateRunnerInAnEnvironment409JSONResponse{N409ConflictJSONResponse: Generate409FromModelErr(conflict)}, nil
+			}
+			return nil, selectionErr
+		}
+		refreshedRunnerId = selected.Id
+	}
 	if ref.DerefOr(request.Params.DryRun, false) {
 		logger.Info("dry run: returning runner ID without making changes", zap.String("runnerId", refreshedRunnerId))
 		return UpdateRunnerInAnEnvironment200JSONResponse{RunnerId: refreshedRunnerId, Updated: false}, nil

@@ -428,6 +428,9 @@ jobs:
           python3 scripts/release_workflow_test.py
           python3 scripts/release-verification_test.py
 
+      - name: Verify captured Module routing boundaries
+        run: python3 scripts/score_routes_test.py
+
       - name: Checkout the exact semantic-release action
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:

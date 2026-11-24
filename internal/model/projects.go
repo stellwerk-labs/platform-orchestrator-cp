@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -153,6 +154,9 @@ func (d *databaser) UpdatedProject(ctx context.Context, optional Tx, orgId, id s
 func (d *databaser) DeleteProject(ctx context.Context, optionalTx Tx, orgId, id string) error {
 	if res, err := d.txOrDb(optionalTx).ExecContext(ctx, `DELETE FROM projects WHERE org_id = $1 AND id = $2`, orgId, id); err != nil {
 		if pqe := new(pq.Error); errors.As(err, &pqe) {
+			if pqe.Code == "23503" && strings.HasPrefix(pqe.Constraint, "project_pipeline_") {
+				return ErrConflict{Code: "project_pipeline_history_retained", Message: "Project pipeline history must be retained. Physical project deletion requires a supported archival policy."}
+			}
 			if pqe.Constraint == "envs_org_id_project_id_fkey" || pqe.Constraint == "envs_project_uuid_fkey" {
 				return NewErrConflict("project contains environments")
 			}

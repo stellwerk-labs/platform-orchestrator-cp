@@ -170,3 +170,7 @@ remain separate Root-controlled gates. No public mutation by this agent.
 ## 2026-11-13: Managed deployment logs, pending commit
 
 Split material authorization by logs/outputs, refreshed OpenAPI descriptions and embedded schema, and exercised both kinds through existing HTTP boundary coverage, including denied plugin identities and organization fallback. See DECISIONS.md for defaults and deployment ordering.
+
+## Native pipeline source export
+
+Prepared the Native pipeline application source export. Public artifact publication and hosted qualification are separate release steps.

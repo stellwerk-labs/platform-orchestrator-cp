@@ -36,6 +36,7 @@ var (
 var stateStorageCompatibilityMatrix = map[RunnerType][]StateStorageType{
 	RunnerTypeKubernetes:      {StateStorageTypeKubernetes, StateStorageTypeS3, StateStorageTypeGcs, StateStorageTypeAzurerm},
 	RunnerTypeKubernetesAgent: {StateStorageTypeKubernetes, StateStorageTypeS3, StateStorageTypeGcs, StateStorageTypeAzurerm},
+	RunnerTypeNativeAgent:     {StateStorageTypeKubernetes, StateStorageTypeS3, StateStorageTypeGcs, StateStorageTypeAzurerm},
 	RunnerTypeKubernetesEks:   {StateStorageTypeKubernetes, StateStorageTypeS3, StateStorageTypeGcs, StateStorageTypeAzurerm},
 	RunnerTypeKubernetesGke:   {StateStorageTypeKubernetes, StateStorageTypeS3, StateStorageTypeGcs, StateStorageTypeAzurerm},
 	RunnerTypeServerlessEcs:   {StateStorageTypeS3},
@@ -52,6 +53,7 @@ func apiRunnerFromDbRunner(rn model.Runner) Runner {
 
 	stateJson, _ := json.Marshal(rn.StateStorageConfiguration)
 	return Runner{
+		Uuid:                ref.Ref(rn.Uuid),
 		CreatedAt:           rn.CreatedAt,
 		Description:         rn.Description.Ref(),
 		Id:                  rn.Id,
@@ -70,6 +72,7 @@ func apiRunnerSummaryFromDbRunner(rn model.Runner) RunnerSummary {
 	_ = json.Unmarshal(encoded, &configuration)
 	configuration.Type = RunnerType(rn.RunnerType)
 	return RunnerSummary{
+		Uuid:                      ref.Ref(rn.Uuid),
 		CreatedAt:                 rn.CreatedAt,
 		Description:               rn.Description.Ref(),
 		Id:                        rn.Id,
@@ -87,6 +90,7 @@ func internalApiRunnerFromDbRunner(rn model.Runner) InternalRunner {
 
 	stateJson, _ := json.Marshal(rn.StateStorageConfiguration)
 	return InternalRunner{
+		Uuid:                ref.Ref(rn.Uuid),
 		CreatedAt:           rn.CreatedAt,
 		Description:         rn.Description.Ref(),
 		Id:                  rn.Id,
@@ -143,6 +147,9 @@ func (s *Server) CreateRunner(ctx context.Context, request CreateRunnerRequestOb
 	runnerType, runnerCfg, err := checkCreateBodyRunnerConfigurationStrict(request.Body.RunnerConfiguration)
 	if err != nil {
 		return CreateRunner400JSONResponse{Generate400Response(err.Error())}, nil
+	}
+	if runnerType == string(RunnerTypeNativeAgent) && len(request.Body.Id) > 128 {
+		return CreateRunner400JSONResponse{Generate400Response("native Runner ID must not exceed 128 characters")}, nil
 	}
 	runnerCfg, runnerConfigSecretPath, err = s.purgeConfigurationFromSecretsAndStoreSecrets(ctx, request.OrgId, request.Body.Id, runnerType, runnerCfg)
 	if err != nil {
@@ -211,7 +218,7 @@ func (s *Server) GetRunner(ctx context.Context, request GetRunnerRequestObject) 
 	} else if err := s.checkOrgAuthorization(ctx, uid, request.OrgId, PermissionRunnerRead); err != nil {
 		return nil, err
 	}
-	runner, err := s.Database.GetRunner(ctx, nil, request.OrgId, request.RunnerId)
+	runner, err := s.Database.GetRunner(ctx, nil, request.OrgId, request.RunnerId, model.GetModeDefault)
 	if err != nil {
 		if me, ok := model.IsErrNotFound(err); ok {
 			return GetRunner404JSONResponse{N404NotFoundJSONResponse: Generate404FromModelErr(me)}, nil
@@ -224,7 +231,7 @@ func (s *Server) GetRunner(ctx context.Context, request GetRunnerRequestObject) 
 // Get runner in the org with secret configuration as secret path
 // (GET /internal/orgs/{orgId}/runners/{runnerId})
 func (s *Server) GetInternalRunner(ctx context.Context, request GetInternalRunnerRequestObject) (GetInternalRunnerResponseObject, error) {
-	runner, err := s.Database.GetRunner(ctx, nil, request.OrgId, request.RunnerId)
+	runner, err := s.Database.GetRunner(ctx, nil, request.OrgId, request.RunnerId, model.GetModeDefault)
 	if err != nil {
 		if me, ok := model.IsErrNotFound(err); ok {
 			return GetInternalRunner404JSONResponse{N404NotFoundJSONResponse: Generate404FromModelErr(me)}, nil
@@ -254,7 +261,7 @@ func (s *Server) DeleteRunner(ctx context.Context, request DeleteRunnerRequestOb
 			}
 		}()
 		var deleteSecretFromVault bool
-		if r, err := s.Database.GetRunner(ctx, tx, request.OrgId, request.RunnerId); err != nil {
+		if r, err := s.Database.GetRunner(ctx, tx, request.OrgId, request.RunnerId, model.GetModeDefault); err != nil {
 			if me, ok := model.IsErrNotFound(err); ok {
 				return DeleteRunner404JSONResponse{N404NotFoundJSONResponse: Generate404FromModelErr(me)}, nil
 			}
@@ -321,7 +328,7 @@ func (s *Server) UpdateRunner(ctx context.Context, request UpdateRunnerRequestOb
 	}()
 
 	// Get original runner
-	runner, err := s.Database.GetRunner(ctx, tx, request.OrgId, request.RunnerId)
+	runner, err := s.Database.GetRunner(ctx, tx, request.OrgId, request.RunnerId, model.GetModeForUpdate)
 	if err != nil {
 		if me, ok := model.IsErrNotFound(err); ok {
 			return UpdateRunner404JSONResponse{N404NotFoundJSONResponse: Generate404FromModelErr(me)}, nil
@@ -334,7 +341,7 @@ func (s *Server) UpdateRunner(ctx context.Context, request UpdateRunnerRequestOb
 		ctx,
 		request.OrgId,
 		request.RunnerId,
-		runner.RunnerType,
+		runner,
 		request.Body.RunnerConfiguration,
 	)
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
 	"github.com/lib/pq"
@@ -17,6 +18,7 @@ import (
 type Runner struct {
 	OrgId                     string
 	Id                        string
+	Uuid                      uuid.UUID
 	CreatedAt                 time.Time
 	UpdatedAt                 time.Time
 	Description               opt.Opt[string]
@@ -53,7 +55,7 @@ func (d *databaser) ListRunners(ctx context.Context, optionalTx Tx, orgId string
 	if rs, err := d.txOrDb(optionalTx).QueryContext(
 		ctx,
 		`WITH org_check AS (SELECT EXISTS (SELECT 1 FROM orgs WHERE id = $1) AS org_exists)
-		 SELECT org_check.org_exists, r.id, r.created_at, r.updated_at, r.type, r.description, r.configuration, r.state_type, r.state_configuration
+		 SELECT org_check.org_exists, r.id, r.uuid, r.created_at, r.updated_at, r.type, r.description, r.configuration, r.state_type, r.state_configuration
          FROM org_check
 		 LEFT JOIN runners r ON org_check.org_exists AND r.org_id = $1
 		 WHERE id > $2
@@ -71,7 +73,7 @@ func (d *databaser) ListRunners(ctx context.Context, optionalTx Tx, orgId string
 		for rs.Next() {
 			var orgExists bool
 			next := Runner{OrgId: orgId}
-			if err := rs.Scan(&orgExists, &next.Id, &next.CreatedAt, &next.UpdatedAt, &next.RunnerType, opt.Scan(&next.Description), asJson(&next.RunnerConfiguration), &next.StateStorageType, asJson(&next.StateStorageConfiguration)); err != nil {
+			if err := rs.Scan(&orgExists, &next.Id, &next.Uuid, &next.CreatedAt, &next.UpdatedAt, &next.RunnerType, opt.Scan(&next.Description), asJson(&next.RunnerConfiguration), &next.StateStorageType, asJson(&next.StateStorageConfiguration)); err != nil {
 				return nil, "", fmt.Errorf("failed to scan row: %w", err)
 			}
 			if !orgExists {
@@ -90,17 +92,17 @@ func (d *databaser) ListRunners(ctx context.Context, optionalTx Tx, orgId string
 	}
 }
 
-func (d *databaser) GetRunner(ctx context.Context, optionalTx Tx, orgId, id string) (*Runner, error) {
+func (d *databaser) GetRunner(ctx context.Context, optionalTx Tx, orgId, id string, mode GetMode) (*Runner, error) {
 	res := Runner{
 		OrgId: orgId,
 		Id:    id,
 	}
 	if err := d.txOrDb(optionalTx).QueryRowContext(
-		ctx, `SELECT created_at, updated_at, type, description, configuration, config_secret, state_type, state_configuration
+		ctx, `SELECT uuid, created_at, updated_at, type, description, configuration, config_secret, state_type, state_configuration
          FROM runners
-		 WHERE org_id = $1 AND id = $2`,
+		 WHERE org_id = $1 AND id = $2`+GetModeSuffix(mode),
 		orgId, id,
-	).Scan(&res.CreatedAt, &res.UpdatedAt, &res.RunnerType, opt.Scan(&res.Description), asJson(&res.RunnerConfiguration), asJson(&res.RunnerConfigurationSecret), &res.StateStorageType, asJson(&res.StateStorageConfiguration)); err != nil {
+	).Scan(&res.Uuid, &res.CreatedAt, &res.UpdatedAt, &res.RunnerType, opt.Scan(&res.Description), asJson(&res.RunnerConfiguration), asJson(&res.RunnerConfigurationSecret), &res.StateStorageType, asJson(&res.StateStorageConfiguration)); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, NewErrNotFound("runner not found")
 		}
@@ -122,9 +124,9 @@ func (d *databaser) CreateRunner(ctx context.Context, tx Tx, request *Runner) (*
 
 	if err := tx.QueryRowContext(
 		ctx,
-		`INSERT INTO runners (org_id, id, created_at, updated_at, type, description, configuration, config_secret, state_type, state_configuration) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING created_at, updated_at`,
+		`INSERT INTO runners (org_id, id, created_at, updated_at, type, description, configuration, config_secret, state_type, state_configuration) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING uuid, created_at, updated_at`,
 		request.OrgId, request.Id, request.CreatedAt, request.UpdatedAt, request.RunnerType, request.Description, asJson(&request.RunnerConfiguration), runnerSecret, request.StateStorageType, asJson(&request.StateStorageConfiguration),
-	).Scan(&ret.CreatedAt, &ret.UpdatedAt); err != nil {
+	).Scan(&ret.Uuid, &ret.CreatedAt, &ret.UpdatedAt); err != nil {
 		if pqe := new(pq.Error); errors.As(err, &pqe) {
 			if pqe.Constraint == "runners_org_id_fkey" {
 				return nil, NewErrConflict("organization not found")
@@ -142,6 +144,9 @@ func (d *databaser) CreateRunner(ctx context.Context, tx Tx, request *Runner) (*
 func (d *databaser) DeleteRunner(ctx context.Context, optionalTx Tx, orgId, id string) error {
 	if res, err := d.txOrDb(optionalTx).ExecContext(ctx, `DELETE FROM runners WHERE org_id = $1 AND id = $2`, orgId, id); err != nil {
 		if pqe := new(pq.Error); errors.As(err, &pqe) {
+			if pqe.Code == "23514" && pqe.Constraint == "runners_native_retention" {
+				return NewErrConflict("native Runner registrations retain execution authority; clear native_execution to disable new admissions")
+			}
 			if pqe.Constraint == "envs_org_id_runner_id_fkey" {
 				return NewErrConflict("the runner is in use by an environment")
 			}
@@ -179,9 +184,9 @@ func (d *databaser) UpdateRunner(ctx context.Context, optionalTx Tx, orgId, id s
 			      state_configuration = COALESCE($7, state_configuration),
 			      updated_at = $8
 			  WHERE org_id = $1 AND id = $2
-			  RETURNING created_at, updated_at, type, description, configuration, config_secret, state_type, state_configuration`,
+			  RETURNING uuid, created_at, updated_at, type, description, configuration, config_secret, state_type, state_configuration`,
 		orgId, id, request.Description, runnerConf, runnerSecret, request.StateStorageType, stateConf, request.UpdatedAt,
-	).Scan(&ret.CreatedAt, &ret.UpdatedAt, &ret.RunnerType, opt.Scan(&ret.Description), asJson(&ret.RunnerConfiguration), asJson(&ret.RunnerConfigurationSecret), &ret.StateStorageType, asJson(&ret.StateStorageConfiguration)); err != nil {
+	).Scan(&ret.Uuid, &ret.CreatedAt, &ret.UpdatedAt, &ret.RunnerType, opt.Scan(&ret.Description), asJson(&ret.RunnerConfiguration), asJson(&ret.RunnerConfigurationSecret), &ret.StateStorageType, asJson(&ret.StateStorageConfiguration)); err != nil {
 		return nil, errors.Wrap(err, "failed to update runner")
 	} else if ret.RunnerType == "" {
 		return nil, NewErrNotFound("runner not found")

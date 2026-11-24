@@ -43,6 +43,9 @@ func readPrivateRegularFile(path string, maxBytes int64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if fd < 0 {
+		return nil, unix.EBADF
+	}
 	file := os.NewFile(uintptr(fd), path)
 	defer func() { _ = file.Close() }()
 	info, err := file.Stat()

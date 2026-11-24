@@ -404,7 +404,7 @@ func TestInternalForceDeleteEnvironment(t *testing.T) {
 	envUuid := uuid.MustParse("01234567-89ab-cdef-0123-456789abcdef")
 
 	db := s.Database.(*mockmodel.MockDatabaser)
-	db.EXPECT().GetEnvironment(gomock.Any(), gomock.Not(nil), "org-id", "proj-id", "env-id", model.GetModeForUpdate).Return(&model.Environment{
+	db.EXPECT().GetEnvironmentForFinalDeletion(gomock.Any(), gomock.Not(nil), "org-id", "proj-id", "env-id").Return(&model.Environment{
 		Status: model.EnvironmentStatusActive,
 		Uuid:   envUuid,
 	}, nil)
@@ -487,6 +487,8 @@ func TestCreateEnvironment_success(t *testing.T) {
 		OrgId:   "org-id",
 		OrgUuid: orgUuid,
 	}, nil).Times(1)
+
+	db.EXPECT().ListRunnerRules(gomock.Any(), gomock.Not(nil), "org-id", "", getRunnerRulesPaginationSize, gomock.Any()).Return(nil, "", nil).Times(1)
 
 	db.EXPECT().CreateEnvironment(gomock.Any(), gomock.Not(nil), gomock.Any()).DoAndReturn(
 		func(_ context.Context, _ model.Tx, e *model.Environment) (*model.Environment, error) {
@@ -682,6 +684,8 @@ func TestCreateEnvironment_successWithOrgFallback(t *testing.T) {
 		OrgId:   "org-id",
 		OrgUuid: orgUuid,
 	}, nil).Times(1)
+
+	db.EXPECT().ListRunnerRules(gomock.Any(), gomock.Not(nil), "org-id", "", getRunnerRulesPaginationSize, gomock.Any()).Return(nil, "", nil).Times(1)
 
 	db.EXPECT().CreateEnvironment(gomock.Any(), gomock.Not(nil), gomock.Any()).DoAndReturn(
 		func(_ context.Context, _ model.Tx, e *model.Environment) (*model.Environment, error) {

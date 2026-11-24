@@ -133,6 +133,7 @@ type Databaser interface {
 	ListEnvironmentsByRunnerId(ctx context.Context, optionalTx Tx, orgId, runnerId string, pageToken string, perPage int) (items []Environment, nextPageToken string, err error)
 	CreateEnvironment(ctx context.Context, optionalTx Tx, request *Environment) (*Environment, error)
 	GetEnvironment(ctx context.Context, optionalTx Tx, orgId, projectId, id string, mode GetMode) (*Environment, error)
+	GetEnvironmentForFinalDeletion(ctx context.Context, tx Tx, orgId, projectId, id string) (*Environment, error)
 	GetEnvironmentByUuid(ctx context.Context, optionalTx Tx, orgId string, uuid uuid.UUID, mode GetMode) (*Environment, error)
 	DeleteEnvironment(ctx context.Context, optionalTx Tx, orgId, projectId, id string) error
 	UpdateEnvironment(ctx context.Context, optionalTx Tx, orgId, projectId, id string, request *EnvironmentPatch) (*Environment, error)
@@ -208,7 +209,7 @@ type Databaser interface {
 	BulkDeleteModuleRuleDefinitions(ctx context.Context, tx Tx, orgId string, params DeleteModuleRulesParams) ([]string, error)
 
 	ListRunners(ctx context.Context, optionalTx Tx, orgId string, pageToken string, perPage int) (items []Runner, nextPageToken string, err error)
-	GetRunner(ctx context.Context, optionalTx Tx, orgId, id string) (*Runner, error)
+	GetRunner(ctx context.Context, optionalTx Tx, orgId, id string, mode GetMode) (*Runner, error)
 	CreateRunner(ctx context.Context, tx Tx, request *Runner) (*Runner, error)
 	DeleteRunner(ctx context.Context, optionalTx Tx, orgId, id string) error
 	UpdateRunner(ctx context.Context, optionalTx Tx, orgId, id string, request *RunnerPatch) (*Runner, error)

@@ -57,6 +57,7 @@ type OrganizationAdminAuthorizer interface {
 const EnvironmentObservationProtocol = "environment-observation/v1"
 const EnvironmentObservationRecoveryProtocol = "environment-observation-recovery/v1"
 const EnvironmentObservationDeletionProtocol = "environment-observation-deletion/v1"
+const PluginPipelinesProtocol = "plugin-pipelines/v1"
 
 type Gateway struct {
 	OrganizationAdmins OrganizationAdminAuthorizer

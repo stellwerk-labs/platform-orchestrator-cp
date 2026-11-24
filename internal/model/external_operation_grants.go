@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
+	p "github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/pipelineapi"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/plugincontext"
 )
 
@@ -27,7 +28,16 @@ const (
 
 // ExternalOperationIntent is the immutable bound of a delegated workflow, not
 // a copy of the plugin's domain model. Core never interprets plugin statuses.
+type ExternalPipelineBinding struct {
+	ProjectUUID     uuid.UUID            `json:"project_uuid"`
+	EnvironmentUUID uuid.UUID            `json:"environment_uuid"`
+	Forward         p.PipelineReference  `json:"forward"`
+	Rollback        *p.PipelineReference `json:"rollback,omitempty"`
+}
+
 type ExternalOperationIntent struct {
+	ForwardOnly    *bool                          `json:"forward_only,omitempty"`
+	Pipelines      []ExternalPipelineBinding      `json:"pipelines,omitempty"`
 	Fingerprint    string                         `json:"fingerprint"`
 	Modules        []uuid.UUID                    `json:"modules"`
 	TargetVersions map[string]uuid.UUID           `json:"target_versions"`
@@ -104,6 +114,9 @@ func validateExternalIntent(intent ExternalOperationIntent) error {
 			return NewErrBadRequest("environment bounds must be unique immutable identities")
 		}
 		environments[target.EnvironmentID] = true
+	}
+	if err := validateExternalPipelineIntent(intent); err != nil {
+		return err
 	}
 	actions := map[string]bool{}
 	for _, action := range intent.Actions {
@@ -261,6 +274,9 @@ func ApplyExternalGrantCommand(ctx context.Context, db Databaser, command Extern
 				return nil, NewErrBadRequest("environment does not belong to the frozen project")
 			}
 		}
+		if err := validateExternalPipelineReferences(ctx, db, tx, command.OrgID, *command.Intent); err != nil {
+			return nil, err
+		}
 		grant = &ExternalOperationGrant{OrgID: command.OrgID, PluginID: command.PluginID, OperationID: command.OperationID, ActorID: command.ActorID, SourceOperation: command.SourceOperation, Intent: *command.Intent, BaselineDefaults: defaults, Revision: 1, State: grantStatePrepared}
 		intent, _ := json.Marshal(grant.Intent)
 		baseline, _ := json.Marshal(grant.BaselineDefaults)
@@ -313,4 +329,71 @@ func ApplyExternalGrantCommand(ctx context.Context, db Databaser, command Extern
 		return nil, err
 	}
 	return grant, nil
+}
+
+func validateExternalPipelineIntent(intent ExternalOperationIntent) error {
+	if intent.ForwardOnly == nil {
+		if len(intent.Pipelines) > 0 {
+			return NewErrBadRequest("pipeline-aware intent requires explicit forward_only")
+		}
+		return nil
+	}
+	seen := map[uuid.UUID]bool{}
+	for _, binding := range intent.Pipelines {
+		if seen[binding.EnvironmentUUID] || !slices.Contains(intent.Environments, ExternalOperationEnvironment{ProjectID: binding.ProjectUUID, EnvironmentID: binding.EnvironmentUUID}) {
+			return NewErrBadRequest("pipeline binding requires a unique scoped Environment")
+		}
+		seen[binding.EnvironmentUUID] = true
+		if err := validateExternalPipelineBinding(binding, *intent.ForwardOnly); err != nil {
+			return err
+		}
+
+	}
+	return nil
+}
+
+func validateExternalPipelineReferences(ctx context.Context, db Databaser, tx Tx, org string, intent ExternalOperationIntent) error {
+	for _, binding := range intent.Pipelines {
+		project, err := db.GetProjectByUuid(ctx, tx, org, binding.ProjectUUID, GetModeDefault)
+		if err != nil {
+			return err
+		}
+		refs := []p.PipelineReference{binding.Forward}
+		if binding.Rollback != nil {
+			refs = append(refs, *binding.Rollback)
+		}
+		for _, ref := range refs {
+			if err := checkExternalPipelineReference(ctx, tx, project, ref); err != nil {
+				return err
+			}
+		}
+
+	}
+	return nil
+}
+
+func validateExternalPipelineBinding(binding ExternalPipelineBinding, forwardOnly bool) error {
+	if err := p.ValidateReference(binding.Forward); err != nil {
+		return NewErrBadRequest(err.Error())
+	}
+	if binding.Rollback == nil {
+		if forwardOnly {
+			return nil
+		}
+		return NewErrBadRequest("pipeline-aware rollout requires explicit rollback pipeline or reviewed forward-only opt-out")
+	}
+	if err := p.ValidateReference(*binding.Rollback); err != nil {
+		return NewErrBadRequest(err.Error())
+	}
+	return nil
+}
+func checkExternalPipelineReference(ctx context.Context, tx Tx, project *Project, ref p.PipelineReference) error {
+	if ref.Builtin != nil {
+		return CheckPipelineAdmission(ctx, tx, project, nil)
+	}
+	version, err := ReadPublishedPipeline(ctx, tx, project, *ref.VersionId)
+	if err != nil {
+		return err
+	}
+	return CheckPipelineAdmission(ctx, tx, project, &PipelineAdmissionReference{PipelineID: version.PipelineId, VersionID: version.Id, Version: version.Version, Digest: ref.Digest})
 }

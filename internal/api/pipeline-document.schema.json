@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "PipelineRecipe": {
+      "additionalProperties": false,
+      "properties": {
+        "approval": {
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "enum": [
+                "local",
+                "cost_non_increasing"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "mode"
+          ],
+          "type": "object"
+        },
+        "cost": {
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "enabled"
+          ],
+          "type": "object"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/definitions/PipelineRecipeStep"
+          },
+          "maxItems": 16,
+          "type": "array"
+        },
+        "strategy": {
+          "enum": [
+            "apply",
+            "reviewed"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "strategy",
+        "steps"
+      ],
+      "type": "object"
+    },
+    "PipelineRecipeStep": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "type": "string"
+        },
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object"
+        },
+        "phase": {
+          "enum": [
+            "pre_plan",
+            "plan_check",
+            "post_apply"
+          ],
+          "type": "string"
+        },
+        "tool_id": {
+          "enum": [
+            "validate-manifest",
+            "resource-policy",
+            "bootstrap-database",
+            "bootstrap-lost-ack"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "tool_id",
+        "phase",
+        "parameters"
+      ],
+      "type": "object"
+    }
+  },
+  "properties": {
+    "definition": {
+      "$ref": "#/definitions/PipelineRecipe"
+    },
+    "name": {
+      "maxLength": 120,
+      "minLength": 1,
+      "type": "string"
+    },
+    "slug": {
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "slug",
+    "name",
+    "definition"
+  ],
+  "title": "Stellwerk pipeline document",
+  "type": "object"
+}

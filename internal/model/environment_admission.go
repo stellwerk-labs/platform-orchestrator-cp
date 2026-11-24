@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/moduleversions"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/genclient"
 )
 
 const (
@@ -20,6 +21,9 @@ const (
 	admissionStateSettled       = "settled"
 	admissionModeDestroy        = "destroy"
 	deploymentModeRollback      = "rollback"
+	admissionModePlanOnly       = "plan_only"
+	admissionModeRollbackPlan   = "rollback_plan"
+	deploymentModeDeploy        = "deploy"
 	deploymentOutcomeCancelled  = "cancelled"
 	deploymentOutcomeFailed     = "failed"
 	deploymentOutcomeTerminated = "terminated"
@@ -28,18 +32,30 @@ const (
 
 // DeploymentAdmission is a Core protection guard, not a second Deployment.
 // DP owns execution and authenticates through the operator's service binding.
+type ExternalAdmissionDispatch struct {
+	PluginID      string    `json:"plugin_id"`
+	OperationID   uuid.UUID `json:"operation_id"`
+	DispatchID    string    `json:"dispatch_id"`
+	Fence         int64     `json:"fence"`
+	RequestDigest string    `json:"request_digest"`
+}
+
 type DeploymentAdmission struct {
-	OrgID                           string               `json:"org_id"`
-	AdmissionID                     uuid.UUID            `json:"admission_id"`
-	ProjectUUID                     uuid.UUID            `json:"project_uuid"`
-	EnvironmentUUID                 uuid.UUID            `json:"environment_uuid"`
-	ActorID                         uuid.UUID            `json:"actor_id"`
-	RequestDigest                   string               `json:"request_digest"`
-	Mode                            string               `json:"mode"`
-	ModuleVersions                  map[string]uuid.UUID `json:"module_versions"`
-	CarryForwardModuleVersions      map[string]uuid.UUID `json:"carry_forward_module_versions"`
-	ConfirmedRestrictedVersionUUIDs []uuid.UUID          `json:"confirmed_restricted_version_uuids"`
-	DraftTestSnapshots              map[string]uuid.UUID `json:"draft_test_snapshots,omitempty"`
+	ExternalDispatch                *ExternalAdmissionDispatch      `json:"external_dispatch,omitempty"`
+	OrgID                           string                          `json:"org_id"`
+	AdmissionID                     uuid.UUID                       `json:"admission_id"`
+	ProjectUUID                     uuid.UUID                       `json:"project_uuid"`
+	EnvironmentUUID                 uuid.UUID                       `json:"environment_uuid"`
+	ActorID                         uuid.UUID                       `json:"actor_id"`
+	RequestDigest                   string                          `json:"request_digest"`
+	Mode                            string                          `json:"mode"`
+	ModuleVersions                  map[string]uuid.UUID            `json:"module_versions"`
+	CarryForwardModuleVersions      map[string]uuid.UUID            `json:"carry_forward_module_versions"`
+	ConfirmedRestrictedVersionUUIDs []uuid.UUID                     `json:"confirmed_restricted_version_uuids"`
+	DraftTestSnapshots              map[string]uuid.UUID            `json:"draft_test_snapshots,omitempty"`
+	Pipeline                        *PipelineAdmissionReference     `json:"pipeline,omitempty"`
+	NativeTarget                    *NativeExecutionTargetReference `json:"native_target,omitempty"`
+	NativeAdmissionWatermark        *NativeAdmissionWatermark       `json:"native_admission_watermark,omitempty"`
 }
 
 type DeploymentAdmissionReceipt struct {
@@ -103,8 +119,39 @@ func advanceEnvironmentAdmissionEpoch(ctx context.Context, tx Tx, org string, en
 }
 
 func validateDeploymentAdmission(value DeploymentAdmission) error {
+	if value.NativeAdmissionWatermark != nil {
+		if value.NativeTarget == nil || value.NativeAdmissionWatermark.AdmissionID == uuid.Nil || value.NativeAdmissionWatermark.Epoch <= 0 {
+			return NewErrBadRequest("native admission watermark requires exact Native authority, a nonzero admission ID and positive epoch")
+		}
+	}
+	if (value.Mode == admissionModePlanOnly || value.Mode == admissionModeRollbackPlan) && value.NativeTarget == nil {
+		return NewErrBadRequest("standalone Plan admission is supported only for Native execution")
+	}
+	if value.NativeTarget != nil {
+		target := value.NativeTarget
+		if !nativeTargetRunnerID.MatchString(target.RunnerID) || target.RunnerUUID == uuid.Nil ||
+			target.RuntimeVersion != string(genclient.NativeTargetRuntimeV2) || target.PipelineVersion != string(genclient.NativeTargetPipelineV2) ||
+			!genclient.StateStorageType(target.StateBackendType).Valid() ||
+			!nativeTargetDigest.MatchString(target.ToolsDigest) || !nativeTargetDigest.MatchString(target.StateConfigurationDigest) {
+			return NewErrBadRequest("native target requires exact bounded Runner authority, supported profiles and SHA256 identities")
+		}
+	}
+	if value.ExternalDispatch != nil {
+		owner := value.ExternalDispatch
+		digest, err := hex.DecodeString(owner.RequestDigest)
+		if owner.PluginID == "" || len(owner.PluginID) > 255 || owner.OperationID == uuid.Nil || owner.DispatchID == "" || len(owner.DispatchID) > 128 || owner.Fence < 1 || err != nil || len(digest) != 32 || strings.ToLower(owner.RequestDigest) != owner.RequestDigest {
+			return NewErrBadRequest("external admission requires exact bounded dispatch identity and digest")
+		}
+	}
+	if value.Pipeline != nil {
+		ref := value.Pipeline
+		digest, err := hex.DecodeString(ref.Digest)
+		if ref.PipelineID == uuid.Nil || ref.VersionID == uuid.Nil || ref.Version < 1 || err != nil || len(digest) != 32 || strings.ToLower(ref.Digest) != ref.Digest {
+			return NewErrBadRequest("pipeline requires exact immutable IDs, version and SHA256 digest")
+		}
+	}
 	digest, err := hex.DecodeString(value.RequestDigest)
-	if value.OrgID == "" || value.AdmissionID == uuid.Nil || value.ProjectUUID == uuid.Nil || value.EnvironmentUUID == uuid.Nil || value.ActorID == uuid.Nil || err != nil || len(digest) != 32 || strings.ToLower(value.RequestDigest) != value.RequestDigest || !slices.Contains([]string{"deploy", deploymentModeRollback, admissionModeDestroy}, value.Mode) || value.ModuleVersions == nil || len(value.ModuleVersions) > 1000 {
+	if value.OrgID == "" || value.AdmissionID == uuid.Nil || value.ProjectUUID == uuid.Nil || value.EnvironmentUUID == uuid.Nil || value.ActorID == uuid.Nil || err != nil || len(digest) != 32 || strings.ToLower(value.RequestDigest) != value.RequestDigest || !slices.Contains([]string{deploymentModeDeploy, deploymentModeRollback, admissionModeDestroy, admissionModePlanOnly, admissionModeRollbackPlan}, value.Mode) || value.ModuleVersions == nil || len(value.ModuleVersions) > 1000 {
 		return NewErrBadRequest("exact bounded Deployment admission identity and resolved Module Versions are required")
 	}
 	for key, version := range value.ModuleVersions {
@@ -193,6 +240,11 @@ func AuthorizeDeploymentAdmission(ctx context.Context, db Databaser, value Deplo
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
+	if value.ExternalDispatch != nil {
+		if err := lockExternalGrant(ctx, tx, value.OrgID, value.ExternalDispatch.PluginID, value.ExternalDispatch.OperationID); err != nil {
+			return nil, err
+		}
+	}
 	if err := lockExternalDispatchEnvironment(ctx, tx, value.EnvironmentUUID); err != nil {
 		return nil, err
 	}
@@ -218,8 +270,8 @@ func AuthorizeDeploymentAdmission(ctx context.Context, db Databaser, value Deplo
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
-	if !replay {
-		if err := checkExternalDispatchBarrier(ctx, tx, value.OrgID, value.EnvironmentUUID); err != nil {
+	if !replay || value.ExternalDispatch != nil {
+		if err := checkOrdinaryExternalDispatchBarrier(ctx, db, tx, value, replay); err != nil {
 			return nil, err
 		}
 	}
@@ -233,8 +285,13 @@ func AuthorizeDeploymentAdmission(ctx context.Context, db Databaser, value Deplo
 		}
 	}
 
+	project, err := db.GetProjectByUuid(ctx, tx, value.OrgID, value.ProjectUUID, GetModeForUpdate)
+	if err != nil {
+		return nil, err
+	}
+
 	environmentMode := GetModeDefault
-	if value.Mode == admissionModeDestroy {
+	if !replay || value.Mode == admissionModeDestroy {
 		environmentMode = GetModeForUpdate
 	}
 	environment, err := db.GetEnvironmentByUuid(ctx, tx, value.OrgID, value.EnvironmentUUID, environmentMode)
@@ -244,12 +301,38 @@ func AuthorizeDeploymentAdmission(ctx context.Context, db Databaser, value Deplo
 	if environment.ProjectUuid != value.ProjectUUID || value.Mode == admissionModeDestroy && (environment.Status != EnvironmentStatusDeleting || environment.DeletionForce == nil || environment.DeletionDeleteRules == nil || *environment.DeletionForce) {
 		return nil, NewErrConflict("admission requires the exact Environment scope and destroy requires confirmed non-force deletion policy")
 	}
+	if !replay && value.Mode != admissionModeDestroy && environment.Status != EnvironmentStatusActive {
+		return nil, NewErrConflict("fresh deployment admission requires an active Environment")
+	}
+	if !replay {
+		runner, err := checkNativeExecutionTarget(ctx, db, tx, environment, value.NativeTarget)
+		if err != nil {
+			return nil, err
+		}
+		if runner != nil {
+			if err := CheckNativeFirstRunnerAssignment(ctx, tx, environment, runner); err != nil {
+				return nil, err
+			}
+			if err := checkNativeAdmissionHistory(ctx, tx, environment, value); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if value.Pipeline != nil && value.Mode == admissionModeDestroy {
+		return nil, NewErrConflict("published project pipelines do not yet qualify this deployment operation")
+	}
+	if err := CheckPipelineAdmission(ctx, tx, project, value.Pipeline); err != nil {
+		return nil, err
+	}
 	pins, err := db.ListEnvironmentModuleVersionPins(ctx, tx, value.OrgID, &value.EnvironmentUUID, nil, false)
 	if err != nil {
 		return nil, err
 	}
 	for _, pin := range pins {
 		if pin.Status != moduleversions.PinActive && pin.Status != moduleversions.PinOverridePending {
+			continue
+		}
+		if externalAdmissionOwnsPendingPin(value, pin) {
 			continue
 		}
 		if value.Mode == admissionModeDestroy && pin.Status == moduleversions.PinActive {
@@ -261,10 +344,14 @@ func AuthorizeDeploymentAdmission(ctx context.Context, db Databaser, value Deplo
 	}
 	activePins := make(map[string]uuid.UUID)
 	for _, pin := range pins {
+		if externalAdmissionOwnsPendingPin(value, pin) {
+			activePins[pin.ModuleUUID.String()] = *pin.OverrideTargetVersionUUID
+		}
 		if pin.Status == moduleversions.PinActive {
 			activePins[pin.ModuleUUID.String()] = pin.VersionUUID
 		}
 	}
+	rollback := value.Mode == deploymentModeRollback || value.Mode == admissionModeRollbackPlan
 	confirmed := make(map[uuid.UUID]struct{}, len(value.ConfirmedRestrictedVersionUUIDs))
 	for _, version := range value.ConfirmedRestrictedVersionUUIDs {
 		confirmed[version] = struct{}{}
@@ -284,7 +371,7 @@ func AuthorizeDeploymentAdmission(ctx context.Context, db Databaser, value Deplo
 				return nil, NewErrBadRequest("Draft test snapshot Project does not match admission scope")
 			}
 			retained := value.CarryForwardModuleVersions[module] == snapshotUUID
-			if retained || value.Mode == deploymentModeRollback {
+			if retained || rollback {
 				var executed bool
 				err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM deployment_admission_guards
      WHERE org_id=$1 AND environment_uuid=$2 AND outcome='succeeded'
@@ -297,10 +384,10 @@ func AuthorizeDeploymentAdmission(ctx context.Context, db Databaser, value Deplo
 					return nil, ErrConflict{Code: ModuleVersionLifecycle, Message: "retained Draft tests require a successful prior admission in this Environment"}
 				}
 			}
-			if catalogue.Status == moduleversions.CatalogueArchived && !retained && value.Mode != deploymentModeRollback {
+			if catalogue.Status == moduleversions.CatalogueArchived && !retained && !rollback {
 				return nil, ErrConflict{Code: ModuleVersionLifecycle, Message: "archived Modules permit only exact retained test material"}
 			}
-			if !retained && value.Mode != deploymentModeRollback && !policy.AllowFreshDraftTests {
+			if !retained && !rollback && !policy.AllowFreshDraftTests {
 				return nil, ErrConflict{Code: ModuleVersionLifecycle, Message: "fresh Draft tests require current Module authoring authority"}
 			}
 			continue
@@ -309,21 +396,21 @@ func AuthorizeDeploymentAdmission(ctx context.Context, db Databaser, value Deplo
 		if err != nil {
 			return nil, err
 		}
-		if catalogue.Status == moduleversions.CatalogueArchived && value.Mode != deploymentModeRollback && value.CarryForwardModuleVersions[module] != versionUUID {
+		if catalogue.Status == moduleversions.CatalogueArchived && !rollback && value.CarryForwardModuleVersions[module] != versionUUID {
 			return nil, ErrConflict{Code: ModuleVersionLifecycle, Message: "archived Modules permit only exact carry-forward or rollback Versions"}
 		}
 		pinned := activePins[module] == versionUUID
 		switch version.LifecycleStatus {
 		case moduleversions.LifecycleProposed:
-			if !pinned && value.Mode != deploymentModeRollback && value.CarryForwardModuleVersions[module] != versionUUID && !policy.AllowFreshProposed {
+			if !pinned && !rollback && value.CarryForwardModuleVersions[module] != versionUUID && !policy.AllowFreshProposed {
 				return nil, ErrConflict{Code: ModuleVersionLifecycle, Message: "fresh Proposed Module Versions require current scoped authority"}
 			}
 		case moduleversions.LifecycleDeprecated:
-			if !pinned && value.Mode != deploymentModeRollback {
+			if !pinned && !rollback {
 				return nil, ErrConflict{Code: ModuleVersionLifecycle, Message: "Deprecated Module Versions require an active Pin or rollback"}
 			}
 		case moduleversions.LifecycleDefective:
-			if _, ok := confirmed[versionUUID]; !ok || !pinned && value.Mode != deploymentModeRollback {
+			if _, ok := confirmed[versionUUID]; !ok || !pinned && !rollback {
 				return nil, ErrConflict{Code: ModuleVersionLifecycle, Message: "Defective Module Versions require exact confirmation and an active Pin or rollback"}
 			}
 			delete(confirmed, versionUUID)

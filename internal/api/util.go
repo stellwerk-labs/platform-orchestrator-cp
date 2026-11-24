@@ -15,6 +15,7 @@ import (
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/api/middleware"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
+	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/ref"
 )
 
 func Generate400Response(message string) N400BadRequestJSONResponse {
@@ -153,9 +154,11 @@ func (s *Server) innerCheck(ctx context.Context, userId uuid.UUID, orgId string,
 	}); err != nil {
 		return errors.Wrap(err, "failed to check authorization")
 	} else if r.StatusCode() == http.StatusForbidden {
+		refusal := ref.DerefOr(r.JSON403, orchestratoriam.N403Forbidden{})
 		return &herrors.PlatformOrchestratorError{
 			StatusCode: http.StatusForbidden,
-			Details:    *r.JSON403.Details,
+			Message:    "Forbidden",
+			Details:    ref.DerefOr(refusal.Details, nil),
 		}
 	} else if r.StatusCode() != http.StatusNoContent {
 		return errors.Errorf("unexpected status code when checking authorization: %s: %s", r.Status(), string(r.Body))

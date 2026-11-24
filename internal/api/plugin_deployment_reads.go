@@ -46,6 +46,11 @@ func (s *Server) ReadPluginDeploymentData(ctx context.Context, request ReadPlugi
 		if body.ModuleVersions != nil || body.DeploymentId != nil || body.DispatchId != nil {
 			return nil, pluginBoundaryError(400, "plugin_request_invalid", "Readiness accepts only Environment references.")
 		}
+	case PluginDeploymentReadRequestKindPipelineChoices:
+		action = "external-deployment.plan"
+		if len(body.Environments) != 1 || body.ModuleVersions != nil || body.DeploymentId != nil || body.DispatchId != nil || body.Pipeline != nil || body.RollbackPipeline != nil || body.ForwardOnly != nil {
+			return nil, pluginBoundaryError(400, "plugin_request_invalid", "Pipeline choices require one Environment only.")
+		}
 	case PluginDeploymentReadRequestKindPlan:
 		action = "external-deployment.plan"
 		if len(body.Environments) != 1 || body.ModuleVersions == nil || len(*body.ModuleVersions) == 0 || len(*body.ModuleVersions) > 1000 || body.DeploymentId != nil || body.DispatchId != nil {
@@ -99,6 +104,35 @@ func (s *Server) ReadPluginDeploymentData(ctx context.Context, request ReadPlugi
 		if err := model.ValidateExternalOperationRead(grant, *body.GrantFence, action, bounds, nil); err != nil {
 			return nil, pluginModelError(err)
 		}
+	}
+	if body.Kind == PluginDeploymentReadRequestKindPipelineChoices {
+		choices, err := s.readPluginPipelineChoices(ctx, request.OrgId, environments[0])
+		if err != nil {
+			return nil, err
+		}
+		encoded, err := json.Marshal(choices)
+		return ReadPluginDeploymentData200JSONResponse{Status: 200, Body: encoded}, err
+	}
+	if body.Kind == PluginDeploymentReadRequestKindPlan && grant != nil && grant.Intent.ForwardOnly != nil {
+		frozen, e := operationPipelineBindings(grant, environments[0])
+		if e != nil {
+			return nil, e
+		}
+		if body.ForwardOnly != nil && *body.ForwardOnly != frozen.ForwardOnly || body.Pipeline != nil && !equalPipelineReference(*body.Pipeline, frozen.Forward) || body.RollbackPipeline != nil && (frozen.Rollback == nil || !equalPipelineReference(*body.RollbackPipeline, *frozen.Rollback)) {
+			return nil, pluginBoundaryError(409, "pipeline_binding_changed", "Replanning must retain the operation's approved pipeline bindings.")
+		}
+		body.Pipeline = &frozen.Forward
+		body.RollbackPipeline = frozen.Rollback
+		body.ForwardOnly = &frozen.ForwardOnly
+	}
+	var pipelineBindings *DeploymentPipelineBindings
+	if body.Kind == PluginDeploymentReadRequestKindPlan && body.ForwardOnly != nil {
+		pipelineBindings, err = s.resolvePluginPipelineBindings(ctx, request.OrgId, environments[0], body.Pipeline, body.RollbackPipeline, *body.ForwardOnly, body.UseRollbackDefault)
+		if err != nil {
+			return nil, err
+		}
+	} else if body.Pipeline != nil || body.RollbackPipeline != nil || (body.Kind == PluginDeploymentReadRequestKindPlan && body.UseRollbackDefault) {
+		return nil, pluginBoundaryError(400, "plugin_request_invalid", "Pipeline preparation requires explicit forward_only.")
 	}
 	downstream := plugins.DataPlaneRequest{OrgID: request.OrgId, PluginID: request.PluginId, ActorID: actor, Action: action}
 	switch body.Kind {
@@ -154,6 +188,20 @@ func (s *Server) ReadPluginDeploymentData(ctx context.Context, request ReadPlugi
 	result, err := s.PluginDataPlane.Call(ctx, downstream)
 	if err != nil {
 		return nil, pluginGatewayError(err)
+	}
+	if pipelineBindings != nil && result.Status == 200 {
+		var planned map[string]json.RawMessage
+		if err = json.Unmarshal(result.Body, &planned); err != nil {
+			return nil, invalidPluginDeploymentReceipt()
+		}
+		planned["pipelines"], err = json.Marshal(pipelineBindings)
+		if err != nil {
+			return nil, err
+		}
+		result.Body, err = json.Marshal(planned)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return ReadPluginDeploymentData200JSONResponse{Status: result.Status, Body: result.Body}, nil
 }

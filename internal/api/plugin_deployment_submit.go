@@ -15,6 +15,7 @@ import (
 
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/model"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/internal/plugins"
+	pipelineapi "github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/pipelineapi"
 	"github.com/stellwerk-labs/platform-orchestrator-cp/shared/v3/plugincontext"
 )
 
@@ -48,6 +49,9 @@ func (s *Server) SubmitPluginDeployment(ctx context.Context, request SubmitPlugi
 	if upstream != nil {
 		return SubmitPluginDeployment200JSONResponse{Status: upstream.Status, Body: upstream.Body, EntitlementWarning: warning}, nil
 	}
+	if err := s.checkPluginPipelineForNewDispatch(ctx, request.OrgId, item.ID, grant.OperationID, environment, *body); err != nil {
+		return nil, err
+	}
 	if err := s.authorizePluginDispatchApproval(ctx, item, dispatch); err != nil {
 		return nil, err
 	}
@@ -72,7 +76,7 @@ func pluginDeploymentSubmitAction(body PluginDeploymentSubmitRequest) string {
 // uses the current grant fence separately and never rewrites this identity.
 func (s *Server) pluginDeploymentIntent(ctx context.Context, org string, item plugins.Installation, grant *model.ExternalOperationGrant, environment pluginDeploymentEnvironment, body PluginDeploymentSubmitRequest, retained *model.ExternalDispatch, withdraw bool) (model.ExternalDispatch, []byte, *plugins.InvocationResult, error) {
 	empty := model.ExternalDispatch{}
-	admission := dpapi.ExternalDeploymentAdmissionBody{OperationRef: grant.OperationID, Fence: body.GrantFence, ProjectId: environment.ProjectID, EnvId: environment.EnvironmentID, ProjectUuid: environment.ProjectUUID, EnvironmentUuid: environment.EnvironmentUUID, Mode: dpapi.ExternalDeploymentAdmissionBodyMode(body.Mode), FirstForwardDeploymentId: body.FirstForwardDeploymentId}
+	admission := dpapi.ExternalDeploymentAdmissionBody{OperationRef: grant.OperationID, Fence: body.GrantFence, ProjectId: environment.ProjectID, EnvId: environment.EnvironmentID, ProjectUuid: environment.ProjectUUID, EnvironmentUuid: environment.EnvironmentUUID, Mode: dpapi.ExternalDeploymentAdmissionBodyMode(body.Mode), FirstForwardDeploymentId: body.FirstForwardDeploymentId, Pipeline: pipelineJSON[*dpapi.PipelineReference](body.Pipeline)}
 	targets := map[string]uuid.UUID{}
 	if body.Plan != nil {
 		admission.Plan = &dpapi.ExternalDeploymentAdmissionPlan{SnapshotId: body.Plan.SnapshotId, Fingerprint: body.Plan.Fingerprint, ExpectedModuleVersions: body.Plan.ModuleVersions}
@@ -122,7 +126,7 @@ func (s *Server) pluginDeploymentIntent(ctx context.Context, org string, item pl
 	if err != nil {
 		return empty, nil, nil, err
 	}
-	dispatch := model.ExternalDispatch{OrgID: org, PluginID: item.ID, OperationID: grant.OperationID, Fence: body.GrantFence, ActorID: grant.ActorID, Action: pluginDeploymentSubmitAction(body), DispatchID: body.RequestId, ProjectUUID: environment.ProjectUUID, EnvironmentUUID: environment.EnvironmentUUID, RequestDigest: plugincontext.Digest(encoded), TargetVersions: targets}
+	dispatch := model.ExternalDispatch{OrgID: org, PluginID: item.ID, OperationID: grant.OperationID, Fence: body.GrantFence, ActorID: grant.ActorID, Action: pluginDeploymentSubmitAction(body), DispatchID: body.RequestId, ProjectUUID: environment.ProjectUUID, EnvironmentUUID: environment.EnvironmentUUID, RequestDigest: plugincontext.Digest(encoded), TargetVersions: targets, Pipeline: pipelineJSON[*pipelineapi.PipelineReference](body.Pipeline)}
 	if retained != nil {
 		// Safety activation can rotate the current operator. Recovery retains
 		// the recorded effect's original actor; IAM checks the current operator.
@@ -253,7 +257,7 @@ func (s *Server) authorizePluginDispatchApproval(ctx context.Context, item plugi
 		return pluginBoundaryError(403, "plugin_approval_invalid", "The installation's enablement for this organization does not declare this approval scope.")
 	}
 	check := environmentCheck(dispatch.EnvironmentUUID, permission)
-	if dispatch.Approval.Scope == "project" {
+	if dispatch.Approval.Scope == string(PluginDeploymentApprovalScopeProject) {
 		check = projectCheck(dispatch.ProjectUUID, permission)
 	}
 	allowed, err := s.pluginAuthorizationDecision(ctx, dispatch.Approval.ActorID, []orchestratoriam.ResourcePermissionCheck{check})

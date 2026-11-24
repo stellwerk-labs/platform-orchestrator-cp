@@ -140,7 +140,7 @@ func TestValidateAndPrepareRunnerConfigurationPatch(t *testing.T) {
 			context.Background(),
 			"test-org",
 			"test-runner",
-			"serverless-ecs",
+			&model.Runner{RunnerType: "serverless-ecs"},
 			patchRequest,
 		)
 
@@ -239,5 +239,40 @@ func TestRunnerCommonFieldsPreserveOmissionAndSupportExplicitNull(t *testing.T) 
 			require.Equal(t, 2, *summary.RunnerConfiguration.MaxParallelJobs)
 			require.Equal(t, []string{"environment-observation/v1"}, *summary.RunnerConfiguration.SupportedProtocols)
 		})
+	}
+}
+
+func TestRunnerCapabilitiesAreTypedPreservedAndExplicitlyCleared(t *testing.T) {
+	for _, runnerType := range []string{"kubernetes", "kubernetes-gke", "kubernetes-eks", "kubernetes-agent", "serverless-ecs"} {
+		t.Run(runnerType, func(t *testing.T) {
+			var update RunnerConfigurationUpdate
+			require.NoError(t, json.Unmarshal([]byte(`{"type":"`+runnerType+`","capabilities":["pipeline.recipe.v1","database.local"]}`), &update))
+			_, parsed, err := checkUpdateBodyRunnerConfigurationStrict(update)
+			require.NoError(t, err)
+			configured := updateRunnerConfiguration(map[string]any{"type": runnerType}, parsed)
+			require.Equal(t, []any{"pipeline.recipe.v1", "database.local"}, configured["capabilities"])
+			summary := apiRunnerSummaryFromDbRunner(model.Runner{RunnerType: runnerType, RunnerConfiguration: configured})
+			require.NotNil(t, summary.RunnerConfiguration.Capabilities)
+			require.Equal(t, []string{"pipeline.recipe.v1", "database.local"}, *summary.RunnerConfiguration.Capabilities)
+			require.NoError(t, json.Unmarshal([]byte(`{"type":"`+runnerType+`"}`), &update))
+			_, parsed, err = checkUpdateBodyRunnerConfigurationStrict(update)
+			require.NoError(t, err)
+			unchanged := updateRunnerConfiguration(configured, parsed)
+			require.NoError(t, applyRunnerConfigurationClears(unchanged, &update))
+			require.Contains(t, unchanged, "capabilities")
+			require.NoError(t, json.Unmarshal([]byte(`{"type":"`+runnerType+`","capabilities":null}`), &update))
+			_, parsed, err = checkUpdateBodyRunnerConfigurationStrict(update)
+			require.NoError(t, err)
+			cleared := updateRunnerConfiguration(configured, parsed)
+			require.NoError(t, applyRunnerConfigurationClears(cleared, &update))
+			require.NotContains(t, cleared, "capabilities")
+			require.Contains(t, configured, "capabilities")
+		})
+	}
+	for _, raw := range []string{`{"type":"kubernetes-agent","capabilities":["local.exec","local.exec"]}`, `{"type":"kubernetes-agent","capabilities":["api_key=secret"]}`, `{"type":"kubernetes-agent","capabilities":null}`} {
+		var configuration RunnerConfiguration
+		require.NoError(t, json.Unmarshal([]byte(raw), &configuration))
+		_, _, err := checkCreateBodyRunnerConfigurationStrict(configuration)
+		require.Error(t, err)
 	}
 }

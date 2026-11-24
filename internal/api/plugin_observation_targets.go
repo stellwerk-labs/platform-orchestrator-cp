@@ -37,6 +37,9 @@ func (s *Server) QueryObservationTargets(ctx context.Context, request observatio
 		return nil, pluginGatewayError(err)
 	}
 	selector := model.ObservationTargetSelector{ProjectIDs: body.ProjectIds, EnvironmentTypes: body.EnvironmentTypes, Production: body.Production, EnvironmentIDs: body.EnvironmentIds}
+	if body.Search != nil {
+		selector.Search = *body.Search
+	}
 	if body.ExcludeEnvironmentIds != nil {
 		selector.ExcludeEnvironmentIDs = *body.ExcludeEnvironmentIds
 	}

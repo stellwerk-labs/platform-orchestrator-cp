@@ -247,7 +247,7 @@ func (p *DataPlanePort) do(ctx context.Context, request DataPlaneRequest) (*http
 // avoid adding a round trip to every discovery/proof check. A missing/old or
 // incomplete DP never advertises the complete optional Core contract.
 func (p *DataPlanePort) SupportsProtocol(ctx context.Context, org string, item Installation, protocol string) bool {
-	if p == nil || protocol != EnvironmentObservationProtocol && protocol != EnvironmentObservationRecoveryProtocol && protocol != EnvironmentObservationDeletionProtocol {
+	if p == nil || protocol != EnvironmentObservationProtocol && protocol != EnvironmentObservationRecoveryProtocol && protocol != EnvironmentObservationDeletionProtocol && protocol != PluginPipelinesProtocol {
 		return false
 	}
 	identity, err := uuid.Parse(item.ServiceUserID)

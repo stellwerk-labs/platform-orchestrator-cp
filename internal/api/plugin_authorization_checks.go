@@ -181,12 +181,12 @@ func resourcesWithinGrant(resources []pluginAuthorizationResource, intent model.
 		switch resource.scope {
 		case "organization":
 			continue
-		case "project":
+		case string(PluginAuthorizationCheckRequestResourcesTypeProject):
 			id, err := uuid.Parse(resource.id)
 			if err != nil || !projects[id] {
 				return false
 			}
-		case "environment":
+		case string(PluginAuthorizationCheckRequestResourcesTypeEnvironment):
 			id, err := uuid.Parse(resource.id)
 			if err != nil || environments[id] != resource.projectID {
 				return false
