@@ -60,7 +60,7 @@ test-integration-postgres: compose.yaml test-startup
 	RUNNER_TEST_VAULT_ADDR=http://127.0.0.1:8200 RUNNER_TEST_VAULT_TOKEN=mytoken \
 	PLUGIN_EVENTS_TEST_NATS_URL=nats://127.0.0.1:14222 \
 	PLUGIN_EVENTS_TEST_DISPOSABLE=1 \
-	go test -tags=integration -count=1 -p 1 -timeout 5m \
+	go test -tags=integration -count=1 -p 1 -timeout 10m \
 	  ../internal/model/... ../internal/api/... ../internal/pluginmanager/... ../cmd/plugin-entitlement-dev/... ../internal/events/...
 
 .PHONY: clean

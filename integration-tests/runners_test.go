@@ -99,6 +99,10 @@ func TestRunners(t *testing.T) {
 			StateStorageConfiguration: *getKubernetesStateStorageConfiguration(t),
 		})
 		if assert.NoError(t, err) && assert.Equal(t, http.StatusCreated, res.StatusCode(), string(res.Body)) {
+			require.NotNil(t, res.JSON201)
+			require.NotNil(t, res.JSON201.Uuid)
+			require.NoError(t, uuid.Validate(res.JSON201.Uuid.String()))
+			require.NotEqual(t, uuid.Nil, *res.JSON201.Uuid)
 			createdRunner = *res.JSON201
 
 			expectedRunnerCfg := new(genclient.RunnerConfiguration)
@@ -149,6 +153,7 @@ func TestRunners(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, res.JSON201.RunnerConfiguration.FromK8sGkeRunnerConfiguration(actualGkeRunnerCfg))
 			assert.Equal(t, genclient.Runner{
+				Uuid:                      createdRunner.Uuid,
 				OrgId:                     orgId,
 				Id:                        "my-gke-runner",
 				RunnerConfiguration:       *expectedRunnerCfg,
@@ -202,6 +207,7 @@ func TestRunners(t *testing.T) {
 			item.CreatedAt = time.Time{}
 			item.UpdatedAt = time.Time{}
 			assert.Equal(t, genclient.RunnerSummary{
+				Uuid:        createdRunner.Uuid,
 				OrgId:       orgId,
 				Id:          createdRunner.Id,
 				Description: createdRunner.Description,
@@ -266,6 +272,7 @@ func TestRunners(t *testing.T) {
 			RunnerConfiguration:       updCfg,
 		})
 		if assert.NoError(t, err) && assert.Equal(t, http.StatusOK, res.StatusCode(), string(res.Body)) {
+			require.Equal(t, createdRunner.Uuid, res.JSON200.Uuid)
 			updatedRunner = *res.JSON200
 			assert.NotEmpty(t, updatedRunner.UpdatedAt)
 			assert.Equal(t, descriptionUpd, updatedRunner.Description)
@@ -332,6 +339,7 @@ func TestRunners(t *testing.T) {
 			RunnerConfiguration: cfg,
 		})
 		if assert.NoError(t, err) && assert.Equal(t, http.StatusOK, res.StatusCode(), string(res.Body)) {
+			require.Equal(t, createdRunner.Uuid, res.JSON200.Uuid)
 			updatedRunner = *res.JSON200
 			assert.NotEmpty(t, updatedRunner.UpdatedAt)
 			assert.Equal(t, ref.Ref("GKE runner UPD"), updatedRunner.Description)
@@ -390,6 +398,7 @@ func TestRunners(t *testing.T) {
 			item.CreatedAt = time.Time{}
 			item.UpdatedAt = time.Time{}
 			assert.Equal(t, &genclient.Runner{
+				Uuid:                      createdRunner.Uuid,
 				OrgId:                     orgId,
 				Id:                        updatedRunner.Id,
 				Description:               updatedRunner.Description,
@@ -416,6 +425,7 @@ func TestRunners(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, item.RunnerConfiguration.FromK8sGkeRunnerConfiguration(actualItemRunnerCfg))
 			assert.Equal(t, &genclient.InternalRunner{
+				Uuid:                      createdRunner.Uuid,
 				OrgId:                     orgId,
 				Id:                        updatedRunner.Id,
 				Description:               updatedRunner.Description,
@@ -427,6 +437,7 @@ func TestRunners(t *testing.T) {
 		}
 	})
 
+	var k8sRunnerUUID uuid.UUID
 	t.Run("create runner - k8s", func(t *testing.T) {
 		cfg := new(genclient.RunnerConfiguration)
 		require.NoError(t, cfg.FromK8sRunnerConfiguration(genclient.K8sRunnerConfiguration{
@@ -453,6 +464,12 @@ func TestRunners(t *testing.T) {
 		})
 
 		if assert.NoError(t, err) && assert.Equal(t, http.StatusCreated, res.StatusCode()) {
+			require.NotNil(t, res.JSON201)
+			require.NotNil(t, res.JSON201.Uuid)
+			require.NoError(t, uuid.Validate(res.JSON201.Uuid.String()))
+			require.NotEqual(t, uuid.Nil, *res.JSON201.Uuid)
+			k8sRunnerUUID = *res.JSON201.Uuid
+			require.NotEqual(t, *createdRunner.Uuid, k8sRunnerUUID)
 			actualRunnerCfg, err := res.JSON201.RunnerConfiguration.AsK8sRunnerConfiguration()
 			require.NoError(t, err)
 			assert.Equal(t, genclient.K8sRunnerConfiguration{
@@ -502,6 +519,7 @@ func TestRunners(t *testing.T) {
 			require.NoError(t, k8sRunner.RunnerConfiguration.FromK8sRunnerConfiguration(actualRunnerCfg))
 			require.NoError(t, stateCfg.FromK8sStorageConfiguration(genclient.K8sStorageConfiguration{Namespace: "platform-orchestrator-state-namespace"}))
 			assert.Equal(t, genclient.Runner{
+				Uuid:                      ref.Ref(k8sRunnerUUID),
 				Description:               ref.Ref("Vanilla runner"),
 				RunnerConfiguration:       *expectedCfg,
 				StateStorageConfiguration: *stateCfg,
@@ -521,6 +539,7 @@ func TestRunners(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, res.JSON200.RunnerConfiguration.FromK8sRunnerConfiguration(actualRunnerCfg))
 			assert.Equal(t, &genclient.InternalRunner{
+				Uuid:                      ref.Ref(k8sRunnerUUID),
 				Description:               k8sRunner.Description,
 				RunnerConfiguration:       k8sRunner.RunnerConfiguration,
 				StateStorageConfiguration: k8sRunner.StateStorageConfiguration,
@@ -597,6 +616,7 @@ func TestRunners(t *testing.T) {
 			RunnerConfiguration: cfg,
 		})
 		if assert.NoError(t, err) && assert.Equal(t, http.StatusOK, res.StatusCode(), string(res.Body)) {
+			require.Equal(t, ref.Ref(k8sRunnerUUID), res.JSON200.Uuid)
 			k8sRunner = *res.JSON200
 			actualRunnerCfg, err := k8sRunner.RunnerConfiguration.AsK8sRunnerConfiguration()
 			require.NoError(t, err)
@@ -619,6 +639,7 @@ func TestRunners(t *testing.T) {
 		res, err := internalClient.GetInternalRunnerWithResponse(t.Context(), orgId, k8sRunnerId)
 		if assert.NoError(t, err) && assert.Equal(t, http.StatusOK, res.StatusCode()) {
 			assert.Equal(t, &genclient.InternalRunner{
+				Uuid:                      ref.Ref(k8sRunnerUUID),
 				Description:               k8sRunner.Description,
 				RunnerConfiguration:       k8sRunner.RunnerConfiguration,
 				StateStorageConfiguration: k8sRunner.StateStorageConfiguration,
@@ -902,7 +923,7 @@ func TestRunners(t *testing.T) {
 		})
 		if assert.NoError(t, err) {
 			assert.Equal(t, http.StatusBadRequest, res.StatusCode(), string(res.Body))
-			assert.Contains(t, res.JSON400.Message, "maximum string length is 200")
+			assert.JSONEq(t, `{"error":"HTTP-400","message":"Bad Request"}`, string(res.Body))
 		}
 	})
 
@@ -1240,7 +1261,7 @@ func TestRunners(t *testing.T) {
 				StateStorageConfiguration: *invalidSsc,
 			})
 			if assert.NoError(t, err) && assert.Equal(t, http.StatusBadRequest, res.StatusCode(), string(res.Body)) {
-				assert.Contains(t, res.JSON400.Message, "state storage path_prefix is not a valid AzureRM path.")
+				assert.JSONEq(t, `{"error":"HTTP-400","message":"Bad Request"}`, string(res.Body))
 			}
 		})
 

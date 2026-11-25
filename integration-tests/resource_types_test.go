@@ -2,7 +2,6 @@ package integrationtests
 
 import (
 	"net/http"
-	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -89,31 +88,31 @@ func TestResourceTypesCrud(t *testing.T) {
 	})
 
 	t.Run("can't create built-in type with invalid inputs", func(t *testing.T) {
-		for i, test := range []struct {
-			body        genclient.CreateResourceTypeJSONRequestBody
-			expectedErr string
+		for _, test := range []struct {
+			body genclient.CreateResourceTypeJSONRequestBody
+			name string
 		}{
 			{
-				body:        genclient.CreateResourceTypeJSONRequestBody{Id: "s3"},
-				expectedErr: `"/output_schema": Value is not nullable`,
+				body: genclient.CreateResourceTypeJSONRequestBody{Id: "s3"},
+				name: "missing output schema",
 			},
 			{
-				body:        genclient.CreateResourceTypeJSONRequestBody{OutputSchema: map[string]interface{}{}},
-				expectedErr: "id must be a valid resource type identifier",
+				body: genclient.CreateResourceTypeJSONRequestBody{OutputSchema: map[string]interface{}{}},
+				name: "missing resource type identifier",
 			},
 			{
-				body:        genclient.CreateResourceTypeJSONRequestBody{Id: "prefix/s3", OutputSchema: map[string]interface{}{}},
-				expectedErr: "id must be a valid resource type identifier",
+				body: genclient.CreateResourceTypeJSONRequestBody{Id: "prefix/s3", OutputSchema: map[string]interface{}{}},
+				name: "invalid resource type identifier",
 			},
 			{
-				body:        genclient.CreateResourceTypeJSONRequestBody{Id: "prefix/s3", Description: ref.Ref("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas in elit arcu. In semper in diam eu commodo. Proin accumsan pharetra libero non maximus. Suspendisse porta ut purus ut imperdiet. Suspendisse elementum lorem nec odio tempus consectetur."), OutputSchema: map[string]interface{}{}},
-				expectedErr: "maximum string length is 200",
+				body: genclient.CreateResourceTypeJSONRequestBody{Id: "prefix/s3", Description: ref.Ref("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas in elit arcu. In semper in diam eu commodo. Proin accumsan pharetra libero non maximus. Suspendisse porta ut purus ut imperdiet. Suspendisse elementum lorem nec odio tempus consectetur."), OutputSchema: map[string]interface{}{}},
+				name: "description exceeds maximum length",
 			},
 		} {
-			t.Run(strconv.Itoa(i), func(t *testing.T) {
+			t.Run(test.name, func(t *testing.T) {
 				res, err := internalClient.InternalCreateResourceTypeWithResponse(t.Context(), test.body)
 				if assert.NoError(t, err) && assert.Equal(t, http.StatusBadRequest, res.StatusCode()) {
-					assert.Contains(t, res.JSON400.Message, test.expectedErr)
+					assert.JSONEq(t, `{"error":"HTTP-400","message":"Bad Request"}`, string(res.Body))
 				}
 			})
 		}
@@ -208,27 +207,27 @@ func TestResourceTypesCrud(t *testing.T) {
 	})
 
 	t.Run("can't create a new type with invalid input", func(t *testing.T) {
-		for i, test := range []struct {
-			body        genclient.CreateResourceTypeJSONRequestBody
-			expectedErr string
+		for _, test := range []struct {
+			body genclient.CreateResourceTypeJSONRequestBody
+			name string
 		}{
 			{
-				body:        genclient.CreateResourceTypeJSONRequestBody{Id: "s3"},
-				expectedErr: `"/output_schema": Value is not nullable`,
+				body: genclient.CreateResourceTypeJSONRequestBody{Id: "s3"},
+				name: "missing output schema",
 			},
 			{
-				body:        genclient.CreateResourceTypeJSONRequestBody{Id: "prefix/s3", OutputSchema: map[string]interface{}{}},
-				expectedErr: "id must be a valid resource type identifier",
+				body: genclient.CreateResourceTypeJSONRequestBody{Id: "prefix/s3", OutputSchema: map[string]interface{}{}},
+				name: "invalid resource type identifier",
 			},
 			{
-				body:        genclient.CreateResourceTypeJSONRequestBody{Id: "s3", Description: ref.Ref("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas in elit arcu. In semper in diam eu commodo. Proin accumsan pharetra libero non maximus. Suspendisse porta ut purus ut imperdiet. Suspendisse elementum lorem nec odio tempus consectetur."), OutputSchema: map[string]interface{}{}},
-				expectedErr: "maximum string length is 200",
+				body: genclient.CreateResourceTypeJSONRequestBody{Id: "s3", Description: ref.Ref("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas in elit arcu. In semper in diam eu commodo. Proin accumsan pharetra libero non maximus. Suspendisse porta ut purus ut imperdiet. Suspendisse elementum lorem nec odio tempus consectetur."), OutputSchema: map[string]interface{}{}},
+				name: "description exceeds maximum length",
 			},
 		} {
-			t.Run(strconv.Itoa(i), func(t *testing.T) {
+			t.Run(test.name, func(t *testing.T) {
 				res, err := client.CreateResourceTypeWithResponse(t.Context(), orgId, test.body)
 				if assert.NoError(t, err) && assert.Equal(t, http.StatusBadRequest, res.StatusCode()) {
-					assert.Contains(t, res.JSON400.Message, test.expectedErr)
+					assert.JSONEq(t, `{"error":"HTTP-400","message":"Bad Request"}`, string(res.Body))
 				}
 			})
 		}

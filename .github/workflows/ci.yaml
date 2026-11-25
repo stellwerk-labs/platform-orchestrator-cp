@@ -550,7 +550,7 @@ jobs:
     needs: [candidate-preflight, verification-preflight]
     if: ${{ !cancelled() && (github.event_name != 'workflow_dispatch' || (!inputs.tests_only && needs.candidate-preflight.result == 'success') || (inputs.tests_only && needs.verification-preflight.result == 'success')) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       IAM_IMAGE: ${{ vars.CORE_IAM_INTEGRATION_IMAGE }}
       DP_IMAGE: ${{ vars.CORE_DP_INTEGRATION_IMAGE }}

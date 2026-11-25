@@ -182,3 +182,20 @@ runtime, schema, dependency or version changes. Focused documentation checks cov
 text, links, file hashes and applicable generator templates; the full functional
 suite was not rerun because the qualified application code is unchanged.
 See DECISIONS.md and LEARNINGS.md for scope and documentation maintenance guidance.
+
+## 2026-11-25: HTTP integration security and identity contracts
+
+Aligned 3 HTTP integration test files with the existing validation-privacy and
+Runner-identity contracts. Invalid request fixtures and status assertions remain;
+schema failures require exact safe JSON, and create/read/list/update projections
+retain checked nonzero server UUIDs. No runtime, schema, dependency or workflow
+change. Focused verification and normal hosted qualification remain distinct.
+See DECISIONS.md and LEARNINGS.md for the test-maintenance rule.
+
+### PostgreSQL package execution budget
+
+The 3 focused HTTP groups passed all 106 checks. The complete integration-tag
+API package passed 267 top-level tests with its 2 existing optional-peer skips;
+execution completed in 271.732 seconds. Applied only the reviewed package and
+CI budget literals after the isolated fixture was removed. No product, schema,
+handler or dependency change; normal hosted release qualification still applies.

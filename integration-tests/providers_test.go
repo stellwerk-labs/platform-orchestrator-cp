@@ -54,16 +54,16 @@ func TestModuleProvidersCrud(t *testing.T) {
 			body        genclient.CreateModuleProviderJSONRequestBody
 			expectedErr string
 		}{
-			{expectedErr: "id must be a valid OpenTofu identifier"},
-			{body: genclient.CreateModuleProviderJSONRequestBody{Id: "my-default-123"}, expectedErr: "provider_type must be a valid OpenTofu identifier"},
-			{body: genclient.CreateModuleProviderJSONRequestBody{ProviderType: "my-type", Id: "my-default-123"}, expectedErr: "source must match (hostname/)namespace/type"},
+			{expectedErr: http.StatusText(http.StatusBadRequest)},
+			{body: genclient.CreateModuleProviderJSONRequestBody{Id: "my-default-123"}, expectedErr: http.StatusText(http.StatusBadRequest)},
+			{body: genclient.CreateModuleProviderJSONRequestBody{ProviderType: "my-type", Id: "my-default-123"}, expectedErr: http.StatusText(http.StatusBadRequest)},
 			{body: genclient.CreateModuleProviderJSONRequestBody{
 				ProviderType: "my-type", Id: "my-default-123", Source: "registry.terraform.io/hashicorp/aws",
-			}, expectedErr: "version_constraint must be a valid provider version constraint"},
+			}, expectedErr: http.StatusText(http.StatusBadRequest)},
 			{body: genclient.CreateModuleProviderJSONRequestBody{
 				ProviderType: "my-type", Id: "my-default-123", Source: "registry.terraform.io/hashicorp/aws", VersionConstraint: "~> 5.0",
 				Description: ref.Ref(strings.Repeat("a", 1000)),
-			}, expectedErr: "maximum string length is 200"},
+			}, expectedErr: http.StatusText(http.StatusBadRequest)},
 			{body: genclient.CreateModuleProviderJSONRequestBody{
 				ProviderType: "my-type", Id: "my-default-123", Source: "registry.terraform.io/hashicorp/aws", VersionConstraint: "~> 5.0",
 				Configuration: map[string]interface{}{"a": ref.Ref(strings.Repeat("a", 15*1024+1))},
@@ -80,7 +80,11 @@ func TestModuleProvidersCrud(t *testing.T) {
 			t.Run(strconv.Itoa(i), func(t *testing.T) {
 				res, err := client.CreateModuleProviderWithResponse(t.Context(), orgId, tc.body)
 				if assert.NoError(t, err) && assert.Equal(t, http.StatusBadRequest, res.StatusCode()) {
-					assert.Contains(t, res.JSON400.Message, tc.expectedErr)
+					if tc.expectedErr == http.StatusText(http.StatusBadRequest) {
+						assert.JSONEq(t, `{"error":"HTTP-400","message":"Bad Request"}`, string(res.Body))
+					} else {
+						assert.Contains(t, res.JSON400.Message, tc.expectedErr)
+					}
 				}
 			})
 		}

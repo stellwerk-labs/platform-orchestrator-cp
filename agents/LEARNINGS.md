@@ -78,3 +78,15 @@ Put availability guidance at feature entry points and keep operational limits ex
 Customer guidance must avoid internal experiment history and private environment details.
 For generated documentation, preserve notices in the source templates while retaining
 dynamic schemas, examples and imports.
+
+## 2026-11-25: HTTP integration security and identity contracts
+
+Public HTTP integration tests must track deliberate shared security policies
+and additive response identities. Preserve detailed business-error checks and
+full structural comparisons; do not ignore fields or expose validator internals.
+
+### PostgreSQL package execution budget
+
+An aggregate package deadline can expire while the current test remains healthy.
+Compare completed-test progress and remaining package time before changing
+application timing; measure the unfiltered suite against a real database.

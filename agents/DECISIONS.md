@@ -65,3 +65,15 @@ Mark Deployment Pipelines as an RC feature, separate from the current stable rel
 Preserve direct Apply as the built-in default; publishing a recipe alone changes no default.
 This documentation correction changes no runtime, schema, dependency or RC version
 and does not invalidate the existing functional qualification.
+
+## 2026-11-25: HTTP integration security and identity contracts
+
+Keep the value-free public schema-validation envelope and server-issued Runner
+UUID authority. Integration expectations verify the exact safe JSON response and
+checked stable registration identity without changing application behavior.
+
+### PostgreSQL package execution budget
+
+Keep package-level PostgreSQL integration budgets separate from individual
+operation deadlines. Extend the package and surrounding CI envelopes to cover
+the measured full suite; preserve all per-test and runtime limits.
