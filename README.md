@@ -4,6 +4,20 @@ The control-plane service for the Stellwerk Platform Orchestrator. It manages
 organization configuration, including projects, environments, module
 definitions, rules, and providers.
 
+## Deployment Pipelines availability (RC)
+
+Deployment Pipelines are an RC feature in [v4.2.0-rc.1](docs/releases/v4.2.0-rc.1.md),
+part of the coordinated Pipeline release candidate. The current stable release
+from `main` does not include Pipelines. Use the matching RC services and clients
+when following Pipeline documentation.
+
+Upgrading alone does not activate Native execution or change existing deployment
+behavior. On an explicitly enabled Pipeline installation, the built-in **Apply**
+default runs Apply directly, with no additional Plan, approval, pre-deployment or
+post-deployment steps. Planning remains an explicit action or part of a selected
+recipe. Publishing a recipe alone does not change any default; an authorized
+operator must select it or update deployment-use policy.
+
 ## Development
 
 Requirements:
