@@ -90,3 +90,8 @@ full structural comparisons; do not ignore fields or expose validator internals.
 An aggregate package deadline can expire while the current test remains healthy.
 Compare completed-test progress and remaining package time before changing
 application timing; measure the unfiltered suite against a real database.
+
+
+## 2026-11-25: Forward pipeline release candidate
+
+A public candidate identity is immutable even if a source gate fails before artifact publication. Correct test contracts in a forward candidate while keeping the earlier tag and its evidence.

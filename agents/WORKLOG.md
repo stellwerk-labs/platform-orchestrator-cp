@@ -199,3 +199,8 @@ API package passed 267 top-level tests with its 2 existing optional-peer skips;
 execution completed in 271.732 seconds. Applied only the reviewed package and
 CI budget literals after the isolated fixture was removed. No product, schema,
 handler or dependency change; normal hosted release qualification still applies.
+
+
+## 2026-11-25: Forward pipeline release candidate
+
+Prepared the rc2 README entry and release note after the reviewed, signed test-only correction. The earlier rc1 note and product runtime remain unchanged. Normal hosted qualification and original-public artifact verification are required before the candidate is installable.

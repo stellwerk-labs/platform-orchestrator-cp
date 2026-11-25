@@ -77,3 +77,8 @@ checked stable registration identity without changing application behavior.
 Keep package-level PostgreSQL integration budgets separate from individual
 operation deadlines. Extend the package and surrounding CI envelopes to cover
 the measured full suite; preserve all per-test and runtime limits.
+
+
+## 2026-11-25: Forward pipeline release candidate
+
+Preserve the previously published candidate tag and note. Advance this candidate to rc2 after the narrowly scoped integration-test correction; the application runtime is unchanged. Documentation availability corrections do not invalidate product qualification.

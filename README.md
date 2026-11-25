@@ -6,7 +6,7 @@ definitions, rules, and providers.
 
 ## Deployment Pipelines availability (RC)
 
-Deployment Pipelines are an RC feature in [v4.2.0-rc.1](docs/releases/v4.2.0-rc.1.md),
+Deployment Pipelines are an RC feature in [v4.2.0-rc.2](docs/releases/v4.2.0-rc.2.md),
 part of the coordinated Pipeline release candidate. The current stable release
 from `main` does not include Pipelines. Use the matching RC services and clients
 when following Pipeline documentation.
