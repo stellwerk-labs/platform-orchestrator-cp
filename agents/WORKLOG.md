@@ -170,3 +170,7 @@ remain separate Root-controlled gates. No public mutation by this agent.
 ## 2026-11-13: Managed deployment logs, pending commit
 
 Split material authorization by logs/outputs, refreshed OpenAPI descriptions and embedded schema, and exercised both kinds through existing HTTP boundary coverage, including denied plugin identities and organization fallback. See DECISIONS.md for defaults and deployment ordering.
+
+## 2026-11-26: Ride out GHCR read-after-write lag in the publisher
+
+`oras cp --no-tty` reads every manifest it has just pushed back from the destination to print its status, and GHCR answered that read with 404 for about a second, which cost Data Plane v4.5.0-rc.3 its candidate (Core publishes through the same script). `scripts/publish-oci-layout.sh` repeats the content-addressed copy only for that exact error (at most 6 attempts, 10 s apart, each under a 300 s timeout) and then requires the tag to resolve to the inspected digest. Other failures stop at once. A loopback registry test with the pinned ORAS reproduces the lag, a wrong digest and a denied push; the pinned ORAS now joins the unit job's release tools.
