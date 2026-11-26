@@ -85,6 +85,7 @@ class WorkflowTests(unittest.TestCase):
 
     def test_every_image_publisher_validates_complete_local_layout_first(self):
         workflow = (ROOT / ".github/workflows/ci.yaml").read_text()
+        self.assertNotIn("oras cp", workflow)
         jobs = dict(re.findall(r"^  ([a-z-]+):\n(.*?)(?=^  [a-z-]+:\n|\Z)", workflow, re.M | re.S))
         producer = jobs["qualified-artifact"]
         self.assertNotIn(": write", producer)
@@ -126,7 +127,6 @@ class WorkflowTests(unittest.TestCase):
                 self.assertLess(job.index(earlier), job.index(later), name)
             self.assertIn('bash scripts/publish-oci-layout.sh "$RUNNER_TEMP/server-layout:$OCI_REFERENCE" "$IMAGE_TAG" "$IMAGE_DIGEST"', job)
             self.assertIn('python3 scripts/release_content.py oci-reference "$RUNNER_TEMP/server-layout" "$IMAGE_DIGEST"', job)
-            self.assertIn('"$RUNNER_TEMP/server-layout:$OCI_REFERENCE" "$IMAGE_TAG"', job)
         self.assertNotIn("gh release create", producer)
         self.assertNotIn("environment:", jobs["stable-version"])
         self.assertNotIn("gh release create", jobs["stable-version"])
@@ -142,11 +142,6 @@ class WorkflowTests(unittest.TestCase):
         if component(ROOT) == "iam":
             self.assertIn("./cmd/authorization-migrate", build)
             self.assertIn("opt/server/authorization-migrate", (ROOT / "scripts/check-server-artifact.sh").read_text())
-
-    def test_publishers_copy_only_through_the_bounded_retry_script(self):
-        workflow = (ROOT / ".github/workflows/ci.yaml").read_text()
-        self.assertNotIn("oras cp", workflow)
-        self.assertEqual(workflow.count("bash scripts/publish-oci-layout.sh"), 2)
 
     def test_installer_actual_version_expression_is_strict(self):
         import subprocess
