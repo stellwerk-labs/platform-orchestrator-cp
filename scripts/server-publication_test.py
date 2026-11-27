@@ -420,14 +420,14 @@ class PublicationTests(unittest.TestCase):
         jobs = dict(re.findall(r"^  ([a-z-]+):\n(.*?)(?=^  [a-z-]+:\n|\Z)", workflow, re.M | re.S))
         publishers = 0
         for name, job in jobs.items():
-            if "oras cp --no-tty --from-oci-layout" not in job:
+            if "bash scripts/publish-oci-layout.sh" not in job:
                 self.assertNotIn("id-token: write", job)
                 continue
             publishers += 1
             self.assertIn("id-token: write", job)
             self.assertNotIn("BUILDKIT_CACHE_MOUNT_NS=", job)
-            self.assertLess(job.index("server-publication.py verify"), job.index("oras cp --no-tty"))
-            self.assertLess(job.index("oras cp --no-tty"), job.index("bash scripts/authenticate-server-artifact.sh"))
+            self.assertLess(job.index("server-publication.py verify"), job.index("bash scripts/publish-oci-layout.sh"))
+            self.assertLess(job.index("bash scripts/publish-oci-layout.sh"), job.index("bash scripts/authenticate-server-artifact.sh"))
             self.assertIn("server-verification-evidence-", job)
             if name in ("release", "candidate-release"):
                 self.assertLess(job.index("authenticate-server-artifact.sh"), job.index("gh release edit"))

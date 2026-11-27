@@ -54,3 +54,7 @@ force deletion retains its legacy fallback. No DP policy table or plugin change.
 ## 2026-11-13: Plaintext deployment log privilege
 
 Plugin-owned Deployment logs require `deployment_logs_read`; outputs retain `deployment_read`. Both use the exact environment resource and independently held organization fallback for retained history after environment removal. Plugin service and admission-checker identities remain denied before IAM. IAM must ship the new exact-grant-only permission first; canonical Admin (`manage_all`) retains access, Viewer/Deployer require an explicit delegated role. No plugin capability or operation grant substitutes for Core permission.
+
+## 2026-11-26: Retry only the demonstrated registry lag
+
+Retry the image copy only when ORAS reports `Error response from registry: sha256:<digest>: not found`, the read-after-write lag that failed Data Plane v4.5.0-rc.3. ORAS already retries 408, 429 and 5xx; authentication, layout and digest failures are deterministic and must stop the publisher. The copy is content-addressed and only points the tag at the inspected root, so a repeat cannot publish other bytes, and a failed attempt may already have written that correct tag; absence is checked once before publishing, never between attempts.
